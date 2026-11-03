@@ -115,7 +115,9 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 ## Features
 
 - **EV integration or virtual EV:** without a car in Home Assistant you enter the
-  battery level yourself when the cable is plugged in
+  battery level yourself when the cable is plugged in. For a car integration that updates the battery level
+  slowly, it can be [simulated from the charger's meter](docs/cookbook.md#car-integration-that-updates-slowly)
+  while charging
 - **Solar and Solcast (optional):** surplus now and forecast ahead, from
   [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and/or own history
 - **Home battery (optional):** charge the home battery to a certain level first, and charge the car from
@@ -304,7 +306,7 @@ The settings from the dashboard are entities that are kept across restarts:
 | Type | Examples |
 |---|---|
 | `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast |
-| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV |
+| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV / simulated battery level |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
 | `select` | forecast type |

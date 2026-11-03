@@ -201,6 +201,13 @@ private agent memory). Update or remove a note when it stops being true.
   kWh is worth fixed price − the hour's raw sell price, can be negative. Use
   `sell_value()` (`engine/pricing.py`); keep price data and DBs raw.
 - "No charging mode active" charges at max by design (fallback).
+- Battery level simulation (`simulate_battery_level_while_charging`, EV page):
+  user choices: it uses the virtual EV's `number.<prefix>_battery_level` (other
+  name/help via `EV_TEXT_KEYS`), counts the charger's kWh meter regardless of
+  the charging mode, resets on a new car value or `last_update_entity_id` time,
+  stays 1 % under the charge limit, a value the user enters is simulated from,
+  and plug-in sends a "does it match the car?" notification. Planning/control
+  use `battery_level()`; history and measurements use `battery_level(real=True)`.
 
 ### Load balancing (site)
 
@@ -265,11 +272,13 @@ Inside it, run `python -m pytest` from the repository root; it is Linux, so no
 shims are needed. The dev HA runs on `http://localhost:8123`; after a code
 change run `bash ha-dev/devcontainer/restart.sh`, and
 `bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates four car profiles, each with its own prefix ("Car with
+Seeding creates five car profiles, each with its own prefix ("Car with
 everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
 without car entities, "Car without climate entity"/`car_no_climate` without the
-climate entity, "Car without Energi Data Service"/`car_no_eds` with only
-Strømligning as price provider) plus the shared site entry. Use them to test
+climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
+updates every 30 minutes with the battery level simulation on, "Car without
+Energi Data Service"/`car_no_eds` with only Strømligning as price provider) plus
+the shared site entry. Use them to test
 missing-entity and single-provider cases. The dev HA, the dev user's profile
 and the seeded entries are in English.
 

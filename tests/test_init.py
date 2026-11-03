@@ -31,6 +31,7 @@ from .conftest import (
     CHARGER_STATUS,
     CONSUMPTION,
     EV_PORT,
+    MOCK_OPTIONS,
     MOCK_OPTIONS_NO_EV,
     OBJECT_PREFIX,
     async_advance,
@@ -257,6 +258,36 @@ async def test_entity_names_follow_the_language_of_the_entry(hass: HomeAssistant
     assert loaded_entry.runtime_data is not old_coordinator
     assert er.async_get(hass).async_get(entity_id).original_name == "Trip km needed"
     assert hass.states.get(entity_id).attributes["friendly_name"].endswith("Trip km needed")
+
+
+async def test_simulated_battery_level_entity(hass: HomeAssistant) -> None:
+    """With a car integration and the simulation, number.cjp_<prefix>_battery_level is the simulated level."""
+    set_source_states(hass, charger_status="charging", ev_level=40)
+    entry = make_entry(options={**MOCK_OPTIONS, "simulate_battery_level_while_charging": True})
+    await async_setup(hass, entry)
+    entity_id = f"number.{OBJECT_PREFIX}_battery_level"
+    state = hass.states.get(entity_id)
+    assert float(state.state) == 40
+    assert state.attributes["real_battery_level"] == 40
+    assert er.async_get(hass).async_get(entity_id).original_name == "Simuleret batteriniveau"
+    assert state.attributes["help"].startswith("Simuleret batteriniveau (")
+
+    # the car's level is behind: the entered level is used after the settings debounce
+    await hass.services.async_call("number", "set_value", {"entity_id": entity_id, "value": 35}, blocking=True)
+    await async_advance(hass, 6)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    state = hass.states.get(entity_id)
+    assert float(state.state) == 35
+    assert state.attributes["entered"] is True
+    assert entry.runtime_data.last_job["error"] is None
+
+    # switched off: no unavailable battery level is left behind
+    old_coordinator = entry.runtime_data
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "simulate_battery_level_while_charging": False})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+    assert er.async_get(hass).async_get(entity_id) is None
+    await async_unload_and_join(hass, entry)
 
 
 async def test_charger_only_instance_without_total_range(hass: HomeAssistant, caplog) -> None:

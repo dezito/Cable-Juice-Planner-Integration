@@ -86,6 +86,7 @@ SELECTORS: dict[str, Any] = {
     "site_phase_order": selector.SelectSelector(selector.SelectSelectorConfig(options=list(PHASE_ORDERS), mode=selector.SelectSelectorMode.DROPDOWN)),
     # car
     "usable_battery_level_entity_id": _entity("sensor", device_class="battery"),
+    "simulate_battery_level_while_charging": BOOLEAN,
     "estimated_battery_range_entity_id": _entity("sensor", device_class="distance"),
     "odometer_entity_id": _entity("sensor", device_class="distance"),
     "charge_port_door_entity_id": _entity(["cover", "binary_sensor", "sensor", "lock"]),
@@ -274,6 +275,9 @@ def validate_step(step: str, values: dict[str, Any]) -> dict[str, str]:
         configured = [key for key in EV_REQUIRED if values.get(key)]
         if configured and len(configured) != len(EV_REQUIRED):
             errors["base"] = "ev_incomplete"
+        elif values.get("simulate_battery_level_while_charging") and not configured:
+            # the simulation corrects itself with the car's battery level
+            errors["simulate_battery_level_while_charging"] = "simulation_needs_ev"
     if step == "solar" and values.get("forecast_entity_id") and not values.get("production_entity_id"):
         errors["production_entity_id"] = "production_required"
     if step == "solar_charging" and values["charging_single_phase_min_amp"] > values["charging_single_phase_max_amp"]:

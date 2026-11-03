@@ -241,6 +241,11 @@
       "title": "Poziom baterii EV",
       "message": "Pamiętaj, aby ustawić poziom baterii EV w Home Assistant"
     },
+    "notify_check_battery_level": {
+      "action": "Popraw poziom baterii",
+      "title": "Poziom baterii przy podłączeniu",
+      "message": "Auto podłączono przy {battery_level} %. Czy zgadza się to z wyświetlaczem auta? Jeśli nie, wpisz właściwy poziom baterii, aby symulacja zaczęła od niego."
+    },
     "notify_battery_under_daily_battery_level": {
       "action": "Aktywuj, aby rozpocząć wymuszone ładowanie",
       "title": "Poziom baterii EV poniżej dziennego minimum",
@@ -480,6 +485,7 @@
     "drive_efficiency": "Efektywność oparta na podgrzewaniu, dystansie i zużyciu energii",
     "km_per_kwh": "Kilometry na kWh",
     "estimated_range": "Szacowany zasięg na podstawie stanu baterii i EMA",
+    "simulated_battery_level": "Poziom baterii używany przez plan: ostatnia wartość auta plus to, co licznik kWh ładowarki naliczył od tego czasu (ze stratami ładowania). Wpisz tu rzeczywistą wartość auta, jeśli wartość auta jest opóźniona. Wartość auta jest w atrybucie real_battery_level",
     "drive_efficiency_last_battery_level": "Poziom baterii podczas ostatniego ładowania (%)",
     "drive_efficiency_last_odometer": "Przebieg podczas ostatniego ładowania ({distance})",
     "co2_emitted": "CO₂ wyemitowane w kg, na podstawie Energi Data Service",
@@ -510,6 +516,7 @@
     "battery_preheat": "Ustawienia poziomu baterii i nagrzewania:\n• Minimalny dzienny poziom baterii ({min_daily_battery_level} %): po powrocie z pracy lub codziennej jazdy.\n• Minimalny poziom baterii w podróży ({min_trip_battery_level} %): po powrocie z podróży.\n• Minimalny limit ładowania ({min_charge_limit_battery_level} %): najniższy limit ładowania, na jaki pozwala auto.\n• Maksymalny zalecany limit ładowania ({max_recommended_charge_limit_battery_level} %): zalecenie producenta.\n• Nagrzewaj X min wcześniej ({preheat_minutes_before} min): nagrzewanie przed wyjazdem do pracy i w podróż (przełącznik nagrzewania na dzień tygodnia). Przy mrozie czas jest dwukrotnie dłuższy.",
     "powerwall": "Ustawienia baterii domowej:\n• Nadwyżka słoneczna ładuje auto dopiero, gdy bateria domowa jest powyżej limitu (teraz {ev_charge_after_powerwall_battery_level} %).\n• Użyj baterii domowej dla auta: wymaga włączonego ładowania słonecznego i rozładowania baterii domowej powyżej potrzeb; używana jest tylko energia powyżej limitu.\nUtwórz automatyzację, która blokuje rozładowanie baterii domowej podczas ładowania auta i zezwala na nie tylko, gdy przełącznik jest włączony, a bateria jest powyżej limitu.",
     "virtual_ev": "Wirtualne EV (bez integracji auta):\n• Poziom baterii: ustaw aktualny poziom baterii auta przy podłączaniu.\n• Poziom po zakończeniu: poziom, przy którym auto kończy ładowanie.\n• Szacowany całkowity zasięg: realistyczny maksymalny zasięg auta.",
+    "simulated_battery_level": "Symulowany poziom baterii (auto wolno aktualizuje poziom baterii):\n• Poziom baterii auta: wartość ostatnio zgłoszona przez auto.\n• Symulowany poziom baterii: ostatnia wartość auta plus to, co licznik kWh ładowarki naliczył od tego czasu, po odjęciu strat ładowania. Plan i akcje ładowarki używają tej wartości.\n• Gdy auto zgłosi nowy poziom baterii, symulacja jest korygowana do wartości auta (może więc lekko skoczyć) i dalej rośnie od tego miejsca.\n• Możesz sam wpisać rzeczywisty poziom baterii auta w Symulowany poziom baterii, np. przy podłączaniu, gdy wartość auta jest opóźniona. Symulacja rośnie dalej od tej wartości, aż auto zgłosi nową. Przy podłączeniu powiadomienie zapyta, czy wartość się zgadza.\n• Symulacja zatrzymuje się 1 % poniżej limitu ładowania auta, aby to auto potwierdziło zakończenie ładowania.\n• Jeśli przy każdej korekcie mocno skacze, strata ładowania jest źle ustawiona: zmierz ją w sekcji Strata ładowania.\nWłączasz i wyłączasz w opcjach integracji w sekcji Auto - czujniki.",
     "price_forecast": "Koryguj prognozę cen: plan koryguje ceny z prognozy (np. Carnot) o ich odchylenie z ostatnich 30 dni, dla każdego dnia naprzód – po 7 dniach pomiarów, maksymalnie ±0,50 {valuta}. Zobacz *Prognoza cen* w analizie."
   },
   "dashboard": {
@@ -545,6 +552,7 @@
     "section_solar": "Słońce i bateria domowa",
     "section_charging_loss": "Strata ładowania",
     "section_virtual_ev": "Wirtualne EV",
+    "section_simulated_battery": "Symulowany poziom baterii",
     "section_advanced": "Zaawansowane",
     "history_battery": "Poziom baterii i limit ładowania",
     "history_efficiency": "Efektywność jazdy",
@@ -701,6 +709,6 @@
     "forecast_better_drives": "⭐ <b>{best}</b> najlepiej przewidział {distance_kwh} samochodu w ostatnich przejazdach: średnio {best_mae} {distance_kwh} błędu na przejazd wobec {selected_mae} {distance_kwh} dla wybranego ✅ <b>{selected}</b> ({percent} % mniejszy błąd). Samochód faktycznie jechał {actual} {distance_kwh}; {best} oczekiwał {best_forecast} {distance_kwh}, a {selected} {selected_forecast} {distance_kwh}.",
     "forecast_no_data": "Zbierane od teraz: zużycie domu po pierwszej pełnej dobie, {distance_kwh} po pierwszym przejeździe.",
     "forecast_explain": "Tuż przed dodaniem nowego pomiaru do historii (zużycie domu co godzinę, {distance_kwh} samochodu po każdym przejeździe) CJP oblicza, co każdy typ prognozy przewidziałby z tej samej historii, i porównuje to z pomiarem. ✅ wybrany typ prognozy, ⭐ najdokładniejszy. **Śr.** to wartość, której każdy typ oczekiwał średnio, wobec rzeczywistej na górze. **Błąd** liczony jest godzina po godzinie / przejazd po przejeździe, więc typ może trafić w średnią, a mimo to za każdym razem mocno się mylić. **Odchylenie** > 0: prognoza była za wysoka.\n\nTyp prognozy (*Ustawienia → Zaawansowane → Typ prognozy*) dotyczy jednocześnie zużycia domu, {distance_kwh} i cen zastępczych, więc wybierz ten, który trafia najlepiej tam, gdzie to najważniejsze. Zużycie domu służy tylko do nadwyżki słonecznej; {distance_kwh} do tego, ile potrzebują wyjazdy i dni robocze.",
-    "history_explain": "* **Poziom baterii i limit ładowania**: ostatnie 48 godzin.\n* **Efektywność jazdy**: ostatnie 30 dni.\n* **Naładowano słońcem**: ostatnie 7 dni."
+    "history_explain": "* **Poziom baterii i limit ładowania**: ostatnie 48 godzin (i symulowany poziom baterii, gdy jest włączony).\n* **Efektywność jazdy**: ostatnie 30 dni.\n* **Naładowano słońcem**: ostatnie 7 dni."
   }
 }

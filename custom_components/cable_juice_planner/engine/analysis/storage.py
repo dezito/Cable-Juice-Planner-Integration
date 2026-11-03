@@ -67,7 +67,7 @@ class AnalysisStorage:
         if not pending or self._analysis_ts() < pending["departure"]:
             return
         # the level the car left with: saved when unplugged shortly before, else the level now
-        level = self.battery_level()
+        level = self.battery_level(real=True)
         start = self.analysis_db.get("drive_start")
         last_level = self.sensor_states.get("drive_efficiency_last_battery_level")
         if start and pending["departure"] - 3 * 3600 <= start <= pending["departure"] + 900 and isinstance(last_level, (int, float)):

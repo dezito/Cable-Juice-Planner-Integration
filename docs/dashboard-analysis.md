@@ -17,7 +17,7 @@ It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovela
 | **Electricity prices** | the prices with the solar forecast and the charging plan |
 | **Current rule** | the current charging rule |
 | **Manual / forced charging** | the switches – forced charging only while it is relevant |
-| **Status** | above the trip: battery level, charging limit, the charger's power and state, estimated range and kWh cost price |
+| **Status** | above the trip: battery level (and the [simulated one](cookbook.md#car-integration-that-updates-slowly) when it is on), charging limit, the charger's power and state, estimated range and kWh cost price |
 | **Trip** | departure, arrival, target and preheating |
 | **Public charging** | only while a charge waits for its price |
 | **Charging history** | each charge with time, reason, %, kWh, price and price/kWh, and per month km, kWh, share from solar and price |
@@ -33,7 +33,8 @@ At the top: **Force planning** recalculates the plan now. The overview also has 
 
 All rules with a **Read more** from the entities' help texts: the charging rules, the work plan per weekday
 (incl. [learn driving distance](learn-distance.md)), optimal weekly charging, the battery levels, cheap power,
-full charge, solar/home battery, charging loss, the virtual EV and, under *Advanced*, the forecast type and
+full charge, solar/home battery, charging loss, the virtual EV (*Simulated battery level* with a car
+integration and the simulation on) and, under *Advanced*, the forecast type and
 [correct the price forecast](how-it-works.md#prices). Preheating is only shown with a car
 integration that has a climate entity.
 
@@ -232,7 +233,8 @@ See [Charging loss](charging-loss.md).
 
 ### History
 
-The battery level, the charge limit, the driving efficiency and the solar charging over time.
+The battery level (and the simulated one when it is on), the charge limit, the driving efficiency and the
+solar charging over time.
 
 ## Editing the dashboard
 

@@ -26,6 +26,28 @@ Settings for typical setups.
 Without a car integration there is no charge limit for the car, no public charging and no continuous
 charging loss measurement.
 
+## Car integration that updates slowly
+
+Some car integrations update the battery level only every 30–60 minutes, so the plan and the charger
+actions work on an old level – while charging the car's level is soon well behind. Turn on **Simulate
+battery level while charging** on the EV page (*Configure → EV*):
+
+- While charging, between the car's updates, the battery level rises with the charger's kWh meter, minus the
+  [charging loss](charging-loss.md). It is shown in *Simulated battery level*
+  (`number.cjp_<prefix>_battery_level`, the same entity as the virtual EV's battery level), next to the
+  car's own level on the dashboard and in the history.
+- Every new battery level from the car (or a new time in the car's *Last update* sensor) corrects the
+  simulation, which keeps rising from there. A big jump at every correction means the charging loss is off.
+- The meter only counts while the charger shows the car plugged in (and the car's charge cable, if set).
+- The simulation stops 1 % below the car's charge limit (else the limit CJP publishes), so the car's own
+  level confirms that the target is reached.
+- When you plug in, a notification asks if the level matches the car's display. If the car's level is
+  behind, enter the real one in *Simulated battery level*: the simulation rises from it until the car reports
+  a new level.
+- The plan, the charger actions, forced charging and load balancing use the simulated level. The charging
+  history, driving efficiency, charging loss measurement, public charging and the departure analysis use the
+  car's own level. The simulation is kept in memory: after a restart it starts from the car's level.
+
 ## Solar panels with the hourly sell price
 
 - [Solar surplus charging](rules/solar.md) on, *Fixed solar sell price* −1.

@@ -12,10 +12,12 @@ from homeassistant.helpers.typing import UndefinedType
 from .const import (
     DOMAIN,
     ENTITY_HELP_GROUPS,
+    EV_TEXT_KEYS,
     MANUFACTURER,
     SIGNAL_HELP_VALUES_CHANGED,
     TITLE,
     device_name,
+    is_battery_simulation_enabled,
     is_ev_configured,
     is_powerwall_configured,
     is_solar_configured,
@@ -40,6 +42,8 @@ def requirement_met(coordinator: CJPCoordinator, requires: str | None) -> bool:
         return is_ev_configured(config)
     if requires == "no_ev":
         return not is_ev_configured(config)
+    if requires == "virtual_battery_level":
+        return not is_ev_configured(config) or is_battery_simulation_enabled(config)
     if requires == "solar":
         return is_solar_configured(config)
     if requires == "powerwall_level":
@@ -90,8 +94,9 @@ class CJPEntity(Entity):
         self.entity_id = f"{platform}.{coordinator.object_prefix}_{key}"
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{key}"
         # name from translations/<language>.json of the entry's language (see name) and icon from
-        # icons.json (entity.<platform>.<key>)
-        self._attr_translation_key = key
+        # icons.json (entity.<platform>.<key>), with a car integration some use other texts
+        self._text_key = EV_TEXT_KEYS.get(key, key) if is_ev_configured(coordinator.config) else key
+        self._attr_translation_key = self._text_key
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry.entry_id)},
             name=device_name(coordinator.prefix, coordinator.car_name),
@@ -103,7 +108,7 @@ class CJPEntity(Entity):
     @property
     def name(self) -> str | UndefinedType | None:
         """Name in the language chosen for the entry, HA's translation_key uses its own UI language."""
-        name = self.coordinator.entity_names.get(f"{self._platform_domain}.{self._key}")
+        name = self.coordinator.entity_names.get(f"{self._platform_domain}.{self._text_key}")
         if name is None:
             return super().name
         try:
@@ -136,9 +141,9 @@ class CJPEntity(Entity):
         """description (short, per entity) and help (the dashboard settings text of the group)."""
         texts = self.coordinator.texts
         result = {}
-        if description := texts.get(f"entity_description.{self._key}"):
+        if description := texts.get(f"entity_description.{self._text_key}"):
             result["description"] = description
-        group = ENTITY_HELP_GROUPS.get(self._key)
+        group = ENTITY_HELP_GROUPS.get(self._text_key)
         if group and (text := texts.get(f"entity_help.{group}")):
             try:
                 result["help"] = text.format_map(help_values(self.coordinator))

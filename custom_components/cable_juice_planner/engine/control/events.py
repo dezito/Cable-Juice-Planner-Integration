@@ -118,6 +118,7 @@ class ControlEvents:
         self.solar_charged_percentage()
         self.is_battery_fully_charged()
         self.set_estimated_range()
+        self.publish_simulated_battery_level()
         self.calc_kwh_price(self.now().minute, update_entities=True)
 
         distance_per_percent = self.distance_per_percentage()
@@ -168,6 +169,7 @@ class ControlEvents:
         if self.is_ev_configured():
             self.analysis_check_departure()
         self.set_estimated_range()
+        self.publish_simulated_battery_level()
         if var_name == "enforce_planning" and self.testing:
             self.debug_info()
 
@@ -175,6 +177,7 @@ class ControlEvents:
         """A setting changed: recalculate the plan (forced, the plan hash ignores most settings)."""
         self.charge_if_needed(force_recalculate=True)
         self.set_estimated_range()
+        self.publish_simulated_battery_level()
         # use_measured_charging_loss may have changed what the plan uses
         self.publish_charging_loss_model()
 
@@ -270,10 +273,26 @@ class ControlEvents:
         self.notify_battery_under_daily_battery_level()
 
     def notify_set_battery_level(self) -> None:
+        if self.battery_simulation_enabled:
+            self.notify_check_battery_level()
+            return
         if self.is_ev_configured() or self.battery_level() != 0.0:
             return
         data = {"actions": [{"action": "URI", "title": self.t("ui.notify_set_battery_level.action"), "uri": f"entityId:{self.own_entity_id('number', 'battery_level')}"}]}
         self.my_notify(self.t("ui.notify_set_battery_level.message"), title=f"{self.title} {self.t('ui.notify_set_battery_level.title')}", data=data, always=True)
+
+    def notify_check_battery_level(self) -> None:
+        """Plugged in with the simulation: the car's level can be behind, ask if it matches the car's display."""
+        level = self.battery_level()
+        if level <= 0.0:
+            return
+        data = {"actions": [{"action": "URI", "title": self.t("ui.notify_check_battery_level.action"), "uri": f"entityId:{self.own_entity_id('number', 'battery_level')}"}]}
+        self.my_notify(
+            self.t("ui.notify_check_battery_level.message", battery_level=round(level)),
+            title=f"{self.title} {self.t('ui.notify_check_battery_level.title')}",
+            data=data,
+            always=True,
+        )
 
     def notify_battery_under_daily_battery_level(self) -> None:
         if not self.ready_to_charge():

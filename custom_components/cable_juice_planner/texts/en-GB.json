@@ -241,6 +241,11 @@
       "title": "EV battery level",
       "message": "Remember to set EV battery level in Home Assistant"
     },
+    "notify_check_battery_level": {
+      "action": "Correct battery level",
+      "title": "Battery level at plug-in",
+      "message": "The car is plugged in at {battery_level} %. Does that match the car's display? If not, enter the right battery level so the simulation starts from there."
+    },
     "notify_battery_under_daily_battery_level": {
       "action": "Activate forced charging",
       "title": "EV battery under daily level",
@@ -480,6 +485,7 @@
     "drive_efficiency": "Efficiency based on preheating, distance driven and energy use",
     "km_per_kwh": "Kilometres per kWh",
     "estimated_range": "Estimated range based on current battery level and Exponential Moving Average (EMA)",
+    "simulated_battery_level": "The battery level the plan uses: the car's last value plus what the charger's kWh meter has counted since (with charging loss). Enter the car's real value here if the car's value is behind. The car's own value is in the attribute real_battery_level",
     "drive_efficiency_last_battery_level": "Battery level at last charging (%)",
     "drive_efficiency_last_odometer": "Odometer reading at last charging ({distance})",
     "co2_emitted": "CO₂ emitted in kg, based on Energi Data Service CO₂ factor",
@@ -510,6 +516,7 @@
     "battery_preheat": "Battery level and preheating settings:\n• Minimum daily battery level ({min_daily_battery_level} %): on returning from work or daily driving.\n• Minimum trip battery level ({min_trip_battery_level} %): at homecoming from a trip.\n• Minimum charge limit ({min_charge_limit_battery_level} %): the lowest charge limit the car allows.\n• Max recommended charge limit ({max_recommended_charge_limit_battery_level} %): the car maker's recommendation.\n• Preheat X min before ({preheat_minutes_before} min): preheat before leaving for work and trips (the preheat switch per weekday). In frost, the lead time is doubled.",
     "powerwall": "Home battery settings:\n• Solar surplus only charges the car when the home battery is above the limit (now {ev_charge_after_powerwall_battery_level} %).\n• Use the home battery for the car: needs Solar charging and Home battery discharge above needed turned on; only energy above the limit is used.\nCreate an automation that disables home battery discharging while the car charges, and only allows it when the switch is on and the battery is above the limit.",
     "virtual_ev": "Virtual EV (without a car integration):\n• Battery level: set the current battery level of the car when you plug it in.\n• Completed battery level: the level the car stops at.\n• Estimated total range: the realistic max range of the car.",
+    "simulated_battery_level": "Simulated battery level (the car updates its battery level slowly):\n• Car battery level: the value the car last reported.\n• Simulated battery level: the car's last value plus what the charger's kWh meter has counted since, minus the charging loss. The plan and the charger actions use this one.\n• When the car reports a new battery level, the simulation is corrected to the car's value (so it can jump a little) and keeps rising from there.\n• You can enter the car's real battery level in Simulated battery level yourself, e.g. when you plug in and the car's value is behind. The simulation keeps rising from there until the car reports a new value. When you plug in, a notification asks if the value is right.\n• The simulation stops 1 % below the car's charge limit, so the car itself confirms that charging is done.\n• If it jumps a lot at every correction, the charging loss is off: measure it under Charging loss.\nTurn it on or off in the integration's options under EV - sensors.",
     "price_forecast": "Correct the price forecast: the plan corrects the forecast prices (e.g. Carnot) with how far off they were the last 30 days, per day ahead – after 7 days of measurements, at most ±0.50 {valuta}. See *Price forecast* in the analysis."
   },
   "dashboard": {
@@ -545,6 +552,7 @@
     "section_solar": "Solar and home battery",
     "section_charging_loss": "Charging loss",
     "section_virtual_ev": "Virtual EV",
+    "section_simulated_battery": "Simulated battery level",
     "section_advanced": "Advanced",
     "history_battery": "Battery level and charging limit",
     "history_efficiency": "Driving efficiency",
@@ -701,6 +709,6 @@
     "forecast_better_drives": "⭐ <b>{best}</b> forecast the car's {distance_kwh} best on the last drives: on average {best_mae} {distance_kwh} off per drive against {selected_mae} {distance_kwh} for the selected ✅ <b>{selected}</b> ({percent} % less error). The car actually drove {actual} {distance_kwh}; {best} expected {best_forecast} {distance_kwh} and {selected} {selected_forecast} {distance_kwh}.",
     "forecast_no_data": "Collected from now on: the house consumption after the first whole day, {distance_kwh} after the first drive.",
     "forecast_explain": "Just before a new measurement is added to the history (the house consumption every hour, the car's {distance_kwh} after every drive), CJP calculates what each forecast type would have predicted from the same history and compares it with the measurement. ✅ the selected forecast type, ⭐ the most accurate. **Avg.** is what each type expected on average, against the actual value at the top. The **error** is counted hour by hour / drive by drive, so a type can hit the average and still miss a lot each time. **Bias** > 0: the forecast was too high.\n\nThe forecast type (*Settings → Advanced → Forecast type*) applies to the house consumption, {distance_kwh} and the fallback prices alike, so pick the one that is most accurate where it matters most. The house consumption is only used for the solar surplus; {distance_kwh} for how much trips and workdays need.",
-    "history_explain": "* **Battery level and charging limit**: the last 48 hours.\n* **Driving efficiency**: the last 30 days.\n* **Charged by solar**: the last 7 days."
+    "history_explain": "* **Battery level and charging limit**: the last 48 hours (and the simulated battery level when it is on).\n* **Driving efficiency**: the last 30 days.\n* **Charged by solar**: the last 7 days."
   }
 }

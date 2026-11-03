@@ -764,6 +764,88 @@ def test_virtual_car_reports_the_drive_after_unplugging_from_completed() -> None
     assert not drive_notifications(higher)
 
 
+SIMULATION_OPTIONS = {**OPTIONS, "simulate_battery_level_while_charging": True}
+# 7.5 kWh from the charger with the default 5 % charging loss in a 75 kWh battery
+SIMULATED_PER_7_5_KWH = 7.5 / 1.05 / 75 * 100
+
+
+def _simulated(engine: CJPEngine, hour: float, level: float, meter: float, status: str = "charging", entered: float | None = None):
+    """Publish the simulated battery level (number.<prefix>_battery_level) with the car at level and the meter at meter kWh."""
+    now = datetime.datetime.combine(DAY, datetime.time(int(hour), int(hour % 1 * 60)))
+    snap = snapshot(now, level=level, status=status, settings={"battery_level": entered} if entered is not None else None)
+    snap.states["sensor.charger_kwh"] = str(meter)
+    result = engine.run_job(snap, engine.publish_simulated_battery_level)
+    assert result.error is None, result.error
+    return result
+
+
+def test_simulated_battery_level_rises_with_the_meter_and_follows_the_car() -> None:
+    engine = CJPEngine(const.build_config(SIMULATION_OPTIONS), "cjp_test", TEXTS)
+    assert _simulated(engine, 10, 40, 0).settings["battery_level"] == 40
+    result = _simulated(engine, 10.5, 40, 7.5)
+    assert result.settings["battery_level"] == pytest.approx(40 + SIMULATED_PER_7_5_KWH, abs=0.05)
+    attributes = result.attributes["battery_level"]
+    assert attributes["real_battery_level"] == 40
+    assert attributes["simulating"] is True
+    assert attributes["kwh_since_car_update"] == 7.5
+    # the car reports: corrected to its level, rising from there
+    assert _simulated(engine, 11, 48, 7.5).settings["battery_level"] == 48
+    assert _simulated(engine, 11.5, 48, 15).settings["battery_level"] == pytest.approx(48 + SIMULATED_PER_7_5_KWH, abs=0.05)
+    # 1 % under the car's charging limit (80 %): the car confirms the end
+    assert _simulated(engine, 13, 48, 60).settings["battery_level"] == 79
+    # planning gets the simulated level, history the car's own
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(13, 5)), level=48, status="charging")
+    snap.states["sensor.charger_kwh"] = "60"
+    assert engine.run_job(snap, engine.battery_level).value == 79
+    assert engine.run_job(snap, engine.battery_level, True).value == 48
+
+
+def test_simulated_battery_level_entered_by_the_user() -> None:
+    """Plugged in with the car's level 30 minutes behind: the entered level is simulated from until the car reports."""
+    engine = CJPEngine(const.build_config(SIMULATION_OPTIONS), "cjp_test", TEXTS)
+    assert _simulated(engine, 16, 60, 0, status="awaiting_start").settings["battery_level"] == 60
+    entered = _simulated(engine, 16.1, 60, 0, status="awaiting_start", entered=50)
+    assert entered.settings["battery_level"] == 50  # under the car's (stale) level is allowed
+    assert entered.attributes["battery_level"]["entered"] is True
+    assert _simulated(engine, 17, 60, 7.5, entered=50).settings["battery_level"] == pytest.approx(50 + SIMULATED_PER_7_5_KWH, abs=0.05)
+    reported = _simulated(engine, 17.5, 62, 7.5)
+    assert reported.settings["battery_level"] == 62
+    assert reported.attributes["battery_level"]["entered"] is False
+
+
+def test_simulated_battery_level_ignores_the_meter_without_the_car() -> None:
+    engine = CJPEngine(const.build_config(SIMULATION_OPTIONS), "cjp_test", TEXTS)
+    _simulated(engine, 10, 40, 0)
+    level = _simulated(engine, 10.5, 40, 7.5).settings["battery_level"]
+    # unplugged: another car may use the charger, the level is kept
+    assert _simulated(engine, 11, 40, 20, status="disconnected").settings["battery_level"] == level
+    # plugged in again: counts from the meter then, a meter reset is no drop either
+    assert _simulated(engine, 12, 40, 27.5).settings["battery_level"] == pytest.approx(level + SIMULATED_PER_7_5_KWH, abs=0.05)
+    assert _simulated(engine, 13, 40, 0).settings["battery_level"] == pytest.approx(level + SIMULATED_PER_7_5_KWH, abs=0.05)
+
+
+def test_simulated_battery_level_off_uses_the_car() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    result = _simulated(engine, 10, 40, 0)
+    assert "battery_level" not in result.settings
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(11, 0)), level=40, status="charging")
+    snap.states["sensor.charger_kwh"] = "30"
+    assert engine.run_job(snap, engine.battery_level).value == 40
+
+
+def test_simulated_battery_level_asks_at_plug_in() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(16, 30))
+    snap = snapshot(now, level=55, **PLUGGED_IN)
+    engine = CJPEngine(const.build_config(SIMULATION_OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charger_status_changed, "awaiting_start", "disconnected")
+    assert result.error is None, result.error
+    asks = [n for n in result.mobile_notifications if TEXTS["ui.notify_check_battery_level.title"] in n["title"]]
+    assert len(asks) == 1
+    assert "55 %" in asks[0]["message"]
+    assert asks[0]["data"]["actions"][0]["uri"] == "entityId:number.cjp_test_battery_level"
+
+
 def test_plug_in_under_daily_level_notifies_once() -> None:
     """The charger status and the car's charge port both report the plug-in: one notification."""
     now = datetime.datetime.combine(DAY, datetime.time(16, 30))

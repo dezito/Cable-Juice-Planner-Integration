@@ -6,7 +6,7 @@ from .base import WEEKDAYS
 # --------------------------------------------------------------------------- #
 # Settings entities (the former input_* helpers)
 # --------------------------------------------------------------------------- #
-# "requires": ev / no_ev / solar / powerwall / powerwall_level -> the entity is only
+# "requires": ev / no_ev / virtual_battery_level / solar / powerwall / powerwall_level -> the entity is only
 # created for that configuration (like init() pruned DEFAULT_ENTITIES).
 # "config": path in CONFIG with the initial value (the PyScript version wrote these
 # from the config file into the helpers at every start).
@@ -51,7 +51,9 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "max_recommended_charge_limit_battery_level": _level(90.0, "ev_car.max_recommended_charge_limit_battery_level"),
     "very_cheap_grid_charging_max_battery_level": _level(70.0, "ev_car.very_cheap_grid_charging_max_battery_level"),
     "ultra_cheap_grid_charging_max_battery_level": _level(90.0, "ev_car.ultra_cheap_grid_charging_max_battery_level"),
-    "battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0, "requires": "no_ev"},
+    # without a car integration the battery level the user enters, with one and
+    # simulate_battery_level_while_charging the simulated level (engine/battery.py)
+    "battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0, "requires": "virtual_battery_level"},
     "completed_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 100.0, "requires": "no_ev"},
     "estimated_total_range": {"min": 0, "max": 1000, "step": 1, "mode": "box", "unit": "{distance}", "default": 0.0, "requires": "no_ev"},
     "trip_charge_procent": {"min": 0, "max": 100, "step": 5, "mode": "slider", "unit": "%", "default": 0.0},

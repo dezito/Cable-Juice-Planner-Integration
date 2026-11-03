@@ -69,6 +69,7 @@
         "description": "Sensorer fra bilens integration. Uden bilintegration lades blanke: så bruges et virtuelt batteriniveau, som du selv sætter. Batteriniveau, rækkevidde og kilometertæller skal enten alle sættes eller alle være tomme.",
         "data": {
           "usable_battery_level_entity_id": "Batteriniveau",
+          "simulate_battery_level_while_charging": "Simulér batteriniveau under ladning",
           "estimated_battery_range_entity_id": "Rækkevidde",
           "odometer_entity_id": "Kilometertæller",
           "charge_port_door_entity_id": "Ladelåge",
@@ -80,12 +81,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Skal være præcis batteriprocent",
+          "simulate_battery_level_while_charging": "Slå til, hvis bilens integration er langsom til at opdatere batteriniveauet (fx kun hver 30.–60. minut). Under ladning, mellem bilens opdateringer, lader CJP batteriniveauet stige ud fra laderens kWh-måler, med ladetab trukket fra. Hver gang bilen melder et nyt batteriniveau (eller et nyt tidspunkt i Sidst opdateret), retter CJP simuleringen til bilens værdi og stiger videre derfra. Planen og laderens handlinger bruger det simulerede niveau; historik, køreeffektivitet og måling af ladetab bruger bilens egen værdi. Simuleringen når højst 1 % under bilens ladegrænse, så bilen selv bekræfter, at målet er nået. Det simulerede niveau vises i Simuleret batteriniveau, hvor du også selv kan skrive bilens rigtige værdi, fx når du tilslutter, og bilens tal er bagud. Ved tilslutning får du en notifikation, der spørger, om det passer med bilens skærm. Kræver bilintegration. Lad den være slået fra, hvis bilen opdaterer batteriniveauet løbende.",
           "estimated_battery_range_entity_id": "Skal være præcis rækkevidde",
           "charge_port_door_entity_id": "Afgør om ladelåge er åben/lukket (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Afgør om bilen er tilsluttet laderen (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit.",
+          "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit. Det simulerede batteriniveau når højst 1 % under den.",
           "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude",
-          "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter.",
+          "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter. Et nyt tidspunkt retter også det simulerede batteriniveau.",
           "climate_entity_id": "Valgfri: bilens klima-entitet. Tilstanden bruges til at afgøre om forvarmningen kører; start/stop sendes som hændelser på ev_request."
         }
       },
@@ -377,6 +379,7 @@
       "no_price_provider": "Vælg mindst én prisleverandør.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
+      "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
       "min_above_max": "Minimum må ikke være større end maksimum.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader."
@@ -469,6 +472,7 @@
         "description": "Sensorer fra bilens integration. Uden bilintegration lades blanke: så bruges et virtuelt batteriniveau, som du selv sætter. Batteriniveau, rækkevidde og kilometertæller skal enten alle sættes eller alle være tomme.",
         "data": {
           "usable_battery_level_entity_id": "Batteriniveau",
+          "simulate_battery_level_while_charging": "Simulér batteriniveau under ladning",
           "estimated_battery_range_entity_id": "Rækkevidde",
           "odometer_entity_id": "Kilometertæller",
           "charge_port_door_entity_id": "Ladelåge",
@@ -480,12 +484,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Skal være præcis batteriprocent",
+          "simulate_battery_level_while_charging": "Slå til, hvis bilens integration er langsom til at opdatere batteriniveauet (fx kun hver 30.–60. minut). Under ladning, mellem bilens opdateringer, lader CJP batteriniveauet stige ud fra laderens kWh-måler, med ladetab trukket fra. Hver gang bilen melder et nyt batteriniveau (eller et nyt tidspunkt i Sidst opdateret), retter CJP simuleringen til bilens værdi og stiger videre derfra. Planen og laderens handlinger bruger det simulerede niveau; historik, køreeffektivitet og måling af ladetab bruger bilens egen værdi. Simuleringen når højst 1 % under bilens ladegrænse, så bilen selv bekræfter, at målet er nået. Det simulerede niveau vises i Simuleret batteriniveau, hvor du også selv kan skrive bilens rigtige værdi, fx når du tilslutter, og bilens tal er bagud. Ved tilslutning får du en notifikation, der spørger, om det passer med bilens skærm. Kræver bilintegration. Lad den være slået fra, hvis bilen opdaterer batteriniveauet løbende.",
           "estimated_battery_range_entity_id": "Skal være præcis rækkevidde",
           "charge_port_door_entity_id": "Afgør om ladelåge er åben/lukket (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Afgør om bilen er tilsluttet laderen (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit.",
+          "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit. Det simulerede batteriniveau når højst 1 % under den.",
           "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude",
-          "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter.",
+          "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter. Et nyt tidspunkt retter også det simulerede batteriniveau.",
           "climate_entity_id": "Valgfri: bilens klima-entitet. Tilstanden bruges til at afgøre om forvarmningen kører; start/stop sendes som hændelser på ev_request."
         }
       },
@@ -752,6 +757,7 @@
       "no_price_provider": "Vælg mindst én prisleverandør.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
+      "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
       "min_above_max": "Minimum må ikke være større end maksimum.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader."
@@ -917,6 +923,9 @@
       },
       "battery_level": {
         "name": "Virtuel elbil batteri niveau"
+      },
+      "simulated_battery_level": {
+        "name": "Simuleret batteriniveau"
       },
       "completed_battery_level": {
         "name": "Elbil lading færdig batteri niveau"

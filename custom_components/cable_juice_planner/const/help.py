@@ -75,4 +75,11 @@ ENTITY_HELP_GROUPS: dict[str, str] = {
     "battery_level": "virtual_ev",
     "completed_battery_level": "virtual_ev",
     "estimated_total_range": "virtual_ev",
+    "simulated_battery_level": "simulated_battery_level",
+}
+
+# With a car integration these entities mean something else: the name (translations), icon,
+# description and help of this key are used instead
+EV_TEXT_KEYS: dict[str, str] = {
+    "battery_level": "simulated_battery_level",
 }

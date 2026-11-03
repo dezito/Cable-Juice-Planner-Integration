@@ -69,6 +69,7 @@
         "description": "Czujniki integracji auta. Bez integracji zostaw puste: używany jest wirtualny poziom baterii. Poziom baterii, zasięg i licznik muszą być wszystkie ustawione albo wszystkie puste.",
         "data": {
           "usable_battery_level_entity_id": "Poziom baterii",
+          "simulate_battery_level_while_charging": "Symuluj poziom baterii podczas ładowania",
           "estimated_battery_range_entity_id": "Zasięg",
           "odometer_entity_id": "Licznik przebiegu",
           "charge_port_door_entity_id": "Klapka gniazda ładowania",
@@ -80,12 +81,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Musi być dokładny poziom baterii (%)",
+          "simulate_battery_level_while_charging": "Włącz, jeśli integracja auta wolno aktualizuje poziom baterii (np. tylko co 30–60 minut). Podczas ładowania, między aktualizacjami auta, CJP podnosi poziom baterii na podstawie licznika kWh ładowarki, po odjęciu strat ładowania. Za każdym razem, gdy auto zgłosi nowy poziom baterii (lub nowy czas w Ostatnia aktualizacja), CJP koryguje symulację do wartości auta i dalej podnosi ją od tego miejsca. Plan i akcje ładowarki używają symulowanego poziomu; historia, efektywność jazdy i pomiar strat ładowania używają wartości auta. Symulacja zatrzymuje się 1 % poniżej limitu ładowania auta, więc to auto potwierdza osiągnięcie celu. Symulowany poziom jest widoczny w Symulowany poziom baterii, gdzie możesz też sam wpisać rzeczywistą wartość auta, np. przy podłączaniu, gdy wartość auta jest opóźniona. Przy podłączeniu powiadomienie zapyta, czy zgadza się z wyświetlaczem auta. Wymaga integracji auta. Zostaw wyłączone, jeśli auto na bieżąco aktualizuje poziom baterii.",
           "estimated_battery_range_entity_id": "Musi być dokładny zasięg",
           "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit.",
+          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit. Symulowany poziom baterii zatrzymuje się 1 % poniżej niego.",
           "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
-          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut.",
+          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut. Nowy czas koryguje też symulowany poziom baterii.",
           "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
         }
       },
@@ -377,6 +379,7 @@
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
+      "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
       "min_above_max": "Minimum nie może być większe niż maksimum.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
@@ -469,6 +472,7 @@
         "description": "Czujniki integracji auta. Bez integracji zostaw puste: używany jest wirtualny poziom baterii. Poziom baterii, zasięg i licznik muszą być wszystkie ustawione albo wszystkie puste.",
         "data": {
           "usable_battery_level_entity_id": "Poziom baterii",
+          "simulate_battery_level_while_charging": "Symuluj poziom baterii podczas ładowania",
           "estimated_battery_range_entity_id": "Zasięg",
           "odometer_entity_id": "Licznik przebiegu",
           "charge_port_door_entity_id": "Klapka gniazda ładowania",
@@ -480,12 +484,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Musi być dokładny poziom baterii (%)",
+          "simulate_battery_level_while_charging": "Włącz, jeśli integracja auta wolno aktualizuje poziom baterii (np. tylko co 30–60 minut). Podczas ładowania, między aktualizacjami auta, CJP podnosi poziom baterii na podstawie licznika kWh ładowarki, po odjęciu strat ładowania. Za każdym razem, gdy auto zgłosi nowy poziom baterii (lub nowy czas w Ostatnia aktualizacja), CJP koryguje symulację do wartości auta i dalej podnosi ją od tego miejsca. Plan i akcje ładowarki używają symulowanego poziomu; historia, efektywność jazdy i pomiar strat ładowania używają wartości auta. Symulacja zatrzymuje się 1 % poniżej limitu ładowania auta, więc to auto potwierdza osiągnięcie celu. Symulowany poziom jest widoczny w Symulowany poziom baterii, gdzie możesz też sam wpisać rzeczywistą wartość auta, np. przy podłączaniu, gdy wartość auta jest opóźniona. Przy podłączeniu powiadomienie zapyta, czy zgadza się z wyświetlaczem auta. Wymaga integracji auta. Zostaw wyłączone, jeśli auto na bieżąco aktualizuje poziom baterii.",
           "estimated_battery_range_entity_id": "Musi być dokładny zasięg",
           "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit.",
+          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit. Symulowany poziom baterii zatrzymuje się 1 % poniżej niego.",
           "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
-          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut.",
+          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut. Nowy czas koryguje też symulowany poziom baterii.",
           "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
         }
       },
@@ -752,6 +757,7 @@
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
+      "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
       "min_above_max": "Minimum nie może być większe niż maksimum.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
@@ -917,6 +923,9 @@
       },
       "battery_level": {
         "name": "Wirtualny poziom baterii EV"
+      },
+      "simulated_battery_level": {
+        "name": "Symulowany poziom baterii"
       },
       "completed_battery_level": {
         "name": "Poziom baterii po zakończeniu ładowania"

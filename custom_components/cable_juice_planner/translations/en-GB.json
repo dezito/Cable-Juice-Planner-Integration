@@ -69,6 +69,7 @@
         "description": "Sensors from the car integration. Without a car integration leave them empty: a virtual battery level that you set is used instead. Battery level, range and odometer must either all be set or all be empty.",
         "data": {
           "usable_battery_level_entity_id": "Battery level",
+          "simulate_battery_level_while_charging": "Simulate battery level while charging",
           "estimated_battery_range_entity_id": "Range",
           "odometer_entity_id": "Odometer",
           "charge_port_door_entity_id": "Charge port door",
@@ -80,12 +81,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Must be accurate battery percentage",
+          "simulate_battery_level_while_charging": "Turn on if the car integration is slow to update the battery level (e.g. only every 30–60 minutes). While charging, between the car's updates, CJP lets the battery level rise with the charger's kWh meter, minus the charging loss. Every time the car reports a new battery level (or a new time in Last update), CJP corrects the simulation to the car's value and keeps rising from there. The plan and the charger actions use the simulated level; history, driving efficiency and the charging loss measurement use the car's own value. The simulation stops 1 % below the car's charge limit, so the car itself confirms that the target is reached. The simulated level is shown in Simulated battery level, where you can also enter the car's real value yourself, e.g. when you plug in and the car's value is behind. When you plug in, a notification asks if it matches the car's display. Requires a car integration. Leave it off if the car updates the battery level continuously.",
           "estimated_battery_range_entity_id": "Must be accurate range",
           "charge_port_door_entity_id": "Indicates port open/closed (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Indicates if vehicle is connected (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit.",
+          "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit. The simulated battery level stops 1 % below it.",
           "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away",
-          "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes.",
+          "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes. A new time also corrects the simulated battery level.",
           "climate_entity_id": "Optional: the climate entity of the car. Its state tells if preheating runs; start/stop are fired as events on ev_request."
         }
       },
@@ -377,6 +379,7 @@
       "no_price_provider": "Choose at least one price provider.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
+      "simulation_needs_ev": "Simulating the battery level requires the car's battery level, range and odometer.",
       "min_above_max": "The minimum cannot be above the maximum.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well."
@@ -469,6 +472,7 @@
         "description": "Sensors from the car integration. Without a car integration leave them empty: a virtual battery level that you set is used instead. Battery level, range and odometer must either all be set or all be empty.",
         "data": {
           "usable_battery_level_entity_id": "Battery level",
+          "simulate_battery_level_while_charging": "Simulate battery level while charging",
           "estimated_battery_range_entity_id": "Range",
           "odometer_entity_id": "Odometer",
           "charge_port_door_entity_id": "Charge port door",
@@ -480,12 +484,13 @@
         },
         "data_description": {
           "usable_battery_level_entity_id": "Must be accurate battery percentage",
+          "simulate_battery_level_while_charging": "Turn on if the car integration is slow to update the battery level (e.g. only every 30–60 minutes). While charging, between the car's updates, CJP lets the battery level rise with the charger's kWh meter, minus the charging loss. Every time the car reports a new battery level (or a new time in Last update), CJP corrects the simulation to the car's value and keeps rising from there. The plan and the charger actions use the simulated level; history, driving efficiency and the charging loss measurement use the car's own value. The simulation stops 1 % below the car's charge limit, so the car itself confirms that the target is reached. The simulated level is shown in Simulated battery level, where you can also enter the car's real value yourself, e.g. when you plug in and the car's value is behind. When you plug in, a notification asks if it matches the car's display. Requires a car integration. Leave it off if the car updates the battery level continuously.",
           "estimated_battery_range_entity_id": "Must be accurate range",
           "charge_port_door_entity_id": "Indicates port open/closed (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Indicates if vehicle is connected (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit.",
+          "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit. The simulated battery level stops 1 % below it.",
           "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away",
-          "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes.",
+          "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes. A new time also corrects the simulated battery level.",
           "climate_entity_id": "Optional: the climate entity of the car. Its state tells if preheating runs; start/stop are fired as events on ev_request."
         }
       },
@@ -752,6 +757,7 @@
       "no_price_provider": "Choose at least one price provider.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
+      "simulation_needs_ev": "Simulating the battery level requires the car's battery level, range and odometer.",
       "min_above_max": "The minimum cannot be above the maximum.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well."
@@ -917,6 +923,9 @@
       },
       "battery_level": {
         "name": "Virtual EV battery level"
+      },
+      "simulated_battery_level": {
+        "name": "Simulated battery level"
       },
       "completed_battery_level": {
         "name": "Completed charging level"
