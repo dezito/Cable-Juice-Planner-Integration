@@ -7,10 +7,11 @@ user's own changes) a repair issue lets the user replace it. The files are compa
 way Home Assistant writes a blueprint (validated and dumped again), so re-importing it
 from source_url is not a change.
 
-Inputs that changed from one entity to several are rewritten as lists in the automations
-that use the blueprint (automations.yaml, written like the automation editor does) once the
-installed file is the bundled version: the editor shows a single entity id in a multiple
-entity selector as empty.
+Inputs that changed from one entity to several still accept a single entity id (the blueprint
+turns it into a list), but the automation editor shows a single entity id in a multiple entity
+selector as empty, so saving the automation there would drop it. The user's automation
+configuration is never written by the integration: automations.yaml is only read, and a
+repair lists the automations so the user can select the entity again in the editor.
 """
 from __future__ import annotations
 
@@ -18,14 +19,15 @@ import logging
 import os
 from pathlib import Path
 
+from homeassistant.components.automation import EVENT_AUTOMATION_RELOADED
 from homeassistant.components.blueprint import BLUEPRINT_SCHEMA, Blueprint
 from homeassistant.config import AUTOMATION_CONFIG_PATH
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.util import yaml as yaml_util
-from homeassistant.util.file import write_utf8_file_atomic
 
 from ..const import DOMAIN
 
@@ -33,6 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SOURCE = Path(__file__).parent.parent / "blueprints"
 ISSUE_PREFIX = "blueprint_update_"
+SINGLE_ENTITY_ISSUE = "blueprint_single_entity_inputs"
 # inputs that took one entity in earlier versions and take several now
 LIST_INPUTS = {"charger_control.yaml": ("charger_status", "power_sensor")}
 
@@ -54,34 +57,71 @@ def _issue_id(name: str) -> str:
     return f"{ISSUE_PREFIX}{Path(name).stem}"
 
 
-def _migrate_automations(hass: HomeAssistant, names: list[str]) -> bool:
-    """Turn a single entity id in a LIST_INPUTS input into a list. True when the file changed."""
-    inputs_by_path = {f"{DOMAIN}/{name}": LIST_INPUTS[name] for name in names if name in LIST_INPUTS}
-    path = hass.config.path(AUTOMATION_CONFIG_PATH)
-    if not inputs_by_path or not os.path.isfile(path):
-        return False
+def _single_entity_automations(path: str, inputs_by_path: dict[str, tuple[str, ...]]) -> list[str]:
+    """Automations with a single entity id in a LIST_INPUTS input. Only reads the file.
+
+    automations.yaml is the file the automation editor edits, so it holds the automations
+    with the problem. The automation entities do not help: for a blueprint automation their
+    raw_config is the substituted configuration, without use_blueprint and its inputs.
+    """
+    if not os.path.isfile(path):
+        return []
     try:
         automations = yaml_util.load_yaml(path)
     except HomeAssistantError as err:
-        # the blueprint itself is still installed; the editor shows the old inputs as empty
-        _LOGGER.warning("Could not read %s to update the blueprint inputs: %s", path, err)
-        return False
-    if not isinstance(automations, list):
-        return False
-    changed = False
-    for automation in automations:
+        _LOGGER.debug("Could not read %s to check the blueprint inputs: %s", path, err)
+        return []
+    found: list[str] = []
+    for automation in automations if isinstance(automations, list) else []:
         blueprint = automation.get("use_blueprint") if isinstance(automation, dict) else None
         if not isinstance(blueprint, dict) or not isinstance(blueprint.get("input"), dict):
             continue
         inputs = blueprint["input"]
-        for key in inputs_by_path.get(blueprint.get("path"), ()):
-            if isinstance(inputs.get(key), str):
-                inputs[key] = [inputs[key]] if inputs[key] else []
-                changed = True
-    if changed:
-        write_utf8_file_atomic(path, yaml_util.dump(automations))
-        _LOGGER.info("Updated the inputs of the automations using %s in %s", ", ".join(inputs_by_path), path)
-    return changed
+        if any(isinstance(inputs.get(key), str) and inputs[key] for key in inputs_by_path.get(blueprint.get("path"), ())):
+            found.append(str(automation.get("alias") or automation.get("id") or blueprint["path"]))
+    return found
+
+
+async def _async_check_single_entity_inputs(hass: HomeAssistant) -> None:
+    """Raise a repair for automations with a single entity id in a LIST_INPUTS input (read only)."""
+    issues = ir.async_get(hass)
+    # while the old blueprint is installed (its update issue is open) the input takes one entity
+    inputs_by_path = {
+        f"{DOMAIN}/{name}": keys
+        for name, keys in LIST_INPUTS.items()
+        if issues.async_get_issue(DOMAIN, _issue_id(name)) is None
+    }
+    found = (
+        await hass.async_add_executor_job(_single_entity_automations, hass.config.path(AUTOMATION_CONFIG_PATH), inputs_by_path)
+        if inputs_by_path
+        else []
+    )
+    if not found:
+        ir.async_delete_issue(hass, DOMAIN, SINGLE_ENTITY_ISSUE)
+        return
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        SINGLE_ENTITY_ISSUE,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=SINGLE_ENTITY_ISSUE,
+        translation_placeholders={"automations": "\n".join(f"- {name}" for name in sorted(found))},
+    )
+
+
+@callback
+def _async_track_single_entity_inputs(hass: HomeAssistant) -> None:
+    """Check once Home Assistant has started and after each automation reload (the editor saved)."""
+
+    async def _started(_hass: HomeAssistant) -> None:
+        await _async_check_single_entity_inputs(hass)
+
+    async def _reloaded(_event: Event) -> None:
+        await _async_check_single_entity_inputs(hass)
+
+    async_at_started(hass, _started)
+    hass.bus.async_listen(EVENT_AUTOMATION_RELOADED, _reloaded)
 
 
 async def _async_reload(hass: HomeAssistant) -> None:
@@ -98,7 +138,7 @@ async def _async_reload(hass: HomeAssistant) -> None:
 async def async_install_blueprints(hass: HomeAssistant) -> None:
     target = _target(hass)
 
-    def _install() -> tuple[list[str], list[str], dict[str, str], bool]:
+    def _install() -> tuple[list[str], list[str], dict[str, str]]:
         sources = sorted(SOURCE.glob("*.yaml"))
         installed: list[str] = []
         outdated: dict[str, str] = {}
@@ -112,16 +152,13 @@ async def async_install_blueprints(hass: HomeAssistant) -> None:
                 _LOGGER.info("Installed blueprint %s", destination)
             elif _normalized(destination.read_text(encoding="utf-8")) != _normalized(content):
                 outdated[source.name] = yaml_util.parse_yaml(content)["blueprint"]["name"]
-        names = [source.name for source in sources]
-        # the installed files are the bundled version (also after a re-import from source_url)
-        migrated = _migrate_automations(hass, [name for name in names if name not in outdated])
-        return names, installed, outdated, migrated
+        return [source.name for source in sources], installed, outdated
 
     # earlier versions kept the digests of the installed files here
     await Store(hass, 1, f"{DOMAIN}.blueprints").async_remove()
     try:
         # the folder is listed in the executor too: scandir blocks the event loop
-        names, installed, outdated, migrated = await hass.async_add_executor_job(_install)
+        names, installed, outdated = await hass.async_add_executor_job(_install)
     except (OSError, HomeAssistantError) as err:
         _LOGGER.error("Could not install the Cable Juice Planner blueprints: %s", err)
         return
@@ -139,7 +176,8 @@ async def async_install_blueprints(hass: HomeAssistant) -> None:
             translation_placeholders={"name": title, "path": f"blueprints/automation/{DOMAIN}/{name}"},
             data={"file": name},
         )
-    if installed or migrated:
+    _async_track_single_entity_inputs(hass)
+    if installed:
         await _async_reload(hass)
 
 
@@ -151,8 +189,9 @@ async def async_update_blueprint(hass: HomeAssistant, name: str) -> None:
     def _update() -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-        _migrate_automations(hass, [name])
 
     await hass.async_add_executor_job(_update)
     _LOGGER.info("Updated blueprint %s", destination)
+    # before the reload: the single entity check after it skips blueprints with this issue
+    ir.async_delete_issue(hass, DOMAIN, _issue_id(name))
     await _async_reload(hass)

@@ -218,16 +218,18 @@ stopped and have their amps set from Home Assistant.
 
 ### HACS (recommended)
 
-[![Open your Home Assistant and add the repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
+[![Open Cable Juice Planner in HACS in your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
 
-1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-Integration` as **Integration**.
-2. Search for **Cable Juice Planner**, install it, and restart Home Assistant.
-3. Add the integration:
+1. Open **HACS**, search for **Cable Juice Planner**, install it, and restart Home Assistant.
+2. Add the integration:
 
    [![Open your Home Assistant and add Cable Juice Planner.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=cable_juice_planner)
 
    or **Settings → Devices & services → Add integration → Cable Juice Planner**.
-4. Create the automation that controls the charger, e.g. with the [blueprint](docs/charger-control.md#the-blueprint).
+3. Create the automation that controls the charger, e.g. with the [blueprint](docs/charger-control.md#the-blueprint).
+
+If **Cable Juice Planner** does not show up in the HACS search, add it as a custom repository first: **HACS** → ⋮ →
+**Custom repositories** → `https://github.com/dezito/Cable-Juice-Planner-Integration` with type **Integration**, then search again.
 
 ### Manual
 

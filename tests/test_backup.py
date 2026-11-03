@@ -9,9 +9,10 @@ import pytest
 from homeassistant import config_entries
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.auth.models import User
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError, Unauthorized
 
 from custom_components.cable_juice_planner.management.backup import BACKUP_DIR
 from custom_components.cable_juice_planner.const import CONF_ENTITY_PREFIX, DB_NAMES, DOMAIN
@@ -77,6 +78,24 @@ async def test_import_rejects_unknown_file(hass: HomeAssistant, config_dir: Path
             DOMAIN, "import_data", {"config_entry_id": loaded_entry.entry_id, "file": "../secrets.json"}, blocking=True
         )
     assert loaded_entry.state is ConfigEntryState.LOADED
+
+
+async def test_import_requires_admin(
+    hass: HomeAssistant, config_dir: Path, loaded_entry, hass_read_only_user: User
+) -> None:
+    """import_data replaces the databases and options, so only administrators may call it."""
+    response = await hass.services.async_call(DOMAIN, "export_data", {}, blocking=True, return_response=True)
+    file = next(iter(response["files"].values()))
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN,
+            "import_data",
+            {"config_entry_id": loaded_entry.entry_id, "file": file},
+            blocking=True,
+            context=Context(user_id=hass_read_only_user.id),
+        )
+    assert loaded_entry.state is ConfigEntryState.LOADED
+    assert not any(name.endswith("_before_import.json") for name in (p.name for p in config_dir.iterdir()))
 
 
 async def test_deleted_entry_is_restored_by_the_config_flow(
