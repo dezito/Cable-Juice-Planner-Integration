@@ -25,7 +25,7 @@ class ControlChargingLoss:
         """Battery level at the end of the measurement: the car's own level when it has
         one, else the charging limit (car) or the completed level (no car integration)."""
         if self.is_ev_configured():
-            battery_level = self.battery_level()
+            battery_level = self.battery_level(real=True)
             if battery_level > 0.0:
                 return battery_level
             limit_entity = self.config["ev_car"]["entity_ids"]["charging_limit_entity_id"]
@@ -70,9 +70,9 @@ class ControlChargingLoss:
                 if not value:
                     reset()
                     return None
-                if not self.is_ev_configured() and self.battery_level() == 0.0:
+                if not self.is_ev_configured() and self.battery_level(real=True) == 0.0:
                     raise ValueError("Battery level is 0.0, make sure battery level is set or car is connected")
-                self.charging_loss_car_begin_battery_level = self.battery_level()
+                self.charging_loss_car_begin_battery_level = self.battery_level(real=True)
                 self.charging_loss_car_begin_kwh = battery_size * (self.charging_loss_car_begin_battery_level / 100.0)
                 self.charging_loss_charger_begin_kwh = charger_current_kwh
                 self.charging_loss_charging_completed = False

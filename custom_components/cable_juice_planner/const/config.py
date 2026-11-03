@@ -49,6 +49,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "location_entity_id": "",
             "last_update_entity_id": "",
         },
+        # battery level rises with the charger's kWh meter between the car's slow updates (engine/battery.py)
+        "simulate_battery_level_while_charging": False,
         "battery_size": 75.0,
         "min_daily_battery_level": 30.0,
         "min_trip_battery_level": 25.0,
@@ -161,6 +163,7 @@ OPTION_PATHS: dict[str, str] = {
     "charging_loss": "charger.charging_loss",
     # ev
     "usable_battery_level_entity_id": "ev_car.entity_ids.usable_battery_level_entity_id",
+    "simulate_battery_level_while_charging": "ev_car.simulate_battery_level_while_charging",
     "estimated_battery_range_entity_id": "ev_car.entity_ids.estimated_battery_range_entity_id",
     "odometer_entity_id": "ev_car.entity_ids.odometer_entity_id",
     "charge_port_door_entity_id": "ev_car.entity_ids.charge_port_door_entity_id",
@@ -249,6 +252,7 @@ FLOW_STEPS: dict[str, list[str]] = {
     "load_balancing": ["site_priority", "site_phase_order"],
     "ev": [
         "usable_battery_level_entity_id",
+        "simulate_battery_level_while_charging",
         "estimated_battery_range_entity_id",
         "odometer_entity_id",
         "charge_port_door_entity_id",
@@ -367,3 +371,7 @@ def is_powerwall_configured(config: dict) -> bool:
 def is_ev_configured(config: dict) -> bool:
     ids = config["ev_car"]["entity_ids"]
     return bool(ids["odometer_entity_id"] and ids["estimated_battery_range_entity_id"] and ids["usable_battery_level_entity_id"])
+
+
+def is_battery_simulation_enabled(config: dict) -> bool:
+    return is_ev_configured(config) and bool(config["ev_car"].get("simulate_battery_level_while_charging"))

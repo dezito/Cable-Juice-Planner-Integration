@@ -241,6 +241,11 @@
       "title": "Elbilen batteriniveau",
       "message": "Husk at sætte batteriniveauet på elbilen i Home Assistant"
     },
+    "notify_check_battery_level": {
+      "action": "Ret batteriniveau",
+      "title": "Batteriniveau ved tilslutning",
+      "message": "Bilen er tilsluttet med {battery_level} %. Passer det med bilens skærm? Ellers skriv det rigtige batteriniveau, så simuleringen starter derfra."
+    },
     "notify_battery_under_daily_battery_level": {
       "action": "Aktivere for at starte tvangsladningen",
       "title": "Elbilen batteri under dagligt batteriniveau",
@@ -480,6 +485,7 @@
     "drive_efficiency": "Kørsel effektivitet baseret på forvarmning, kørte {distance} og strømforbrug",
     "km_per_kwh": "{distance_kwh}",
     "estimated_range": "Estimerede rækkevidde baseret på nuværende batteriniveau og Exponential Moving Average (EMA)",
+    "simulated_battery_level": "Batteriniveauet planen bruger: bilens seneste værdi plus det, laderens kWh-måler har talt siden (med ladetab). Skriv bilens rigtige værdi her, hvis bilens tal er bagud. Bilens egen værdi står i attributten real_battery_level",
     "drive_efficiency_last_battery_level": "Batteriniveau ved sidste ladning (%)",
     "drive_efficiency_last_odometer": "Kilometerstand ved sidste ladning ({distance})",
     "co2_emitted": "CO₂ udledt i kg, baseret på Energi Data Service CO₂ faktor",
@@ -510,6 +516,7 @@
     "battery_preheat": "Batteriniveau- og forvarmningsindstillinger:\n• Minimum dagligt batteriniveau ({min_daily_battery_level} %): ved hjemkomst fra arbejde eller dagligkørsel.\n• Minimum tur batteriniveau ({min_trip_battery_level} %): ved hjemkomst fra en tur.\n• Minimum ladegrænse ({min_charge_limit_battery_level} %): bilens laveste mulige ladegrænse.\n• Maks. anbefalet ladegrænse ({max_recommended_charge_limit_battery_level} %): bilproducentens anbefaling.\n• Forvarm X min før ({preheat_minutes_before} min): forvarm bilen før afgang til arbejde og ture (forvarm-kontakten pr. ugedag). Ved frostgrader fordobles tiden.",
     "powerwall": "Husbatteri-indstillinger:\n• Solcelleoverskud lader kun bilen, når husbatteriet er over grænsen (nu {ev_charge_after_powerwall_battery_level} %).\n• Brug husbatteriets strøm til bilen: kræver at Solcelleoverskud til opladning og Husbatteri aflader over behov er slået til; kun strøm over grænsen bruges.\nLav en automation der slår husbatteriets afladning fra, når bilen lader, og kun tillader den når kontakten er slået til og batteriet er over grænsen.",
     "virtual_ev": "Virtuel elbil (uden bilintegration):\n• Batteriniveau: sæt bilens nuværende batteriniveau, når den tilsluttes.\n• Færdig batteriniveau: niveauet bilen stopper ved.\n• Estimeret samlet rækkevidde: bilens realistiske maks. rækkevidde.",
+    "simulated_battery_level": "Simuleret batteriniveau (bilen opdaterer batteriniveauet langsomt):\n• Bilens batteriniveau: den værdi, bilen sidst meldte.\n• Simuleret batteriniveau: bilens seneste værdi plus det, laderens kWh-måler har talt siden, med ladetab trukket fra. Planen og laderens handlinger bruger denne.\n• Når bilen melder et nyt batteriniveau, rettes simuleringen til bilens værdi (den kan derfor hoppe lidt) og stiger videre derfra.\n• Du kan selv skrive bilens rigtige batteriniveau i Simuleret batteriniveau, fx når du tilslutter, og bilens tal er bagud. Simuleringen stiger videre derfra, indtil bilen melder et nyt tal. Ved tilslutning får du en notifikation, der spørger, om værdien passer.\n• Simuleringen når højst 1 % under bilens ladegrænse, så bilen selv bekræfter, at ladningen er færdig.\n• Hopper den meget ved hver rettelse, passer ladetabet ikke: mål det under Ladetab.\nSlås til og fra i integrationens indstillinger under Elbil - sensorer.",
     "price_forecast": "Ret prisprognosen: planen retter prognosepriserne (f.eks. Carnot) med hvor meget de har ramt ved siden af de sidste 30 dage, pr. dag frem – efter 7 dages målinger, højst ±0,50 {valuta}. Se *Prisprognose* i analysen."
   },
   "dashboard": {
@@ -545,6 +552,7 @@
     "section_solar": "Sol og husbatteri",
     "section_charging_loss": "Ladetab",
     "section_virtual_ev": "Virtuel elbil",
+    "section_simulated_battery": "Simuleret batteriniveau",
     "section_advanced": "Avanceret",
     "history_battery": "Batteriniveau og ladegrænse",
     "history_efficiency": "Kørselseffektivitet",
@@ -701,6 +709,6 @@
     "forecast_better_drives": "⭐ <b>{best}</b> har ramt bilens {distance_kwh} bedst på de seneste ture: i gennemsnit {best_mae} {distance_kwh} ved siden af pr. tur mod {selected_mae} {distance_kwh} for den valgte ✅ <b>{selected}</b> ({percent} % mindre fejl). Faktisk kørte bilen {actual} {distance_kwh}; {best} forventede {best_forecast} {distance_kwh} og {selected} {selected_forecast} {distance_kwh}.",
     "forecast_no_data": "Samles fra nu af: husets forbrug efter første hele døgn, {distance_kwh} efter første tur.",
     "forecast_explain": "Lige før en ny måling gemmes i historikken (husets forbrug hver time, bilens {distance_kwh} efter hver tur), beregnes det, hver prognosetype ville have forudsagt ud fra den samme historik, og det sammenlignes med målingen. ✅ den valgte prognosetype, ⭐ den der har ramt bedst. **Gns.** er det, hver type forventede i gennemsnit, mod det faktiske øverst. **Fejl** tælles time for time / tur for tur, så en type kan ramme gennemsnittet og alligevel fejle meget hver gang. **Afvigelse** > 0: prognosen var for høj.\n\nPrognosetypen (*Indstillinger → Avanceret → Prognosetype*) gælder både husets forbrug, {distance_kwh} og reservepriserne, så vælg den, der rammer bedst der, hvor det betyder mest. Husets forbrug bruges kun til solcelleoverskuddet; {distance_kwh} til hvor meget ture og arbejdsdage kræver.",
-    "history_explain": "* **Batteriniveau og ladegrænse**: de sidste 48 timer.\n* **Køreeffektivitet**: de sidste 30 dage.\n* **Ladet af solen**: de sidste 7 dage."
+    "history_explain": "* **Batteriniveau og ladegrænse**: de sidste 48 timer (og det simulerede batteriniveau, når det er slået til).\n* **Køreeffektivitet**: de sidste 30 dage.\n* **Ladet af solen**: de sidste 7 dage."
   }
 }

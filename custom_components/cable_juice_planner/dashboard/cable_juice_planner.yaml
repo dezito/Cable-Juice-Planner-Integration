@@ -1344,6 +1344,7 @@ views:
       grid_options: &id001
         columns: full
     # forced charging: only while the battery is under the daily minimum
+    # (the simulated battery level instead of the car's when it is on, see dashboard_build)
     - type: conditional
       conditions:
       - condition: or
@@ -1413,6 +1414,7 @@ views:
       - entity: sensor.mcqueen_battery_level
         name:
           type: entity
+      # the virtual battery level, or with a car integration the simulated one
       - entity: number.cjp_battery_level
         name:
           type: entity
@@ -1885,6 +1887,7 @@ views:
         name:
           type: entity
       grid_options: *id001
+    # @@section_simulated_battery@@ with a car integration (dashboard_build)
     - type: heading
       heading: '@@section_virtual_ev@@'
       icon: mdi:car-cog

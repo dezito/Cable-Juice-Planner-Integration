@@ -5,11 +5,12 @@ from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import NUMBER_SETTINGS
+from .const import DOMAIN, NUMBER_SETTINGS
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 from .utils.helpers import float_or_none, get_dict_value_with_path
@@ -20,6 +21,11 @@ PRIMARY_NUMBERS = ("battery_level", "trip_charge_procent", "trip_range_needed", 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data
+    if not requirement_met(coordinator, NUMBER_SETTINGS["battery_level"]["requires"]):
+        # a car integration without the simulation: no unavailable battery level left behind
+        ent_reg = er.async_get(hass)
+        if entity_id := ent_reg.async_get_entity_id("number", DOMAIN, f"{entry.entry_id}_battery_level"):
+            ent_reg.async_remove(entity_id)
     async_add_entities(
         CJPNumber(coordinator, key, info) for key, info in NUMBER_SETTINGS.items() if requirement_met(coordinator, info.get("requires"))
     )

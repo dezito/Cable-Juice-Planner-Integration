@@ -90,8 +90,12 @@ async def test_ev_entities_all_or_nothing(hass: HomeAssistant) -> None:
     result = await _configure(hass, result, "ev", {"usable_battery_level_entity_id": EV_LEVEL})
     assert result["step_id"] == "ev"
     assert result["errors"] == {"base": "ev_incomplete"}
-    # charger only (no car integration) is allowed
-    result = await _configure(hass, result, "ev", {})
+    # the battery level simulation needs the car integration
+    result = await _configure(hass, result, "ev", {"simulate_battery_level_while_charging": True})
+    assert result["step_id"] == "ev"
+    assert result["errors"] == {"simulate_battery_level_while_charging": "simulation_needs_ev"}
+    # charger only (no car integration) is allowed (the form keeps the switch as entered)
+    result = await _configure(hass, result, "ev", {"simulate_battery_level_while_charging": False})
     assert result["step_id"] == "ev_specs"
 
 

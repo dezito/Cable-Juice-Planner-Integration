@@ -39,12 +39,12 @@ class HistorySession:
         if entity_state in EV_PLUGGED_STATES and self._is_not_home():
             if sessions and "end_battery_level" not in sessions[-1]:
                 return None
-            sessions.append({"start_battery_level": self.battery_level()})
+            sessions.append({"start_battery_level": self.battery_level(real=True)})
             self.mark_dirty("runtime")
         elif sessions and entity_state in EV_UNPLUGGED_STATES and self._is_not_home():
             sessions[-1].update({
-                "end_battery_level": self.battery_level(),
-                "added_percentage": round(self.battery_level() - sessions[-1]["start_battery_level"], 1),
+                "end_battery_level": self.battery_level(real=True),
+                "added_percentage": round(self.battery_level(real=True) - sessions[-1]["start_battery_level"], 1),
                 "timestamp": self.now(),
             })
             self.mark_dirty("runtime")

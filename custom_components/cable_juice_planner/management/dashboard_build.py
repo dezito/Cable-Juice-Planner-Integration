@@ -8,6 +8,8 @@ entities. At setup it is rewritten for this config entry:
 * external entities (charger, car, Energi Data Service, Strømligning, Solcast) -> the
   configured ones; extra car entities (frunk, sentry mode, ...) are derived from the
   name of the car's battery level entity
+* with the simulated battery level (number.cjp_battery_level with a car integration), conditions
+  on the car's battery level use it instead and the virtual EV section is named after it
 * cards bound to an entity that does not exist are removed, and a heading left
   without settings below it; without a car also the analysis sections with only its data
 * ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
@@ -34,7 +36,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import cached_json_fragment, json_fragment
 from homeassistant.helpers.storage import Store
 
-from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
+from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, is_battery_simulation_enabled, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
 
 _LOGGER = logging.getLogger(__name__)
@@ -279,6 +281,27 @@ def _translate(node: Any, texts: dict[str, str]) -> Any:
     return node
 
 
+def _condition_entity(node: Any, old: str, new: str) -> Any:
+    """Conditions (not cards) on old use new instead."""
+    if isinstance(node, list):
+        return [_condition_entity(item, old, new) for item in node]
+    if isinstance(node, dict):
+        if "condition" in node and node.get("entity") == old:
+            node = {**node, "entity": new}
+        return {key: _condition_entity(value, old, new) for key, value in node.items()}
+    return node
+
+
+def _rename_heading(node: Any, old: str, new: str, icon: str) -> Any:
+    if isinstance(node, list):
+        return [_rename_heading(item, old, new, icon) for item in node]
+    if isinstance(node, dict):
+        if node.get("type") == "heading" and node.get("heading") == old:
+            return {**node, "heading": new, "icon": icon}
+        return {key: _rename_heading(value, old, new, icon) for key, value in node.items()}
+    return node
+
+
 def _referenced_entities(node: Any, found: set[str]) -> set[str]:
     """Entity ids used as `entity:` (cards, conditions) or as list items."""
     if isinstance(node, list):
@@ -331,7 +354,13 @@ def render_dashboard(
     if own != ENTITY_ID_PREFIX:
         text = _OWN_ENTITY.sub(lambda match: f"{match.group(1)}.{own}_", text)
     template = yaml.safe_load(text)
-    unconfigured = {source for source, target in mapping.items() if not target}
+    simulated = f"number.{own}_battery_level"
+    if is_battery_simulation_enabled(config) and simulated in existing:
+        # the virtual battery level is the simulated one: the forced charging card follows the level
+        # the plan uses, and its settings section is named after it
+        template = _condition_entity(template, config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"], simulated)
+        template = _rename_heading(template, "@@section_virtual_ev@@", "@@section_simulated_battery@@", "mdi:battery-sync")
+    unconfigured ={source for source, target in mapping.items() if not target}
     missing = {entity_id for entity_id in _referenced_entities(template, set()) if entity_id not in existing} | unconfigured
     if not (is_ev_configured(config) and config["ev_car"]["entity_ids"]["climate_entity_id"]):
         # preheating needs the car integration and its climate entity

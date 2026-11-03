@@ -155,7 +155,7 @@ class HistoryEfficiency:
         return max_battery_level
 
     def is_battery_fully_charged(self) -> None:
-        battery_level = self.battery_level()
+        battery_level = self.battery_level(real=True)
         if battery_level < FULL_CHARGE_BATTERY_LEVEL:
             if self.full_charge_99_since is not None:
                 self.full_charge_99_since = None
@@ -201,7 +201,7 @@ class HistoryEfficiency:
 
         def set_last_battery_level():
             key = "drive_efficiency_last_battery_level"
-            self.set_state(key, max(self.battery_level(), self.peak_battery_level_after_last_plug()))
+            self.set_state(key, max(self.battery_level(real=True), self.peak_battery_level_after_last_plug()))
             for item in list(self.own_attr(key, error_state={})):
                 if item != "description":
                     self.del_attr(key, item)
@@ -273,7 +273,7 @@ class HistoryEfficiency:
                 self.preheating = False
                 return
             if state in EV_UNPLUGGED_STATES + CHARGER_NOT_READY_STATUS:
-                if self.battery_level() <= 0.0:
+                if self.battery_level(real=True) <= 0.0:
                     return
                 if not self.preheating:
                     self.drive_efficiency_save_car_stats()
@@ -289,12 +289,12 @@ class HistoryEfficiency:
             if not self.is_ev_configured():
                 distance_per_kwh = self.km_percentage_to_km_kwh(self.distance_per_percentage())
                 efficiency = 100.0
-                last_battery_level = float(self.own_state("drive_efficiency_last_battery_level", float_type=True, error_state=self.battery_level()))
+                last_battery_level = float(self.own_state("drive_efficiency_last_battery_level", float_type=True, error_state=self.battery_level(real=True)))
                 if last_battery_level == 0.0:
-                    last_battery_level = self.get_max_recommended_charge_limit_battery_level() - self.battery_level()
+                    last_battery_level = self.get_max_recommended_charge_limit_battery_level() - self.battery_level(real=True)
                     _LOGGER.warning("Last battery level is 0.0, recalculating from current battery level: %s", last_battery_level)
                 self.current_battery_level_expenses()
-                used_battery = last_battery_level - self.battery_level()
+                used_battery = last_battery_level - self.battery_level(real=True)
                 used_kwh = self.percentage_to_kwh(used_battery)
                 kilometers = round(self.get_estimated_total_range() * (used_battery / 100.0), 1)
                 # entered level above the saved one (charged elsewhere or no unplug seen): no drive to report
@@ -311,8 +311,8 @@ class HistoryEfficiency:
                     raise ValueError(f"{odometer_entity} is not available, ignoring drive")
                 current_odometer = float(self.get_state(odometer_entity, float_type=True))
                 last_odometer = float(self.own_state("drive_efficiency_last_odometer", float_type=True, error_state=current_odometer))
-                last_battery_level = float(self.own_state("drive_efficiency_last_battery_level", float_type=True, error_state=self.battery_level()))
-                used_battery = last_battery_level - self.battery_level()
+                last_battery_level = float(self.own_state("drive_efficiency_last_battery_level", float_type=True, error_state=self.battery_level(real=True)))
+                used_battery = last_battery_level - self.battery_level(real=True)
                 kilometers = current_odometer - last_odometer
                 used_kwh = self.percentage_to_kwh(used_battery)
                 if used_kwh == 0.0 or used_battery == 0.0:
@@ -320,7 +320,7 @@ class HistoryEfficiency:
                     return
                 distance_per_kwh = kilometers / used_kwh
                 distance_per_percentage = kilometers / used_battery
-                cars_distance_per_percentage = round(self.battery_range() / self.battery_level(), 2)
+                cars_distance_per_percentage = round(self.battery_range() / self.battery_level(real=True), 2)
                 efficiency = abs(round((distance_per_percentage / cars_distance_per_percentage) * 100.0, 2))
                 if kilometers <= 5.0 or used_battery <= 2.0:
                     _LOGGER.warning("%s <= 5.0 or %s usedBattery <= 2.0, ignoring drive", kilometers, used_battery)

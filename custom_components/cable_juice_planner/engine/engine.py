@@ -43,6 +43,7 @@ from ..const import (
     POWERWALL_DISCHARGING_TRIGGER,
     SOLAR_PRODUCTION_TRIGGER,
     WEEKDAYS,
+    is_battery_simulation_enabled,
     is_charger_configured,
     is_ev_configured,
     is_powerwall_configured,
@@ -97,6 +98,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.solar_configured = is_solar_configured(config)
         self.powerwall_configured = is_powerwall_configured(config)
         self.ev_configured = is_ev_configured(config)
+        self.battery_simulation_enabled = is_battery_simulation_enabled(config)
 
         charger = config["charger"]
         solar = config["solar"]
@@ -175,6 +177,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.charger_action = "stop"
         self.charger_enabled = True
         self.charger_mode = "normal"
+        # anchor of the simulated battery level (engine/battery.py), not persisted
+        self.battery_simulation: dict = {}
         self.reset_current_charging_session()
 
         # per job

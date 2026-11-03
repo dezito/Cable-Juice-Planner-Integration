@@ -167,6 +167,26 @@ def test_forced_charging_shown_when_relevant() -> None:
     assert branches[0]["conditions"][0]["below"] == "number.cjp_tesla_min_daily_battery_level"
 
 
+def test_simulated_battery_level_on_the_dashboard() -> None:
+    """With the simulation the virtual battery level is the simulated one: next to the car's, in the history and its own settings section."""
+    config = const.build_config({**OPTIONS, "language": "da", "simulate_battery_level_while_charging": True})
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "number.cjp_tesla_battery_level"}
+    dashboard = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
+    overview, settings, _ = dashboard["views"]
+    status = next(card for card in _cards(overview) if card.get("type") == "entities" and any(row.get("entity") == "sensor.ev_battery_level" for row in card["entities"]))
+    assert [row["entity"] for row in status["entities"]][:2] == ["sensor.ev_battery_level", "number.cjp_tesla_battery_level"]
+    graph = next(card for card in _cards(dashboard) if card.get("type") == "history-graph" and any(row.get("entity") == "sensor.ev_battery_level" for row in card["entities"]))
+    assert "number.cjp_tesla_battery_level" in [row["entity"] for row in graph["entities"]]
+    # forced charging follows the level the plan uses
+    forced = next(c for c in _cards(overview) if c.get("type") == "conditional" and "forced_charging_daily_battery_level" in yaml.dump(c["card"]))
+    assert {c["entity"] for branch in forced["conditions"][0]["conditions"] for c in branch["conditions"]} == {"number.cjp_tesla_battery_level"}
+    # the virtual car section is named after the simulation, with its read more (only the battery level is left in it)
+    headings = [card["heading"] for card in _cards(settings) if card.get("type") == "heading"]
+    assert "Simuleret batteriniveau" in headings and "Virtuel elbil" not in headings
+    contents = [card["content"] for card in _cards(settings) if card.get("type") == "markdown"]
+    assert any("state_attr('number.cjp_tesla_battery_level', 'help')" in content for content in contents)
+
+
 def test_settings_read_more_includes_each_help_group() -> None:
     options = {
         **OPTIONS,

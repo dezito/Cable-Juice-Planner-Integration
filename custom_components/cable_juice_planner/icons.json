@@ -129,6 +129,9 @@
       "battery_level": {
         "default": "mdi:battery-high"
       },
+      "simulated_battery_level": {
+        "default": "mdi:battery-sync"
+      },
       "completed_battery_level": {
         "default": "mdi:battery-high"
       },
