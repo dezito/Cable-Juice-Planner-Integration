@@ -1251,13 +1251,17 @@
     }
   },
   "issues": {
+    "blueprint_single_entity_inputs": {
+      "title": "Wybierz ponownie encje w automatyzacjach sterowania ładowarką",
+      "description": "Te automatyzacje używają blueprintu **Cable Juice Planner - charger control** z jedną encją w *Status or \"charging\" entities* / *Charging power*:\n\n{automations}\n\nNadal działają. Te pola przyjmują teraz kilka encji, a edytor automatyzacji pokazuje tam pojedynczą encję jako pustą, więc zapisanie automatyzacji bez ponownego jej wybrania usuwa ją. Otwórz każdą automatyzację, wybierz encje ponownie i zapisz.\n\nNaprawa zniknie, gdy żadna automatyzacja nie będzie miała już pojedynczej encji."
+    },
     "blueprint_update": {
       "title": "Nowa wersja blueprintu {name}",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Zaktualizuj blueprint {name}",
-            "description": "Cable Juice Planner zawiera wersję blueprintu **{name}**, która różni się od `{path}`.\n\nWybierz **Zatwierdź**, aby zastąpić plik dołączoną wersją i ponownie wczytać automatyzacje, które go używają. Jeśli automatyzacja ma jedną encję w polu, które teraz przyjmuje kilka, zostanie ona zapisana jako lista w `automations.yaml`, aby edytor ją pokazał. Twoje własne zmiany w pliku zostaną nadpisane – jeśli chcesz je zachować, najpierw skopiuj plik pod inną nazwą.\n\nZignoruj tę naprawę, aby zachować własny plik."
+            "description": "Cable Juice Planner zawiera wersję blueprintu **{name}**, która różni się od `{path}`.\n\nWybierz **Zatwierdź**, aby zastąpić plik dołączoną wersją i ponownie wczytać automatyzacje, które go używają. Twoje własne zmiany w pliku zostaną nadpisane – jeśli chcesz je zachować, najpierw skopiuj plik pod inną nazwą.\n\nZignoruj tę naprawę, aby zachować własny plik."
           }
         }
       }

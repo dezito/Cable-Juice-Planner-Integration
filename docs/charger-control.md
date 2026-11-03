@@ -30,9 +30,12 @@ entities, and your automation does it – easiest with the blueprint that comes 
 The file is never overwritten on its own. If a new version arrives with a HACS update (or you have edited
 the file yourself), a repair shows up after restart under *Settings → System → Repairs*. If you choose to
 update, the file is replaced with the bundled version, and automations using it are reloaded. If you ignore
-it, you keep your own file. When an input that took one entity now takes several (*Status or "charging"
-entities*, *Charging power*), automations in `automations.yaml` that use the blueprint get the entity saved as
-a list, because the automation editor shows a single entity in such a field as empty. It still works unchanged. If the file is deleted, the latest version is put back on the next restart.
+it, you keep your own file. If the file is deleted, the latest version is put back on the next restart.
+
+*Status or "charging" entities* and *Charging power* took one entity in earlier versions and take several now.
+An automation with a single entity there still works, but the automation editor shows the field as empty, and
+saving the automation without selecting the entity again removes it. A repair lists those automations: open
+each one, select the entities again and save. Cable Juice Planner never changes your automations itself.
 
 Create **one automation per car**. Under *Cable Juice Planner* select the car's **Charger action** – the
 current per phase is read from its attributes.

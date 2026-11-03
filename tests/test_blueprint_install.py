@@ -7,13 +7,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from homeassistant.components.automation import EVENT_AUTOMATION_RELOADED
 from homeassistant.components.blueprint import BLUEPRINT_SCHEMA, Blueprint
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import yaml as yaml_util
 
-from custom_components.cable_juice_planner.management.blueprint_install import SOURCE, async_install_blueprints
+from custom_components.cable_juice_planner.management.blueprint_install import (
+    SINGLE_ENTITY_ISSUE,
+    SOURCE,
+    async_install_blueprints,
+)
 from custom_components.cable_juice_planner.const import DOMAIN
 from custom_components.cable_juice_planner.repairs import async_create_fix_flow
 
@@ -135,75 +140,84 @@ async def test_old_digest_store_is_removed(hass: HomeAssistant, hass_storage: di
     assert f"{DOMAIN}.blueprints" not in hass_storage
 
 
-def _automations(hass: HomeAssistant) -> Path:
-    return Path(hass.config.path("automations.yaml"))
+def _automation(alias: str, blueprint: str, charger_status: Any, power_sensor: Any = None) -> dict[str, Any]:
+    """An automation as the automation editor saves it in automations.yaml."""
+    inputs = {"action_sensor": "sensor.cjp_tesla_charger_action", "charger_status": charger_status}
+    if power_sensor is not None:
+        inputs["power_sensor"] = power_sensor
+    return {"id": alias.replace(" ", "_"), "alias": alias, "description": "", "use_blueprint": {"path": blueprint, "input": inputs}}
 
 
-def _write_automations(hass: HomeAssistant, charger_status: Any, power_sensor: Any) -> None:
-    automations = [
-        {
-            "id": "1",
-            "alias": "charger control",
-            "use_blueprint": {
-                "path": f"{DOMAIN}/charger_control.yaml",
-                "input": {"action_sensor": "sensor.cjp_tesla_charger_action", "charger_status": charger_status, "power_sensor": power_sensor},
-            },
-        },
-        # another blueprint with an input of the same name is left alone
-        {"id": "2", "alias": "other", "use_blueprint": {"path": "other/blueprint.yaml", "input": {"charger_status": "sensor.other"}}},
-    ]
-    _automations(hass).write_text(yaml_util.dump(automations), encoding="utf-8")
+def _write_automations(hass: HomeAssistant, automations: list[dict[str, Any]]) -> str:
+    content = yaml_util.dump(automations)
+    Path(hass.config.path("automations.yaml")).write_text(content, encoding="utf-8")
+    return content
 
 
-def _inputs(hass: HomeAssistant) -> list[dict[str, Any]]:
-    return [automation["use_blueprint"]["input"] for automation in yaml_util.load_yaml(str(_automations(hass)))]
+async def test_single_entity_inputs_raise_repair(hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]]) -> None:
+    """The editor shows a single entity id in a multiple entity selector as empty: a repair lists the automations.
 
-
-async def test_single_entity_inputs_become_lists(hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]]) -> None:
-    """The multiple entity selector shows a single entity id as empty: the repair turns it into a list."""
-    _write(hass, {name: _old(content) for name, content in _bundled().items()})
-    _write_automations(hass, "sensor.bil_lader_status", "")
+    automations.yaml is only read, never written."""
+    _write(hass, _bundled())
+    content = _write_automations(
+        hass,
+        [
+            _automation("charger control", f"{DOMAIN}/charger_control.yaml", "sensor.bil_lader_status", ["sensor.bil_lader_power"]),
+            _automation("power only", f"{DOMAIN}/charger_control.yaml", [], "sensor.bil_lader_power"),
+            _automation("already lists", f"{DOMAIN}/charger_control.yaml", ["sensor.a"], ["sensor.b"]),
+            _automation("empty", f"{DOMAIN}/charger_control.yaml", "", ""),
+            # another blueprint with an input of the same name is left alone
+            _automation("other", "other/blueprint.yaml", "sensor.other"),
+            {"id": "plain", "alias": "plain", "triggers": [], "actions": []},
+        ],
+    )
     await async_install_blueprints(hass)
     await hass.async_block_till_done()
-    # not before the blueprint is updated
-    assert _inputs(hass)[0]["charger_status"] == "sensor.bil_lader_status"
 
-    issue_id, issue = next((issue_id, issue) for issue_id, issue in _issues(hass).items() if issue.data["file"] == "charger_control.yaml")
+    issue = _issues(hass)[SINGLE_ENTITY_ISSUE]
+    assert not issue.is_fixable
+    assert issue.translation_key == SINGLE_ENTITY_ISSUE
+    assert issue.translation_placeholders == {"automations": "- charger control\n- power only"}
+    assert Path(hass.config.path("automations.yaml")).read_text(encoding="utf-8") == content
+    assert not reloads[1]
+
+    # the user selected the entities again in the editor: it saves lists and reloads the automations
+    _write_automations(hass, [_automation("charger control", f"{DOMAIN}/charger_control.yaml", ["sensor.bil_lader_status"], [])])
+    hass.bus.async_fire(EVENT_AUTOMATION_RELOADED)
+    await hass.async_block_till_done()
+    assert SINGLE_ENTITY_ISSUE not in _issues(hass)
+
+
+async def test_no_single_entity_repair_while_old_blueprint_is_installed(
+    hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]]
+) -> None:
+    """The old blueprint takes one entity there; after the update the repair points at the automations."""
+    _write(hass, {name: _old(content) for name, content in _bundled().items()})
+    _write_automations(hass, [_automation("charger control", f"{DOMAIN}/charger_control.yaml", "sensor.bil_lader_status")])
+    await async_install_blueprints(hass)
+    await hass.async_block_till_done()
+    assert SINGLE_ENTITY_ISSUE not in _issues(hass)
+
+    issue_id, issue = next((issue_id, issue) for issue_id, issue in _issues(hass).items() if issue.data and issue.data["file"] == "charger_control.yaml")
     flow = await async_create_fix_flow(hass, issue_id, issue.data)
     flow.hass = hass
     flow.handler = DOMAIN
     flow.issue_id = issue_id
     flow.flow_id = "test"
     await flow.async_step_confirm({})
+    # the reload after the update ends with this event
+    hass.bus.async_fire(EVENT_AUTOMATION_RELOADED)
     await hass.async_block_till_done()
-
-    inputs = _inputs(hass)
-    assert inputs[0]["charger_status"] == ["sensor.bil_lader_status"]
-    assert inputs[0]["power_sensor"] == []
-    assert inputs[0]["action_sensor"] == "sensor.cjp_tesla_charger_action"
-    assert inputs[1]["charger_status"] == "sensor.other"
+    assert _issues(hass)[SINGLE_ENTITY_ISSUE].translation_placeholders == {"automations": "- charger control"}
 
 
-async def test_single_entity_inputs_become_lists_at_start(hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]]) -> None:
-    """The blueprint is already the bundled version (e.g. re-imported): the inputs are updated at start, once."""
-    _write(hass, _bundled())
-    _write_automations(hass, "sensor.bil_lader_status", ["sensor.bil_lader_power"])
-    await async_install_blueprints(hass)
-    await hass.async_block_till_done()
-    assert _inputs(hass)[0]["charger_status"] == ["sensor.bil_lader_status"]
-    assert _inputs(hass)[0]["power_sensor"] == ["sensor.bil_lader_power"]
-    assert len(reloads[1]) == 1
-
-    # nothing left to change: the file is not written again
-    written = _automations(hass).stat().st_mtime_ns
-    await async_install_blueprints(hass)
-    await hass.async_block_till_done()
-    assert _automations(hass).stat().st_mtime_ns == written
-    assert len(reloads[1]) == 1
-
-
-async def test_unreadable_automations_do_not_stop_the_install(hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]]) -> None:
-    _automations(hass).write_text("- alias: [broken\n", encoding="utf-8")
+@pytest.mark.parametrize("content", [None, "", "- alias: [broken\n", "not: a list\n", "- id: secret\n  alias: !secret name\n"])
+async def test_missing_or_unreadable_automations_give_no_repair(
+    hass: HomeAssistant, reloads: tuple[AsyncMock, list[ServiceCall]], content: str | None
+) -> None:
+    if content is not None:
+        Path(hass.config.path("automations.yaml")).write_text(content, encoding="utf-8")
     await async_install_blueprints(hass)
     await hass.async_block_till_done()
     assert _files(hass) == _bundled()
+    assert SINGLE_ENTITY_ISSUE not in _issues(hass)

@@ -1251,13 +1251,17 @@
     }
   },
   "issues": {
+    "blueprint_single_entity_inputs": {
+      "title": "Entitäten in den Lade-Automationen erneut auswählen",
+      "description": "Diese Automationen verwenden den Blueprint **Cable Juice Planner - charger control** mit einer einzelnen Entität in *Status or \"charging\" entities* / *Charging power*:\n\n{automations}\n\nSie funktionieren weiterhin. Diese Felder nehmen jetzt mehrere Entitäten, und der Automationseditor zeigt eine einzelne Entität dort als leer an – speicherst du die Automation, ohne sie erneut auszuwählen, wird sie entfernt. Öffne jede Automation, wähle die Entitäten erneut aus und speichere.\n\nDie Reparatur verschwindet, wenn keine Automation mehr eine einzelne Entität hat."
+    },
     "blueprint_update": {
       "title": "Neue Version des Blueprints {name}",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Blueprint {name} aktualisieren",
-            "description": "Cable Juice Planner bringt eine Version des Blueprints **{name}** mit, die sich von `{path}` unterscheidet.\n\nWähle **Absenden**, um die Datei durch die mitgelieferte Version zu ersetzen und die Automationen neu zu laden, die sie verwenden. Hat eine Automation eine einzelne Entität in einem Feld, das jetzt mehrere nimmt, wird sie in `automations.yaml` als Liste gespeichert, damit sie im Editor angezeigt wird. Eigene Änderungen an der Datei werden überschrieben – kopiere sie vorher unter einem anderen Dateinamen, wenn du sie behalten möchtest.\n\nIgnoriere diese Reparatur, um deine eigene Datei zu behalten."
+            "description": "Cable Juice Planner bringt eine Version des Blueprints **{name}** mit, die sich von `{path}` unterscheidet.\n\nWähle **Absenden**, um die Datei durch die mitgelieferte Version zu ersetzen und die Automationen neu zu laden, die sie verwenden. Eigene Änderungen an der Datei werden überschrieben – kopiere sie vorher unter einem anderen Dateinamen, wenn du sie behalten möchtest.\n\nIgnoriere diese Reparatur, um deine eigene Datei zu behalten."
           }
         }
       }
