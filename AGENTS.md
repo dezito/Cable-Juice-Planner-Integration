@@ -229,6 +229,34 @@ Points a HACS reviewer raised; check every change against them.
   `blueprint_single_entity_inputs` listing the automations, checked after
   start and on `automation_reloaded`.
 
+### Home Assistant quality scale
+
+Follow the [Integration Quality Scale rules](https://contributors.home-assistant.io/core/quality-scale/rules/)
+where they fit a calculated integration, and
+[Permissions](https://contributors.home-assistant.io/core/internals/permissions/) for actions. Keep these in
+place and extend them to new code:
+
+- Actions are registered in `async_setup` (action-setup); see the admin rule
+  above.
+- Errors from actions are `ServiceValidationError` / `HomeAssistantError`
+  with `translation_domain=DOMAIN` and a `translation_key` from the
+  `exceptions` section of `strings.json` (exception-translations), added in
+  every language. No free-text messages; `_validation_error()` in
+  `__init__.py` passes on a translated error and wraps anything else in
+  `action_failed`.
+- Every entity platform module sets `PARALLEL_UPDATES = 0`
+  (parallel-updates); new platforms too.
+- `diagnostics.py` returns the debug export data without the databases,
+  anonymised by the same `Redactor` (diagnostics). New data in the debug
+  export goes through the redactor.
+- The README "Removal" section (docs-removal-instructions) lists what is left
+  behind; update it when the integration writes new files or folders.
+- Blocking I/O (listing, globbing, reading files) runs in the executor. A
+  plain function given to `async_at_started`, a listener or `HassJob` runs in
+  a thread: mark it `@callback` or make it `async`.
+- Not applicable: discovery, reauthentication and connection tests (no device
+  or external account).
+
 ### User decisions
 
 - Default prefix `cjp`. Settings changes -> 5 s debounce + forced

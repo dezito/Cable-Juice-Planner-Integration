@@ -17,6 +17,9 @@ from .const import EV_REQUEST_TYPES, is_ev_configured
 from .coordinator import CJPCoordinator
 from .entity import CJPEntity
 
+# the entities read the coordinator's data and change only the integration's own settings
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data

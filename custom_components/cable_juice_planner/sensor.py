@@ -17,6 +17,9 @@ from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 from .site import CJPSite
 
+# the entities read the coordinator's data and change only the integration's own settings
+PARALLEL_UPDATES = 0
+
 MAX_STATE_LENGTH = 255
 # markdown / plan attributes are large; keep them out of the recorder database
 UNRECORDED = ("analysis", "charging_loss_model", "economy", "current_charging_rule", "overview", "charging_history", "emoji_description", "drive_efficiency", "km_per_kwh", "kwh_cost_price")

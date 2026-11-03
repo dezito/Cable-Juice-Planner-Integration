@@ -1250,6 +1250,32 @@
       }
     }
   },
+  "exceptions": {
+    "action_failed": {
+      "message": "Handlingen mislykkedes: {error}"
+    },
+    "backup_invalid_name": {
+      "message": "Ugyldigt navn på backup-fil: {name}"
+    },
+    "backup_not_found": {
+      "message": "Backuppen {path} blev ikke fundet"
+    },
+    "backup_unreadable": {
+      "message": "Kunne ikke læse backuppen {name}: {error}"
+    },
+    "backup_wrong_integration": {
+      "message": "{name} er ikke en Cable Juice Planner-backup"
+    },
+    "choose_instance": {
+      "message": "Vælg Cable Juice Planner-instansen (config_entry_id)"
+    },
+    "entry_not_loaded": {
+      "message": "Cable Juice Planner-instansen {entry_id} er ikke indlæst"
+    },
+    "not_an_instance": {
+      "message": "{entry_id} er ikke en Cable Juice Planner-instans"
+    }
+  },
   "issues": {
     "blueprint_single_entity_inputs": {
       "title": "Vælg entiteterne i ladeautomationerne igen",

@@ -111,16 +111,16 @@ def list_backups(folder: str) -> dict[str, str]:
 def load_backup(folder: str, name: str) -> dict[str, Any]:
     """Read and check a backup file (blocking)."""
     if not _NAME_RE.match(name):
-        raise HomeAssistantError(f"Invalid backup file name {name!r}")
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="backup_invalid_name", translation_placeholders={"name": name})
     path = os.path.join(folder, name)
     if not os.path.isfile(path):
-        raise HomeAssistantError(f"Backup {os.path.join(BACKUP_DIR, name)} not found")
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="backup_not_found", translation_placeholders={"path": os.path.join(BACKUP_DIR, name)})
     try:
         backup = load_json(path)
     except Exception as err:  # noqa: BLE001
-        raise HomeAssistantError(f"Could not read backup {name}: {err}") from err
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="backup_unreadable", translation_placeholders={"name": name, "error": str(err)}) from err
     if not isinstance(backup, dict) or backup.get("integration") != DOMAIN:
-        raise HomeAssistantError(f"{name} is not a Cable Juice Planner backup")
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="backup_wrong_integration", translation_placeholders={"name": name})
     return backup
 
 
