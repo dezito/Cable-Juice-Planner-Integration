@@ -1250,6 +1250,32 @@
       }
     }
   },
+  "exceptions": {
+    "action_failed": {
+      "message": "The action failed: {error}"
+    },
+    "backup_invalid_name": {
+      "message": "Invalid backup file name: {name}"
+    },
+    "backup_not_found": {
+      "message": "Backup {path} not found"
+    },
+    "backup_unreadable": {
+      "message": "Could not read backup {name}: {error}"
+    },
+    "backup_wrong_integration": {
+      "message": "{name} is not a Cable Juice Planner backup"
+    },
+    "choose_instance": {
+      "message": "Choose the Cable Juice Planner instance (config_entry_id)"
+    },
+    "entry_not_loaded": {
+      "message": "Cable Juice Planner config entry {entry_id} is not loaded"
+    },
+    "not_an_instance": {
+      "message": "{entry_id} is not a Cable Juice Planner instance"
+    }
+  },
   "issues": {
     "blueprint_single_entity_inputs": {
       "title": "Select the entities in the charger control automations again",

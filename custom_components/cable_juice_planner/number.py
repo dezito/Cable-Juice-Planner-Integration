@@ -15,6 +15,9 @@ from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 from .utils.helpers import float_or_none, get_dict_value_with_path
 
+# the entities read the coordinator's data and change only the integration's own settings
+PARALLEL_UPDATES = 0
+
 # values the user changes while using the car (trip, virtual battery), the rest are configuration
 PRIMARY_NUMBERS = ("battery_level", "trip_charge_procent", "trip_range_needed", "public_charging_session_cost")
 

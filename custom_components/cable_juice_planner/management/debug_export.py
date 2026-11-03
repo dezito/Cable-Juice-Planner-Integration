@@ -312,9 +312,10 @@ def _write(folder: str, name: str, prefix: str, data: dict[str, Any], redactor: 
     return os.path.getsize(path)
 
 
-async def async_export_debug(hass: HomeAssistant, coordinator: CJPCoordinator) -> str:
-    """Write the debug file of coordinator, returns its name (in debug_dir)."""
-    now = dt_util.now()
+async def async_debug_data(
+    hass: HomeAssistant, coordinator: CJPCoordinator, now: datetime.datetime, databases: bool = True
+) -> tuple[dict[str, Any], Redactor]:
+    """The debug data of coordinator and the redactor that anonymises it (debug file and diagnostics)."""
     prefix = coordinator.object_prefix
     engine_state: Any = None
     if coordinator.engine is not None:
@@ -357,13 +358,25 @@ async def async_export_debug(hass: HomeAssistant, coordinator: CJPCoordinator) -
         "failed_job": {**failed, "snapshot": snapshot_dict(failed["snapshot"])} if failed else None,
         "planning_job": {**planning, "snapshot": snapshot_dict(planning["snapshot"])} if planning else None,
         "engine": engine_state,
-        "databases": await coordinator.storage.async_load_raw(),
+        "databases": await coordinator.storage.async_load_raw() if databases else "<only in the debug export>",
         # the snapshots only carry prices when they were refreshed, the replay falls back to these
         "price_data": coordinator._price_snapshot(),
         "log": list(LOG_BUFFER.records),
         "log_file": await hass.async_add_executor_job(_log_file_tail, hass.config.path(f"{DOMAIN}_{coordinator.prefix}.log")),
     }
-    redactor = Redactor(prefix, coordinator.config, await _async_words(hass, coordinator))
+    return data, Redactor(prefix, coordinator.config, await _async_words(hass, coordinator))
+
+
+def jsonable(data: dict[str, Any], redactor: Redactor) -> dict[str, Any]:
+    """The anonymised data as plain JSON values (blocking for large data)."""
+    return json.loads(json.dumps(redactor.value(data), ensure_ascii=False, default=str))
+
+
+async def async_export_debug(hass: HomeAssistant, coordinator: CJPCoordinator) -> str:
+    """Write the debug file of coordinator, returns its name (in debug_dir)."""
+    now = dt_util.now()
+    prefix = coordinator.object_prefix
+    data, redactor = await async_debug_data(hass, coordinator, now)
     name = f"{prefix}_debug_{now.strftime('%Y%m%d_%H%M%S')}.json.gz"
     size = await hass.async_add_executor_job(_write, debug_dir(hass), name, prefix, data, redactor)
     _LOGGER.info("Debug info of Cable Juice Planner %s written to %s (%s kB)", prefix, os.path.join(DEBUG_DIR, name), round(size / 1024))

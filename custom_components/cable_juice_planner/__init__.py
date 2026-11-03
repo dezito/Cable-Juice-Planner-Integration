@@ -70,13 +70,26 @@ PUBLIC_CHARGING_SCHEMA = vol.Schema(
 )
 
 
+def _validation_error(err: HomeAssistantError) -> ServiceValidationError:
+    """A translated ServiceValidationError for an error from a service action."""
+    if err.translation_domain == DOMAIN and err.translation_key:
+        return ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key=err.translation_key,
+            translation_placeholders=err.translation_placeholders,
+        )
+    return ServiceValidationError(translation_domain=DOMAIN, translation_key="action_failed", translation_placeholders={"error": str(err)})
+
+
 def _coordinators(hass: HomeAssistant, call: ServiceCall) -> list[CJPCoordinator]:
     entry_id = call.data.get("config_entry_id")
     entries = [entry for entry in hass.config_entries.async_loaded_entries(DOMAIN) if isinstance(entry.runtime_data, CJPCoordinator)]
     if entry_id:
         entries = [entry for entry in entries if entry.entry_id == entry_id]
         if not entries:
-            raise ServiceValidationError(f"Cable Juice Planner config entry {entry_id} is not loaded")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="entry_not_loaded", translation_placeholders={"entry_id": entry_id}
+            )
     return [entry.runtime_data for entry in entries]
 
 
@@ -104,7 +117,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def _add_public_charging(call: ServiceCall) -> ServiceResponse:
         coordinators = _coordinators(hass, call)
         if len(coordinators) != 1:
-            raise ServiceValidationError("Choose the Cable Juice Planner instance (config_entry_id)")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="choose_instance")
         data = {key: value for key, value in call.data.items() if key != "config_entry_id"}
         return await coordinators[0].async_add_public_charging_session(**data)
 
@@ -117,11 +130,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def _import_data(call: ServiceCall) -> None:
         entry = hass.config_entries.async_get_entry(call.data["config_entry_id"])
         if entry is None or entry.domain != DOMAIN or entry.data.get(CONF_SITE):
-            raise ServiceValidationError(f"{call.data['config_entry_id']} is not a Cable Juice Planner instance")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="not_an_instance",
+                translation_placeholders={"entry_id": call.data["config_entry_id"]},
+            )
         try:
             await async_import(hass, entry, call.data["file"].split("/")[-1], call.data["restore_configuration"])
         except HomeAssistantError as err:
-            raise ServiceValidationError(str(err)) from err
+            raise _validation_error(err) from err
 
     hass.services.async_register(DOMAIN, SERVICE_EXPORT_DATA, _export_data, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
     # replaces the databases and can rewrite the entry options: administrators only

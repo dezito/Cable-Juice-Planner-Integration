@@ -1250,6 +1250,32 @@
       }
     }
   },
+  "exceptions": {
+    "action_failed": {
+      "message": "Akcja nie powiodła się: {error}"
+    },
+    "backup_invalid_name": {
+      "message": "Nieprawidłowa nazwa pliku kopii zapasowej: {name}"
+    },
+    "backup_not_found": {
+      "message": "Nie znaleziono kopii zapasowej {path}"
+    },
+    "backup_unreadable": {
+      "message": "Nie można odczytać kopii zapasowej {name}: {error}"
+    },
+    "backup_wrong_integration": {
+      "message": "{name} nie jest kopią zapasową Cable Juice Planner"
+    },
+    "choose_instance": {
+      "message": "Wybierz instancję Cable Juice Planner (config_entry_id)"
+    },
+    "entry_not_loaded": {
+      "message": "Instancja Cable Juice Planner {entry_id} nie jest wczytana"
+    },
+    "not_an_instance": {
+      "message": "{entry_id} nie jest instancją Cable Juice Planner"
+    }
+  },
   "issues": {
     "blueprint_single_entity_inputs": {
       "title": "Wybierz ponownie encje w automatyzacjach sterowania ładowarką",

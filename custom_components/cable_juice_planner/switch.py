@@ -14,6 +14,9 @@ from .const import SWITCH_SETTINGS
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 
+# the entities read the coordinator's data and change only the integration's own settings
+PARALLEL_UPDATES = 0
+
 # shown with the charging modes on the dashboard, the rest are configuration
 PRIMARY_SWITCHES = ("allow_manual_charging_now", "allow_manual_charging_solar", "solar_charging", "fill_up", "workplan_charging", "cheap_grid_charging")
 

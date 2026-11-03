@@ -1250,6 +1250,32 @@
       }
     }
   },
+  "exceptions": {
+    "action_failed": {
+      "message": "Дію не виконано: {error}"
+    },
+    "backup_invalid_name": {
+      "message": "Неприпустима назва файлу резервної копії: {name}"
+    },
+    "backup_not_found": {
+      "message": "Резервну копію {path} не знайдено"
+    },
+    "backup_unreadable": {
+      "message": "Не вдалося прочитати резервну копію {name}: {error}"
+    },
+    "backup_wrong_integration": {
+      "message": "{name} не є резервною копією Cable Juice Planner"
+    },
+    "choose_instance": {
+      "message": "Виберіть екземпляр Cable Juice Planner (config_entry_id)"
+    },
+    "entry_not_loaded": {
+      "message": "Екземпляр Cable Juice Planner {entry_id} не завантажено"
+    },
+    "not_an_instance": {
+      "message": "{entry_id} не є екземпляром Cable Juice Planner"
+    }
+  },
   "issues": {
     "blueprint_single_entity_inputs": {
       "title": "Виберіть сутності в автоматизаціях керування зарядним пристроєм ще раз",
