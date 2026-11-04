@@ -197,6 +197,8 @@ class EnergyForecast:
         powerwall_charging_timestamps_dict: dict = {}
 
         def get_database_kwh(cloudiness, date) -> list:
+            """[kWh, sell price, has history]; has history is False when neither the score nor its
+            neighbours have measurements (the 0 kWh is then unknown, not a measured 0)."""
             hour = date.hour
             day_of_week = date.weekday()
             try:
@@ -215,10 +217,10 @@ class EnergyForecast:
                     power_one_up_list = [self.get_forecast_value(power_one_up_list)] if power_one_up_list else []
                     avg_power = max(average(power_list + power_list + power_list + power_one_down_list + power_one_up_list), 0.0)
                     avg_sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week]))
-                    return [avg_power / 1000, avg_sell_price]
+                    return [avg_power / 1000, avg_sell_price, bool(power_list or power_one_down_list or power_one_up_list)]
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Cant get cloudiness: %s, hour: %s, day_of_week: %s. %s", cloudiness, hour, day_of_week, err)
-            return [0.0, 0.0]
+            return [0.0, 0.0, False]
 
         def process_forecast(loop_datetime, is_away, current_hour_factor, cloudiness, solar_forecast_from_integration,
                              total_db, total_db_sell, total_forecast, total_forecast_sell, total_avg, total_avg_sell, powerwall_kwh_needed):
@@ -226,16 +228,20 @@ class EnergyForecast:
             loop_sell = []
             if is_away and not self.is_powerwall_configured():
                 return powerwall_kwh_needed
+            database_used = False
             if cloudiness is not None:
-                power_factor = 0.5 if loop_datetime in solar_forecast_from_integration else 1.0
-                power_factor *= current_hour_factor
                 power_cost = get_database_kwh(cloudiness, loop_datetime)
-                loop_kwh.append(power_cost[0] * power_factor)
-                loop_sell.append(power_cost[1] * power_factor)
                 total_db.append(round(power_cost[0], 3))
                 total_db_sell.append(round(power_cost[1], 3))
+                # no solar history for the hour and weather: Solcast alone instead of averaging with an unknown 0
+                if power_cost[2] or loop_datetime not in solar_forecast_from_integration:
+                    database_used = True
+                    power_factor = 0.5 if loop_datetime in solar_forecast_from_integration else 1.0
+                    power_factor *= current_hour_factor
+                    loop_kwh.append(power_cost[0] * power_factor)
+                    loop_sell.append(power_cost[1] * power_factor)
             if loop_datetime in solar_forecast_from_integration:
-                power_factor = 1.5 if cloudiness is not None else 1.0
+                power_factor = 1.5 if database_used else 1.0
                 power_factor *= current_hour_factor
                 loop_kwh.append(solar_forecast_from_integration[loop_datetime][0] * power_factor)
                 loop_sell.append(solar_forecast_from_integration[loop_datetime][1] * power_factor)
