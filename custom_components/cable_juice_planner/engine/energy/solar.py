@@ -133,7 +133,14 @@ class EnergySolar:
                     if powerwall_battery_level < powerwall_reserved_battery_level or (self.powerwall_max_charging_power(period=cron_interval) > POWERWALL_CHARGING_TRIGGER and period != 59):
                         powerwall_force_power -= max(powerwall_charging_power, solar["powerwall_charging_power_limit"]) if powerwall_charging_power > POWERWALL_CHARGING_TRIGGER else solar["powerwall_charging_power_limit"]
                 else:
-                    if powerwall_battery_level < powerwall_reserved_battery_level and powerwall_charging_power > POWERWALL_CHARGING_TRIGGER and self.ready_to_charge():
+                    # Only solar surplus can be moved from the home battery to the car. Without surplus (e.g. the battery
+                    # charges from the grid) nothing is moved, so the battery is not reported as stopped.
+                    if (
+                        powerwall_battery_level < powerwall_reserved_battery_level
+                        and powerwall_charging_power > POWERWALL_CHARGING_TRIGGER
+                        and watts_available_from_local_energy_solar_only > 0.0
+                        and self.ready_to_charge()
+                    ):
                         _LOGGER.info("Forcing powerwall to stop charging power with %sW, because current_hour %s is not in powerwall_charging_timestamps", powerwall_charging_power, current_hour)
                         powerwall_force_power += min(watts_available_from_local_energy_solar_only, powerwall_charging_consumption)
                         powerwall_forced_stop_charging = True

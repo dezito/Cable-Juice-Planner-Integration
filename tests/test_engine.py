@@ -386,6 +386,59 @@ def test_hour_end_does_not_subtract_battery_charging_twice() -> None:
     assert hour["power_consumption_without_all_exclusion"][0][1] > 0.0
 
 
+def _home_battery_charging(monkeypatch: pytest.MonkeyPatch, hour: int, solar: float) -> tuple[str, float]:
+    """The home battery charges 7277 W below the car's battery level limit, with `solar` W production and 600 W house."""
+    from custom_components.cable_juice_planner.engine.energy.power import POWER_VALUE_KEYS
+
+    now = datetime.datetime.combine(DAY, datetime.time(hour, 30))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now), engine.startup, {}).error is None
+    house, charging = 600.0, 7277.0
+    values = dict.fromkeys(POWER_VALUE_KEYS, 0.0)
+    values.update(
+        power_consumption=house,
+        power_consumption_without_ignored=house,
+        power_consumption_without_ignored_ev=house,
+        power_consumption_without_all_exclusion=house,
+        powerwall_charging_consumption=charging,
+        solar_production=solar,
+    )
+    patches = {
+        "is_solar_configured": lambda: True,
+        "is_powerwall_configured": lambda: True,
+        "power_values": lambda **_: dict(values),
+        "local_energy_available": lambda **_: max(solar - house, 0.0),
+        "local_energy_prediction": lambda **_: {}.keys(),  # no hour where the battery is expected to charge from solar
+        "get_powerwall_discharge_above_needed": lambda: False,
+        "get_powerwall_battery_level": lambda: 63.0,
+        "get_ev_charge_after_powerwall_battery_level": lambda: 90.0,
+        "powerwall_max_charging_power": lambda **_: charging,
+        "ready_to_charge": lambda: True,
+        "current_hour_in_charge_hours": lambda: False,
+    }
+    for name, func in patches.items():
+        monkeypatch.setattr(engine, name, func)
+    result = engine.run_job(snapshot(now), engine.max_local_energy_available_remaining_period)
+    assert result.error is None, result.error
+    latest = engine.max_local_energy_available_history[max(engine.max_local_energy_available_history)]
+    return engine.powerwall_charging_text, latest["5. powerwall_force_power"]
+
+
+def test_home_battery_charging_without_solar_surplus_is_not_reported_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Grid charging of the home battery (no solar surplus): nothing to give the car, so not "stopped"."""
+    text, force_power = _home_battery_charging(monkeypatch, 0, solar=0.0)
+    assert text == TEXTS["ui.max_local_energy_available_remaining_period.powerwall_charging"].format(powerwall_charging_consumption=7277)
+    assert force_power == 0.0
+
+
+def test_home_battery_charging_with_solar_surplus_is_reported_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Solar surplus that charges the home battery is moved to the car - at any time of day."""
+    for hour in (12, 0):  # depends on the surplus, not on the clock
+        text, force_power = _home_battery_charging(monkeypatch, hour, solar=3000.0)
+        assert text == TEXTS["ui.max_local_energy_available_remaining_period.powerwall_force_stop"].format(powerwall_charging_consumption=7277)
+        assert force_power == 2400.0  # min(solar surplus 3000 - 600, battery charging 7277)
+
+
 def test_hour_end_without_consumption_entity_records_nothing() -> None:
     now = datetime.datetime.combine(DAY, datetime.time(12, 59))
     engine = CJPEngine(const.build_config({**OPTIONS, "power_consumption_entity_id": ""}), "cjp_test", TEXTS)
