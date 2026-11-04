@@ -18,9 +18,8 @@ from homeassistant.util import dt as dt_util
 from ..const import HISTORY_BUFFER_HOURS, HISTORY_SHORT_BUFFER_HOURS
 from ..engine import Snapshot
 from ..engine.energy.forecast import SOLCAST_ENDINGS, strip_forecast_suffix
-from ..utils.helpers import float_or_none
 from ..engine.history.history import merge_rows
-from ..prices import PRICE_SNAPSHOT_SECONDS, TARIFF_STATE_KEYS
+from ..prices import PRICE_SNAPSHOT_SECONDS
 from .constants import FORECAST_TIMEOUT, STATISTICS_REFRESH_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,19 +70,8 @@ class CoordinatorData:
         return snapshot
 
     def _price_snapshot(self) -> dict:
-        entity_ids = self.config["prices"]["entity_ids"]
-        attributes: dict[str, dict] = {}
-        values: dict[str, float] = {}
-        tariff_entities = {entity_ids.get(key) for key in TARIFF_STATE_KEYS} - {None, ""}
-        for entity_id in self.price_entities:
-            state = self.hass.states.get(entity_id)
-            if state is None:
-                continue
-            attributes[entity_id] = dict(state.attributes)
-            if entity_id in tariff_entities:
-                value = float_or_none(state.state)
-                values[entity_id] = value if value is not None else 0.0
-        return {"attributes": attributes, "values": values}
+        provider = self.price_provider
+        return provider.snapshot(self.hass.states.get) if provider else {"attributes": {}, "values": {}}
 
     def _solcast_snapshot(self) -> dict[str, list]:
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"]

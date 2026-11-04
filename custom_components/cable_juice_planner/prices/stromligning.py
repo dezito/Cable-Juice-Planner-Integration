@@ -15,11 +15,12 @@ class StromligningPriceProvider(BasePriceProvider):
     """Strømligning ('prices' attribute with start/price, tariffs as separate sensors)."""
 
     source_name = "stromligning"
+    buy_key = "stromligning_buy_current_price"
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
         get = self.entity_ids.get
-        self.buy_current_price = get("stromligning_buy_current_price", "")
+        self.buy_current_price = get(self.buy_key, "")
         self.buy_tomorrow_available = get("stromligning_buy_tomorrow_available", "")
         self.buy_forecasts = get("stromligning_buy_forecasts", "")
         self.sell_current_price = get("stromligning_sell_current_price", "")

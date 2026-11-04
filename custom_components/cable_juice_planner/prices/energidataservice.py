@@ -15,10 +15,11 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
     """https://github.com/MTrab/energidataservice (raw_today / raw_tomorrow / forecast)."""
 
     source_name = "energidataservice"
+    buy_key = "energidataservice_buy_entity_id"
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
-        self.buy_entity_id = self.entity_ids.get("energidataservice_buy_entity_id", "")
+        self.buy_entity_id = self.entity_ids.get(self.buy_key, "")
         self.sell_entity_id = self.entity_ids.get("energidataservice_sell_entity_id", "") or self.buy_entity_id
 
     def get_buy_price_entity_id(self) -> str:

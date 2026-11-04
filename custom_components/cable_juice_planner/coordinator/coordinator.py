@@ -43,6 +43,7 @@ from ..const import (
 )
 from ..management.debug_export import DebugRecorder
 from ..engine import CJPEngine, JobResult
+from ..prices import CombinedPriceProvider
 from ..utils.formatting import translate
 from ..management.storage import CJPStorage
 from .data import CoordinatorData
@@ -142,6 +143,11 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
     def legacy_prefix(self) -> str | None:
         """Prefix of the PyScript installation chosen for import in the config flow."""
         return self.entry.data.get("legacy_prefix")
+
+    @property
+    def price_provider(self) -> CombinedPriceProvider | None:
+        """The engine's price provider: everything about prices (entities, snapshot, history)."""
+        return self.engine.price_provider if self.engine is not None else None
 
     @property
     def signal(self) -> str:

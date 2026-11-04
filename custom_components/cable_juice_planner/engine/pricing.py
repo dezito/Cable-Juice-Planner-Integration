@@ -52,12 +52,8 @@ class Pricing:
                 provider = self.price_provider
                 if provider is None:
                     raise ValueError("No price provider")
-                if sell_prices:
-                    hour_prices = provider.get_sell_prices()
-                    sources = provider.sell_price_sources
-                else:
-                    hour_prices = provider.get_buy_prices()
-                    sources = provider.buy_price_sources
+                hour_prices = provider.get_sell_prices() if sell_prices else provider.get_buy_prices()
+                sources = provider.get_price_sources(sell_prices)
                 if not hour_prices:
                     raise ValueError(f"No {'sell' if sell_prices else 'grid'} prices returned from {type(provider).__name__}")
                 hour_prices = deepcopy(hour_prices)

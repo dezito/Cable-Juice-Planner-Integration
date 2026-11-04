@@ -304,7 +304,7 @@
       },
       "price_provider": {
         "title": "Electricity prices",
-        "description": "Choose where the hourly prices come from. With both, the first one with a price for an hour is used.",
+        "description": "Choose where the hourly prices come from. With both, Strømligning has priority: its price is used for every hour it has one, and Energi Data Service fills the gaps.",
         "data": {
           "price_providers": "Price providers"
         }
@@ -707,7 +707,7 @@
       },
       "price_provider": {
         "title": "Electricity prices",
-        "description": "Choose where the hourly prices come from. With both, the first one with a price for an hour is used.",
+        "description": "Choose where the hourly prices come from. With both, Strømligning has priority: its price is used for every hour it has one, and Energi Data Service fills the gaps.",
         "data": {
           "price_providers": "Price providers"
         }

@@ -4,7 +4,6 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ...const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
 from ...utils.helpers import days_between, reset_time_to_hour
 from .helpers import ANALYSIS_DAYS, ANALYSIS_DRIVES, ANALYSIS_MIN_KM, ANALYSIS_MIN_PERCENT, PRICE_FORECAST_DAYS, PRICE_HOURS_DAYS, _is_num, evaluate_price_day, hourly_prices
 
@@ -105,14 +104,11 @@ class AnalysisStorage:
             return
         current_hour = reset_time_to_hour(self.now())
         hours = self.analysis_db["price_hours"]
-        prices = provider.get_buy_prices()
-        sources = provider.buy_price_sources
-        forecast = {ts: price for ts, price in prices.items() if str(sources.get(ts, "")).endswith(":forecast")}
-        for hour, price in hourly_prices(forecast).items():
+        # the forecasts as published, without the penalty per day ahead the providers add
+        for hour, price in hourly_prices(provider.get_buy_forecast_prices(adder=False)).items():
             lead = days_between(current_hour, hour)
             if 1 <= lead <= PRICE_FORECAST_DAYS:
-                # the providers add lead / divider to forecasts to prefer known prices
-                hours.setdefault(hour.strftime("%Y-%m-%dT%H"), {})[str(lead)] = round(price - lead / PRICE_ADDER_DAY_BETWEEN_DIVIDER, 3)
+                hours.setdefault(hour.strftime("%Y-%m-%dT%H"), {})[str(lead)] = round(price, 3)
         for hour, price in hourly_prices(provider.get_buy_real_prices()).items():
             hours.setdefault(hour.strftime("%Y-%m-%dT%H"), {})["real"] = round(price, 3)
 

@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections.abc import Callable, Mapping
+from typing import Any
 
+from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
+from ..utils.helpers import days_between, float_or_none, reset_time_to_hour
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,12 +31,18 @@ _ZERO_TARIFFS = {
 }
 
 
+# hass.states.get (or anything returning an object with .state and .attributes, or None)
+GetState = Callable[[str], Any]
+
+
 def _naive(timestamp):
     return timestamp.replace(tzinfo=None) if isinstance(timestamp, datetime.datetime) else timestamp
 
 
 class BasePriceProvider:
     source_name = "base"
+    # config key of the buy price entity
+    buy_key = ""
 
     def __init__(self, config: dict) -> None:
         prices_config = config.get("prices", {})
@@ -148,7 +158,16 @@ class BasePriceProvider:
 
 
 class CombinedPriceProvider(BasePriceProvider):
-    """Merges the configured providers."""
+    """Every price of the integration, from the configured providers in PRICE_PROVIDER_PRIORITY
+    order (Strømligning before Energi Data Service).
+
+    For each timestamp the first provider with a price wins, and real prices always win over
+    forecasts. The rest of the integration only asks this class: the coordinator which
+    entities to read (snapshot, recorded history), the engine the prices.
+
+    The Home Assistant side methods only read the configuration, so the coordinator can call
+    them on the event loop while the worker updates the prices.
+    """
 
     source_name = "combined"
 
@@ -163,6 +182,42 @@ class CombinedPriceProvider(BasePriceProvider):
         self.last_update = None
         for provider in providers:
             provider.shared_data = self.shared_data
+
+    # Home Assistant side ------------------------------------------------- #
+
+    def price_entity_ids(self) -> list[str]:
+        """Every configured price entity (each once)."""
+        return list(dict.fromkeys(entity_id for entity_id in self.entity_ids.values() if entity_id))
+
+    def buy_price_entity_ids(self) -> list[str]:
+        """The buy price entities of the providers, in priority order."""
+        return [entity_id for entity_id in (p.get_buy_price_entity_id() for p in self.providers) if entity_id]
+
+    def snapshot(self, get_state: GetState) -> dict:
+        """The price entities for set_snapshot(): {"attributes": {...}, "values": {...}}."""
+        attributes: dict[str, dict] = {}
+        values: dict[str, float] = {}
+        tariff_entities = {self.entity_ids.get(key) for key in TARIFF_STATE_KEYS} - {None, ""}
+        for entity_id in self.price_entity_ids():
+            state = get_state(entity_id)
+            if state is None:
+                continue
+            attributes[entity_id] = dict(state.attributes)
+            if entity_id in tariff_entities:
+                value = float_or_none(state.state)
+                values[entity_id] = value if value is not None else 0.0
+        return {"attributes": attributes, "values": values}
+
+    def combine_history(self, history: Mapping[str, Mapping]) -> dict:
+        """Recorded buy prices {entity_id: {timestamp: price}} -> {timestamp: price}: per
+        timestamp the price of the first provider that has one."""
+        combined: dict = {}
+        for entity_id in self.buy_price_entity_ids():
+            for timestamp, price in (history.get(entity_id) or {}).items():
+                combined.setdefault(timestamp, price)
+        return combined
+
+    # prices (worker) ----------------------------------------------------- #
 
     def set_now(self, now: datetime.datetime) -> None:
         self.now = now
@@ -246,6 +301,36 @@ class CombinedPriceProvider(BasePriceProvider):
         self._sync_prices()
         return self.sell_real_prices
 
+    def get_buy_forecast_prices(self, adder: bool = True) -> dict:
+        """The forecast buy prices; adder=False without the penalty per day ahead the providers
+        add to prefer known prices."""
+        self._sync_prices()
+        return self._forecast(self.buy_prices, self.buy_price_sources, adder)
+
+    def get_sell_forecast_prices(self, adder: bool = True) -> dict:
+        self._sync_prices()
+        return self._forecast(self.sell_prices, self.sell_price_sources, adder)
+
+    def _forecast(self, prices: dict, sources: dict, adder: bool) -> dict:
+        current_hour = reset_time_to_hour(self.now)
+        return {
+            timestamp: price if adder else price - days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+            for timestamp, price in prices.items()
+            if str(sources.get(timestamp, "")).endswith(":forecast")
+        }
+
+    def get_price_sources(self, sell_prices: bool = False) -> dict:
+        """{timestamp: "<provider>:real" or "<provider>:forecast"}. Shared - do not modify."""
+        self._sync_prices()
+        return self.sell_price_sources if sell_prices else self.buy_price_sources
+
+    def price_source(self, timestamp, sell_prices: bool = False) -> str:
+        """The source ("<provider>:real", "<provider>:forecast" or "") of the price at exactly timestamp."""
+        return self.get_price_sources(sell_prices).get(_naive(timestamp), "")
+
+    def is_forecast(self, timestamp, sell_prices: bool = False) -> bool:
+        return self.price_source(timestamp, sell_prices).endswith(":forecast")
+
     def get_buy_price(self, timestamp=None) -> float:
         self._sync_prices()
         timestamp = _naive(timestamp if timestamp is not None else self.now)
@@ -283,6 +368,16 @@ class CombinedPriceProvider(BasePriceProvider):
             return {key: details.get(key, 0.0) for key in _ZERO_TARIFFS}
         return dict(_ZERO_TARIFFS)
 
+    def get_buy_periods_in_hour(self, timestamp) -> int:
+        self._sync_prices()
+        return self._periods_in_hour(self.buy_real_prices, timestamp) or 1
+
     def get_sell_periods_in_hour(self, timestamp) -> int:
         self._sync_prices()
         return self._periods_in_hour(self.sell_real_prices, timestamp) or 1
+
+    def get_current_price_timestamp(self, timestamp=None, sell_prices: bool = False):
+        self._sync_prices()
+        timestamp = _naive(timestamp if timestamp is not None else self.now)
+        result = self.get_price_at_timestamp(self.sell_real_prices if sell_prices else self.buy_real_prices, timestamp)
+        return None if result is None else result["price_timestamp"]

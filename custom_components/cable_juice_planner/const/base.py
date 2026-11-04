@@ -8,6 +8,10 @@ CONF_ENTITY_PREFIX = "entity_prefix"
 DEFAULT_ENTITY_PREFIX = ""  # optional; entity ids are cjp_<prefix>_<key> (cjp_<key> without)
 ENTITY_ID_PREFIX = "cjp"
 
+# Price providers in priority order. For each hour the planner and the economy use the
+# first configured provider that has a price, then fall back to the next one.
+PRICE_PROVIDER_PRIORITY = ("stromligning", "energidataservice")
+
 
 def normalize_prefix(prefix: str | None) -> str:
     """User prefix without the fixed cjp_ (entries before version 2 stored it with it)."""

@@ -81,7 +81,8 @@ integration (virtual EV).
 
 ### Prices
 
-Energi Data Service and/or Strømligning. With both, the first one with a price for an hour is used.
+Energi Data Service and/or Strømligning. With both, Strømligning has priority: its price is used for every
+hour it has one, and Energi Data Service fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
 
