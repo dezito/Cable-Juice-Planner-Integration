@@ -95,6 +95,12 @@ What's in the file is there so the problem can be found and the calculation repl
 - the state of the entities Cable Juice Planner uses and of its own entities, including the plans and the
   overview
 - the last 50 calculations with the charging rule, errors and tracebacks
+- the automations made from the bundled blueprint (*Cable Juice Planner - charger control*): their inputs (the actions you set up for your charger and car),
+  whether they are on and when they last ran, and the installed blueprint file when it differs from the
+  bundled one
+- for the entities Cable Juice Planner and the blueprint automations use: the integration (e.g. `huawei_solar`,
+  `fronius`, `zaptec`), the device's manufacturer, model and firmware, the integration's version and whether
+  it is loaded
 - the inputs of the last 2 calculations and of the last calculation that failed (states, history, prices,
   weather/solar forecast)
 - the internal state and the databases (charging history, power values, price history, analysis)
@@ -111,16 +117,21 @@ Everything is anonymised before the file is written:
   never read.
 - **Names**: names of people, Home Assistant users, the home (its name in Home Assistant), the car name and
   notify services become `<redacted>`, also inside log messages and texts.
-- **Entity names**: entity ids of other integrations are replaced by the setting they are used for, e.g.
+- **Entity names**: entity ids of other integrations are replaced by the setting or blueprint input they are used for, e.g.
   `sensor.power_consumption` instead of `sensor.my_house_consumption`; other entities become `sensor.entity_1`
   and so on. Cable Juice Planner's own entities (`sensor.<prefix>_...`) are kept. Friendly names are removed.
 - **Location**: Coordinates (the home and the car's location) are rounded to whole degrees (about 100 × 60
   km). Addresses, streets, cities and postal codes are removed.
 - **Contact and network details**: e-mail addresses, URLs and IP addresses are removed everywhere, also in log
   messages. Phone numbers, MAC addresses and host names are removed from entity attributes.
-- **Device identifiers**: VIN and serial numbers in entity attributes are removed.
+- **Device identifiers**: VIN and serial numbers in entity attributes are removed. Of devices only the
+  manufacturer, model and firmware are exported: not their names, serial numbers or identifiers, and not the
+  names of integration entries.
+- **Services**: service names such as `number.set_value` or `zaptec.limit_current` are kept, so the blueprint
+  actions can be read; notify services and scripts are named after your things and are replaced.
 
-What remains is your energy data: consumption, prices, plans and history. Open the file (it is gzip
+What remains is your energy data (consumption, prices, plans and history) and how your setup is built
+(blueprint actions, integrations and device models). Open the file (it is gzip
 compressed JSON) if you want to check it before you upload it. Cable Juice Planner never sends anything by
 itself; the file only leaves your Home Assistant when you upload it.
 
