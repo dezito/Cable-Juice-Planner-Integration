@@ -150,8 +150,9 @@ class CoordinatorRefresh:
         from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
 
         instance = get_instance(self.hass)
-        prices_cfg = self.config["prices"]["entity_ids"]
-        price_id = prices_cfg["energidataservice_buy_entity_id"] or prices_cfg["stromligning_buy_current_price"]
+        # the buy price history of every price provider, combined by the provider (priority per hour)
+        provider = self.price_provider
+        price_ids = provider.buy_price_entity_ids() if provider else []
         odometer_id = self.config["ev_car"]["entity_ids"]["odometer_entity_id"] if self.ev_configured else ""
         status_id = self.config["charger"]["entity_ids"]["status_entity_id"]
         end = dt_util.utcnow()
@@ -164,22 +165,26 @@ class CoordinatorRefresh:
             return start.timestamp() if isinstance(start, datetime.datetime) else float(start)
 
         try:
-            if price_id:
+            if price_ids:
                 stats = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, end - datetime.timedelta(days=keep_days + 5), end, {price_id}, "hour", None, {"mean"}
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=keep_days + 5), end, set(price_ids), "hour", None, {"mean"}
                 )
-                data["prices"] = {stat_ts(row): row["mean"] for row in stats.get(price_id, []) if row.get("mean") is not None}
-                if not data["prices"]:
-                    # no long-term statistics (no state_class): the raw history, the price changes every hour
-                    start = end - datetime.timedelta(days=keep_days)
-                    raw = await instance.async_add_executor_job(
-                        partial(
-                            history.get_significant_states, self.hass, start, end, [price_id], None,
-                            include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                recorded = {}
+                for price_id in price_ids:
+                    hourly = {stat_ts(row): row["mean"] for row in stats.get(price_id, []) if row.get("mean") is not None}
+                    if not hourly:
+                        # no long-term statistics (no state_class): the raw history, the price changes every hour
+                        start = end - datetime.timedelta(days=keep_days)
+                        raw = await instance.async_add_executor_job(
+                            partial(
+                                history.get_significant_states, self.hass, start, end, [price_id], None,
+                                include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                            )
                         )
-                    )
-                    series = as_series((state.last_changed.timestamp(), state.state) for state in raw.get(price_id, []))
-                    data["prices"] = {row[0]: row[1] for row in resample_steps(series, start.timestamp(), end.timestamp(), 3600.0)}
+                        series = as_series((state.last_changed.timestamp(), state.state) for state in raw.get(price_id, []))
+                        hourly = {row[0]: row[1] for row in resample_steps(series, start.timestamp(), end.timestamp(), 3600.0)}
+                    recorded[price_id] = hourly
+                data["prices"] = provider.combine_history(recorded)
             if odometer_id:
                 months = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, end - datetime.timedelta(days=400), end, {odometer_id}, "month", None, {"change"}

@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.cable_juice_planner import _async_run_after_home_assistant_started
+from custom_components.cable_juice_planner.prices import create_price_provider
 from custom_components.cable_juice_planner.const import (
     BUTTON_KEYS,
     DOMAIN,
@@ -590,3 +591,48 @@ async def test_economy_uses_the_raw_price_history_without_statistics(hass: HomeA
     assert [PRICE] in calls
     prices = captured["prices"]
     assert prices[(hour - datetime.timedelta(hours=3)).timestamp()] == pytest.approx(1.3)
+
+
+async def test_economy_prefers_stromligning_over_energi_data_service(hass: HomeAssistant, loaded_entry) -> None:
+    """With both price providers the economy uses Strømligning per hour and Energi Data Service where it has none."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from .conftest import PRICE  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    coordinator.config["prices"]["entity_ids"]["stromligning_buy_current_price"] = "sensor.stromligning"
+    # a changed configuration reloads the entry, which builds a new price provider
+    coordinator.engine.price_provider = create_price_provider(coordinator.config)
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    queried = []
+
+    def statistics(_hass, _start, _end, ids, period, *_args):
+        if period != "hour":
+            return {}
+        queried.append(set(ids))
+        return {
+            "sensor.stromligning": [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 1.0} for h in range(1, 4)],
+            PRICE: [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 2.0} for h in range(1, 7)],
+        }
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    captured = {}
+    original = coordinator.async_run_job
+
+    async def run_job(name, *args, **kwargs):
+        if name == "economy_update":
+            captured.update(args[0])
+        return await original(name, *args, **kwargs)
+
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value={}),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+        patch.object(coordinator, "async_run_job", side_effect=run_job),
+    ):
+        await coordinator._async_economy_refresh()
+    assert {"sensor.stromligning", PRICE} in queried
+    prices = captured["prices"]
+    assert prices[(hour - datetime.timedelta(hours=2)).timestamp()] == 1.0
+    assert prices[(hour - datetime.timedelta(hours=5)).timestamp()] == 2.0

@@ -304,7 +304,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med begge bruges den første der har en pris for en given time.",
+        "description": "Vælg hvor timepriserne kommer fra. Med begge har Strømligning første prioritet: dens pris bruges for hver time, den har en, og Energi Data Service udfylder hullerne.",
         "data": {
           "price_providers": "Prisleverandører"
         }
@@ -707,7 +707,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med begge bruges den første der har en pris for en given time.",
+        "description": "Vælg hvor timepriserne kommer fra. Med begge har Strømligning første prioritet: dens pris bruges for hver time, den har en, og Energi Data Service udfylder hullerne.",
         "data": {
           "price_providers": "Prisleverandører"
         }
