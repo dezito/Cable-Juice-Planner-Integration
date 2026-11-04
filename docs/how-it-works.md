@@ -33,8 +33,10 @@ battery % the car really uses, also in winter.
 ### Solar surplus
 
 With solar panels, the plan uses the forecast **surplus** (production minus the house's consumption) from
-Solcast and/or CJP's own history per weather type. The surplus the car can use is subtracted from what has
-to be bought. See [Solar surplus charging](rules/solar.md).
+Solcast and/or CJP's own history per weather type. With both, Solcast counts 75 % and the history 25 %;
+when the history has no measurement for the hour and weather type (e.g. on a new installation), Solcast is
+used alone. The surplus the car can use is subtracted from what has to be bought. See
+[Solar surplus charging](rules/solar.md).
 
 ### Prices
 

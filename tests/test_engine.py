@@ -1029,3 +1029,20 @@ def test_solar_sell_price_with_fixed_price(fixed: float) -> None:
     assert result.value == pytest.approx(hourly if fixed == -1.0 else 1.0 - hourly, abs=0.001)
     if fixed != -1.0:
         assert result.value < 0.0  # 18:00 sells for more than the fixed price
+
+
+def test_solcast_alone_when_there_is_no_solar_history() -> None:
+    """A new installation has no solar history: Solcast alone, not averaged with an unknown 0 (0.75 x Solcast)."""
+    options = {**OPTIONS, "production_entity_id": "sensor.solar", "forecast_entity_id": "sensor.solcast_today"}
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    noon = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(12))  # a Saturday, not a workday
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    daily = [{"datetime": datetime.datetime.combine(DAY + datetime.timedelta(days=day), datetime.time(0)).isoformat(), "condition": "sunny"} for day in range(8)]
+    snap.forecast_dict = {"hourly": [{"datetime": noon.isoformat(), "condition": "sunny"}], "daily": daily}
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine.get_solar_kwh_forecast = lambda: {noon: (2.0, 0.5)}
+    result = engine.run_job(snap, engine.local_energy_prediction)
+    assert result.error is None, result.error
+    assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
