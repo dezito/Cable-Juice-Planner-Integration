@@ -6,11 +6,17 @@ export_debug service/button writes them with the configuration, the settings, th
 state and the databases to <config>/cable_juice_planner_debug/<prefix>_debug_<time>.json.gz and
 creates a notification with a download link and a prefilled GitHub issue.
 
+The file also holds the automations of the bundled blueprint (read from automations.yaml,
+inputs included) with their state, the installed blueprint files (the content only when
+it differs from the bundled one), and for the entities they and the configuration use the
+integration, the device (manufacturer, model, firmware) and the integration's version.
+
 Nothing personal may end up in the file: entity ids of other integrations are replaced by
-the config key they are used for (sensor.power_consumption), names of people, the car, the
-home and notify services are replaced by <redacted>, coordinates are rounded to whole degrees and
-keys, addresses, e-mails, URLs and IP addresses are removed. The snapshots can be replayed
-with tests/debug_replay.py.
+the config key or blueprint input they are used for (sensor.power_consumption), names of
+people, the car, the home and notify services are replaced by <redacted>, coordinates are
+rounded to whole degrees and keys, addresses, e-mails, URLs and IP addresses are removed.
+Service names (number.set_value) are kept. Device and config entry names, serial numbers and
+identifiers are not exported. The snapshots can be replayed with tests/debug_replay.py.
 """
 from __future__ import annotations
 
@@ -26,6 +32,7 @@ import re
 import traceback
 from collections import deque
 from http import HTTPStatus
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -33,14 +40,18 @@ from aiohttp import web
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.config import AUTOMATION_CONFIG_PATH
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.http import KEY_HASS
-from homeassistant.loader import async_get_integration
-from homeassistant.util import dt as dt_util
+from homeassistant.loader import IntegrationNotFound, async_get_integration
+from homeassistant.util import dt as dt_util, yaml as yaml_util
 
 from ..utils.codec import encode
 from ..const import DOMAIN
+from .blueprint_install import SOURCE as BLUEPRINT_SOURCE, _normalized
 
 if TYPE_CHECKING:
     from ..coordinator import CJPCoordinator
@@ -90,6 +101,10 @@ _SENSITIVE_KEY_RE = re.compile(
 _COORDINATE_KEYS = {"latitude", "longitude", "lat", "lon", "lng"}
 _ROUNDED_KEYS = {"elevation": -2, "altitude": -2, "gps_accuracy": -2}
 REDACTED = "<redacted>"
+# what a device is, not its name, serial number or identifiers
+DEVICE_FIELDS = ("manufacturer", "model", "model_id", "sw_version", "hw_version")
+# services of these domains are named after the user's things (notify.mobile_app_<phone>, script.<name>)
+NAMED_SERVICE_DOMAINS = {"notify", "script"}
 
 # ---------------------------------------------------------------------- #
 # Log ring buffer
@@ -175,14 +190,51 @@ class DebugRecorder:
 # ---------------------------------------------------------------------- #
 
 
+def _references(value: Any, services: set[str] | frozenset[str], found: dict[str, set[str]] | None = None) -> dict[str, set[str]]:
+    """Entity ids, device ids and integration domains in an automation configuration."""
+    if found is None:
+        found = {"entities": set(), "devices": set(), "domains": set()}
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in ("action", "service") and isinstance(child, str) and "." in child:
+                found["domains"].add(child.partition(".")[0])
+            elif key == "device_id":
+                found["devices"].update(item for item in (child if isinstance(child, list) else [child]) if isinstance(item, str))
+            else:
+                if key == "domain" and isinstance(child, str):
+                    found["domains"].add(child)
+                _references(child, services, found)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            _references(child, services, found)
+    elif isinstance(value, str):
+        found["entities"].update(match.group(0) for match in _ENTITY_RE.finditer(value) if match.group(0) not in services)
+    return found
+
+
 class Redactor:
     """Replaces everything personal in the export, see the module docstring."""
 
-    def __init__(self, own_prefix: str, config: dict, words: list[str]) -> None:
+    def __init__(
+        self,
+        own_prefix: str,
+        config: dict,
+        words: list[str],
+        services: set[str] | frozenset[str] = frozenset(),
+        inputs: list[dict] | None = None,
+    ) -> None:
         self.own_prefix = own_prefix
+        self.services = services  # domain.service names that look like entity ids and are kept
         self.aliases: dict[str, str] = {}  # domain.object base -> alias base
         self._used: set[str] = set()
         self._collect_aliases(config)
+        # entities of the blueprint automations are named after their input (after the config)
+        for automation_inputs in inputs or []:
+            for name, value in automation_inputs.items():
+                for entity_id in sorted(_references(value, services)["entities"]):
+                    domain, _, object_id = entity_id.partition(".")
+                    if not self._own(domain, object_id):
+                        self._alias(domain, object_id, str(name))
         words = sorted({word.strip() for word in words if word and len(word.strip()) >= 3}, key=len, reverse=True)
         self._words = re.compile(r"\b(" + "|".join(map(re.escape, words)) + r")\b", re.IGNORECASE) if words else None
 
@@ -209,9 +261,13 @@ class Redactor:
             self.aliases[key] = alias
         return f"{domain}.{self.aliases[key]}{suffix}"
 
+    def _own(self, domain: str, object_id: str) -> bool:
+        """Kept as they are: own entities, sun.sun and module names (sensor.py)."""
+        return object_id == "py" or object_id.startswith(f"{self.own_prefix}_") or (domain == "sun" and object_id == "sun")
+
     def _entity(self, match: re.Match) -> str:
         domain, object_id = match.group(1), match.group(2)
-        if object_id == "py" or object_id.startswith(f"{self.own_prefix}_") or (domain == "sun" and object_id == "sun"):
+        if self._own(domain, object_id) or match.group(0) in self.services:
             return match.group(0)
         return self._alias(domain, object_id)
 
@@ -257,6 +313,156 @@ class Redactor:
         if dataclasses.is_dataclass(value) and not isinstance(value, type):
             return self.value({field.name: getattr(value, field.name) for field in dataclasses.fields(value)}, key)
         return self.text(str(value))
+
+
+# ---------------------------------------------------------------------- #
+# Blueprint automations, devices and integrations
+# ---------------------------------------------------------------------- #
+
+
+def _is_own_blueprint(path: str, bundled: set[str]) -> bool:
+    """The bundled blueprint, also when it was imported from source_url into another folder."""
+    return path.startswith(f"{DOMAIN}/") or Path(path).name in bundled
+
+
+def _read_blueprints(automations_path: str, root: str) -> dict[str, Any]:
+    """The automations of the bundled blueprints in automations.yaml (only read) and the
+    blueprint files: installed, up to date, the content only when it differs (blocking)."""
+    bundled = {source.name: source for source in BLUEPRINT_SOURCE.glob("*.yaml")}
+    result: dict[str, Any] = {"automations": [], "automations_error": None, "files": {}}
+    try:
+        automations = yaml_util.load_yaml(automations_path) if os.path.isfile(automations_path) else []
+    except HomeAssistantError as err:
+        automations = []
+        result["automations_error"] = str(err)
+    for automation in automations if isinstance(automations, list) else []:
+        blueprint = automation.get("use_blueprint") if isinstance(automation, dict) else None
+        if not isinstance(blueprint, dict) or not _is_own_blueprint(str(blueprint.get("path") or ""), set(bundled)):
+            continue
+        item = {key: automation[key] for key in ("id", "alias", "mode", "initial_state") if key in automation}
+        result["automations"].append({**item, "path": str(blueprint["path"]), "input": blueprint.get("input") or {}})
+
+    folder = Path(root)
+    paths = {f"{DOMAIN}/{name}" for name in bundled} | {item["path"] for item in result["automations"]}
+    if (folder / DOMAIN).is_dir():
+        paths |= {f"{DOMAIN}/{file.name}" for file in (folder / DOMAIN).glob("*.yaml")}
+    for path in sorted(paths):
+        file = (folder / path).resolve()
+        if not file.is_relative_to(folder.resolve()) or not file.is_file():
+            result["files"][path] = {"installed": False}
+            continue
+        try:
+            content = file.read_text(encoding="utf-8", errors="replace")
+            source = bundled.get(file.name)
+            up_to_date = source is not None and _normalized(content) == _normalized(source.read_text(encoding="utf-8"))
+        except OSError as err:
+            result["files"][path] = {"installed": True, "error": str(err)}
+            continue
+        result["files"][path] = {"installed": True, "bundled": source is not None, "up_to_date": up_to_date}
+        if not up_to_date:
+            result["files"][path]["content"] = content
+    return result
+
+
+def _known_services(hass: HomeAssistant) -> set[str]:
+    """Registered services that look like entity ids (number.set_value), kept by the Redactor."""
+    return {
+        f"{domain}.{service}"
+        for domain, services in hass.services.async_services().items()
+        if domain in ENTITY_DOMAINS and domain not in NAMED_SERVICE_DOMAINS
+        for service in services
+    }
+
+
+def _automation_state(hass: HomeAssistant, entity_id: str | None) -> dict[str, Any]:
+    state = hass.states.get(entity_id) if entity_id else None
+    if state is None:
+        return {"entity_id": entity_id, "state": None}
+    return {
+        "entity_id": entity_id,
+        "state": state.state,
+        "last_triggered": state.attributes.get("last_triggered"),
+        "current": state.attributes.get("current"),
+    }
+
+
+async def _async_blueprint_data(
+    hass: HomeAssistant, entry_id: str, services: set[str]
+) -> tuple[dict[str, Any], dict[str, set[str]]]:
+    """The blueprint automations with their state and what their inputs refer to."""
+    data = await hass.async_add_executor_job(
+        _read_blueprints, hass.config.path(AUTOMATION_CONFIG_PATH), hass.config.path("blueprints", "automation")
+    )
+    ent_reg = er.async_get(hass)
+    own = {entry.entity_id for entry in er.async_entries_for_config_entry(ent_reg, entry_id)}
+    referenced: dict[str, set[str]] = {"entities": set(), "devices": set(), "domains": set()}
+    listed: set[str] = set()
+    for automation in data["automations"]:
+        automation_id = automation.pop("id", None)
+        entity_id = ent_reg.async_get_entity_id("automation", "automation", str(automation_id)) if automation_id else None
+        if entity_id:
+            listed.add(entity_id)
+        found = _references(automation["input"], services)
+        for key, values in found.items():
+            referenced[key] |= values
+        automation["this_instance"] = bool(own & found["entities"])
+        automation["entity"] = _automation_state(hass, entity_id)
+    # automations of the blueprint outside automations.yaml (packages): only their state
+    from homeassistant.components.automation import automations_with_blueprint
+
+    for path, file in data["files"].items():
+        if not file.get("installed"):
+            continue
+        for entity_id in automations_with_blueprint(hass, path):
+            if entity_id not in listed:
+                data["automations"].append({"path": path, "input": None, "this_instance": None, "entity": _automation_state(hass, entity_id)})
+    return data, referenced
+
+
+def _device_info(hass: HomeAssistant, device_id: str | None) -> dict[str, Any] | None:
+    """What the device is and which integrations provide it (no name, serial or identifiers)."""
+    device = dr.async_get(hass).async_get(device_id) if device_id else None
+    if device is None:
+        return None
+    info: dict[str, Any] = {field: value for field in DEVICE_FIELDS if (value := getattr(device, field, None))}
+    # a device belongs to one config entry since 2026.10 (config_entries is deprecated there)
+    entry_ids = [device.config_entry_id] if hasattr(device, "config_entry_id") else list(device.config_entries)
+    info["integrations"] = sorted(
+        {entry.domain for entry_id in entry_ids if entry_id and (entry := hass.config_entries.async_get_entry(entry_id))}
+    )
+    return info
+
+
+def _entity_info(hass: HomeAssistant, entity_id: str, platform: str | None = None) -> dict[str, Any]:
+    state = hass.states.get(entity_id)
+    entry = er.async_get(hass).async_get(entity_id)
+    info: dict[str, Any] = {
+        "platform": platform or (entry.platform if entry else None),
+        "state": state.state if state else None,
+        "unit": state.attributes.get("unit_of_measurement") if state else None,
+        "device_class": state.attributes.get("device_class") if state else None,
+        "last_changed": state.last_changed.isoformat() if state else None,
+    }
+    if entry and (device := _device_info(hass, entry.device_id)):
+        info["device"] = device
+    return info
+
+
+async def _async_integrations(hass: HomeAssistant, domains: set[str]) -> dict[str, Any]:
+    """Version (custom integrations) and config entry states of the integrations in use."""
+    result: dict[str, Any] = {}
+    for domain in sorted(domain for domain in domains if domain and domain != DOMAIN):
+        try:
+            integration = await async_get_integration(hass, domain)
+        except IntegrationNotFound:
+            result[domain] = {"found": False}
+            continue
+        result[domain] = {
+            "custom": not integration.is_built_in,
+            "version": str(integration.version) if integration.version else None,
+            "entries": sorted(entry.state.value for entry in hass.config_entries.async_entries(domain)),
+        }
+    return result
 
 
 # ---------------------------------------------------------------------- #
@@ -325,16 +531,17 @@ async def async_debug_data(
         except TimeoutError:
             engine_state = "<timeout, a job is still running>"
     recorder = coordinator.debug
-    entities = {}
-    for entity_id in (*coordinator.configured_entities, *coordinator.price_entities):
-        state = hass.states.get(entity_id)
-        entities[entity_id] = {
-            "platform": coordinator._platforms.get(entity_id),
-            "state": state.state if state else None,
-            "unit": state.attributes.get("unit_of_measurement") if state else None,
-            "device_class": state.attributes.get("device_class") if state else None,
-            "last_changed": state.last_changed.isoformat() if state else None,
-        }
+    services = _known_services(hass)
+    blueprints, referenced = await _async_blueprint_data(hass, coordinator.entry.entry_id, services)
+    entities = {
+        entity_id: _entity_info(hass, entity_id, coordinator._platforms.get(entity_id))
+        for entity_id in (*coordinator.configured_entities, *coordinator.price_entities)
+    }
+    for entity_id in sorted(referenced["entities"] - set(entities)):
+        entities[entity_id] = {**_entity_info(hass, entity_id), "blueprint": True}
+    devices = {device_id: info for device_id in sorted(referenced["devices"]) if (info := _device_info(hass, device_id))}
+    domains = {info["platform"] for info in entities.values()} | {domain for info in devices.values() for domain in info["integrations"]}
+    domains |= {domain for domain in referenced["domains"] if domain not in ENTITY_DOMAINS and domain != "homeassistant"}
     snapshots = [{**item, "snapshot": snapshot_dict(item["snapshot"])} for item in recorder.snapshots]
     failed, planning = recorder.failed, recorder.planning
     data = {
@@ -350,6 +557,9 @@ async def async_debug_data(
         "options": dict(coordinator.entry.options),
         "config": coordinator.config,
         "entities": entities,
+        "devices": devices,
+        "integrations": await _async_integrations(hass, domains),
+        "blueprints": blueprints,
         "settings": dict(coordinator.settings),
         "states": dict(coordinator.data),
         "attributes": {key: dict(value) for key, value in coordinator.attributes.items()},
@@ -364,7 +574,8 @@ async def async_debug_data(
         "log": list(LOG_BUFFER.records),
         "log_file": await hass.async_add_executor_job(_log_file_tail, hass.config.path(f"{DOMAIN}_{coordinator.prefix}.log")),
     }
-    return data, Redactor(prefix, coordinator.config, await _async_words(hass, coordinator))
+    inputs = [item["input"] for item in blueprints["automations"] if isinstance(item["input"], dict)]
+    return data, Redactor(prefix, coordinator.config, await _async_words(hass, coordinator), services, inputs)
 
 
 def jsonable(data: dict[str, Any], redactor: Redactor) -> dict[str, Any]:

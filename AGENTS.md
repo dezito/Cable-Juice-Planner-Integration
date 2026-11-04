@@ -333,6 +333,17 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   prefilled `.github/ISSUE_TEMPLATE/bug_report.yml` link. CJP snapshots carry
   prices only once an hour, so the export adds `price_data`.
 - Keep this file in sync with the BattMind copy.
+- Besides the coordinator data the export holds `blueprints` (the bundled
+  blueprint's automations from `automations.yaml`, read only, with inputs and
+  automation state; the installed blueprint files with their content only
+  when they differ from the bundled one), `devices` and `integrations`
+  (platform, manufacturer/model/firmware, integration version and config
+  entry states). Device and config entry names, serial numbers and
+  identifiers are never exported. The `Redactor` names blueprint input
+  entities after their input and keeps registered service names
+  (`number.set_value`), except `notify`/`script` services. Since 2026.10 a
+  device has `config_entry_id`; `config_entries` is deprecated, so support
+  both (minimum is 2025.1).
 - To analyse a file handed in by the user, run from the repo root:
   `PYTHONPATH=../ha-dev/windows %LOCALAPPDATA%/ha-dev-tests/venv/Scripts/python.exe tests/debug_replay.py <file> [failed|planning|<index>]`.
 
