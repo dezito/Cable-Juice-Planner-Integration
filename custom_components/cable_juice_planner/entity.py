@@ -17,6 +17,7 @@ from .const import (
     SIGNAL_HELP_VALUES_CHANGED,
     TITLE,
     device_name,
+    hidden_settings,
     is_battery_simulation_enabled,
     is_ev_configured,
     is_powerwall_configured,
@@ -145,6 +146,9 @@ class CJPEntity(Entity):
             result["description"] = description
         group = ENTITY_HELP_GROUPS.get(self._text_key)
         if group and (text := texts.get(f"entity_help.{group}")):
+            # a setting the dashboard doesn't show: its paragraph is left out
+            if hidden := hidden_settings(self.coordinator.config):
+                text = "\n\n".join(part for part in text.split("\n\n") if not any(f"{{{key}}}" in part for key in hidden))
             try:
                 result["help"] = text.format_map(help_values(self.coordinator))
             except (ValueError, IndexError):

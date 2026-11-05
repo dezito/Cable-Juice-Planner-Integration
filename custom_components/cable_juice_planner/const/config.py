@@ -373,5 +373,14 @@ def is_ev_configured(config: dict) -> bool:
     return bool(ids["odometer_entity_id"] and ids["estimated_battery_range_entity_id"] and ids["usable_battery_level_entity_id"])
 
 
+def hidden_settings(config: dict) -> tuple[str, ...]:
+    """Number settings the dashboard and the help texts leave out for this configuration.
+
+    min_charge_limit_battery_level only limits the car's charge limit entity (the max
+    recommended limit stays: the plan charges up to it with or without that entity).
+    """
+    return () if config["ev_car"]["entity_ids"]["charging_limit_entity_id"] else ("min_charge_limit_battery_level",)
+
+
 def is_battery_simulation_enabled(config: dict) -> bool:
     return is_ev_configured(config) and bool(config["ev_car"].get("simulate_battery_level_while_charging"))
