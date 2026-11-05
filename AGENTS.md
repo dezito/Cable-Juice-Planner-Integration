@@ -280,6 +280,11 @@ place and extend them to new code:
   kWh is worth fixed price − the hour's raw sell price, can be negative. Use
   `sell_value()` (`engine/pricing.py`); keep price data and DBs raw.
 - "No charging mode active" charges at max by design (fallback).
+- Without "Car charge limit" (`charging_limit_entity_id`) the dashboard and the
+  help texts leave out `min_charge_limit_battery_level` (`hidden_settings()` in
+  `const/config.py`; the entity still exists). `max_recommended_charge_limit_battery_level`
+  stays visible: the plan charges up to it with or without the car's limit
+  (user decision 2026-11-05).
 - Battery level simulation (`simulate_battery_level_while_charging`, EV page):
   user choices: it uses the virtual EV's `number.<prefix>_battery_level` (other
   name/help via `EV_TEXT_KEYS`), counts the charger's kWh meter regardless of

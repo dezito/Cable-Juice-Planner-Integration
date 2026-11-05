@@ -155,6 +155,34 @@ def test_preheat_only_with_a_climate_entity() -> None:
         assert entity_id in with_climate
 
 
+def test_min_charge_limit_only_with_a_charge_limit_entity() -> None:
+    """Without "Car charge limit" the min. charge limit is hidden; the max. recommended limit stays (the plan uses it)."""
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "number.ev_charge_limit"}
+    with_limit = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
+    assert "number.cjp_tesla_min_charge_limit_battery_level" in with_limit
+    without = render_dashboard(const.build_config({**OPTIONS, "language": "da", "charging_limit_entity_id": ""}), "tesla", "entry1", existing)
+    assert "number.cjp_tesla_min_charge_limit_battery_level" not in without
+    assert "entity: number.cjp_tesla_max_recommended_charge_limit_battery_level" in without
+    # the section's read more still finds its help
+    assert "state_attr('number.cjp_tesla_max_recommended_charge_limit_battery_level', 'help')" in without
+
+
+async def test_help_leaves_out_the_min_charge_limit_without_its_entity(hass: HomeAssistant) -> None:
+    from custom_components.cable_juice_planner.entity import CJPEntity
+
+    def help_text(charging_limit: str) -> str:
+        config = const.build_config({**OPTIONS, "language": "da", "charging_limit_entity_id": charging_limit})
+        coordinator = SimpleNamespace(
+            hass=hass, object_prefix="cjp_tesla", data={}, settings={}, config=config,
+            texts=load_texts("da"), entry=SimpleNamespace(entry_id="entry1"), prefix="tesla", car_name=None,
+        )
+        return CJPEntity(coordinator, "number", "min_daily_battery_level").help_attributes()["help"]
+
+    assert "Minimum ladegrænse" in help_text("number.ev_charge_limit")
+    without = help_text("")
+    assert "Minimum ladegrænse" not in without and "Maks. anbefalet ladegrænse" in without and "\n\n\n" not in without
+
+
 def test_forced_charging_shown_when_relevant() -> None:
     """Only while the battery level is under the daily minimum."""
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}

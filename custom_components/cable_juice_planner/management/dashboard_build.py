@@ -10,6 +10,8 @@ entities. At setup it is rewritten for this config entry:
   name of the car's battery level entity
 * with the simulated battery level (number.cjp_battery_level with a car integration), conditions
   on the car's battery level use it instead and the virtual EV section is named after it
+* settings the configuration doesn't use are removed (preheating without the car's climate
+  entity, the min. charge limit without its charge limit entity: ``hidden_settings()``)
 * cards bound to an entity that does not exist are removed, and a heading left
   without settings below it; without a car also the analysis sections with only its data
 * ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
@@ -36,7 +38,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import cached_json_fragment, json_fragment
 from homeassistant.helpers.storage import Store
 
-from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, is_battery_simulation_enabled, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
+from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, hidden_settings, is_battery_simulation_enabled, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
 
 _LOGGER = logging.getLogger(__name__)
@@ -365,6 +367,8 @@ def render_dashboard(
     if not (is_ev_configured(config) and config["ev_car"]["entity_ids"]["climate_entity_id"]):
         # preheating needs the car integration and its climate entity
         missing |= {f"{platform}.{own}_{key}" for platform, key in PREHEAT_ENTITIES}
+    # e.g. the min. charge limit without the car's charge limit entity
+    missing |= {f"number.{own}_{key}" for key in hidden_settings(config)}
     if not is_ev_configured(config):
         template = _drop_sections(template, EV_SECTIONS)
     texts = load_texts(normalize_language(config.get("language")), currency, distance)
