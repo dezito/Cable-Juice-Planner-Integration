@@ -554,6 +554,81 @@ async def test_analysis_reads_the_recorder(hass: HomeAssistant, loaded_entry) ->
     assert coordinator.engine.analysis_backfilled()
 
 
+async def test_learned_distance_reads_the_daily_statistics(hass: HomeAssistant, loaded_entry) -> None:
+    """Evenings without an own odometer reading come from the daily long-term statistics, in the odometer's unit."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from .conftest import EV_ODOMETER  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    coordinator.engine.daily_odometer = {}
+    today = dt_util.start_of_local_day()
+    queried = []
+
+    def statistics(_hass, _start, end, ids, period, units, types):
+        if EV_ODOMETER not in ids:
+            return {}
+        queried.append((end, set(ids), period, units, types))
+        return {EV_ODOMETER: [
+            {"start": dt_util.start_of_local_day(today.date() - datetime.timedelta(days=days)).timestamp(), "state": 20000.0 + (20 - days) * 30}
+            for days in range(20, 0, -1)
+        ]}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=10)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value={}) as raw,
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+    ):
+        await coordinator._async_distance_refresh()
+        await hass.async_block_till_done()
+    assert queried == [(today, {EV_ODOMETER}, "day", {"distance": "km"}, {"state", "max"})]
+    raw.assert_not_called()
+    assert len(coordinator.engine.daily_odometer) == 20
+    assert coordinator.engine.daily_odometer[(today.date() - datetime.timedelta(days=1)).isoformat()] == 20570.0
+    attributes = hass.states.get(f"number.{OBJECT_PREFIX}_typical_daily_distance").attributes
+    assert attributes["learned_days"] == 19 and attributes["learned_distance"] == 30
+
+
+async def test_learned_distance_uses_the_raw_history_without_statistics(hass: HomeAssistant, loaded_entry) -> None:
+    """An odometer without state_class has no statistics: the last state of each day in the raw
+    history, also on a day without driving; a day ending unavailable gets no reading."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from .conftest import EV_ODOMETER  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    coordinator.engine.daily_odometer = {}
+    today = dt_util.start_of_local_day().date()
+
+    def at(days: int, hour: int) -> datetime.datetime:
+        return dt_util.start_of_local_day(today - datetime.timedelta(days=days)) + datetime.timedelta(hours=hour)
+
+    def state(moment, value):
+        return State(EV_ODOMETER, value, last_changed=moment, last_updated=moment)
+
+    states = {EV_ODOMETER: [
+        state(dt_util.utcnow() - datetime.timedelta(days=5), "20000"),  # the state at the start
+        state(at(3, 10), "20040"),
+        state(at(1, 8), "unavailable"),
+    ]}
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=4)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value=states),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", return_value={}),
+    ):
+        await coordinator._async_distance_refresh()
+        await hass.async_block_till_done()
+    assert coordinator.engine.daily_odometer == {
+        (today - datetime.timedelta(days=4)).isoformat(): 20000.0,
+        (today - datetime.timedelta(days=3)).isoformat(): 20040.0,
+        (today - datetime.timedelta(days=2)).isoformat(): 20040.0,  # parked all day
+    }
+
+
 async def test_economy_uses_the_raw_price_history_without_statistics(hass: HomeAssistant, loaded_entry) -> None:
     """A price sensor without state_class has no statistics: its raw history gives the hourly prices."""
     from types import SimpleNamespace  # noqa: PLC0415

@@ -1,7 +1,9 @@
 """Learned driving distance per weekday (engine part).
 
 The odometer is read every evening (hour_end at 23:59). The distance of a day is the
-difference to the reading the evening before. From the last weeks:
+difference to the reading the evening before. Evenings without an own reading (Home Assistant
+was down, a new install) are filled in from the recorder by distance_backfill. From the last
+weeks:
 
 - workday_distance_needed_<day>: the median of that weekday, so one long trip does not
   move it;
@@ -72,6 +74,32 @@ class Distance:
         self.daily_odometer[today.isoformat()] = odometer
         oldest = (today - datetime.timedelta(weeks=DISTANCE_WEEKS, days=1)).isoformat()
         self.daily_odometer = {date: value for date, value in self.daily_odometer.items() if date >= oldest}
+        self.mark_dirty("runtime")
+        self.update_learned_distances()
+
+    def distance_backfill(self, readings: dict) -> None:
+        """The coordinator's odometer at the end of each day {"YYYY-MM-DD": odometer} from Home
+        Assistant's long-term statistics or raw history. It only fills days without an own reading
+        in the last weeks; today is left to hour_end, a day's partial value would stay otherwise."""
+        if not self.is_ev_configured() or not readings:
+            return
+        today = self.now().date()
+        oldest = today - datetime.timedelta(weeks=DISTANCE_WEEKS, days=1)
+        added = 0
+        for date, value in readings.items():
+            try:
+                day = datetime.date.fromisoformat(str(date))
+                odometer = float(value)
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(odometer) or not oldest <= day < today or day.isoformat() in self.daily_odometer:
+                continue
+            self.daily_odometer[day.isoformat()] = odometer
+            added += 1
+        if not added:
+            return
+        _LOGGER.debug("Learned driving distance: %s days filled in from the recorder", added)
+        self.daily_odometer = dict(sorted(self.daily_odometer.items()))
         self.mark_dirty("runtime")
         self.update_learned_distances()
 

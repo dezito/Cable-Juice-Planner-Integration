@@ -39,6 +39,7 @@ class CoordinatorEvents:
         if self.ev_configured:
             self._unsubs.append(track(self._job_handler("preheat_cron"), minute="/5", second=0))
             self._unsubs.append(track(self._charging_loss_hourly, minute=17, second=0))
+            self._unsubs.append(track(self._distance_daily, hour=3, minute=53, second=0))
 
         charger = self.config["charger"]["entity_ids"]
         ev = self.config["ev_car"]["entity_ids"]

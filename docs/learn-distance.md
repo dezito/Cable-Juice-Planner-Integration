@@ -7,6 +7,11 @@ Instead of guessing the km per workday, CJP can learn them from the odometer.
 ## How it works
 
 - The odometer is read every evening (23:59). A day's distance is the difference to the evening before.
+- Evenings CJP did not read itself – Home Assistant was restarted or down, or CJP is newly installed – are
+  filled in from Home Assistant's recorder at startup and every night: the odometer's daily **long-term
+  statistics** (the last value of each day), or, for an odometer without `state_class`, the raw history
+  (only as many days as the recorder keeps, 10 by default). So a new install starts with up to 8 weeks of
+  days right away. CJP's own readings always win, and a day the odometer ended unavailable gets no reading.
 - From the last **8 weeks** CJP suggests:
 
   | Number | Suggestion | Why |
