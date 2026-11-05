@@ -15,11 +15,11 @@ import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import save_json
-from homeassistant.helpers.restore_state import async_get as async_get_restore_data
+from homeassistant.helpers.restore_state import StoredState, async_get as async_get_restore_data
 from homeassistant.util import dt as dt_util
 from homeassistant.util.json import load_json
 
@@ -39,10 +39,22 @@ def backup_dir(hass: HomeAssistant) -> str:
     return hass.config.path(BACKUP_DIR)
 
 
+@callback
+def async_get_stored_state(hass: HomeAssistant, entity_id: str) -> StoredState | None:
+    """The state the restore state helper stored for entity_id, also when the entity is not loaded.
+
+    Home Assistant 2026.11 indexes the stored states by entity registry id and replaced
+    RestoreStateData.last_states with async_get_stored_state; older versions only have last_states.
+    """
+    data = async_get_restore_data(hass)
+    if (get_stored_state := getattr(data, "async_get_stored_state", None)) is not None:
+        return get_stored_state(entity_id)
+    return data.last_states.get(entity_id)
+
+
 def _collect_settings(hass: HomeAssistant, entry_id: str) -> dict[str, str]:
     """platform.key -> state of the entry's settings entities (last stored state when unloaded)."""
     ent_reg = er.async_get(hass)
-    last_states = async_get_restore_data(hass).last_states
     settings: dict[str, str] = {}
     for reg_entry in er.async_entries_for_config_entry(ent_reg, entry_id):
         key = f"{reg_entry.domain}.{reg_entry.unique_id.removeprefix(f'{entry_id}_')}"
@@ -50,7 +62,7 @@ def _collect_settings(hass: HomeAssistant, entry_id: str) -> dict[str, str]:
             continue
         state = hass.states.get(reg_entry.entity_id)
         if state is None or state.state in ("unknown", "unavailable"):
-            stored = last_states.get(reg_entry.entity_id)
+            stored = async_get_stored_state(hass, reg_entry.entity_id)
             state = stored.state if stored else None
         if state is not None and state.state not in ("unknown", "unavailable"):
             settings[key] = state.state

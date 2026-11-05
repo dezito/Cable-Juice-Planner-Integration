@@ -14,11 +14,10 @@ from homeassistant.core import CoreState, Event, HomeAssistant, ServiceCall, Ser
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.restore_state import async_get as async_get_restore_data
 from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.helpers.typing import ConfigType
 
-from .management.backup import BACKUP_DIR, async_export, async_import
+from .management.backup import BACKUP_DIR, async_export, async_get_stored_state, async_import
 from .const import (
     CONF_ENTITY_PREFIX,
     CONF_SITE,
@@ -231,7 +230,7 @@ def _async_migrate_last_full_charge(hass: HomeAssistant, entry: ConfigEntry) -> 
     data = dict(entry.data)
     ent_reg = er.async_get(hass)
     if entity_id := ent_reg.async_get_entity_id("datetime", DOMAIN, f"{entry.entry_id}_last_full_charge"):
-        stored = async_get_restore_data(hass).last_states.get(entity_id)
+        stored = async_get_stored_state(hass, entity_id)
         if stored and stored.state.state not in ("unknown", "unavailable"):
             data[MIGRATED_LAST_FULL_CHARGE] = stored.state.state
         ent_reg.async_remove(entity_id)
@@ -249,7 +248,7 @@ def _async_migrate_removed_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
         entity_id = ent_reg.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}")
         if entity_id is None:
             continue
-        if key == "solar_sell_fixed_price" and (stored := async_get_restore_data(hass).last_states.get(entity_id)):
+        if key == "solar_sell_fixed_price" and (stored := async_get_stored_state(hass, entity_id)):
             if (value := float_or_none(stored.state.state)) is not None:
                 options[key] = value
         ent_reg.async_remove(entity_id)

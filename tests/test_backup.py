@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,11 +11,15 @@ from homeassistant import config_entries
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.auth.models import User
-from homeassistant.core import Context, HomeAssistant
+from homeassistant.core import Context, HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError, Unauthorized
+from homeassistant.helpers.restore_state import StoredState
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import mock_restore_cache
 
-from custom_components.cable_juice_planner.management.backup import BACKUP_DIR
+from custom_components.cable_juice_planner.management import backup
+from custom_components.cable_juice_planner.management.backup import BACKUP_DIR, async_get_stored_state
 from custom_components.cable_juice_planner.const import CONF_ENTITY_PREFIX, DB_NAMES, DOMAIN
 
 from .conftest import OBJECT_PREFIX, async_unload_and_join, form_defaults
@@ -32,6 +37,23 @@ def config_dir(hass: HomeAssistant, tmp_path: Path) -> Path:
 
 async def _settle(hass: HomeAssistant) -> None:
     await hass.async_block_till_done(wait_background_tasks=True)
+
+
+async def test_stored_state_of_an_unloaded_entity(hass: HomeAssistant) -> None:
+    mock_restore_cache(hass, [State(SWITCH, "on")])
+    assert async_get_stored_state(hass, SWITCH).state.state == "on"
+    assert async_get_stored_state(hass, TIME) is None
+
+
+@pytest.mark.parametrize("api", ["async_get_stored_state", "last_states"])
+async def test_stored_state_supports_both_restore_state_apis(hass: HomeAssistant, monkeypatch, api: str) -> None:
+    """HA 2026.11 replaced RestoreStateData.last_states with async_get_stored_state."""
+    stored = StoredState(State(SWITCH, "on"), None, dt_util.utcnow())
+    states = {SWITCH: stored}
+    data = SimpleNamespace(async_get_stored_state=states.get) if api == "async_get_stored_state" else SimpleNamespace(last_states=states)
+    monkeypatch.setattr(backup, "async_get_restore_data", lambda hass: data)
+    assert async_get_stored_state(hass, SWITCH) is stored
+    assert async_get_stored_state(hass, TIME) is None
 
 
 async def test_export_and_import_service(hass: HomeAssistant, config_dir: Path, loaded_entry, hass_storage) -> None:
