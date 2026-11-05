@@ -1,4 +1,4 @@
-"""Charging loss, economy and analysis refresh."""
+"""Charging loss, economy, analysis and learned driving distance refresh."""
 from __future__ import annotations
 
 import datetime
@@ -6,18 +6,22 @@ import logging
 from functools import partial
 from typing import Any
 
+from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import DistanceConverter
 
 from ..const import ENTITY_UNAVAILABLE_STATES
+from ..engine.distance import DISTANCE_WEEKS
 from ..engine.loss import LOSS_GROUP_SIZE, as_series, resample_steps
+from ..utils.helpers import float_or_none
 from .constants import CHARGING_LOSS_STATISTICS_CHUNK_DAYS, CHARGING_LOSS_STATISTICS_DAYS, CONNECTED_STATUS
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class CoordinatorRefresh:
-    """Reads long-term statistics for the charging loss, economy and analysis."""
+    """Reads long-term statistics for the charging loss, economy, analysis and learned driving distance."""
 
     @callback
     def _charging_loss_hourly(self, _now) -> None:
@@ -265,6 +269,69 @@ class CoordinatorRefresh:
             return
         _LOGGER.debug("Analysis: %s hourly temperatures, %s status changes", len(data.get("temps", {})), len(data.get("status", [])))
         await self.async_run_job("analysis_update", data)
+
+    @callback
+    def _distance_daily(self, _now) -> None:
+        self._background(self._async_distance_refresh(), "learned_distance")
+
+    async def _async_distance_refresh(self) -> None:
+        """The odometer at the end of each day of the last weeks, for the evenings the engine did
+        not read it itself (learned driving distance): the daily long-term statistics (the last
+        state, the max for a measurement sensor), without statistics the raw history."""
+        if not self.ev_configured or "recorder" not in self.hass.config.components:
+            return
+        odometer_id = self.config["ev_car"]["entity_ids"]["odometer_entity_id"]
+        if not odometer_id:
+            return
+        from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
+        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+
+        instance = get_instance(self.hass)
+        today = dt_util.start_of_local_day()
+        start = dt_util.start_of_local_day(today.date() - datetime.timedelta(weeks=DISTANCE_WEEKS, days=1))
+        # the statistics in the unit the engine reads the odometer in
+        state = self.hass.states.get(odometer_id)
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if state else None
+        units = {"distance": unit} if unit in DistanceConverter.VALID_UNITS else None
+        readings: dict[str, float] = {}
+        try:
+            stats = await instance.async_add_executor_job(
+                statistics_during_period, self.hass, start, today, {odometer_id}, "day", units, {"state", "max"}
+            )
+            for row in stats.get(odometer_id, []):
+                value = float_or_none(row.get("state") if row.get("state") is not None else row.get("max"))
+                begin = row.get("start")
+                if value is None or begin is None:
+                    continue
+                begin = begin if isinstance(begin, datetime.datetime) else dt_util.utc_from_timestamp(float(begin))
+                readings[dt_util.as_local(begin).date().isoformat()] = value
+            if not readings:
+                # no long-term statistics (no state_class): the last state of each day in the raw history
+                raw_start = max(start, dt_util.utcnow() - datetime.timedelta(days=getattr(instance, "keep_days", 10)))
+                raw = await instance.async_add_executor_job(
+                    partial(
+                        history.get_significant_states, self.hass, raw_start, today, [odometer_id], None,
+                        include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                    )
+                )
+                rows = sorted((state.last_changed, state.state) for state in raw.get(odometer_id, []))
+                index, last = 0, None
+                day = dt_util.as_local(raw_start).date()
+                while day < today.date():
+                    day_end = dt_util.start_of_local_day(day + datetime.timedelta(days=1))
+                    while index < len(rows) and rows[index][0] < day_end:
+                        last = rows[index][1]
+                        index += 1
+                    # unavailable at the end of the day: no reading, like the engine's own
+                    if (value := float_or_none(last)) is not None:
+                        readings[day.isoformat()] = value
+                    day += datetime.timedelta(days=1)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Learned driving distance: could not load the odometer history: %s", err)
+            return
+        _LOGGER.debug("Learned driving distance: %s days of odometer history", len(readings))
+        if readings:
+            await self.async_run_job("distance_backfill", readings)
 
     async def async_recalculate_charging_loss(self) -> None:
         """button recalculate_charging_loss: forget the measurements and read the whole history again."""

@@ -215,6 +215,7 @@ class CoordinatorLifecycle:
             self._background(self._async_charging_loss_refresh(backfill=not self.engine.charging_loss_backfilled()), "charging_loss_history")
             self._background(self._async_economy_refresh(), "economy")
             self._background(self._async_analysis_refresh(), "analysis")
+            self._background(self._async_distance_refresh(), "learned_distance")
             if self.last_job.get("worker_thread"):
                 log_lines.append(f"📟Worker: {self.last_job['worker_thread']}")
         except Exception as err:  # noqa: BLE001

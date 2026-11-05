@@ -642,6 +642,37 @@ def test_daily_odometer_is_recorded_at_the_end_of_the_day() -> None:
     assert "runtime" in result.db_saves
 
 
+def test_distance_backfill_fills_only_the_missing_days() -> None:
+    """Evenings CJP did not read itself come from the recorder; its own readings win, and today
+    (a partial day), days older than the learning window and bad values are left out."""
+    recorded = _distance_engine({0: 42, 1: 42, 2: 42, 3: 42, 4: 120, 5: 10, 6: 0}).daily_odometer
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    own_day = (DAY - datetime.timedelta(days=3)).isoformat()
+    engine.daily_odometer = {own_day: recorded[own_day]}
+    readings = {
+        **recorded,
+        own_day: recorded[own_day] + 999,  # the own reading wins
+        DAY.isoformat(): recorded[DAY.isoformat()] - 10,  # today is left to hour_end
+        (DAY - datetime.timedelta(weeks=9)).isoformat(): 1.0,  # older than the learning window
+        (DAY - datetime.timedelta(weeks=5)).isoformat(): "unavailable",
+        (DAY - datetime.timedelta(weeks=6)).isoformat(): float("nan"),
+        "not a date": 1.0,
+    }
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    result = engine.run_job(snapshot(now), engine.distance_backfill, readings)
+    assert result.error is None, result.error
+    assert engine.daily_odometer == {date: value for date, value in recorded.items() if date != DAY.isoformat()}
+    assert "runtime" in result.db_saves
+    # 28 evenings up to yesterday give 27 days
+    assert result.attributes["typical_daily_distance"]["learned_days"] == 27
+    assert result.attributes["workday_distance_needed_friday"]["learned_distance"] == 120
+
+    # nothing new: nothing saved
+    result = engine.run_job(snapshot(now), engine.distance_backfill, readings)
+    assert result.error is None, result.error
+    assert "runtime" not in result.db_saves
+
+
 def test_fill_up_fills_to_max_in_the_cheapest_night_and_keeps_the_floor() -> None:
     """40 %: tonight only the floor would be needed, the cheap night tomorrow fills up to 90 %."""
     engine, _ = run(3, settings={"fill_up": True}, **PLUGGED_IN)
