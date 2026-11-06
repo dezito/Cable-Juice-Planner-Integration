@@ -1,12 +1,19 @@
 # Public charging
 
-Needs an EV integration. Charges away from home are added to the charging history and the economy, so the
-cost per km includes them.
+Needs an EV integration with a location (`location_entity_id`). Charges away from home are added to the
+charging history and the economy, so the cost per km includes them. Without a location, the two entities
+below and the dashboard card aren't created; the service under
+[Adding a charge yourself](#adding-a-charge-yourself) still works.
 
 ## How it works
 
 1. A charge away from home (the charge port or cable used while the car isn't home) is detected
    automatically: the time, the battery level at start and end, and the percentage added.
+   Only a car known to be away counts: any state other than `home`, also when it is briefly
+   `unavailable` and the last known state from the past day was away. Without a location entity, or with
+   no known location, no public charge is detected – the charger's status can't tell, as it often reports
+   the plug-in minutes after the car's port or cable. Add such a charge yourself (see below). If you
+   remove the location later, a charge still waiting for its price is dropped.
 2. When it ends, *Public charging completed* (`binary_sensor.cjp_<prefix>_public_charging_session_done`)
    turns on, and you get a notification – with the mobile app you can enter the price from it.
 3. Enter the **total price** of the charge (not the price per kWh) in *Cost of public charging*

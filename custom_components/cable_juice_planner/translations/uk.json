@@ -86,7 +86,7 @@
           "charge_port_door_entity_id": "Стан порту зарядки (відкрито/закрито) (Підтримувані стани: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Кабель підключено до авто (Підтримувані стани: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Необов’язково: поточний ліміт заряду авто. Використовується для розрахунку втрат і округлення (Kia/Cupra). Бажаний ліміт публікується як сенсор charging_limit. Симульований рівень батареї зупиняється на 1 % нижче нього.",
-          "location_entity_id": "Якщо не задано, використовується charger.entity_ids.status_entity_id",
+          "location_entity_id": "Якщо не задано, використовується charger.entity_ids.status_entity_id. Публічні зарядки визначаються лише за відомого місцезнаходження",
           "last_update_entity_id": "Необов’язково: час останнього оновлення авто. Немає події wake_up, якщо авто оновилось протягом 14 хвилин. Новий час також коригує симульований рівень батареї.",
           "climate_entity_id": "Необов’язково: кліматична сутність авто. Її стан показує, чи триває підігрів; старт/стоп надсилаються як події ev_request."
         }
@@ -489,7 +489,7 @@
           "charge_port_door_entity_id": "Стан порту зарядки (відкрито/закрито) (Підтримувані стани: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Кабель підключено до авто (Підтримувані стани: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Необов’язково: поточний ліміт заряду авто. Використовується для розрахунку втрат і округлення (Kia/Cupra). Бажаний ліміт публікується як сенсор charging_limit. Симульований рівень батареї зупиняється на 1 % нижче нього.",
-          "location_entity_id": "Якщо не задано, використовується charger.entity_ids.status_entity_id",
+          "location_entity_id": "Якщо не задано, використовується charger.entity_ids.status_entity_id. Публічні зарядки визначаються лише за відомого місцезнаходження",
           "last_update_entity_id": "Необов’язково: час останнього оновлення авто. Немає події wake_up, якщо авто оновилось протягом 14 хвилин. Новий час також коригує симульований рівень батареї.",
           "climate_entity_id": "Необов’язково: кліматична сутність авто. Її стан показує, чи триває підігрів; старт/стоп надсилаються як події ev_request."
         }

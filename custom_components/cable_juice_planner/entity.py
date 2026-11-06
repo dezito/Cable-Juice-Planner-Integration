@@ -21,6 +21,7 @@ from .const import (
     is_battery_simulation_enabled,
     is_ev_configured,
     is_powerwall_configured,
+    is_public_charging_configured,
     is_solar_configured,
 )
 from .coordinator import CJPCoordinator
@@ -43,6 +44,8 @@ def requirement_met(coordinator: CJPCoordinator, requires: str | None) -> bool:
         return is_ev_configured(config)
     if requires == "no_ev":
         return not is_ev_configured(config)
+    if requires == "public_charging":
+        return is_public_charging_configured(config)
     if requires == "virtual_battery_level":
         return not is_ev_configured(config) or is_battery_simulation_enabled(config)
     if requires == "solar":

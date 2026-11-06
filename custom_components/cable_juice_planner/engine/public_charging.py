@@ -35,7 +35,7 @@ class TripAndPublicCharging:
         return float(value)
 
     def get_public_charging_session_done(self) -> bool:
-        if not self.is_ev_configured():
+        if not self.public_charging_configured:
             return False
         return self.sensor_states.get("public_charging_session_done") == "on"
 

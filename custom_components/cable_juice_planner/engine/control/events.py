@@ -77,8 +77,8 @@ class ControlEvents:
                 self.sensor_states[key] = 0.0
             self._changed_sensors.add(key)
         self._changed_sensors.add("last_full_charge")
-        if self.is_ev_configured():
-            # startup_public_charging_session_done
+        if self.public_charging_configured:
+            # startup_public_charging_session_done (without the car's location no session is restored: no entity to enter its cost)
             self.sensor_states["public_charging_session_done"] = runtime.get("public_charging_session_done") or "off"
             self.public_charging_sessions = list(runtime.get("public_charging_session") or [])
             finished = self.finished_public_charging_sessions()
@@ -326,7 +326,8 @@ class ControlEvents:
             return
         _LOGGER.info("Ev charge port/cable changed from %s to %s", old_value, value)
         self.power_connected_trigger(value)
-        self.public_charging_session(value)
+        if self.public_charging_configured:
+            self.public_charging_session(value)
 
     def emulated_battery_level_changed(self, value, old_value) -> None:
         try:

@@ -129,7 +129,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund;
   forecast prices are corrected with their measured bias
 - **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
-- **[Public charging](docs/public-charging.md)** (with EV integration)
+- **[Public charging](docs/public-charging.md)** (with EV integration and location)
   - a charge away from home is detected automatically: time, battery level at start and end, and percentage added
   - you get a notification, enter the total price, and the charge is added to the history and the economy
   - waiting sessions are remembered across restarts, and charges can also be added with a service
@@ -309,12 +309,12 @@ The settings from the dashboard are entities that are kept across restarts:
 | Type | Examples |
 |---|---|
 | `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
-| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV / simulated battery level |
+| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
 | `select` | forecast type |
 | `button` | force planning, reset trip, recalculate charging loss, export data, reset dashboard |
-| `binary_sensor` | public charging session done (waiting for the price) |
+| `binary_sensor` | public charging session done (waiting for the price; with location) |
 
 If you click a setting, a short explanation is shown under **Attributes** (`description`
 and `help`). The plan is recalculated 5 seconds after a change.

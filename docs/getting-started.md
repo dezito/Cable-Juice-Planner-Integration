@@ -65,7 +65,7 @@ integration (virtual EV).
 
 - **Battery size:** the usable capacity in kWh.
 - **Charge port / cable** and **location** tell whether the car is plugged in at home. Without location,
-  CJP uses the charger's status.
+  CJP uses the charger's status, and [public charging](public-charging.md) isn't detected.
 - **Simulate battery level while charging:** for car integrations that update the battery level slowly.
   See [the recipe](cookbook.md#car-integration-that-updates-slowly).
 - **Charge limit:** the car's current limit. The wanted limit is published as `sensor.cjp_<prefix>_charging_limit`.

@@ -373,6 +373,11 @@ def is_ev_configured(config: dict) -> bool:
     return bool(ids["odometer_entity_id"] and ids["estimated_battery_range_entity_id"] and ids["usable_battery_level_entity_id"])
 
 
+def is_public_charging_configured(config: dict) -> bool:
+    """Public charging is only detected with the car's location (the charger can't tell home from away)."""
+    return is_ev_configured(config) and bool(config["ev_car"]["entity_ids"]["location_entity_id"].strip())
+
+
 def hidden_settings(config: dict) -> tuple[str, ...]:
     """Number settings the dashboard and the help texts leave out for this configuration.
 

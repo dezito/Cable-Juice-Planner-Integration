@@ -86,7 +86,7 @@
           "charge_port_door_entity_id": "Indicates port open/closed (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Indicates if the vehicle is connected (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit. The simulated battery level stops 1 % below it.",
-          "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away",
+          "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away. Public charging sessions are only detected with a known location",
           "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes. A new time also corrects the simulated battery level.",
           "climate_entity_id": "Optional: the climate entity of the car. Its state tells if preheating runs; start/stop are fired as events on ev_request."
         }
@@ -489,7 +489,7 @@
           "charge_port_door_entity_id": "Indicates port open/closed (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Indicates if the vehicle is connected (Supported states: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Optional: the current charge limit of the car. Used for the charging loss calculation and rounding (Kia/Cupra). The wanted limit is published as the sensor charging_limit. The simulated battery level stops 1 % below it.",
-          "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away",
+          "location_entity_id": "If not set, falls back to charger.entity_ids.status_entity_id for home/away. Public charging sessions are only detected with a known location",
           "last_update_entity_id": "Optional: time of the last update of the car. No wake_up event when the car updated within 14 minutes. A new time also corrects the simulated battery level.",
           "climate_entity_id": "Optional: the climate entity of the car. Its state tells if preheating runs; start/stop are fired as events on ev_request."
         }
