@@ -1,0 +1,148 @@
+name: Draft release
+
+# Run by hand (Actions -> Draft release -> Run workflow) with the new tag.
+# Claude writes the release notes from the changes since the previous release
+# and the workflow creates (or updates) a DRAFT release with them. Review the
+# draft and press Publish; release.yml then attaches the zip.
+# Needs the repository secret CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: New release tag (e.g. v1.0.9)
+        required: true
+      previous_tag:
+        description: Compare with this tag (empty = the latest published release)
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: draft-release
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      PREVIOUS_INPUT: ${{ inputs.previous_tag }}
+      TARGET: ${{ github.event.repository.default_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Collect release context
+        id: context
+        run: |
+          set -euo pipefail
+          tag_re='^v[0-9]+(\.[0-9]+)+(-[0-9A-Za-z.]+|(a|b|rc)[0-9]+)?$'
+          if ! [[ "$TAG" =~ $tag_re ]]; then
+            echo "::error::Tag must look like v1.0.9, v1.0.9-beta.1 or v1.0.9.1b1, got '$TAG'"
+            exit 1
+          fi
+          python3 -m pip install --quiet awesomeversion
+          python3 .github/check_version.py "${TAG#v}"
+          state=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || echo missing)
+          if [ "$state" = "false" ]; then
+            echo "::error::Release $TAG is already published; its notes are not overwritten"
+            exit 1
+          fi
+          # A beta (a letter after the "v": -beta.1, b1, rc1) is compared with the latest
+          # release, beta or not; a stable release with the latest stable one, so its
+          # notes cover the betas too.
+          if [[ "${TAG#v}" =~ [A-Za-z] ]]; then
+            prerelease=true
+            list_args=()
+          else
+            prerelease=false
+            list_args=(--exclude-pre-releases)
+          fi
+          previous="$PREVIOUS_INPUT"
+          if [ -z "$previous" ]; then
+            previous=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts "${list_args[@]}" \
+              --limit 1 --json tagName --jq '.[0].tagName')
+          fi
+          if ! [[ "$previous" =~ $tag_re ]] || ! git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
+            echo "::error::Previous tag '$previous' was not found"
+            exit 1
+          fi
+          mkdir -p .release
+          gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json body --jq .body > .release/previous.md
+          gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f target_commitish="$TARGET" -f previous_tag_name="$previous" \
+            --jq .body > .release/whats-changed.md
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Release $TAG (pre-release: $prerelease), compared with $previous"
+
+      - name: Write release notes with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          claude_args: >-
+            --model sonnet
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Write,Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
+          prompt: |
+            Write the GitHub release notes for ${{ env.TAG }} of this Home Assistant integration.
+            The changes are everything between the tag ${{ steps.context.outputs.previous }} and HEAD.
+            Pre-release (beta for testers): ${{ steps.context.outputs.prerelease }}.
+
+            Gather the facts yourself:
+            - `git log --no-merges ${{ steps.context.outputs.previous }}..HEAD` for the commits.
+            - `git diff ${{ steps.context.outputs.previous }} HEAD -- docs README.md` and the English
+              texts (`custom_components/*/translations/en.json`, `custom_components/*/texts/en.json`)
+              for what users see and what the settings are called in the UI.
+            - The code diff where the docs don't explain a change. AGENTS.md describes the project.
+            - `.release/whats-changed.md` lists the merged pull requests.
+            - `.release/previous.md` is the previous release's notes: copy its style and structure,
+              never its content.
+
+            Write the notes to `.release/notes.md` in English Markdown with these sections, in this
+            order, and leave out a section that would be empty:
+            - `## Highlights`: 2-4 bullets, the most important changes for users.
+            - `## ⚠️ Before you update`: only when users have to do something, or when a setting or
+              rule now behaves differently from before (say what changed and what to check).
+            - `## ✨ New`: new features, with where to find them in the UI and their defaults.
+            - `## 🔧 Improvements`: changed behaviour that works better than before.
+            - `## 🐛 Fixes`: bugs that were fixed.
+
+            Rules:
+            - Write for the people who use the integration, not for developers. Leave out tests,
+              CI, refactoring, version bumps and internal renames that users don't see.
+            - Use the names of settings, switches and pages exactly as the English texts show them,
+              in *italics*; entity attributes and actions in `code`.
+            - Only describe what the diff shows. Never guess at behaviour or numbers.
+            - Do not add a "What's Changed" list or a changelog link; they are appended afterwards.
+            - Do not create or change any other file, and do not commit.
+
+      - name: Create or update the draft release
+        env:
+          PREVIOUS: ${{ steps.context.outputs.previous }}
+          PRERELEASE: ${{ steps.context.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [ ! -s .release/notes.md ]; then
+            echo "::error::Claude did not write .release/notes.md"
+            exit 1
+          fi
+          { cat .release/notes.md; printf '\n\n'; cat .release/whats-changed.md; } > .release/body.md
+          # HACS only offers a pre-release to users who turned on beta versions.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file .release/body.md \
+              --prerelease="$PRERELEASE"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --prerelease="$PRERELEASE" \
+              --target "$TARGET" --title "$TAG" --notes-file .release/body.md
+          fi
+          {
+            echo "Draft release $TAG (pre-release: $PRERELEASE, compared with $PREVIOUS) is ready for review:"
+            echo "https://github.com/$GITHUB_REPOSITORY/releases"
+          } >> "$GITHUB_STEP_SUMMARY"

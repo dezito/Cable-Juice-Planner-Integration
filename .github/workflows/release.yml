@@ -27,12 +27,15 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
 
-      - name: Check manifest version
+      - name: Set manifest version from the tag
         run: |
-          version=$(jq -r .version "custom_components/$DOMAIN/manifest.json")
-          if [ "v$version" != "$TAG" ] && [ "$version" != "$TAG" ]; then
-            echo "::warning::Tag $TAG does not match manifest version $version"
-          fi
+          version="${TAG#v}"
+          python3 -m pip install --quiet awesomeversion
+          python3 .github/check_version.py "$version"
+          manifest="custom_components/$DOMAIN/manifest.json"
+          jq --arg v "$version" '.version = $v' "$manifest" > manifest.tmp
+          mv manifest.tmp "$manifest"
+          echo "manifest.json version: $(jq -r .version "$manifest")"
 
       - name: Build zip
         run: |

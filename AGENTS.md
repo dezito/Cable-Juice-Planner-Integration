@@ -63,6 +63,7 @@ tests/                                   Pytest suite
 docs/                                    User documentation and behavior details
 .github/workflows/validate.yml           CI: hassfest and HACS validation
 .github/workflows/release.yml            Attaches cable_juice_planner.zip to published releases
+.github/workflows/release-notes.yml      Draft release with notes written by Claude
 pytest.ini / requirements_test.txt       Pytest configuration and pinned test deps
 ```
 
@@ -205,8 +206,17 @@ private agent memory). Update or remove a note when it stops being true.
   (its download count is the install count). `.github/workflows/release.yml`
   builds it from `custom_components/cable_juice_planner/` (files at the zip
   root) when a release is published; run it by hand with a tag for a release
-  that lacks the zip. Bump `manifest.json` `version` to the tag before
-  publishing.
+  that lacks the zip. It sets `manifest.json` `version` in the zip from the
+  tag (`v1.0.9` -> `1.0.9`), so the version in the repository need not be
+  bumped by hand. `.github/workflows/release-notes.yml` (*Draft release*, run
+  by hand with the new tag) lets Claude write the notes from the changes since
+  the previous release and creates or updates a draft release; it never
+  touches a published one. It needs the secret `CLAUDE_CODE_OAUTH_TOKEN`. Keep
+  its prompt in sync with the BattMind copy. A tag with a letter (`-beta.1`,
+  `b1`, `rc1`) becomes a pre-release, compared with the latest release; a
+  stable tag is compared with the latest stable release. Both workflows run
+  `.github/check_version.py`, which rejects versions Home Assistant won't load
+  (e.g. `1.0.7.1-beta.1`; use `1.0.7.1b1`).
 
 ### HACS default-catalog review
 
