@@ -16,6 +16,10 @@ Check in this order:
   *Charge EV after home battery minimum level*, or it is one of the 4 expensive hours where the surplus is sold.
 - **Is the action `charge`, but the car doesn't charge?** Then it is the automation: check the blueprint's
   trace (*Automations → ⋮ → Traces*) and its *Charging state* inputs.
+- **⚠️ Charging without a rule, e.g. right after plugging in?** The car or charger started by itself while the
+  action was `stop`. CJP asks for stop again (`stop_request`), and the blueprint sends stop and 0 A once more –
+  update the blueprint when Repairs offers it, and check that *Stop charging* or *Set charging current* really
+  stops your charger. See [Charging state](charger-control.md#charging-state).
 
 ## It planned to charge tonight, but the car wasn't charged in the morning
 

@@ -57,6 +57,7 @@ def _set_action(
     amps: list[int] | None = None,
     enabled: bool = True,
     limit: int = 0,
+    stop_request: int = 0,
 ) -> None:
     """The charger action as the integration publishes it, incl. the decision the blueprint triggers on."""
     attributes: dict[str, Any] = {
@@ -65,6 +66,7 @@ def _set_action(
         **{f"phase_{i}_amps": value for i, value in enumerate(amps or [16 if state == "charge" else 0, 0, 0], start=1)},
         **{f"circuit_phase_{i}_amps": value for i, value in enumerate(circuit or [], start=1)},
         "charging_limit": limit,
+        "stop_request": stop_request,
         "updated": dt_util.now().isoformat(),
     }
     attributes["decision"] = charger_decision(state, attributes)
@@ -378,3 +380,46 @@ async def test_one_of_several_entities_is_enough(hass: HomeAssistant, calls: lis
     await asyncio.sleep(1.2)
     await hass.async_block_till_done()
     assert calls == ["enable", "fail_charger_stop", "car_stop", "fail_amps"]
+
+
+async def test_stop_is_sent_again_on_a_stop_request(hass: HomeAssistant, calls: list[str]) -> None:
+    """The car started by itself when plugged in while the action already was stop: the
+    integration counts stop_request up, and stop and the current are sent once more."""
+    _set_action(hass, "stop")
+    await _setup(hass, check_charging=False, disable_actions=_service("disable"))
+    calls.clear()
+
+    _set_action(hass, "stop", stop_request=1)
+    await hass.async_block_till_done()
+    assert calls == ["fail_charger_stop", "car_stop", "fail_amps"]
+
+    # every new request again
+    calls.clear()
+    _set_action(hass, "stop", stop_request=2)
+    await hass.async_block_till_done()
+    assert calls == ["fail_charger_stop", "car_stop", "fail_amps"]
+
+    # back to 0 after a restart of the integration: nothing to stop
+    calls.clear()
+    _set_action(hass, "stop")
+    await hass.async_block_till_done()
+    assert calls == []
+
+    # a disabled charger is disabled again
+    _set_action(hass, "stop", enabled=False)
+    await hass.async_block_till_done()
+    calls.clear()
+    _set_action(hass, "stop", enabled=False, stop_request=1)
+    await hass.async_block_till_done()
+    assert calls == ["fail_charger_stop", "car_stop", "fail_amps", "disable"]
+
+
+async def test_stop_request_does_not_stop_charging(hass: HomeAssistant, calls: list[str]) -> None:
+    """A stop request that arrives with (or after) charge doesn't stop it."""
+    _set_action(hass, "charge")
+    await _setup(hass, check_charging=False)
+    calls.clear()
+
+    _set_action(hass, "charge", stop_request=1)
+    await hass.async_block_till_done()
+    assert calls == []
