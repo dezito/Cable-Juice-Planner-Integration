@@ -148,7 +148,7 @@ class EnergyForecast:
                     if date not in hour_prices:
                         continue
                     watt = round(data["pv_estimate"] * 1000.0, 0)
-                    consumption = self.get_forecast_value(self.power_values_db[date.hour].get("power_consumption_without_all_exclusion", [0.0]))
+                    consumption = self.get_forecast_value(self.power_values_db[date.hour].get("power_consumption_without_all_exclusion", [0.0]), self.consumption_forecast_type)
                     available_kwh = round(max(watt - consumption, 0.0) / 1000.0, 3)
                     # hour_prices are sell prices already (ev.py calculated the sell price of them a second time)
                     forecast[date] = (available_kwh, self.sell_value(hour_prices[date]))

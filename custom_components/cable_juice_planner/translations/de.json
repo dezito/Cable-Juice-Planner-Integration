@@ -873,6 +873,9 @@
       },
       "price_forecast_correction": {
         "name": "Preisprognose korrigieren"
+      },
+      "auto_forecast_type": {
+        "name": "Prognosetyp automatisch wählen"
       }
     },
     "number": {

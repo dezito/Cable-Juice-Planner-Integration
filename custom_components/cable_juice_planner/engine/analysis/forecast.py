@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from .helpers import ANALYSIS_DAYS, FORECAST_DRIVES, FORECAST_DRIVES_RECENT, FORECAST_TYPES, PRICE_CHART_DAYS, PRICE_CHART_LEADS, PRICE_CORRECTION_DAYS, PRICE_CORRECTION_MAX, PRICE_CORRECTION_MIN_DAYS, PRICE_FORECAST_DAYS, PRICE_RANK_HOURS, _is_num, _num
+from .helpers import ANALYSIS_DAYS, FORECAST_AUTO_DAYS, FORECAST_AUTO_MIN_DAYS, FORECAST_AUTO_MIN_DRIVES, FORECAST_DRIVES, FORECAST_DRIVES_RECENT, FORECAST_TYPES, PRICE_CHART_DAYS, PRICE_CHART_LEADS, PRICE_CORRECTION_DAYS, PRICE_CORRECTION_MAX, PRICE_CORRECTION_MIN_DAYS, PRICE_FORECAST_DAYS, PRICE_RANK_HOURS, _is_num, _num, auto_forecast_choice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,53 +120,119 @@ class AnalysisForecast:
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Recording the km/kWh forecast failed")
 
-    def _forecast_attributes(self) -> dict:
+    def _consumption_errors(self, days: int) -> dict | None:
+        """Each type's error forecasting the house consumption over the closed days of the last days."""
         today = self.now().date()
-        closed = {date: day for date, day in self.analysis_db["consumption_days"].items() if date < today.isoformat()}
+        first = (today - datetime.timedelta(days=days)).isoformat()
+        selected = [
+            day for date, day in self.analysis_db["consumption_days"].items()
+            if first <= date < today.isoformat() and isinstance(day, dict) and _num(day.get("hours"))
+        ]
+        hours = sum(_num(day.get("hours")) for day in selected)
+        use = sum(_num(day.get("use")) for day in selected)
+        if not hours:
+            return None
+        # the measured kWh per hour, and per type what it forecast on average (measured + bias)
+        result = {"days": len(selected), "hours": int(hours), "actual": round(use / hours, 3)}
+        for kind in FORECAST_TYPES:
+            absolute = sum(_num((day.get(kind) or [0, 0])[0]) for day in selected)
+            bias = sum(_num((day.get(kind) or [0, 0])[1]) for day in selected)
+            result[kind] = {
+                "mae": round(absolute / hours, 3),
+                "bias": round(bias / hours, 3),
+                "relative": round(absolute / use, 3) if use > 0 else None,
+                "forecast": round((use + bias) / hours, 3),
+            }
+        return result
 
-        def consumption_errors(days: int) -> dict | None:
-            first = (today - datetime.timedelta(days=days)).isoformat()
-            selected = [day for date, day in closed.items() if date >= first]
-            hours = sum(_num(day.get("hours")) for day in selected)
-            use = sum(_num(day.get("use")) for day in selected)
-            if not hours:
-                return None
-            # the measured kWh per hour, and per type what it forecast on average (measured + bias)
-            result = {"hours": int(hours), "actual": round(use / hours, 3)}
-            for kind in FORECAST_TYPES:
-                absolute = sum(_num((day.get(kind) or [0, 0])[0]) for day in selected)
-                bias = sum(_num((day.get(kind) or [0, 0])[1]) for day in selected)
-                result[kind] = {
-                    "mae": round(absolute / hours, 3),
-                    "bias": round(bias / hours, 3),
-                    "relative": round(absolute / use, 3) if use > 0 else None,
-                    "forecast": round((use + bias) / hours, 3),
-                }
-            return result
+    def _drive_errors(self, count: int) -> dict | None:
+        """Each type's error forecasting the km/kWh of the last count drives."""
+        selected = [drive for drive in self.analysis_db["efficiency_drives"][-count:] if _is_num(drive.get("actual"))]
+        if not selected:
+            return None
+        actual = sum(drive["actual"] for drive in selected)
+        result = {"drives": len(selected), "actual": round(actual / len(selected), 2)}
+        for kind in FORECAST_TYPES:
+            errors = [_num(drive.get(kind)) - drive["actual"] for drive in selected]
+            result[kind] = {
+                "mae": round(sum(abs(error) for error in errors) / len(errors), 2),
+                "bias": round(sum(errors) / len(errors), 2),
+                "relative": round(sum(abs(error) for error in errors) / actual, 3) if actual > 0 else None,
+                "forecast": round(sum(_num(drive.get(kind)) for drive in selected) / len(selected), 2),
+            }
+        return result
 
-        def drive_errors(count: int) -> dict | None:
-            selected = [drive for drive in self.analysis_db["efficiency_drives"][-count:] if _is_num(drive.get("actual"))]
-            if not selected:
-                return None
-            actual = sum(drive["actual"] for drive in selected)
-            result = {"drives": len(selected), "actual": round(actual / len(selected), 2)}
-            for kind in FORECAST_TYPES:
-                errors = [_num(drive.get(kind)) - drive["actual"] for drive in selected]
-                result[kind] = {
-                    "mae": round(sum(abs(error) for error in errors) / len(errors), 2),
-                    "bias": round(sum(errors) / len(errors), 2),
-                    "relative": round(sum(abs(error) for error in errors) / actual, 3) if actual > 0 else None,
-                    "forecast": round(sum(_num(drive.get(kind)) for drive in selected) / len(selected), 2),
-                }
-            return result
+    def _auto_forecast_on(self) -> bool:
+        return self.switch_state("auto_forecast_type", "off") == "on"
 
+    def auto_forecast_types(self, manual: str) -> tuple[str | None, str | None]:
+        """The forecast types the house consumption and the km/kWh use with the switch auto_forecast_type.
+
+        Each starts at the selected (manual) type and moves to the type that hit best (house
+        consumption: FORECAST_AUTO_DAYS days, km/kWh: FORECAST_DRIVES drives) when its error is
+        FORECAST_AUTO_MARGIN smaller; kept in analysis_db["forecast_auto"]. None while there are
+        too few measurements (FORECAST_AUTO_MIN_DAYS / FORECAST_AUTO_MIN_DRIVES) or the switch is off.
+        """
+        known = self.analysis_db.get("forecast_auto")
+        known = known if isinstance(known, dict) else {}
+        choices: dict[str, str | None] = {"consumption": None, "drives": None}
+        if self._auto_forecast_on():
+            choices["consumption"] = auto_forecast_choice(
+                self._consumption_errors(FORECAST_AUTO_DAYS), known.get("consumption") or manual, FORECAST_AUTO_MIN_DAYS, "days"
+            )
+            choices["drives"] = auto_forecast_choice(
+                self._drive_errors(FORECAST_DRIVES), known.get("drives") or manual, FORECAST_AUTO_MIN_DRIVES, "drives"
+            )
+        # off: the next time it is turned on, it starts at the selected type again
+        stored = {key: value for key, value in choices.items() if value}
+        if stored != known:
+            if stored:
+                self.analysis_db["forecast_auto"] = stored
+            else:
+                self.analysis_db.pop("forecast_auto", None)
+            self.mark_dirty("analysis")
+        return choices["consumption"], choices["drives"]
+
+    def forecast_state(self) -> tuple[bool, str, str]:
+        """The switch auto_forecast_type and the forecast types the house consumption and the km/kWh use."""
+        return self._auto_forecast_on(), self.consumption_forecast_type, self.drive_forecast_type
+
+    def republish_forecast_if_changed(self) -> None:
+        """The analysis shows the types in use: published again when the switch or an automatic choice changed."""
+        if self.published_forecast_state is None or self.published_forecast_state == self.forecast_state():
+            return
+        try:
+            self.publish_analysis()
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Publishing the analysis failed")
+
+    def _forecast_attributes(self) -> dict:
         def best(errors: dict | None) -> str | None:
             return min(FORECAST_TYPES, key=lambda kind: errors[kind]["mae"]) if errors else None
 
-        consumption_30 = consumption_errors(30)
-        drives_30 = drive_errors(FORECAST_DRIVES)
+        manual = self.get_forecast_type()
+        auto = self._auto_forecast_on()
+        consumption_30 = self._consumption_errors(30)
+        drives_30 = self._drive_errors(FORECAST_DRIVES)
+        self.published_forecast_state = self.forecast_state()
         return {
-            "selected": self.get_forecast_type(),
-            "consumption": {"last_7": consumption_errors(7), "last_30": consumption_30, "best": best(consumption_30)},
-            "drives": {"recent": drive_errors(FORECAST_DRIVES_RECENT), "all": drives_30, "best": best(drives_30)},
+            # the select's type; consumption/drives "selected": the type each of them uses
+            "selected": manual,
+            "auto": auto,
+            "auto_min_days": FORECAST_AUTO_MIN_DAYS,
+            "auto_min_drives": FORECAST_AUTO_MIN_DRIVES,
+            "consumption": {
+                "last_7": self._consumption_errors(7),
+                "last_30": consumption_30,
+                "best": best(consumption_30),
+                "selected": self.consumption_forecast_type,
+                "auto_waiting": auto and self.forecast_type_auto["consumption"] is None,
+            },
+            "drives": {
+                "recent": self._drive_errors(FORECAST_DRIVES_RECENT),
+                "all": drives_30,
+                "best": best(drives_30),
+                "selected": self.drive_forecast_type,
+                "auto_waiting": auto and self.forecast_type_auto["drives"] is None,
+            },
         }

@@ -75,7 +75,7 @@ class Battery:
         estimated_total_range = 0.0
         try:
             if self.is_ev_configured():
-                calc = self.get_forecast_value(self.km_kwh_efficiency_db)
+                calc = self.get_forecast_value(self.km_kwh_efficiency_db, self.drive_forecast_type)
                 if calc == 0.0:
                     raise ValueError(f"calc is invalid: {calc}")
                 estimated_total_range = self.km_kwh_to_km_percentage(calc) * 100.0
@@ -145,7 +145,7 @@ class Battery:
             try:
                 if self.km_kwh_efficiency_db == {}:
                     raise ValueError("No data yet")
-                calc = self.get_forecast_value(self.km_kwh_efficiency_db)
+                calc = self.get_forecast_value(self.km_kwh_efficiency_db, self.drive_forecast_type)
                 if calc == 0.0:
                     raise ValueError(f"calc is invalid: {calc}")
                 output = self.km_kwh_to_km_percentage(calc)

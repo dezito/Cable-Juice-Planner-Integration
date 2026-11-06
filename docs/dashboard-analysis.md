@@ -34,7 +34,8 @@ At the top: **Force planning** recalculates the plan now. The overview also has 
 All rules with a **Read more** from the entities' help texts: the charging rules, the work plan per weekday
 (incl. [learn driving distance](learn-distance.md)), optimal weekly charging, the battery levels, cheap power,
 full charge, solar/home battery, charging loss, the virtual EV (*Simulated battery level* with a car
-integration and the simulation on) and, under *Advanced*, the forecast type and
+integration and the simulation on) and, under *Advanced*, the forecast type,
+[choose the forecast type automatically](#forecast-accuracy) and
 [correct the price forecast](how-it-works.md#prices). Preheating is only shown with a car
 integration that has a climate entity.
 
@@ -179,7 +180,7 @@ history:
 
 Just before a new measurement is added to the history (the house consumption at the end of every hour, the
 km/kWh when a drive is saved), CJP calculates what each type would have predicted from the same history
-and compares it with the measurement. ✅ marks the selected type, ⭐ the most accurate.
+and compares it with the measurement. ✅ marks the type in use, ⭐ the most accurate.
 
 | Column | Meaning |
 |---|---|
@@ -194,7 +195,20 @@ types' error, how much smaller it is, and what each expected against the actual 
 
 One forecast type (*Settings → Advanced → Forecast type*) is used for the house consumption, km/kWh and the
 fallback prices alike, so the two tables can point at different types. Pick the one that is most accurate
-where it matters most to you: without solar, the house consumption is not used. The numbers are collected
+where it matters most to you: without solar, the house consumption is not used.
+
+With **Choose the forecast type automatically** on (off by default; the switch is in this section and under
+*Settings → Advanced*), the house consumption and km/kWh each use their own most accurate type instead, as
+which type is best can change over time (e.g. into winter):
+
+- the house consumption is judged over the last 30 days, from 7 days of measurements
+- km/kWh over the last 30 drives, from 10 drives
+- each starts at the selected type and only switches when another type has at least 5 % less error, so it
+  does not swap back and forth between nearly equal types
+- until there are enough measurements, and always for the fallback prices and the solar history, the
+  selected type is used
+
+An info line under each table shows which type is used, or how many measurements it is still waiting for. The numbers are collected
 from the first start: the house consumption after the first whole day, km/kWh after the first drive.
 
 <details>

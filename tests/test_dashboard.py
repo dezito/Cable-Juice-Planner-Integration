@@ -332,6 +332,7 @@ def test_analysis_sections_include_controls_for_their_graphs() -> None:
     assert "switch.cjp_tesla_workplan_charging" not in section_entities("Klar til afgang")
     assert "switch.cjp_tesla_price_forecast_correction" in section_entities("Prisprognose")
     assert "select.cjp_tesla_forecast_type" in section_entities("Prognosens træfsikkerhed")
+    assert "switch.cjp_tesla_auto_forecast_type" in section_entities("Prognosens træfsikkerhed")
     assert "switch.cjp_tesla_calculate_charging_loss" not in section_entities("Ladetab pr. effekt")
     assert "switch.cjp_tesla_use_measured_charging_loss" in section_entities("Ladetab pr. effekt")
     assert "button.cjp_tesla_recalculate_charging_loss" in section_entities("Ladetab pr. effekt")

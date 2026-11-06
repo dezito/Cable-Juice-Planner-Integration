@@ -155,7 +155,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - whether the car was ready at each work plan departure
   - planned the evening before against actually charged
   - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
-  - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate
+  - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate; optionally the most accurate type is chosen automatically
   - battery capacity over time, and the charging loss per power
 - **CO₂ emissions** and **kWh charged by solar**
 - **Very detailed charging history**
@@ -308,7 +308,7 @@ The settings from the dashboard are entities that are kept across restarts:
 
 | Type | Examples |
 |---|---|
-| `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast |
+| `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
 | `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV / simulated battery level |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |

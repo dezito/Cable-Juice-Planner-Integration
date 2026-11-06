@@ -158,6 +158,12 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.charging_no_rule_count = 0
         self.error_count = 0
         self.forecast_type = "ema"
+        # with the switch auto_forecast_type the type each forecast uses (engine/pricing.get_forecast_type)
+        self.consumption_forecast_type = "ema"
+        self.drive_forecast_type = "ema"
+        self.forecast_type_auto: dict[str, str | None] = {"consumption": None, "drives": None}
+        # forecast_state() when the analysis was published (None: not yet)
+        self.published_forecast_state: tuple | None = None
         self.public_charging_sessions: list = []
         self.powerwall_charging_text = ""
         self.last_wake_up_datetime = reset_datetime()

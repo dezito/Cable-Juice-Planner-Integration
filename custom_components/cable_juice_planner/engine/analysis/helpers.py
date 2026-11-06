@@ -60,12 +60,40 @@ FORECAST_DRIVES = 30  # drives the km/kWh forecast is judged over (FORECAST_DRIV
 FORECAST_DRIVES_RECENT = 10
 
 
+FORECAST_AUTO_DAYS = 30  # days the automatic consumption forecast type is judged over (switch auto_forecast_type)
+
+
+FORECAST_AUTO_MIN_DAYS = 7  # days with a recorded consumption forecast needed before its type is chosen automatically
+
+
+FORECAST_AUTO_MIN_DRIVES = 10  # drives needed before the km/kWh forecast type is chosen automatically
+
+
+FORECAST_AUTO_MARGIN = 0.05  # how much smaller another type's error must be before the automatic choice changes
+
+
 def _is_num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _num(value) -> float:
     return float(value) if _is_num(value) else 0.0
+
+
+def auto_forecast_choice(errors: dict | None, current: str, min_count: int, count_key: str) -> str | None:
+    """The forecast type to use automatically: current, or another type whose error is
+    FORECAST_AUTO_MARGIN smaller (so near-equal types don't swap back and forth).
+
+    None while errors[count_key] (days or drives) is below min_count.
+    """
+    if not errors or _num(errors.get(count_key)) < min_count:
+        return None
+    if current not in FORECAST_TYPES:
+        current = "ema"
+    best = min(FORECAST_TYPES, key=lambda kind: errors[kind]["mae"])
+    if errors[best]["mae"] < errors[current]["mae"] * (1 - FORECAST_AUTO_MARGIN):
+        return best
+    return current
 
 
 def _step_value(series: list[tuple[float, float]], ts: float) -> float | None:

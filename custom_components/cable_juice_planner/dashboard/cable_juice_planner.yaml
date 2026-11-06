@@ -1920,10 +1920,14 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
-        {% if help %}<details><summary>@@read_more@@</summary>
+        {% set ns = namespace(forecast_help=none, price_help=none) %}
+        {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
+        {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
+        {% if ns.forecast_help or ns.price_help %}<details><summary>@@read_more@@</summary>
 
-        {{ help }}
+        {% if ns.forecast_help %}{{ ns.forecast_help }}{% endif %}
+
+        {% if ns.price_help %}{{ ns.price_help }}{% endif %}
 
         </details>{% endif %}
       grid_options: *id001
@@ -1932,6 +1936,9 @@ views:
       show_header_toggle: false
       entities:
       - entity: select.cjp_forecast_type
+        name:
+          type: entity
+      - entity: switch.cjp_auto_forecast_type
         name:
           type: entity
       - entity: switch.cjp_price_forecast_correction
@@ -2543,6 +2550,9 @@ views:
       state_color: true
       show_header_toggle: false
       entities:
+      - entity: switch.cjp_auto_forecast_type
+        name:
+          type: entity
       - entity: select.cjp_forecast_type
         name:
           type: entity
@@ -2558,18 +2568,22 @@ views:
         {% macro p(v) %}{{ (v * 100) | round(0) | int ~ ' %' if v is number else '–' }}{% endmacro %}
         {% set f = states.sensor.cjp_analysis.attributes.forecast or {} %}
         {% set labels = {'ema': 'EMA', 'trend': 'Trend', 'average': '@@forecast_average@@'} %}
-        {% macro table(short, long, best, avg_label, short_label, long_label, msg) -%}
+        {% macro table(short, long, best, selected, waiting, avg_label, short_label, long_label, msg, auto_msg, waiting_msg) -%}
         | @@forecast_type@@ | {{ avg_label }} | @@mae@@ {{ short_label }} | @@mae@@ {{ long_label }} | @@relative@@ | @@bias@@ |
         |:---|---:|---:|---:|---:|---:|
         | 📏 @@forecast_actual@@ | {{ n(long.actual) }} | | | | |
         {% for kind, label in labels.items() -%}
-        | {{ '✅ ' if kind == f.selected }}{{ '⭐ ' if kind == best }}{{ label }} | {{ n(long[kind].forecast) }} | {{ n(short[kind].mae if short else none) }} | {{ n(long[kind].mae) }} | {{ p(long[kind].relative) }} | {{ n(long[kind].bias) }} |
+        | {{ '✅ ' if kind == selected }}{{ '⭐ ' if kind == best }}{{ label }} | {{ n(long[kind].forecast) }} | {{ n(short[kind].mae if short else none) }} | {{ n(long[kind].mae) }} | {{ p(long[kind].relative) }} | {{ n(long[kind].bias) }} |
         {% endfor %}
-        {% if best and best != f.selected and f.selected in long %}
-        {% set b, s = long[best], long[f.selected] %}
+        {% if f.auto and waiting %}
+        <ha-alert alert-type="info">{{ waiting_msg | replace('{manual}', labels[f.selected]) }}</ha-alert>
+        {% elif f.auto %}
+        <ha-alert alert-type="info">{{ auto_msg | replace('{selected}', labels[selected]) }}</ha-alert>
+        {% elif best and best != selected and selected in long %}
+        {% set b, s = long[best], long[selected] %}
         {% set percent = ((1 - b.mae / s.mae) * 100) | round(0) | int if s.mae else 0 %}
         <ha-alert alert-type="warning">{{ msg
-          | replace('{best}', labels[best]) | replace('{selected}', labels[f.selected])
+          | replace('{best}', labels[best]) | replace('{selected}', labels[selected])
           | replace('{best_mae}', n(b.mae)) | replace('{selected_mae}', n(s.mae))
           | replace('{percent}', percent | string) | replace('{actual}', n(long.actual))
           | replace('{best_forecast}', n(b.forecast)) | replace('{selected_forecast}', n(s.forecast)) }}</ha-alert>
@@ -2580,12 +2594,16 @@ views:
         {% if c.last_30 -%}
         **@@forecast_consumption_intro@@** ({{ c.last_30.hours }} @@hours@@)
         {% set msg %}@@forecast_better@@{% endset %}
-        {{ table(c.last_7, c.last_30, c.best, '@@forecast_avg_kwh@@', '7 @@days@@', '30 @@days@@', msg) }}
+        {% set auto_msg %}@@forecast_auto_on@@{% endset %}
+        {% set waiting_msg %}@@forecast_auto_waiting@@{% endset %}
+        {{ table(c.last_7, c.last_30, c.best, c.selected or f.selected, c.auto_waiting, '@@forecast_avg_kwh@@', '7 @@days@@', '30 @@days@@', msg, auto_msg, waiting_msg | replace('{days}', f.auto_min_days | string)) }}
         {%- endif %}
         {% if d.all -%}
         **@@forecast_drives_intro@@** ({{ d.all.drives }} @@drives@@)
         {% set msg %}@@forecast_better_drives@@{% endset %}
-        {{ table(d.recent, d.all, d.best, '@@forecast_avg_km@@', '@@last@@ ' ~ d.recent.drives, '@@last@@ ' ~ d.all.drives, msg) }}
+        {% set auto_msg %}@@forecast_auto_on_drives@@{% endset %}
+        {% set waiting_msg %}@@forecast_auto_waiting_drives@@{% endset %}
+        {{ table(d.recent, d.all, d.best, d.selected or f.selected, d.auto_waiting, '@@forecast_avg_km@@', '@@last@@ ' ~ d.recent.drives, '@@last@@ ' ~ d.all.drives, msg, auto_msg, waiting_msg | replace('{drives}', f.auto_min_drives | string)) }}
         {%- endif %}
         {%- else -%}
         <ha-alert alert-type="info">@@forecast_no_data@@</ha-alert>

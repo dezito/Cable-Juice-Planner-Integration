@@ -245,3 +245,54 @@ def test_forecast_published_at_startup_without_a_car() -> None:
     forecast = result.attributes["analysis"]["forecast"]
     assert (forecast["consumption"]["last_30"]["hours"], forecast["consumption"]["last_30"]["actual"]) == (2, 0.5)
     assert forecast["drives"]["all"] is None
+
+
+def test_forecast_type_is_chosen_automatically() -> None:
+    """auto_forecast_type: the house consumption and the km/kWh each use the type that hit them best."""
+    engine, snap = _engine()
+    for back in range(1, 8):
+        engine.analysis_db["consumption_days"][(DAY - datetime.timedelta(days=back)).isoformat()] = {
+            "hours": 24, "use": 12.0, "ema": [4.8, 4.8], "trend": [2.4, 2.4], "average": [7.2, 7.2],
+        }
+    # the km/kWh: average 0.1 off, ema 0.3, trend 0.5 (only 9 drives: too few)
+    engine.analysis_db["efficiency_drives"] = [{"date": "x", "actual": 6.0, "ema": 6.3, "trend": 6.5, "average": 6.1}] * 9
+
+    # off (default): the selected type everywhere
+    assert engine.run_job(snap, engine.get_forecast_type).value == "ema"
+    assert (engine.consumption_forecast_type, engine.drive_forecast_type) == ("ema", "ema")
+    assert "forecast_auto" not in engine.analysis_db
+
+    snap.settings["auto_forecast_type"] = True
+    # the planning uses the automatic types and publishes the analysis again, before the next hour end
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert result.attributes["analysis"]["forecast"]["consumption"]["selected"] == "trend"
+    assert engine.run_job(snap, engine.get_forecast_type).value == "ema"  # the select's type (fallback prices, solar history)
+    assert (engine.consumption_forecast_type, engine.drive_forecast_type) == ("trend", "ema")
+    assert engine.analysis_db["forecast_auto"] == {"consumption": "trend"}
+    forecast = engine.run_job(snap, engine.publish_analysis).attributes["analysis"]["forecast"]
+    assert (forecast["selected"], forecast["auto"]) == ("ema", True)
+    assert (forecast["consumption"]["selected"], forecast["consumption"]["auto_waiting"]) == ("trend", False)
+    assert (forecast["drives"]["selected"], forecast["drives"]["auto_waiting"]) == ("ema", True)
+
+    # the 10th drive: the km/kWh moves to the average
+    engine.analysis_db["efficiency_drives"] = engine.analysis_db["efficiency_drives"] + [engine.analysis_db["efficiency_drives"][0]]
+    assert engine.run_job(snap, engine.get_forecast_type).error is None
+    assert engine.drive_forecast_type == "average"
+    assert engine.analysis_db["forecast_auto"] == {"consumption": "trend", "drives": "average"}
+
+    # less than FORECAST_AUTO_MARGIN better: the choice stays
+    for day in engine.analysis_db["consumption_days"].values():
+        day["ema"] = [2.3, 2.3]
+    assert engine.run_job(snap, engine.get_forecast_type).error is None
+    assert engine.consumption_forecast_type == "trend"
+    for day in engine.analysis_db["consumption_days"].values():
+        day["ema"] = [2.2, 2.2]
+    assert engine.run_job(snap, engine.get_forecast_type).error is None
+    assert engine.consumption_forecast_type == "ema"
+
+    # off again: the selected type, and the next time it starts at the selected type again
+    snap.settings["auto_forecast_type"] = False
+    assert engine.run_job(snap, engine.get_forecast_type).error is None
+    assert (engine.consumption_forecast_type, engine.drive_forecast_type) == ("ema", "ema")
+    assert "forecast_auto" not in engine.analysis_db

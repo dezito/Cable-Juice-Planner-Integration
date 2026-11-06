@@ -30,6 +30,8 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     "powerwall_discharge_above_needed": {"default": False, "requires": "powerwall_level"},
     # correct the price forecast with its measured bias (engine/analysis)
     "price_forecast_correction": {"default": True},
+    # the house consumption and km/kWh use the forecast type that hit best lately (engine/analysis)
+    "auto_forecast_type": {"default": False},
 }
 
 

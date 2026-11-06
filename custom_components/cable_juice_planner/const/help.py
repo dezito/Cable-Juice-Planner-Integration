@@ -3,6 +3,7 @@ from __future__ import annotations
 # Help texts of the dashboard settings: entity key -> runtime text entity_help.<id>
 ENTITY_HELP_GROUPS: dict[str, str] = {
     "price_forecast_correction": "price_forecast",
+    "auto_forecast_type": "forecast_auto",
     "public_charging_session_cost": "public_charging",
     "public_charging_session_done": "public_charging",
     "forced_charging_daily_battery_level": "forced_charging",

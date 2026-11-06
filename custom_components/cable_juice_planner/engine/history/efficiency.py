@@ -109,7 +109,7 @@ class HistoryEfficiency:
             if not self.km_kwh_efficiency_db:
                 _LOGGER.warning("KM_KWH_EFFICIENCY_DB is empty or contains no valid float values.")
                 return
-            range_per_percentage = self.km_kwh_to_km_percentage(float(self.get_forecast_value(self.km_kwh_efficiency_db)))
+            range_per_percentage = self.km_kwh_to_km_percentage(float(self.get_forecast_value(self.km_kwh_efficiency_db, self.drive_forecast_type)))
             if range_per_percentage <= 0:
                 _LOGGER.warning("Calculated range_per_percentage is not valid (<= 0). Skipping update.")
                 return

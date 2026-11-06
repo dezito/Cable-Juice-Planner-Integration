@@ -78,6 +78,9 @@
       },
       "use_measured_charging_loss": {
         "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "auto_forecast_type": {
+        "default": "mdi:auto-mode"
       }
     },
     "number": {
