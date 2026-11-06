@@ -81,10 +81,12 @@ class ControlEvents:
             # startup_public_charging_session_done
             self.sensor_states["public_charging_session_done"] = runtime.get("public_charging_session_done") or "off"
             self.public_charging_sessions = list(runtime.get("public_charging_session") or [])
-            if self.sensor_states["public_charging_session_done"] == "on" and not self.public_charging_sessions:
+            finished = self.finished_public_charging_sessions()
+            if self.sensor_states["public_charging_session_done"] == "on" and not finished:
                 self.sensor_states["public_charging_session_done"] = "off"
-            if self.public_charging_sessions:
-                self.sensor_attrs.setdefault("public_charging_session_done", {})["public_charging_session"] = [dict(s) for s in self.public_charging_sessions]
+            # only the sessions waiting for their cost; one still charging has no end level or time yet
+            if finished:
+                self.sensor_attrs.setdefault("public_charging_session_done", {})["public_charging_session"] = [dict(s) for s in finished]
             self._changed_sensors.add("public_charging_session_done")
 
         self.set_charging_rule(f"📟{t('ui.startup.setting_entities')}")
@@ -339,7 +341,7 @@ class ControlEvents:
         """state_trigger_public_charging_session_cost. 'add' = wait 60 s and add to history."""
         if value is None or value == 0.0:
             return None
-        if not self.get_public_charging_session_done() or not self.public_charging_sessions or value == -2.0:
+        if not self.get_public_charging_session_done() or not self.finished_public_charging_sessions() or value == -2.0:
             self.set_setting("public_charging_session_cost", 0.0)
             return None
         return "add"

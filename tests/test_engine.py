@@ -1077,3 +1077,42 @@ def test_solcast_alone_when_there_is_no_solar_history() -> None:
     result = engine.run_job(snap, engine.local_energy_prediction)
     assert result.error is None, result.error
     assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
+
+
+def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0):
+    now = datetime.datetime.combine(DAY, datetime.time(12, minute))
+    snap = snapshot(now, level=level, port=port, settings={"public_charging_session_cost": cost})
+    snap.states["device_tracker.ev"] = "not_home"
+    result = engine.run_job(snap, func, *args)
+    assert result.error is None, result.error
+    return result
+
+
+def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
+    """A second public charge starts before the first one's cost is entered: only finished charges wait for a cost."""
+    engine = _loss_engine()
+    queue = lambda: engine.sensor_attrs.get("public_charging_session_done", {}).get("public_charging_session")  # noqa: E731
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off")
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    # plugged in again away from home, the first charge's cost not entered yet
+    _public_job(engine, 40, engine.public_charging_session, "on", level=65, port="on")
+    assert len(engine.public_charging_sessions) == 2
+    assert [s["added_percentage"] for s in queue()] == [40]
+    # a restart while charging: the queue still leaves out the charge in progress
+    restarted = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    runtime = {"public_charging_session_done": "on", "public_charging_session": deepcopy(engine.public_charging_sessions)}
+    assert _public_job(restarted, 41, restarted.startup, {"runtime": runtime}, level=66, port="on")
+    assert [s["added_percentage"] for s in restarted.sensor_attrs["public_charging_session_done"]["public_charging_session"]] == [40]
+    assert restarted.sensor_states["public_charging_session_done"] == "on"
+    # entering the first cost adds it and keeps the charge in progress
+    _public_job(engine, 45, engine.add_public_charging_session, level=65, port="on", cost=120.0)
+    assert engine.sensor_states["public_charging_session_done"] == "off"
+    assert engine.public_charging_sessions == [{"start_battery_level": 65.0}]
+    assert queue() is None
+    public = [row for row in engine.charging_history_db.values() if row.get("public_cost")]
+    assert [(row["percentage"], row["public_cost"]) for row in public] == [(40.0, 120.0)]
+    # the second charge ends and waits for its cost
+    _public_job(engine, 50, engine.public_charging_session, "off", level=90, port="off")
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    assert [s["added_percentage"] for s in queue()] == [25]

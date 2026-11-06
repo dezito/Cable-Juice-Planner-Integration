@@ -13,8 +13,9 @@ cost per km includes them.
    (`number.cjp_<prefix>_public_charging_session_cost`). Enter `-1` to ignore the charge.
 4. About 1 minute later the charge is added to the history, and the field is reset.
 
-With several charges, enter them in the order they happened. A charge waiting for its price is remembered
-across restarts. On the dashboard, the public charging card is only shown while a charge waits.
+With several charges, enter them in the order they happened. A charge only waits for its price once it has
+ended, so you can start the next public charge before entering the price of the last one. A charge waiting
+for its price, or one still in progress, is remembered across restarts. On the dashboard, the public charging card is only shown while a charge waits.
 
 ## Adding a charge yourself
 

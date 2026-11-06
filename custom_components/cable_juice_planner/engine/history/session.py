@@ -32,6 +32,13 @@ class HistorySession:
             # state_trigger_public_charging_session_done
             self.public_charging_session_done_changed(value)
 
+    def finished_public_charging_sessions(self) -> list[dict]:
+        """The sessions waiting for their cost; a session still charging (no end level yet) is left out."""
+        return [s for s in self.public_charging_sessions if "end_battery_level" in s]
+
+    def _publish_public_sessions(self) -> None:
+        self.set_attr("public_charging_session_done", "public_charging_session", [dict(s) for s in self.finished_public_charging_sessions()])
+
     def public_charging_session(self, entity_state: str):
         """Charge port/cable changed away from home (or the cost was entered: add_to_history)."""
         t = self.t
@@ -55,7 +62,7 @@ class HistorySession:
                     self._set_public_session_done("off")
                 return None
             self._set_public_session_done("on")
-            self.set_attr("public_charging_session_done", "public_charging_session", [dict(s) for s in sessions])
+            self._publish_public_sessions()
             self.set_setting("public_charging_session_cost", -2.0)
             data = {"actions": [{"action": "URI", "title": t("ui.public_charging_session.action"), "uri": f"entityId:{self.own_entity_id('number', 'public_charging_session_cost')}"}]}
             self.my_notify(
@@ -69,7 +76,9 @@ class HistorySession:
                 data=data,
                 always=True,
             )
-        elif self.get_public_charging_session_done() and sessions and entity_state == "add_to_history":
+        elif self.get_public_charging_session_done() and self.finished_public_charging_sessions() and entity_state == "add_to_history":
+            # the cost is for the oldest finished session; a session still charging stays in the queue
+            first = next(i for i, s in enumerate(sessions) if "end_battery_level" in s)
             cost = self.number_state("public_charging_session_cost")
             if not isinstance(cost, float):
                 _LOGGER.warning("Public charging session: Invalid cost %s, not adding to history", cost)
@@ -79,18 +88,18 @@ class HistorySession:
                 return None
             if cost == -1.0:
                 _LOGGER.info("Public charging session cost reset to -1.0, not adding to history")
-                sessions.pop(0)
+                sessions.pop(first)
                 self.mark_dirty("runtime")
-                if not sessions:
+                if not self.finished_public_charging_sessions():
                     self._set_public_session_done("off")
                 else:
                     self.set_setting("public_charging_session_cost", -2.0)
-                    self.set_attr("public_charging_session_done", "public_charging_session", [dict(s) for s in sessions])
+                    self._publish_public_sessions()
                 return None
             if cost < 0.0:
                 self.set_setting("public_charging_session_cost", 0.0)
                 return None
-            current_session = sessions.pop(0)
+            current_session = sessions.pop(first)
             self.mark_dirty("runtime")
             added_kwh = self.percentage_to_kwh(current_session["added_percentage"], include_charging_loss=False)
             timestamp = self.now()
@@ -116,11 +125,11 @@ class HistorySession:
                 odometer = self.get_state(odometer_entity, float_type=True, error_state=None)
                 if odometer:
                     self.charging_history_db[timestamp]["odometer"] = int(odometer)
-            if not sessions:
+            if not self.finished_public_charging_sessions():
                 self._set_public_session_done("off")
             else:
                 self.set_setting("public_charging_session_cost", -2.0)
-                self.set_attr("public_charging_session_done", "public_charging_session", [dict(s) for s in sessions])
+                self._publish_public_sessions()
             _LOGGER.info("Public charging session added to history: %s%% %.2fkWh %.2fkr", current_session["added_percentage"], added_kwh, cost)
             try:
                 self.charging_history_combine_and_set()
@@ -139,7 +148,8 @@ class HistorySession:
         if value in ENTITY_UNAVAILABLE_STATES:
             return
         if value == "off":
-            self.public_charging_sessions = []
+            # keep a session that is still charging away from home
+            self.public_charging_sessions = [s for s in self.public_charging_sessions if "end_battery_level" not in s]
             self.mark_dirty("runtime")
             self.set_setting("public_charging_session_cost", 0.0)
             self.del_attr("public_charging_session_done", "public_charging_session")

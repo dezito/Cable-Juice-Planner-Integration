@@ -1493,7 +1493,7 @@ views:
           grid_options: *id001
         - type: markdown
           content: |-
-            {% set sessions = state_attr('binary_sensor.cjp_public_charging_session_done', 'public_charging_session') or [] %}
+            {% set sessions = (state_attr('binary_sensor.cjp_public_charging_session_done', 'public_charging_session') or []) | selectattr('timestamp', 'defined') | list %}
             {% if sessions | length > 1 %}<ha-alert alert-type="info">@@pc_queue@@: <b>{{ sessions | length }}</b></ha-alert>
 
             | @@pc_sessions@@ | |
