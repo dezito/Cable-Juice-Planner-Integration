@@ -1139,6 +1139,74 @@ def test_price_history_never_stores_the_filled_hours() -> None:
     assert engine.kwh_avg_prices_db["history"][15][DAY.weekday()] == _price_history()["history"][15][DAY.weekday()]
 
 
+def _assert_price_history_repaired(engine: CJPEngine, good: dict) -> None:
+    today, other = DAY.weekday(), (DAY.weekday() + 1) % 7
+    for name in ("history", "history_sell"):
+        history = engine.kwh_avg_prices_db[name]
+        assert all(isinstance(history[h][d], list) for h in range(24) for d in range(7))
+        assert history[15][other] == good[name][15][other]
+    # today's prices are stored again, in front of the old ones
+    assert engine.kwh_avg_prices_db["history"][15][today][1:] == good["history"][15][today]
+    assert engine.kwh_avg_prices_db["last_save"].date() == DAY
+
+
+def test_price_history_nested_twice_is_repaired(caplog: pytest.LogCaptureFixture) -> None:
+    """A version 2.0 database that an earlier migration wrapped once more ({hour: {weekday: {weekday: [...]}}})."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    snap.price_data["attributes"]["sensor.price"].update(raw_tomorrow=[], tomorrow_valid=False, forecast=[])
+    good = _price_history()
+    broken = deepcopy(good)
+    for name in ("history", "history_sell"):
+        broken[name] = {h: {d: deepcopy(good[name][h]) for d in range(7)} for h in range(24)}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    started = engine.run_job(snap, engine.startup, {"kwh_avg_prices": broken})
+    assert started.error is None, started.error
+    assert "kwh_avg_prices" in started.db_saves
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    assert "Can't append KWH avg prices" not in caplog.text
+    _assert_price_history_repaired(engine, good)
+
+    # the hours without a provider price get the history of that weekday, not 0 + the daily adder
+    # (not day 7: today's weekday now starts with today's price)
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    prices = engine.grid_price_cache["prices"]
+    for days in (1, 6):
+        timestamp = now.replace(hour=17) + datetime.timedelta(days=days)
+        assert engine.grid_price_cache["sources"][timestamp] == "database"
+        assert prices[timestamp] == pytest.approx(round(2.0 + timestamp.weekday() / 10 + days / 30, 2))
+
+
+def test_price_history_version_1_is_transformed() -> None:
+    """Version 1.0 had one list per hour; every weekday starts with that list."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    good = _price_history()
+    old = {**deepcopy(good), "version": 1.0}
+    for name in ("history", "history_sell"):
+        old[name] = {h: [2.5] * 3 for h in range(24)}
+        for h in range(24):
+            good[name][h] = {d: [2.5] * 3 for d in range(7)}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now), engine.startup, {"kwh_avg_prices": old}).error is None
+    assert engine.run_job(snapshot(now), engine.update_grid_prices).error is None
+    _assert_price_history_repaired(engine, good)
+
+
+def test_failed_price_append_leaves_the_database_unchanged(caplog: pytest.LogCaptureFixture) -> None:
+    """max/mean/min are not changed when storing the day fails halfway (they used to gain today's value every hour)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now), engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    engine.kwh_avg_prices_db.pop("last_save", None)
+    engine.kwh_avg_prices_db["history"][15] = None
+    before = deepcopy(engine.kwh_avg_prices_db)
+    result = engine.run_job(snapshot(now), engine.update_grid_prices)
+    assert result.error is None
+    assert "Can't append KWH avg prices" in caplog.text
+    assert engine.kwh_avg_prices_db == before
+    assert "kwh_avg_prices" not in result.db_saves
+
+
 def test_sell_value_with_fixed_solar_sell_price() -> None:
     """A fixed price settles the difference to the hourly price: fixed - hourly, also negative."""
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
