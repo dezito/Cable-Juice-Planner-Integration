@@ -116,10 +116,11 @@ async def test_setup_creates_entities(hass: HomeAssistant, loaded_entry) -> None
 
     ent_reg = er.async_get(hass)
     expected = [
-        *_expected_settings(lambda requires: requires in (None, "ev")),
+        *_expected_settings(lambda requires: requires in (None, "ev", "public_charging")),
         f"sensor.{OBJECT_PREFIX}_current_charging_rule",
         f"sensor.{OBJECT_PREFIX}_charger_action",
         f"event.{OBJECT_PREFIX}_ev_request",
+        f"binary_sensor.{OBJECT_PREFIX}_public_charging_session_done",
     ]
     missing = [entity_id for entity_id in expected if ent_reg.async_get(entity_id) is None or hass.states.get(entity_id) is None]
     assert not missing
@@ -288,6 +289,31 @@ async def test_simulated_battery_level_entity(hass: HomeAssistant) -> None:
     await hass.async_block_till_done(wait_background_tasks=True)
     await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
     assert er.async_get(hass).async_get(entity_id) is None
+    await async_unload_and_join(hass, entry)
+
+
+async def test_no_public_charging_entities_without_a_location(hass: HomeAssistant) -> None:
+    """Without the car's location no public charge is detected: its entities are not created, old ones leave the registry."""
+    entry = make_entry(options={**MOCK_OPTIONS, "location_entity_id": ""})
+    ent_reg = er.async_get(hass)
+    old = [
+        ent_reg.async_get_or_create(platform, DOMAIN, f"{entry.entry_id}_{key}", suggested_object_id=f"{OBJECT_PREFIX}_{key}").entity_id
+        for platform, key in (("binary_sensor", "public_charging_session_done"), ("number", "public_charging_session_cost"))
+    ]
+    set_source_states(hass)
+    await async_setup(hass, entry)
+    coordinator = entry.runtime_data
+    assert coordinator.last_job["error"] is None
+    assert all(ent_reg.async_get(entity_id) is None and hass.states.get(entity_id) is None for entity_id in old)
+    # the other car entities are still there
+    assert hass.states.get(f"event.{OBJECT_PREFIX}_ev_request") is not None
+    # plugging in and out away from home starts no session
+    hass.states.async_set(EV_PORT, "on")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    hass.states.async_set(EV_PORT, "off")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.engine.public_charging_sessions == []
+    assert not coordinator.engine.get_public_charging_session_done()
     await async_unload_and_join(hass, entry)
 
 

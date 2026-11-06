@@ -86,7 +86,7 @@
           "charge_port_door_entity_id": "Afgør om ladelåge er åben/lukket (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Afgør om bilen er tilsluttet laderen (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit. Det simulerede batteriniveau når højst 1 % under den.",
-          "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude",
+          "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude. Offentlige ladninger registreres kun med en kendt lokation",
           "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter. Et nyt tidspunkt retter også det simulerede batteriniveau.",
           "climate_entity_id": "Valgfri: bilens klima-entitet. Tilstanden bruges til at afgøre om forvarmningen kører; start/stop sendes som hændelser på ev_request."
         }
@@ -489,7 +489,7 @@
           "charge_port_door_entity_id": "Afgør om ladelåge er åben/lukket (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Afgør om bilen er tilsluttet laderen (Understøttede tilstande: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Valgfri: bilens nuværende ladegrænse. Bruges til ladetab-beregningen og afrunding (Kia/Cupra). Den ønskede grænse udstilles som sensoren charging_limit. Det simulerede batteriniveau når højst 1 % under den.",
-          "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude",
+          "location_entity_id": "Hvis ikke sat, falder tilbage til charger.entity_ids.status_entity_id for at udlede hjemme/ude. Offentlige ladninger registreres kun med en kendt lokation",
           "last_update_entity_id": "Valgfri: tidspunkt for bilens seneste opdatering. Ingen wake_up-hændelse hvis bilen er opdateret inden for 14 minutter. Et nyt tidspunkt retter også det simulerede batteriniveau.",
           "climate_entity_id": "Valgfri: bilens klima-entitet. Tilstanden bruges til at afgøre om forvarmningen kører; start/stop sendes som hændelser på ev_request."
         }

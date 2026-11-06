@@ -4,11 +4,12 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import is_ev_configured
+from .const import DOMAIN
 from .coordinator import CJPCoordinator
-from .entity import CJPUpdatingEntity
+from .entity import CJPUpdatingEntity, requirement_met
 
 # the entities read the coordinator's data and change only the integration's own settings
 PARALLEL_UPDATES = 0
@@ -16,8 +17,14 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data
-    if is_ev_configured(coordinator.config):
-        async_add_entities([CJPPublicChargingSessionDone(coordinator, "binary_sensor", "public_charging_session_done")])
+    key = "public_charging_session_done"
+    if requirement_met(coordinator, "public_charging"):
+        async_add_entities([CJPPublicChargingSessionDone(coordinator, "binary_sensor", key)])
+        return
+    # no car location: no public charging, no unavailable entity left behind
+    ent_reg = er.async_get(hass)
+    if entity_id := ent_reg.async_get_entity_id("binary_sensor", DOMAIN, f"{entry.entry_id}_{key}"):
+        ent_reg.async_remove(entity_id)
 
 
 class CJPPublicChargingSessionDone(CJPUpdatingEntity, BinarySensorEntity):

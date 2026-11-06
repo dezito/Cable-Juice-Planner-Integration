@@ -47,6 +47,7 @@ from ..const import (
     is_charger_configured,
     is_ev_configured,
     is_powerwall_configured,
+    is_public_charging_configured,
     is_solar_configured,
 )
 from .analysis.analysis import Analysis
@@ -98,6 +99,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.solar_configured = is_solar_configured(config)
         self.powerwall_configured = is_powerwall_configured(config)
         self.ev_configured = is_ev_configured(config)
+        self.public_charging_configured = is_public_charging_configured(config)
         self.battery_simulation_enabled = is_battery_simulation_enabled(config)
 
         charger = config["charger"]

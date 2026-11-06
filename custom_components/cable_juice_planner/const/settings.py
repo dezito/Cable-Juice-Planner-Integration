@@ -6,8 +6,8 @@ from .base import WEEKDAYS
 # --------------------------------------------------------------------------- #
 # Settings entities (the former input_* helpers)
 # --------------------------------------------------------------------------- #
-# "requires": ev / no_ev / virtual_battery_level / solar / powerwall / powerwall_level -> the entity is only
-# created for that configuration (like init() pruned DEFAULT_ENTITIES).
+# "requires": ev / no_ev / public_charging (car + location) / virtual_battery_level / solar / powerwall /
+# powerwall_level -> the entity is only created for that configuration (like init() pruned DEFAULT_ENTITIES).
 # "config": path in CONFIG with the initial value (the PyScript version wrote these
 # from the config file into the helpers at every start).
 # Values are restored on restart and migrated once from input_*.<legacy prefix>_<key>.
@@ -62,7 +62,7 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "trip_range_needed": {"min": 0, "max": 1000, "step": 5, "mode": "slider", "unit": "{distance}", "default": 0.0},
     "full_charge_recommended": {"min": 0, "max": 60, "step": 1, "mode": "slider", "unit": "d", "default": 0.0},
     "ev_charge_after_powerwall_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "slider", "unit": "%", "default": 0.0, "config": "solar.ev_charge_after_powerwall_battery_level", "requires": "powerwall_level"},
-    "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "ev"},
+    "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "public_charging"},
 }
 
 FORECAST_TYPE_OPTIONS = ["Average", "EMA (Exponential Moving Average)", "Trend"]

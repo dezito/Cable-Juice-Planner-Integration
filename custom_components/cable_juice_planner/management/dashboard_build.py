@@ -38,7 +38,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import cached_json_fragment, json_fragment
 from homeassistant.helpers.storage import Store
 
-from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, hidden_settings, is_battery_simulation_enabled, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
+from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
 
 _LOGGER = logging.getLogger(__name__)
@@ -369,6 +369,9 @@ def render_dashboard(
         missing |= {f"{platform}.{own}_{key}" for platform, key in PREHEAT_ENTITIES}
     # e.g. the min. charge limit without the car's charge limit entity
     missing |= {f"number.{own}_{key}" for key in hidden_settings(config)}
+    if not is_public_charging_configured(config):
+        # public charging needs the car's location: its card goes (also while the old entities are still registered)
+        missing |= {f"binary_sensor.{own}_public_charging_session_done", f"number.{own}_public_charging_session_cost"}
     if not is_ev_configured(config):
         template = _drop_sections(template, EV_SECTIONS)
     texts = load_texts(normalize_language(config.get("language")), currency, distance)

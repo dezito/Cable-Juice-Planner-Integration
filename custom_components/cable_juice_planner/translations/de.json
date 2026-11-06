@@ -86,7 +86,7 @@
           "charge_port_door_entity_id": "Ladeport offen/geschlossen (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Fahrzeug mit Lader verbunden (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Batteriestand erreicht höchstens 1 % darunter.",
-          "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs",
+          "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs. Öffentliche Ladevorgänge werden nur mit bekanntem Standort erkannt",
           "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Batteriestand.",
           "climate_entity_id": "Optional: die Klima-Entität des Autos. Ihr Zustand zeigt, ob das Vorheizen läuft; Start/Stopp werden als Ereignisse auf ev_request ausgelöst."
         }
@@ -489,7 +489,7 @@
           "charge_port_door_entity_id": "Ladeport offen/geschlossen (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Fahrzeug mit Lader verbunden (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Batteriestand erreicht höchstens 1 % darunter.",
-          "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs",
+          "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs. Öffentliche Ladevorgänge werden nur mit bekanntem Standort erkannt",
           "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Batteriestand.",
           "climate_entity_id": "Optional: die Klima-Entität des Autos. Ihr Zustand zeigt, ob das Vorheizen läuft; Start/Stopp werden als Ereignisse auf ev_request ausgelöst."
         }

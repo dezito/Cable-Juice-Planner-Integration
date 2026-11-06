@@ -29,7 +29,7 @@ from .test_engine import OPTIONS
 def _own(prefix: str) -> set[str]:
     own = const.object_prefix(prefix)
     ids = {f"switch.{own}_{key}" for key, info in const.SWITCH_SETTINGS.items() if info.get("requires") in (None, "ev")}
-    ids |= {f"number.{own}_{key}" for key, info in const.NUMBER_SETTINGS.items() if info.get("requires") in (None, "ev")}
+    ids |= {f"number.{own}_{key}" for key, info in const.NUMBER_SETTINGS.items() if info.get("requires") in (None, "ev", "public_charging")}
     ids |= {f"sensor.{own}_{key}" for key, info in const.SENSOR_DEFS.items() if info[3] in (None, "ev")}
     ids |= {f"time.{own}_{key}" for key in const.TIME_SETTINGS} | {f"datetime.{own}_{key}" for key in const.DATETIME_SETTINGS}
     ids |= {f"select.{own}_{key}" for key in const.SELECT_SETTINGS} | {f"button.{own}_{key}" for key in (*const.BUTTON_KEYS, *const.EV_BUTTON_KEYS)}
@@ -144,6 +144,18 @@ def test_dashboard_layout() -> None:
     queue = next(card["content"] for card in _cards(conditional) if card.get("type") == "markdown" and "public_charging_session'" in card.get("content", ""))
     assert "sessions | length > 1" in queue and "sessions[0].start_battery_level" in queue
     assert "@@" not in queue
+
+
+def test_public_charging_only_with_a_location() -> None:
+    """Without the car's location the public charging card goes, also while the old entities are still registered."""
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "binary_sensor.cjp_tesla_public_charging_session_done"}
+    with_location = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
+    without = render_dashboard(const.build_config({**OPTIONS, "language": "da", "location_entity_id": ""}), "tesla", "entry1", existing)
+    for entity_id in ("binary_sensor.cjp_tesla_public_charging_session_done", "number.cjp_tesla_public_charging_session_cost"):
+        assert entity_id in with_location
+        assert entity_id not in without
+    overview = yaml.safe_load(without)["views"][0]
+    assert "Offentlig ladning" not in [card.get("heading") for card in _cards(overview)]
 
 
 def test_preheat_only_with_a_climate_entity() -> None:

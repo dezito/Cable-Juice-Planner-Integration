@@ -21,7 +21,12 @@ class HistorySession:
         self.charging_history(None, "")
 
     def _is_not_home(self) -> bool:
-        current_location = self.get_state(self.config["ev_car"]["entity_ids"]["location_entity_id"], error_state="away")
+        """Known to be away. No location entity, or an unknown location, is never a public charge:
+        the charger's own status can come minutes after the car's port/cable, so it can't tell home from away."""
+        location_entity = self.config["ev_car"]["entity_ids"]["location_entity_id"]
+        if not self.is_entity_configured(location_entity):
+            return False
+        current_location = self.get_state(location_entity, error_state="unknown")
         return not (current_location == "home" or current_location in ENTITY_UNAVAILABLE_STATES)
 
     def _set_public_session_done(self, value: str) -> None:

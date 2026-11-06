@@ -86,7 +86,7 @@
           "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit. Symulowany poziom baterii zatrzymuje się 1 % poniżej niego.",
-          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
+          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza. Publiczne ładowania są wykrywane tylko przy znanej lokalizacji",
           "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut. Nowy czas koryguje też symulowany poziom baterii.",
           "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
         }
@@ -489,7 +489,7 @@
           "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit. Symulowany poziom baterii zatrzymuje się 1 % poniżej niego.",
-          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
+          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza. Publiczne ładowania są wykrywane tylko przy znanej lokalizacji",
           "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut. Nowy czas koryguje też symulowany poziom baterii.",
           "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
         }

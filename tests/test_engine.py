@@ -73,7 +73,7 @@ def default_settings() -> dict:
     """The values of the setting entities right after the first setup (car configured, no solar)."""
     settings: dict = {key: info["default"] for key, info in const.SWITCH_SETTINGS.items() if info.get("requires") is None}
     settings.update(
-        {key: float(info["default"]) for key, info in const.NUMBER_SETTINGS.items() if info.get("requires") in (None, "ev")}
+        {key: float(info["default"]) for key, info in const.NUMBER_SETTINGS.items() if info.get("requires") in (None, "ev", "public_charging")}
     )
     settings.update({key: info["default"] for key, info in const.SELECT_SETTINGS.items()})
     settings.update({key: datetime.time.fromisoformat(info["default"]) for key, info in const.TIME_SETTINGS.items()})
@@ -1182,10 +1182,13 @@ def test_solcast_alone_when_there_is_no_solar_history() -> None:
     assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
 
 
-def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0):
+def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home", location_history: list | None = None):
     now = datetime.datetime.combine(DAY, datetime.time(12, minute))
     snap = snapshot(now, level=level, port=port, settings={"public_charging_session_cost": cost})
-    snap.states["device_tracker.ev"] = "not_home"
+    snap.states["device_tracker.ev"] = location
+    if location_history is not None:
+        # (minutes before now, state)
+        snap.buffers = {"device_tracker.ev": [(now.replace(tzinfo=TZ).timestamp() - ago * 60, value) for ago, value in location_history]}
     result = engine.run_job(snap, func, *args)
     assert result.error is None, result.error
     return result
@@ -1219,3 +1222,43 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     _public_job(engine, 50, engine.public_charging_session, "off", level=90, port="off")
     assert engine.sensor_states["public_charging_session_done"] == "on"
     assert [s["added_percentage"] for s in queue()] == [25]
+
+
+@pytest.mark.parametrize(
+    ("location_entity", "location", "location_history", "detected"),
+    [
+        ("device_tracker.ev", "not_home", None, True),
+        ("device_tracker.ev", "Work", None, True),  # another zone is away too
+        ("device_tracker.ev", "home", None, False),
+        ("", "not_home", None, False),  # no location entity: the charger can't tell, its status comes minutes after the car's port
+        ("device_tracker.missing", "not_home", None, False),  # the configured entity is gone from Home Assistant
+        ("device_tracker.ev", "unknown", None, False),
+        ("device_tracker.ev", "unavailable", [], False),
+        ("device_tracker.ev", "unavailable", [(60, "home")], False),
+        ("device_tracker.ev", "unavailable", [(60, "not_home")], True),  # the last known location
+    ],
+)
+def test_public_charging_session_needs_a_known_location(location_entity: str, location: str, location_history: list | None, detected: bool) -> None:
+    """Only a car known to be away gets a public charge; no or an unknown location never starts or ends one."""
+    engine = CJPEngine(const.build_config({**OPTIONS, "location_entity_id": location_entity}), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {}).error is None
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", location=location, location_history=location_history)
+    assert bool(engine.public_charging_sessions) is detected
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", location=location, location_history=location_history)
+    assert (engine.sensor_states.get("public_charging_session_done") == "on") is detected
+    assert bool(engine.sensor_attrs.get("public_charging_session_done", {}).get("public_charging_session")) is detected
+
+
+def test_no_public_charging_without_a_location() -> None:
+    """The location removed: a waiting session isn't restored (no entity to enter its cost), the port starts none."""
+    engine = CJPEngine(const.build_config({**OPTIONS, "location_entity_id": ""}), "cjp_test", TEXTS)
+    waiting = [{"start_battery_level": 30.0, "end_battery_level": 70.0, "added_percentage": 40.0, "timestamp": datetime.datetime.combine(DAY, datetime.time(0, 30))}]
+    runtime = {"public_charging_session_done": "on", "public_charging_session": waiting}
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {"runtime": runtime}).error is None
+    assert engine.public_charging_sessions == []
+    assert not engine.get_public_charging_session_done()
+    assert "public_charging_session_done" not in engine.sensor_states
+    _public_job(engine, 0, engine.ev_port_changed, "on", "off", level=30, port="on")
+    _public_job(engine, 30, engine.ev_port_changed, "off", "on", level=70, port="off")
+    assert engine.public_charging_sessions == []
+    assert "public_charging_session_done" not in engine.sensor_states
