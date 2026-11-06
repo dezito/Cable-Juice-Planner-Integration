@@ -171,16 +171,51 @@ class EnergyPrice:
             if name not in self.kwh_avg_prices_db:
                 self.kwh_avg_prices_db[name] = []
                 force_save = True
-        if version <= 1.0:
-            _LOGGER.info("Transforming price database from version %s to 2.0", version)
-            old_db = deepcopy(self.kwh_avg_prices_db)
-            for name in ("history", "history_sell"):
-                self.kwh_avg_prices_db[name] = {h: {d: old_db[name][h].copy() for d in range(7)} for h in range(24)}
-            force_save = True
+        for name in ("history", "history_sell"):
+            if self._normalize_price_history(name, version):
+                force_save = True
         if force_save and self.price_provider is not None:
             self.append_kwh_prices()
         self.mark_dirty("kwh_avg_prices")
         self.set_low_forecast_price()
+
+    def _normalize_price_history(self, name: str, version: float) -> bool:
+        """Bring kwh_avg_prices_db[name] to the version 2.0 shape {hour: {weekday: [prices]}}.
+
+        Checks the shape instead of trusting the version: version 1.0 had one list per hour,
+        and an earlier migration that ran on data already in version 2.0 wrapped every weekday
+        once more ({hour: {weekday: {weekday: [prices]}}}). Returns True when something changed.
+        """
+        history = self.kwh_avg_prices_db.get(name)
+        if not isinstance(history, dict):
+            history = self.kwh_avg_prices_db[name] = {}
+        transformed = repaired = changed = False
+        for h in range(24):
+            days = history.get(h)
+            if isinstance(days, list):
+                history[h] = {d: days.copy() for d in range(7)}
+                transformed = changed = True
+                continue
+            if not isinstance(days, dict):
+                days = history[h] = {}
+                changed = True
+            for d in range(7):
+                values = days.get(d)
+                if isinstance(values, dict):
+                    # the copy of this weekday sits under the same weekday
+                    while isinstance(values, dict):
+                        values = values.get(d)
+                    repaired = True
+                if not isinstance(values, list):
+                    values = []
+                if values is not days.get(d):
+                    days[d] = values
+                    changed = True
+        if transformed:
+            _LOGGER.info("Transforming price database %s from version %s to 2.0", name, version)
+        if repaired:
+            _LOGGER.warning("Repaired price database %s: an earlier migration had nested every weekday twice", name)
+        return changed
 
     def append_kwh_prices(self) -> None:
         if len(self.kwh_avg_prices_db) == 0:
@@ -211,7 +246,9 @@ class EnergyPrice:
                 return
 
             prices = [price - refund for price in today_grid_prices.values()]
-            db = self.kwh_avg_prices_db
+            # changed on a copy: a failure halfway must not leave today's prices in max/mean/min,
+            # where the next hourly attempt would add them again
+            db = deepcopy(self.kwh_avg_prices_db)
             db["max"].insert(0, max(prices))
             db["mean"].insert(0, round(average(prices), 3))
             db["min"].insert(0, min(prices))
@@ -233,6 +270,7 @@ class EnergyPrice:
                 _LOGGER.warning("Missing some hours in today's power prices, not saving to database. Added hours: %s", added)
                 return
             db["last_save"] = self.now()
+            self.kwh_avg_prices_db = db
             _LOGGER.info("Price history updated with %s hours", added)
             self.mark_dirty("kwh_avg_prices")
             self.set_low_forecast_price()
