@@ -62,6 +62,7 @@ tests/                                   Pytest suite
 
 docs/                                    User documentation and behavior details
 .github/workflows/validate.yml           CI: hassfest and HACS validation
+.github/workflows/release.yml            Attaches cable_juice_planner.zip to published releases
 pytest.ini / requirements_test.txt       Pytest configuration and pinned test deps
 ```
 
@@ -199,6 +200,13 @@ private agent memory). Update or remove a note when it stops being true.
   about removed/renamed entities between development versions. Detailed docs
   live in `docs/` (English); the README is a short landing page that links into
   it. Anchor links to emoji headings need a leading hyphen.
+- Releases: `hacs.json` has `zip_release` with
+  `filename: cable_juice_planner.zip`, so HACS installs from that release asset
+  (its download count is the install count). `.github/workflows/release.yml`
+  builds it from `custom_components/cable_juice_planner/` (files at the zip
+  root) when a release is published; run it by hand with a tag for a release
+  that lacks the zip. Bump `manifest.json` `version` to the tag before
+  publishing.
 
 ### HACS default-catalog review
 

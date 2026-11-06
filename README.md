@@ -234,7 +234,8 @@ If **Cable Juice Planner** does not show up in the HACS search, add it as a cust
 
 ### Manual
 
-Copy `custom_components/cable_juice_planner` to `config/custom_components/cable_juice_planner` and restart Home Assistant.
+Download `cable_juice_planner.zip` from the [latest release](https://github.com/dezito/Cable-Juice-Planner-Integration/releases/latest),
+unpack it into `config/custom_components/cable_juice_planner` and restart Home Assistant.
 
 ---
 
