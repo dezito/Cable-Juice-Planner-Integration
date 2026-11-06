@@ -318,6 +318,18 @@ place and extend them to new code:
   `sensor.py`, from the attributes actually written, incl. the site's circuit
   patch) and compares from/to state into the `changed` variable. Not
   `mode: restart` + delay: a restart can cancel a start and lose what changed.
+- `stop_charging(force=True)` (charging without a rule, restart of a charger
+  that doesn't charge) counts `charger_stop_request` up; it is published as
+  `stop_request` and, when above 0, in `decision`, so the blueprint sends stop
+  again although the action already is `stop` (`'stop'` in `changed` only when
+  it rises; 0 after a restart). Without it a car/charger that starts by itself
+  on plug-in is never stopped (Easee resets its dynamic charger limit to max
+  on every new session).
+- `charging_without_rule` has no blind minutes after the hour (the PyScript
+  version skipped minute 0–4). Instead it skips the average's window after
+  the action went charge → stop or the charger was disabled
+  (`charger_stopped_at`), when the charger may still give power; a stop in
+  the future (clock went back) is ignored.
 
 ### PyScript import
 

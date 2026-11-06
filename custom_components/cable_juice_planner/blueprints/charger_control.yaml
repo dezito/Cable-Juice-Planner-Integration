@@ -528,6 +528,10 @@ variables:
         {% endfor %}
         {% if diff.found %}{% set ns.items = ns.items + [name] %}{% endif %}
       {% endfor %}
+      {# stop again: it charges although the integration said stop (only counts up, 0 after a restart) #}
+      {% if after.get('stop_request') | int(0) > before.get('stop_request') | int(0) %}
+        {% set ns.items = ns.items + ['stop'] %}
+      {% endif %}
     {% endif %}
     {{ ns.items }}
   # a new action (or Home Assistant start / back from unavailable): the whole start or stop
@@ -835,3 +839,27 @@ actions:
                   - continue_on_error: true
                     sequence: !input amps_actions
                   - *car_amps
+              # it charges although the action is stop (e.g. the car or the charger started by
+              # itself when plugged in): stop and the current (0 A) once more
+              - if:
+                  - condition: template
+                    value_template: "{{ 'stop' in changed and action == 'stop' }}"
+                then:
+                  - if:
+                      - condition: template
+                        value_template: "{{ 'amps' in changed and command_delay > 0 }}"
+                    then:
+                      - delay: "{{ command_delay }}"
+                  - continue_on_error: true
+                    sequence: !input stop_actions
+                  - continue_on_error: true
+                    sequence: !input car_stop_actions
+                  - *pause
+                  - continue_on_error: true
+                    sequence: !input amps_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ 'stop' in changed and not charger_enabled and 'enabled' not in changed }}"
+                then:
+                  - continue_on_error: true
+                    sequence: !input disable_actions

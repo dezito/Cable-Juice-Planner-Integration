@@ -95,6 +95,7 @@ def snapshot(
     level: float = 40,
     status: str = "disconnected",
     port: str = "off",
+    power: float = 0,
     settings: dict | None = None,
     site: dict | None = None,
 ) -> Snapshot:
@@ -107,7 +108,7 @@ def snapshot(
     }
     states = {
         "sensor.charger_status": status,
-        "sensor.charger_power": "0",
+        "sensor.charger_power": str(power),
         "sensor.charger_kwh": "0",
         "sensor.charger_lifetime_kwh": "1000",
         "sensor.ev_battery_level": str(level),
@@ -191,6 +192,108 @@ def test_low_battery_charges_unless_expensive() -> None:
 
     engine, _ = run(18, level=10, settings=settings, **PLUGGED_IN)
     assert engine.charger_action == "stop"
+
+
+def test_charging_without_rule_asks_for_stop_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The car/charger starts by itself when plugged in while the action already is stop.
+
+    The action doesn't change, so the charger automation would never run: each forced stop
+    counts stop_request up, which changes the decision the blueprint triggers on.
+    """
+    from custom_components.cable_juice_planner.engine.history.history import History
+    from custom_components.cable_juice_planner.sensor import charger_decision
+
+    monkeypatch.setattr(History, "get_average_value", lambda self, *args, **kwargs: 3000.0)
+    kwargs = {"level": 80, "settings": {"fill_up": True}, "status": "charging", "port": "on", "power": 3000}
+    engine, result = run(18, **kwargs)
+    assert engine.charger_action == "stop"
+    now = datetime.datetime.combine(DAY, datetime.time(18, 35))
+    requests = [result.attributes["charger_action"]["stop_request"]]
+    for _ in range(3):
+        result = engine.run_job(snapshot(now, **kwargs), engine.charge_if_needed, True)
+        assert result.error is None, result.error
+        requests.append(result.attributes["charger_action"]["stop_request"])
+
+    assert engine.charger_action == "stop"
+    # first only counted (startup + the first plan), then a forced stop on every run while it charges
+    assert requests == [0, 1, 2, 3]
+    attributes = result.attributes["charger_action"]
+    assert charger_decision("stop", attributes).endswith(", stop request 3")
+
+    # not charging any more: nothing more is asked for
+    kwargs = {**kwargs, "status": "awaiting_start", "power": 0}
+    monkeypatch.setattr(History, "get_average_value", lambda self, *args, **kwargs: 0.0)
+    result = engine.run_job(snapshot(now, **kwargs), engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_stop_request == 3
+
+
+def _no_rule_engine(monkeypatch: pytest.MonkeyPatch, start: datetime.datetime) -> tuple[CJPEngine, dict]:
+    """An engine whose charger gives 3000 W (now and on average)."""
+    from custom_components.cable_juice_planner.engine.history.history import History
+
+    monkeypatch.setattr(History, "get_average_value", lambda self, *args, **kwargs: 3000.0)
+    kwargs = {"level": 80, "status": "charging", "port": "on", "power": 3000}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(start, **kwargs), engine.startup, {}).error is None
+    return engine, kwargs
+
+
+def _check_no_rule(engine: CJPEngine, at: datetime.datetime, kwargs: dict) -> bool:
+    result = engine.run_job(snapshot(at, **kwargs), engine.charging_without_rule)
+    assert result.error is None, result.error
+    return result.value
+
+
+@pytest.mark.parametrize("minute", [0, 2, 4])
+def test_charging_without_rule_is_seen_at_the_start_of_the_hour(monkeypatch: pytest.MonkeyPatch, minute: int) -> None:
+    """No blind minutes after the hour: the car that started by itself is counted at once."""
+    start = datetime.datetime.combine(DAY, datetime.time(12, minute))
+    engine, kwargs = _no_rule_engine(monkeypatch, start)
+    engine.charging_no_rule_count = 0
+    assert _check_no_rule(engine, start, kwargs) is False
+    assert engine.charging_no_rule_count == 1
+
+
+def test_charging_just_after_a_stop_is_not_without_rule(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A planned hour ended: the charger still gives power until the stop has reached it."""
+    stopped = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine, kwargs = _no_rule_engine(monkeypatch, stopped - datetime.timedelta(hours=1))
+    engine.run_job(snapshot(stopped - datetime.timedelta(hours=1), **kwargs), engine.start_charging)
+    engine.run_job(snapshot(stopped, **kwargs), engine.stop_charging)
+    assert engine.charger_stopped_at == stopped
+    engine.charging_no_rule_count = 0
+
+    # within the average's window (5 min): not counted
+    for minutes in (0, 2, 4):
+        assert _check_no_rule(engine, stopped + datetime.timedelta(minutes=minutes), kwargs) is False
+    assert engine.charging_no_rule_count == 0
+
+    # still charging after the window: it is
+    assert _check_no_rule(engine, stopped + datetime.timedelta(minutes=5), kwargs) is False
+    assert engine.charging_no_rule_count == 1
+
+    # a stop that was already stop doesn't start a new window
+    engine.run_job(snapshot(stopped + datetime.timedelta(minutes=6), **kwargs), engine.stop_charging)
+    assert engine.charger_stopped_at == stopped
+
+
+def test_stop_before_the_clock_went_back_does_not_hide_charging(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local time: after the clock went back an hour, a stop at 02:58 lies "in the future"."""
+    stopped = datetime.datetime.combine(DAY, datetime.time(2, 58))
+    engine, kwargs = _no_rule_engine(monkeypatch, stopped)
+    engine.charger_action = "charge"
+    engine.run_job(snapshot(stopped, **kwargs), engine.stop_charging)
+    engine.charging_no_rule_count = 0
+    assert _check_no_rule(engine, datetime.datetime.combine(DAY, datetime.time(2, 10)), kwargs) is False
+    assert engine.charging_no_rule_count == 1
+
+
+def test_charger_decision_without_stop_request_is_unchanged() -> None:
+    from custom_components.cable_juice_planner.sensor import charger_decision
+
+    attributes = {"mode": "normal", "charger_enabled": True, "phase_1_amps": 0, "charging_limit": 80, "stop_request": 0}
+    assert charger_decision("stop", attributes) == "stop, enabled, mode normal, 0/0/0 A, circuit 0/0/0 A, limit 80 %"
 
 
 def test_manual_charging() -> None:

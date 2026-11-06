@@ -182,6 +182,12 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.notify_history: dict = {}
         self.charger_action = "stop"
         self.charger_enabled = True
+        # counts the forced stops (charging without a rule): a new value makes the charger
+        # automation send stop again, also when the action already was stop. Not persisted.
+        self.charger_stop_request = 0
+        # when the action last went from charge to stop (or the charger was disabled): the
+        # charger may still give power for a moment, which isn't charging without a rule
+        self.charger_stopped_at: datetime.datetime | None = None
         self.charger_mode = "normal"
         # anchor of the simulated battery level (engine/battery.py), not persisted
         self.battery_simulation: dict = {}

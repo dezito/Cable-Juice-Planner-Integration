@@ -134,6 +134,7 @@ class ControlActions:
     def _publish_charger_action(self) -> None:
         self.set_state("charger_action", self.charger_action)
         self.set_attr("charger_action", "charger_enabled", self.charger_enabled)
+        self.set_attr("charger_action", "stop_request", self.charger_stop_request)
 
     def start_charging(self, entities=None, force=False) -> None:
         """Charge (or with entities=['enabled']: only enable the charger)."""
@@ -147,12 +148,24 @@ class ControlActions:
         self._publish_charger_action()
 
     def stop_charging(self, entities=None, force=False) -> None:
-        """Stop charging (with entities=['enabled']: disable the charger)."""
+        """Stop charging (with entities=['enabled']: disable the charger).
+
+        force: it charges although it should not (e.g. the car or charger started by itself
+        when it was plugged in). The action is often stop already, so nothing would change
+        for the charger automation: stop_request is counted up, and the blueprint sends
+        stop (or disable) once more.
+        """
+        if force:
+            self.charger_stop_request += 1
+            _LOGGER.info("Charger action: stop again (request %s)", self.charger_stop_request)
         if entities == ["enabled"]:
+            if self.charger_enabled:
+                self.charger_stopped_at = self.now()
             self.charger_enabled = False
         else:
             if self.charger_action != "stop":
                 _LOGGER.info("Charger action: stop")
+                self.charger_stopped_at = self.now()
             self.charger_action = "stop"
         self._publish_charger_action()
 

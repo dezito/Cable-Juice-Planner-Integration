@@ -92,10 +92,14 @@ def charger_decision(action: Any, attributes: dict) -> str:
         return "/".join(str(attributes.get(f"{prefix}phase_{i}_amps", 0)) for i in (1, 2, 3))
 
     enabled = "enabled" if attributes.get("charger_enabled", True) else "disabled"
-    return (
+    decision = (
         f"{action}, {enabled}, mode {attributes.get('mode')}, {amps('')} A, "
         f"circuit {amps('circuit_')} A, limit {attributes.get('charging_limit')} %"
     )
+    # a forced stop changes the decision, so the automation sends stop again
+    if attributes.get("stop_request"):
+        decision += f", stop request {attributes['stop_request']}"
+    return decision
 
 
 class CJPActionSensor(CJPSensor):

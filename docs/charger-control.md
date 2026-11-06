@@ -9,6 +9,7 @@ entities, and your automation does it – easiest with the blueprint that comes 
 |---|---|
 | `sensor.cjp_<prefix>_charger_action` | `charge` or `stop`: whether the charger should charge now |
 | ↳ attribute `charger_enabled` | whether the charger should be enabled |
+| ↳ attribute `stop_request` | counts up each time CJP sees charging without a rule and asks for stop again (0 after a restart); while it is above 0 it is also in `decision` (`…, stop request 3`) |
 | ↳ attributes `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | the charging current per phase in A (0 = phase not used) – so an automation only needs `charger_action` |
 | ↳ attributes `circuit_phase_1_amps` … `_3_amps` | the circuit's limit per phase (e.g. Easee's circuit limit); on a [shared circuit](load-balancing.md#shared-circuit-eg-easee-master) the sum per grid phase of all its chargers |
 | ↳ attribute `decision` | the action, enabled, mode, amps, circuit and charge limit in one text, e.g. `charge, enabled, mode normal, 16/16/16 A, circuit 24/24/24 A, limit 80 %` – trigger on it to run once per change |
@@ -151,6 +152,13 @@ one of them is enough:
 If it hasn't started, the charging current and start are sent once more to the charger and the car; if it
 hasn't stopped, stop and the current are sent once more. Because one entity is enough, the charger's entities
 alone can check a car that can't be read.
+
+**Charging without a rule:** a car or charger can start by itself when it is plugged in (e.g. a charger that
+resets its current limit for a new session, or a car that charges as soon as the cable is in) while the action
+already is `stop`. Nothing in the decision changes then, so the automation wouldn't run. When CJP sees charging
+power without a rule (⚠️), it counts `stop_request` up on every calculation while it lasts, and the automation
+sends **Stop charging**, **Stop charging in the car** and the current (0 A) once more – and **Disable the
+charger** when it should be disabled. Update the blueprint (Repairs) to get this.
 
 ### Restart when not charging
 

@@ -180,10 +180,15 @@ class ControlSchedule:
 
     def charging_without_rule(self) -> bool | None:
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
-        if self.now().minute < minutes or self.testing:
+        if self.testing:
             return False
         now = self.now()
         past = now - datetime.timedelta(minutes=minutes)
+        # just stopped (e.g. a planned hour ended): the charger may still give power until the
+        # stop has reached it, and the average still holds the allowed charging (local time:
+        # a stop "in the future" after the clock went back an hour doesn't count)
+        if self.charger_stopped_at is not None and past < self.charger_stopped_at <= now:
+            return False
         entity_id = self.config["charger"]["entity_ids"]["power_consumtion_entity_id"]
         power = abs(float(self.get_state(entity_id, float_type=True, error_state=0.0)))
         power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3)
