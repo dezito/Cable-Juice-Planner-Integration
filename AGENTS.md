@@ -195,6 +195,13 @@ private agent memory). Update or remove a note when it stops being true.
 
 - Built like BattMind-Integration; keep the worker-thread design so calculations
   never block HA: single-thread executor, snapshot -> job result.
+- Database fail-safe lives in `management/storage.py` (same code in BattMind):
+  every save goes through `CJPStorage.async_save`, which first copies the valid
+  current file to `cable_juice_planner_backups/storage/` (one copy a day, 3
+  kept; the age comes from the newest copy's mtime, so restarts add none), and
+  `async_load` moves a corrupt file to `.corrupt.<time>` and
+  restores the newest valid copy. Tests: `tests/test_storage_failsafe.py`;
+  `hass_storage` mocks the Store, so they place the files on disk themselves.
 - `input_boolean.dezito_show_debug_button` in the generated dashboard is the
   user's own toggle for the debug-info badge. It is intentional; do not flag it.
 - README/docs audience: first-time installs, possibly migrating from PyScript. The HACS integration is new, so no release notes or "changed since" text
