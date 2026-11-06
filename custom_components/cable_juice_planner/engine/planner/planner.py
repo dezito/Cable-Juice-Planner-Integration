@@ -56,6 +56,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
 
         try:
             self.get_forecast_type()
+            self.republish_forecast_if_changed()
             self.current_battery_level_expenses()
             energy_prediction = self.local_energy_prediction()
         except KeyError as e:

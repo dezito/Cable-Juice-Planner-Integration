@@ -154,8 +154,15 @@ class Pricing:
         return expensive
 
     def get_forecast_type(self) -> str:
+        """The selected forecast type. With the switch auto_forecast_type the house consumption and the
+        km/kWh use the type that hit each of them best lately (engine/analysis); the fallback prices and
+        the solar history always use the selected one."""
         forecast_type = str(self.setting("forecast_type") or "ema").split(" ")[0].lower()
         self.forecast_type = forecast_type if forecast_type in ("average", "ema", "trend") else "ema"
+        consumption, drives = self.auto_forecast_types(self.forecast_type)
+        self.forecast_type_auto = {"consumption": consumption, "drives": drives}
+        self.consumption_forecast_type = consumption or self.forecast_type
+        self.drive_forecast_type = drives or self.forecast_type
         return self.forecast_type
 
     def get_forecast_value(self, data=None, forecast_type: str | None = None) -> float:

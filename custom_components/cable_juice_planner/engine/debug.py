@@ -36,6 +36,8 @@ class Diagnostics:
                     "POWERWALL_CONFIGURED": self.powerwall_configured,
                     "EV_CONFIGURED": self.ev_configured,
                     "FORECAST_TYPE": self.forecast_type,
+                    "CONSUMPTION_FORECAST_TYPE": self.consumption_forecast_type,
+                    "DRIVE_FORECAST_TYPE": self.drive_forecast_type,
                 },
                 {"CONFIG": self.config},
             ),

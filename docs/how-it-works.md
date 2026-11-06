@@ -51,7 +51,7 @@ most ±0.50 kr. The [price forecast analysis](dashboard-analysis.md#price-foreca
 and the correction used.
 
 <p align="center">
-  <img src="../images/settings-advanced.png" alt="The Advanced settings: forecast type and correct the price forecast" width="380">
+  <img src="../images/settings-advanced.png" alt="The Advanced settings: forecast type, choose the forecast type automatically and correct the price forecast" width="380">
 </p>
 
 CJP also keeps its **own price database**: every day the prices from the price integration are stored per
