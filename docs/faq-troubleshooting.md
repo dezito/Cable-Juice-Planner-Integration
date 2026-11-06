@@ -73,6 +73,18 @@ It is only recalculated when something it depends on has changed. Press **Force 
 See [Charging loss](charging-loss.md#one-time-measurement): the charge has to add at least 30 percentage
 points, and the car has to report when it is full.
 
+## A database file was corrupt
+
+Before Cable Juice Planner saves a database, it checks the current file in `/config/.storage/` and copies it
+to `/config/cable_juice_planner_backups/storage/`. It makes one copy a day per database (a restart doesn't
+make an extra one) and keeps the newest 3. A damaged file is never copied, so it can't replace the good
+copies.
+
+If a database file is empty, isn't valid JSON or can't be read at startup (e.g. after a power cut), it is
+moved aside as `….corrupt.<time>` and the newest good copy is restored. The log then has an error naming
+both files. Data saved after that copy was made is lost, at most about a day. Without a good copy the database is treated as missing, as on a new install. You can then import
+a full backup (see [Backup](../README.md#backup-export-and-import-of-data)).
+
 ## Report a problem
 
 When Cable Juice Planner does something wrong, create a debug file **as soon as possible** after it happened: it holds
