@@ -21,7 +21,7 @@ It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovela
 | **Trip** | departure, arrival, target and preheating |
 | **Public charging** | only while a charge waits for its price |
 | **Charging history** | each charge with time, reason, %, kWh, price and price/kWh, and per month km, kWh, share from solar and price |
-| **Overview** | the plan with a reason for each hour, the departure plan, the cost of the current battery level, the last drive's efficiency and the solar surplus forecast |
+| **Overview** | the plan with a reason for each hour, the departure plan, the cost of the current battery level, the last drive's efficiency and the solar surplus forecast. With the card_mod add-on installed, tables have no visible row or column borders and every other table row is slightly shaded, starting with the first row (not in a table with one row) |
 
 | Battery and charging plan | Electricity prices |
 | --- | --- |
