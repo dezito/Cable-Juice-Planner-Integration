@@ -334,7 +334,7 @@ class HistoryCombine:
         ])
 
         datetime_keys = [key for key in total["cost"] if isinstance(key, datetime.datetime)]
-        for i, month in enumerate(sorted(datetime_keys)):
+        for month in sorted(datetime_keys):
             local_energy = ""
             solar_percentage = ""
             if total["kWh_from_local_energy"][month] > 0.0 and total["kwh"][month] > 0.0:
@@ -346,11 +346,10 @@ class HistoryCombine:
                 unit_string = f"<br>{unit_price:.2f}<br>({round(total['cost'][month] / total['km'][month][0], 2):.2f})"
             else:
                 unit_string = f"<br>{unit_price:.2f}"
-            start, end = ("<font color=grey>", "</font>") if i % 2 == 0 else ("", "")
             month_name = t(f"ui.calendar.month_names.{month.strftime('%b').lower()}")
             history.append(
-                f"| {start}{month_name}<br>{month.strftime('%Y')}{end} | {start}{total['km'][month][1]}{end} | {start}{total['km'][month][2]}{end}"
-                f" | {start}{round(total['kwh'][month], 1)}{local_energy}{solar_percentage}{end} | {start}{round(total['cost'][month], 2):.2f}{unit_string}{end} |"
+                f"| {month_name}<br>{month.strftime('%Y')} | {total['km'][month][1]} | {total['km'][month][2]}"
+                f" | {round(total['kwh'][month], 1)}{local_energy}{solar_percentage} | {round(total['cost'][month], 2):.2f}{unit_string} |"
             )
 
         total_local_energy = ""
