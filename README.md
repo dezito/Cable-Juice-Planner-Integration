@@ -5,6 +5,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
 [![GitHub Release](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-Integration)](https://github.com/dezito/Cable-Juice-Planner-Integration/releases)
 [![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-Integration)](LICENSE)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/dezito)
 
 Plans EV charging based on a work plan or the cheapest times over a week.
 The plan uses electricity prices, solar surplus, home battery and the car's actual consumption.
@@ -411,6 +412,12 @@ See [FAQ and troubleshooting](docs/faq-troubleshooting.md). In short:
    `blueprints/automation/cable_juice_planner/` and `cable_juice_planner_<prefix>.log`.
 
 ---
+
+## Support
+
+Cable Juice Planner is free and open source. If it saves you money or time, you can [buy me a coffee](https://buymeacoffee.com/dezito) to support further development. It is entirely optional: bug reports, feedback and stars on GitHub help just as much.
+
+<a href="https://buymeacoffee.com/dezito" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a>
 
 ## License
 
