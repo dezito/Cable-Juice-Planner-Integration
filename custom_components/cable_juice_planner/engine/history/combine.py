@@ -20,7 +20,6 @@ from ...utils.helpers import (
     minutes_between,
     month_first_day,
 )
-from .efficiency import EFFICIENCY_FACTORS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,19 +34,6 @@ class HistoryCombine:
         current_history_bytes_size = 0
         db = self.charging_history_db
         now = self.now()
-
-        def calculate_estimated_km(kwh, month):
-            try:
-                efficiency_factor = EFFICIENCY_FACTORS.get(month, 1.0)
-                km_per_kwh = float(self.own_state("km_per_kwh", float_type=True, error_state=0.0))
-                try:
-                    km_per_kwh = float(self.own_attr("km_per_kwh", "average", error_state=None).split(" ")[0])
-                except (TypeError, AttributeError, ValueError):
-                    pass
-                return round(kwh * km_per_kwh * efficiency_factor, 1), True
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Error calculating estimated range: %s %s", err, type(err))
-                return 0.0, False
 
         def history_loop_append(lines):
             nonlocal current_history_bytes_size
@@ -71,7 +57,6 @@ class HistoryCombine:
                 "charging_kwh_night": {"total": 0.0},
                 "km": {"total": 0.0},
                 "odometer": {},
-                "odometer_first_charge_datetime": None,
             }
             details = False
             length = 10
@@ -137,10 +122,6 @@ class HistoryCombine:
                         end_charger_meter = data["end_charger_meter"]
                     if "odometer" in data:
                         odometer = data["odometer"]
-                        if not total["odometer_first_charge_datetime"]:
-                            total["odometer_first_charge_datetime"] = when
-                        else:
-                            total["odometer_first_charge_datetime"] = min(total["odometer_first_charge_datetime"], when)
                     if "charging_type" in data:
                         if isinstance(data["charging_type"], str):
                             data["charging_type"] = [data["charging_type"]]
@@ -272,35 +253,24 @@ class HistoryCombine:
                     total["km"][month] = round(self.get_state(odometer_entity, float_type=True, error_state=total["odometer"][month]) - total["odometer"][month], 1)
                 total["km"]["total"] += total["km"][month]
 
-            estimated_values_used = False
             if odometer_entity:
                 for month in total["km"]:
                     if month == "total":
                         continue
-                    estimated_km = 0.0
-                    if total["km"][month] == 0.0:
-                        estimated_km, estimated_values_used = calculate_estimated_km(total["kwh"].get(month, 0.0), month.month)
-                        total["km"][month] = estimated_km
-                        total["km"]["total"] += estimated_km
-                    elif month == month_first_day(total["odometer_first_charge_datetime"]):
-                        kwh = sum(value["kWh"] for key, value in db.items() if month_first_day(key) == month and "odometer" not in value)
-                        estimated_km, estimated_values_used = calculate_estimated_km(kwh, month.month)
-                        total["km"][month] = total["km"][month] + estimated_km
-                        total["km"]["total"] += estimated_km
                     km_kwh = 0.0
                     wh_km = 0.0
                     if total["km"][month] > 0.0 and total["kwh"][month] > 0.0:
                         km_kwh = round(total["km"][month] / total["kwh"][month], 2)
                         wh_km = round(1000 / km_kwh, 2) if km_kwh > 0.0 else 0.0
                     efficiency_label = f"{km_kwh:.1f}<br>({wh_km:.1f})" if km_kwh > 0.0 else ""
-                    total["km"][month] = [total["km"][month], f"{'~' if estimated_km > 0.0 else ''}{int(round(total['km'][month], 0))}", efficiency_label]
+                    total["km"][month] = [total["km"][month], f"{int(round(total['km'][month], 0))}", efficiency_label]
             else:
                 for month in total["km"]:
                     if month != "total":
                         total["km"][month] = [total["km"][month], "", ""]
 
             if total["kwh"]["total"] > 0.0:
-                self._history_totals(history, total, solar_in_months, estimated_values_used)
+                self._history_totals(history, total, solar_in_months)
             history.append("</center>")
 
         total_history_bytes_size = len("\n".join(history).encode("utf-8"))
@@ -311,7 +281,7 @@ class HistoryCombine:
             self.charging_history_db = combined_db
             self.save_charging_history()
 
-    def _history_totals(self, history: list, total: dict, solar_in_months: bool, estimated_values_used: bool) -> None:
+    def _history_totals(self, history: list, total: dict, solar_in_months: bool) -> None:
         """The monthly totals table and the day/night allocation below the history."""
         t = self.t
         valuta = t("ui.common.valuta")
@@ -371,9 +341,6 @@ class HistoryCombine:
         history.append(
             f"| **{t('ui.common.total')}** | {total_km} | {efficiency_label} | **{round(total['kwh']['total'], 1)}**{total_local_energy} | **{round(total['cost']['total'], 2):.2f}<br>{unit_string}** |"
         )
-        if estimated_values_used:
-            history.append(f"\n##### ~ = {t('ui.charging_history_combine_and_set.estimated_distance')}\n")
-
         history.append("---")
         history.append(f"\n**{t('ui.charging_history_combine_and_set.charging_allocation')}**")
         history.append(f"| {t('ui.charging_history_combine_and_set.month')} | {t('ui.charging_history_combine_and_set.day_kwh')} | {t('ui.charging_history_combine_and_set.night_kwh')} |")

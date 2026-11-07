@@ -131,7 +131,6 @@
       "too_big_warning": "Home Assistant tillader ikke at vise mere historik",
       "more_history": "Se mere historik",
       "month": "Måned",
-      "estimated_distance": "Estimeret {distance} udfra forbrug og effektivitet",
       "charging_allocation": "Ladnings fordeling",
       "day_kwh": "Dag kWh",
       "night_kwh": "Nat kWh",

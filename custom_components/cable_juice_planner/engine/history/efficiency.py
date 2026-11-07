@@ -25,15 +25,6 @@ from ...utils.helpers import (
 _LOGGER = logging.getLogger(__name__)
 
 
-EFFICIENCY_ADJUSTMENT = 1.15
-
-
-EFFICIENCY_FACTORS = {
-    month: factor * EFFICIENCY_ADJUSTMENT
-    for month, factor in {1: 0.85, 2: 0.87, 3: 0.90, 4: 0.95, 5: 1.00, 6: 1.02, 7: 1.03, 8: 1.02, 9: 1.00, 10: 0.95, 11: 0.90, 12: 0.87}.items()
-}
-
-
 HEATING_STATES = ("preheat_start", "preheat_cancel")
 
 

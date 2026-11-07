@@ -131,7 +131,6 @@
       "too_big_warning": "Home Assistant kann nicht mehr Historie anzeigen",
       "more_history": "Mehr Historie anzeigen",
       "month": "Monat",
-      "estimated_distance": "Geschätzte {distance} anhand Verbrauch/Effizienz",
       "charging_allocation": "Ladeverteilung",
       "day_kwh": "Tag kWh",
       "night_kwh": "Nacht kWh",
