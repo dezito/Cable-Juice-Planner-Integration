@@ -1392,10 +1392,25 @@ views:
       grid_options: *id001
     - type: markdown
       card_mod: &id003
-        style: |
-          ha-card {
-            --markdown-table-border-color: transparent
-          }
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+            td details details:not(:only-of-type):nth-of-type(odd) {
+              background: rgba(127, 127, 127, 0.1);
+              border-radius: 4px;
+            }
       content: '{{ state_attr(''sensor.cjp_charging_history'', ''history'') }}'
       grid_options: *id001
     - type: markdown
@@ -1492,6 +1507,7 @@ views:
             </details>{% endif %}
           grid_options: *id001
         - type: markdown
+          card_mod: *id003
           content: |-
             {% set sessions = (state_attr('binary_sensor.cjp_public_charging_session_done', 'public_charging_session') or []) | selectattr('timestamp', 'defined') | list %}
             {% if sessions | length > 1 %}<ha-alert alert-type="info">@@pc_queue@@: <b>{{ sessions | length }}</b></ha-alert>
@@ -1978,10 +1994,25 @@ views:
         columns: full
     - type: markdown
       card_mod:
-        style: |
-          ha-card {
-            --markdown-table-border-color: transparent
-          }
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+            td details details:not(:only-of-type):nth-of-type(odd) {
+              background: rgba(127, 127, 127, 0.1);
+              border-radius: 4px;
+            }
       content: |-
         {% set e = states.sensor.cjp_economy.attributes %}
         @@economy_intro@@
@@ -2121,6 +2152,7 @@ views:
       grid_options:
         columns: full
     - type: markdown
+      card_mod: *id003
       content: |-
         {% set a = states.sensor.cjp_analysis.attributes %}
         {% set f = a.temperature_fit %}
@@ -2211,6 +2243,7 @@ views:
       grid_options:
         columns: full
     - type: markdown
+      card_mod: *id003
       content: |-
         {% set a = states.sensor.cjp_analysis.attributes %}
         {% if a.departures -%}
@@ -2238,6 +2271,7 @@ views:
       grid_options:
         columns: full
     - type: markdown
+      card_mod: *id003
       content: |-
         {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
         {% set typical = 'number.cjp_typical_daily_distance' -%}
@@ -2350,10 +2384,25 @@ views:
       grid_options: *id001
     - type: markdown
       card_mod:
-        style: |
-          ha-card {
-            --markdown-table-border-color: transparent
-          }
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+            td details details:not(:only-of-type):nth-of-type(odd) {
+              background: rgba(127, 127, 127, 0.1);
+              border-radius: 4px;
+            }
       content: |-
         {% macro n(v, d=2) %}{{ v | round(d) if v is number else '–' }}{% endmacro %}
         {% macro p(v) %}{{ (v * 100) | round(0) | int ~ ' %' if v is number else '–' }}{% endmacro %}
@@ -2559,10 +2608,25 @@ views:
       grid_options: *id001
     - type: markdown
       card_mod:
-        style: |
-          ha-card {
-            --markdown-table-border-color: transparent
-          }
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+            td details details:not(:only-of-type):nth-of-type(odd) {
+              background: rgba(127, 127, 127, 0.1);
+              border-radius: 4px;
+            }
       content: |-
         {% macro n(v, d=2) %}{{ v | round(d) if v is number else '–' }}{% endmacro %}
         {% macro p(v) %}{{ (v * 100) | round(0) | int ~ ' %' if v is number else '–' }}{% endmacro %}
