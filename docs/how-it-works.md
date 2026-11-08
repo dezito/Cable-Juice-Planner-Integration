@@ -106,6 +106,12 @@ daily minimum, or the max. recommended limit.
   CJP keeps the last prices for 2 hours, then plans entirely with the database. An hour that has no price
   at all (not published and not in the database either) is never planned at a made-up price, so a need can
   stay uncovered until prices are available again.
+- **A price that is not a number** (empty, text, `nan`, `inf`): the hour counts as having no price and gets
+  the price of another price integration, otherwise the price from the database, like any missing hour.
+- **The car's battery level is not usable:** when the car is `unavailable` or `unknown` (for example asleep),
+  the plan starts from the last level it reported in the last 24 hours. When the value is broken (`nan`,
+  `inf`, text), it only looks 6 hours back. Without a level in that time the plan starts from 0 %, so it plans
+  more charging, never less.
 - **Solcast missing:** the solar forecast uses CJP's own history.
 - **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the max.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.

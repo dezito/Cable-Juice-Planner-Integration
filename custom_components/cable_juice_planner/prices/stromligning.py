@@ -5,7 +5,7 @@ import datetime
 import logging
 
 from ..utils.helpers import to_datetime
-from .base import BasePriceProvider, _naive
+from .base import BasePriceProvider, _naive, is_number
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class StromligningPriceProvider(BasePriceProvider):
         for raw in attr["prices"]:
             timestamp = _naive(to_datetime(raw.get("start")))
             price = raw.get("price")
-            if not isinstance(timestamp, datetime.datetime) or not isinstance(price, (int, float)):
+            if not isinstance(timestamp, datetime.datetime) or not is_number(price):
                 continue
             if timestamp in prices:
                 continue

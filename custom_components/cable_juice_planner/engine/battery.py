@@ -1,12 +1,17 @@
 """Battery levels, range, distance and charging loss."""
 from __future__ import annotations
 
+import datetime
 import logging
+import math
 
 from ..const import CHARGER_CHARGING_STATUS, CHARGER_COMPLETED_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES, EV_UNPLUGGED_STATES
 from ..utils.helpers import float_or_none, round_up
 
 _LOGGER = logging.getLogger(__name__)
+
+# How long ago the car's battery level sensor may have stopped giving numbers for its last number to still be used
+BATTERY_LEVEL_MAX_AGE = datetime.timedelta(hours=6)
 
 
 class Battery:
@@ -172,7 +177,21 @@ class Battery:
             entity_id = self.config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"]
             if not self.is_entity_available(entity_id):
                 return 0.0
-            level = float(self.get_state(entity_id, float_type=True, error_state=0.0))
+            level = self.get_state(entity_id, try_history=False, float_type=True, error_state=None)
+            if not isinstance(level, float) or not math.isfinite(level):
+                # unavailable, unknown, text, "nan" or "inf": the last number the sensor gave (also one that
+                # never changed since), else 0 % (plans more charging, never less). A car that is unavailable
+                # or unknown (e.g. asleep) keeps the window of a day; text, "nan" and "inf" are a broken value
+                # and only count 6 hours back for planning. Measurements (real=True) always look a day back.
+                unavailable = self.get_state(entity_id, try_history=False, error_state=None) in ENTITY_UNAVAILABLE_STATES
+                max_age = datetime.timedelta(days=1) if real or unavailable else BATTERY_LEVEL_MAX_AGE
+                level = self.history.get_last_value(entity_id, float_type=True, error_state=None, max_age=max_age, warn=False)
+                if not isinstance(level, float) or not math.isfinite(level):
+                    # asked ~40 times per job: warn once
+                    if not self._job_cache.get("battery_level_warned"):
+                        self._job_cache["battery_level_warned"] = True
+                        _LOGGER.warning("No battery level from %s the last %s, using 0%%", entity_id, max_age)
+                    return 0.0
         except Exception as err:  # noqa: BLE001
             _LOGGER.error(err)
             return 0.0

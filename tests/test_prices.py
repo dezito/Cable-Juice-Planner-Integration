@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 
 import pytest
 
@@ -206,6 +207,56 @@ def test_selling_costs_lower_the_sell_price() -> None:
     assert details["sell_tariffs"] == pytest.approx(0.17)
     # what was subtracted for selling, for the attributes of the solar price
     assert (details["sell_transmissions_nettarif"], details["sell_systemtarif"]) == pytest.approx((0.05, 0.09))
+
+
+# --- a price that is not a finite number never reaches the plan (same rule as BattMind) ---
+
+NOT_PRICES = [float("nan"), float("inf"), float("-inf"), None, "abc", True]
+
+
+@pytest.mark.parametrize("bad", NOT_PRICES, ids=repr)
+def test_energi_data_service_skips_rows_without_a_finite_price(bad) -> None:
+    provider = EnergiDataServicePriceProvider(_config(energidataservice_buy_entity_id="sensor.eds"))
+    today = [{"hour": start, "price": 2.5} for start in _starts(TODAY)]
+    today[5] = {"hour": today[5]["hour"], "price": bad}
+    forecast = [{"hour": start, "price": 2.0} for start in _starts(TODAY + datetime.timedelta(days=2))]
+    forecast[7] = {"hour": forecast[7]["hour"], "price": bad}
+    _load(provider, {"sensor.eds": {"raw_today": today, "tomorrow_valid": False, "forecast": forecast}})
+    real, predicted = provider.get_buy_real_prices(), provider.get_buy_forecast_prices()
+    assert datetime.datetime.combine(TODAY, datetime.time(5)) not in real and len(real) == 23
+    assert datetime.datetime.combine(TODAY + datetime.timedelta(days=2), datetime.time(7)) not in predicted and len(predicted) == 23
+    assert all(math.isfinite(price) for price in (*real.values(), *predicted.values()))
+
+
+@pytest.mark.parametrize("bad", NOT_PRICES, ids=repr)
+def test_stromligning_skips_rows_without_a_finite_price(bad) -> None:
+    provider = StromligningPriceProvider(_config(stromligning_buy_current_price="sensor.buy"))
+    rows = _rows(TODAY, lambda hour: bad if hour == 5 else 1.5)
+    _load(provider, {"sensor.buy": {"prices": rows}})
+    prices = provider.get_buy_real_prices()
+    assert datetime.datetime.combine(TODAY, datetime.time(5)) not in prices and len(prices) == 23
+    assert all(math.isfinite(price) for price in prices.values())
+
+
+def test_the_combined_prices_drop_a_price_that_is_not_a_finite_number() -> None:
+    """Whatever a provider returns: such an hour is missing (filled from the price history), never a price."""
+    five, six = (datetime.datetime.combine(TODAY, datetime.time(hour)) for hour in (5, 6))
+
+    class _Stub:
+        source_name = "stub"
+        sell_price_details: dict = {}
+
+        def get_buy_real_prices(self):
+            return {five: float("nan"), six: 1.0}
+
+        def get_buy_forecast_prices(self):
+            return {five + datetime.timedelta(days=2): float("-inf"), six + datetime.timedelta(days=2): 2.0}
+
+    provider = _both_providers()
+    provider.providers = [_Stub()]
+    prices, real, sources, _ = provider._combine("buy")
+    assert prices == {six: 1.0, six + datetime.timedelta(days=2): 2.0}
+    assert real == {six: 1.0} and set(sources) == set(prices)
 
 
 def _eds_provider(sell_tariffs: bool) -> EnergiDataServicePriceProvider:

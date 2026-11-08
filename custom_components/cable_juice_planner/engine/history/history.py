@@ -21,6 +21,7 @@ from __future__ import annotations
 import bisect
 import datetime
 import logging
+import math
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -140,10 +141,14 @@ class History:
             non_numeric: list[tuple[float, object]] = []
             for ts, value in sensor_data:
                 try:
-                    numeric_y.append(float(value))
-                    numeric_x.append(ts)
+                    number = float(value)
                 except ValueError:
                     non_numeric.append((ts, value))
+                    continue
+                if not math.isfinite(number):
+                    continue  # "nan" and "inf" are no measurement: they would turn every interpolated point into nan/inf
+                numeric_y.append(number)
+                numeric_x.append(ts)
             if numeric_x:
                 points = linspace(start_ts, end_ts, NUM_POINTS)
                 for ts, value in zip(points, interp(points, numeric_x, numeric_y)):
@@ -250,13 +255,16 @@ class History:
             _LOGGER.error("Error in get_average_value for %s: %s", entity_id, err)
         return error_state
 
-    def get_last_value(self, entity_id, float_type=False, convert_to=None, error_state="unknown"):
-        """Last value within the last day (interpolated like the original)."""
+    def get_last_value(self, entity_id, float_type=False, convert_to=None, error_state="unknown", max_age=datetime.timedelta(days=1), warn=True):
+        """Last value within max_age (the last day), interpolated like the original.
+
+        The state at the start of the window counts: a value that has not changed since before the window is still the last value."""
         to_datetime = self.now
-        states = self.get_values(entity_id, to_datetime - datetime.timedelta(days=1), to_datetime, float_type=float_type, convert_to=convert_to)
+        states = self.get_values(entity_id, to_datetime - max_age, to_datetime, float_type=float_type, convert_to=convert_to)
         if states and isinstance(states, list):
             return states[-1]
-        _LOGGER.warning("No data found for %s the last day, returning %s", entity_id, error_state)
+        if warn:
+            _LOGGER.warning("No data found for %s the last %s, returning %s", entity_id, max_age, error_state)
         return error_state
 
     def last_numeric(self, entity_id):
