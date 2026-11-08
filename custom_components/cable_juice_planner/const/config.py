@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any
 
 from ..utils.helpers import get_dict_value_with_path, set_dict_value_with_path
+
+# Sidebar icon of the generated dashboard: "<set>:<name>", e.g. mdi:ev-station
+DEFAULT_DASHBOARD_ICON = "mdi:ev-station"
+DASHBOARD_ICON_RE = re.compile(r"^[a-z0-9_-]+:[a-z0-9_-]+$")
+
+
+def dashboard_icon(value: Any) -> str:
+    """The sidebar icon to use: value when it is a valid icon name, otherwise the default."""
+    icon = value.strip() if isinstance(value, str) else ""
+    return icon if DASHBOARD_ICON_RE.match(icon) else DEFAULT_DASHBOARD_ICON
+
 
 # Same nested layout as <prefix>_config.yaml in the PyScript version, so the ported
 # algorithm reads CONFIG["charger"]["charging_max_amp"] etc. unchanged. Values the
@@ -28,6 +40,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "cron_interval": 5,
     "dashboard": True,
+    "dashboard_icon": DEFAULT_DASHBOARD_ICON,
     "database": {
         "power_values_db_data_to_save": 15,
         "solar_available_db_data_to_save": 10,
@@ -224,6 +237,7 @@ OPTION_PATHS: dict[str, str] = {
     # advanced / database
     "cron_interval": "cron_interval",
     "dashboard": "dashboard",
+    "dashboard_icon": "dashboard_icon",
     "enable_diagnostic_file_log": "enable_diagnostic_file_log",
     "testing_mode": "testing_mode",
     "site_priority": "site.priority",
@@ -238,7 +252,7 @@ OPTION_PATHS: dict[str, str] = {
 
 # Config/options flow pages: step id -> option keys shown on that page
 FLOW_STEPS: dict[str, list[str]] = {
-    "general": ["language"],
+    "general": ["language", "dashboard_icon"],
     "charger": [
         "status_entity_id",
         "power_consumtion_entity_id",

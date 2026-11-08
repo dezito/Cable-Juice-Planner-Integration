@@ -6,10 +6,12 @@
         "title": "General",
         "description": "Language of texts and notifications.",
         "data": {
-          "language": "Language"
+          "language": "Language",
+          "dashboard_icon": "Sidebar icon"
         },
         "data_description": {
-          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications.",
+          "dashboard_icon": "Icon of the dashboard in the sidebar, e.g. mdi:ev-station. Leave empty for the default icon."
         }
       },
       "charger": {
@@ -323,12 +325,14 @@
         "data": {
           "name": "Name of the car",
           "entity_prefix": "Entity prefix",
-          "language": "Language"
+          "language": "Language",
+          "dashboard_icon": "Sidebar icon"
         },
         "data_description": {
           "name": "Optional, e.g. Tesla or Family car. Used as the device name (entities show as e.g. Tesla Overview) and in the notifications.",
           "entity_prefix": "Optional. All entities start with cjp_, the prefix follows: tesla gives sensor.cjp_tesla_overview, empty gives sensor.cjp_overview. Use a different prefix for each car. Cannot be changed later.",
-          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications.",
+          "dashboard_icon": "Icon of the dashboard in the sidebar, e.g. mdi:ev-station. Leave empty for the default icon."
         }
       },
       "site": {
@@ -381,6 +385,7 @@
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
       "simulation_needs_ev": "Simulating the battery level requires the car's battery level, range and odometer.",
       "min_above_max": "The minimum cannot be above the maximum.",
+      "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well."
     },
@@ -409,10 +414,12 @@
         "title": "General",
         "description": "Language of texts and notifications.",
         "data": {
-          "language": "Language"
+          "language": "Language",
+          "dashboard_icon": "Sidebar icon"
         },
         "data_description": {
-          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications.",
+          "dashboard_icon": "Icon of the dashboard in the sidebar, e.g. mdi:ev-station. Leave empty for the default icon."
         }
       },
       "charger": {
@@ -759,6 +766,7 @@
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
       "simulation_needs_ev": "Simulating the battery level requires the car's battery level, range and odometer.",
       "min_above_max": "The minimum cannot be above the maximum.",
+      "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well."
     },

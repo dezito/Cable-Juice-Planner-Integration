@@ -332,7 +332,7 @@ are not stored in the recorder database.
 ## Dashboard
 
 With **Dashboard in the sidebar** enabled (default), each car gets its own dashboard,
-e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with three views:
+e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with three views. You choose its sidebar icon when adding the car, and can change it under **Configure → General**:
 
 - **Overview:** battery level with forecast and planned charging hours, electricity prices with solar and the
   charging plan, current charging rule, status, manual and forced charging, trip, public charging, the

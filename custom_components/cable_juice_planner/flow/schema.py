@@ -9,7 +9,7 @@ import voluptuous as vol
 
 from homeassistant.helpers import selector
 
-from ..const import PHASE_ORDERS, SITE_DEFAULTS, SITE_FIELDS, CONFIG_KEYS_RENAMING, ENTITY_OPTION_KEYS, LANGUAGES, LIST_OPTION_KEYS, NUMBER_SETTINGS, OPTION_PATHS, currency_symbol, default_options, normalize_language
+from ..const import DASHBOARD_ICON_RE, DEFAULT_DASHBOARD_ICON, PHASE_ORDERS, SITE_DEFAULTS, SITE_FIELDS, CONFIG_KEYS_RENAMING, ENTITY_OPTION_KEYS, LANGUAGES, LIST_OPTION_KEYS, NUMBER_SETTINGS, OPTION_PATHS, currency_symbol, dashboard_icon, default_options, normalize_language
 from ..utils.helpers import delete_dict_key_with_path, get_dict_value_with_path, set_dict_value_with_path
 
 
@@ -146,6 +146,7 @@ SELECTORS: dict[str, Any] = {
     # advanced / database
     "cron_interval": selector.SelectSelector(selector.SelectSelectorConfig(options=CRON_INTERVALS, mode=selector.SelectSelectorMode.DROPDOWN)),
     "dashboard": BOOLEAN,
+    "dashboard_icon": selector.IconSelector(selector.IconSelectorConfig(placeholder=DEFAULT_DASHBOARD_ICON)),
     "enable_diagnostic_file_log": BOOLEAN,
     "testing_mode": BOOLEAN,
     "power_values_db_data_to_save": _number(1, 100, 1, "d"),
@@ -242,6 +243,9 @@ def build_schema(
             schema[vol.Optional(key, description={"suggested_value": value})] = _selector(key, currency)
         elif key in REQUIRED_KEYS:
             schema[vol.Required(key, default=value)] = _selector(key, currency)
+        elif key == "dashboard_icon":
+            # no default: a cleared field is left out by the frontend, and a default would bring back the old icon
+            schema[vol.Optional(key, description={"suggested_value": value or dashboard_icon(None)})] = _selector(key, currency)
         else:
             schema[vol.Optional(key, default=bool(value))] = _selector(key, currency)
     return vol.Schema(schema)
@@ -260,6 +264,9 @@ def normalize_input(keys: list[str], user_input: dict[str, Any]) -> dict[str, An
             result[key] = round(min(float(value or 0.0), 0.0) / 100, 4)
         elif key in INT_KEYS:
             result[key] = int(float(value))
+        elif key == "dashboard_icon":
+            # a cleared field means the default icon; an invalid name is kept so validate_step can reject it
+            result[key] = str(value or "").strip() or dashboard_icon(None)
         elif SELECTORS.get(key) is BOOLEAN:
             result[key] = bool(value)
         elif isinstance(value, (int, float)):
@@ -271,6 +278,8 @@ def normalize_input(keys: list[str], user_input: dict[str, Any]) -> dict[str, An
 
 def validate_step(step: str, values: dict[str, Any]) -> dict[str, str]:
     errors: dict[str, str] = {}
+    if "dashboard_icon" in values and not DASHBOARD_ICON_RE.match(values["dashboard_icon"]):
+        errors["dashboard_icon"] = "invalid_icon"
     if step == "ev":
         configured = [key for key in EV_REQUIRED if values.get(key)]
         if configured and len(configured) != len(EV_REQUIRED):

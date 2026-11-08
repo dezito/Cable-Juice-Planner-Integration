@@ -6,10 +6,12 @@
         "title": "Generelt",
         "description": "Sprog i tekster og notifikationer.",
         "data": {
-          "language": "Sprog"
+          "language": "Sprog",
+          "dashboard_icon": "Ikon i sidepanelet"
         },
         "data_description": {
-          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer.",
+          "dashboard_icon": "Ikonet for dashboardet i sidepanelet, f.eks. mdi:ev-station. Lad feltet være tomt for standardikonet."
         }
       },
       "charger": {
@@ -323,12 +325,14 @@
         "data": {
           "name": "Bilens navn",
           "entity_prefix": "Entity-prefix",
-          "language": "Sprog"
+          "language": "Sprog",
+          "dashboard_icon": "Ikon i sidepanelet"
         },
         "data_description": {
           "name": "Valgfri, f.eks. Tesla eller Familiebilen. Vises som enhedens navn (entiteterne hedder f.eks. Tesla Oversigt) og i notifikationerne.",
           "entity_prefix": "Valgfri. Alle entiteter starter med cjp_, prefixet kommer bagefter: tesla giver sensor.cjp_tesla_overview, tomt giver sensor.cjp_overview. Brug et forskelligt prefix til hver bil. Kan ikke ændres bagefter.",
-          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer.",
+          "dashboard_icon": "Ikonet for dashboardet i sidepanelet, f.eks. mdi:ev-station. Lad feltet være tomt for standardikonet."
         }
       },
       "site": {
@@ -381,6 +385,7 @@
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
       "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
       "min_above_max": "Minimum må ikke være større end maksimum.",
+      "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader."
     },
@@ -409,10 +414,12 @@
         "title": "Generelt",
         "description": "Sprog i tekster og notifikationer.",
         "data": {
-          "language": "Sprog"
+          "language": "Sprog",
+          "dashboard_icon": "Ikon i sidepanelet"
         },
         "data_description": {
-          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer.",
+          "dashboard_icon": "Ikonet for dashboardet i sidepanelet, f.eks. mdi:ev-station. Lad feltet være tomt for standardikonet."
         }
       },
       "charger": {
@@ -759,6 +766,7 @@
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
       "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
       "min_above_max": "Minimum må ikke være større end maksimum.",
+      "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader."
     },

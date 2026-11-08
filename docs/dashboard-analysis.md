@@ -2,7 +2,8 @@
 
 With **Dashboard in the sidebar** on (default), each car gets its own dashboard, e.g. `/cjp-planner`
 (without prefix) or `/cjp-tesla`. It is built on every startup from your setup: cards for things you
-haven't set up are removed.
+haven't set up are removed. You choose the **Sidebar icon** of each car when you add it (default
+`mdi:ev-station`) and can change it under **Configure → General**.
 
 It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovelace-mushroom),
 [ApexCharts Card](https://github.com/RomRider/apexcharts-card),
