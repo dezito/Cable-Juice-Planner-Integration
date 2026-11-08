@@ -16,10 +16,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import translation
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
-from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, TITLE, normalize_language
+from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
 from ..engine import CJPEngine
 from ..utils.formatting import load_texts
 from ..utils.helpers import float_or_none
@@ -154,6 +155,7 @@ class CoordinatorLifecycle:
             await site.async_wait_started()
         t = self.t
         log_lines: list[str] = []
+        job_error: BaseException | None = None
         _LOGGER.info("Cable Juice Planner %s starting, calculations run in thread cjp_%s_worker_0", self.prefix, self.prefix)
         try:
             await self._async_validate_entities()
@@ -183,6 +185,13 @@ class CoordinatorLifecycle:
 
             result = await self.async_run_job("startup", databases, odometer_history, include_prices=True, include_forecast=True)
             info = result.value or {}
+            if result.error:
+                # run_job caught it: the start is not a success even though nothing was raised here
+                job_error = result.error
+                _LOGGER.error("Cable Juice Planner startup job failed: %s %s", job_error, type(job_error))
+                log_lines.append(f"⛔Error during startup: {job_error}")
+            # the help texts of the entities (the solar steps table) are now complete
+            async_dispatcher_send(self.hass, self.signal, SIGNAL_HELP_VALUES_CHANGED)
             configured = t("ui.startup.configuration.configured")
             not_configured = t("ui.startup.configuration.not_configured")
             distance = t("ui.common.distance_type")
@@ -222,13 +231,27 @@ class CoordinatorLifecycle:
             _LOGGER.exception("Error during Cable Juice Planner startup")
             log_lines.append(f"⛔Error during startup: {err}")
             self.set_charging_rule(f"⛔{t('ui.init.script_stopped')}.\n{t('ui.init.check_log')}:\n{err}")
+            self._startup_failed_notification(log_lines)
+        else:
+            if job_error:
+                self.set_charging_rule(f"⛔{t('ui.init.script_stopped')}.\n{t('ui.init.check_log')}:\n{job_error}")
+                self._startup_failed_notification(log_lines)
+            else:
+                # a successful start only goes to the log
+                persistent_notification.async_dismiss(self.hass, f"{self.prefix}_startup_notification")
         finally:
             for line in log_lines:
                 if line.strip("-# "):
                     _LOGGER.info(line.lstrip("#* ").replace("**", ""))
-            persistent_notification.async_create(
-                self.hass, "\n".join(log_lines), title=f"📟{self.title} started", notification_id=f"{self.prefix}_startup_notification"
-            )
+
+    def _startup_failed_notification(self, log_lines: list[str]) -> None:
+        """A failed start stays visible until the next start (a successful one only goes to the log)."""
+        persistent_notification.async_create(
+            self.hass,
+            "\n".join(log_lines),
+            title=f"⛔{self.title} {self.t('ui.init.script_stopped')}",
+            notification_id=f"{self.prefix}_startup_notification",
+        )
 
     async def _async_legacy_runtime_state(self) -> dict:
         """State the PyScript version kept in helpers and template sensors.

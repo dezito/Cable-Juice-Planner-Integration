@@ -80,6 +80,8 @@ def help_values(coordinator: CJPCoordinator) -> _HelpValues:
         elif isinstance(value, float):
             value = int(value) if value.is_integer() else round(value, 2)
         values[key] = value
+    # published by the startup job; empty (not "?") until then and after a failed start
+    values.setdefault("charging_amps_table", "")
     return values
 
 

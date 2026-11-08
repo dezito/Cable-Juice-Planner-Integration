@@ -15,6 +15,8 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.cable_juice_planner import _async_run_after_home_assistant_started
+from custom_components.cable_juice_planner.coordinator import CJPCoordinator
+from custom_components.cable_juice_planner.engine import CJPEngine
 from custom_components.cable_juice_planner.prices import create_price_provider
 from custom_components.cable_juice_planner.const import (
     BUTTON_KEYS,
@@ -385,6 +387,75 @@ async def test_missing_entity_waits_and_notifies(hass: HomeAssistant, mock_entry
     calls = {call.kwargs.get("notification_id"): call for call in create.call_args_list}
     assert CONSUMPTION in calls[f"{mock_entry.data['entity_prefix']}_validation_procedure_missing_entity_ids"].args[1]
     await async_unload_and_join(hass, mock_entry)
+
+
+def _startup_notification(hass: HomeAssistant, coordinator):
+    return hass.data["persistent_notification"].get(f"{coordinator.prefix}_startup_notification")
+
+
+async def test_successful_startup_leaves_no_notification(hass: HomeAssistant, mock_entry) -> None:
+    """The start only goes to the log, and a notice of an earlier failed start is dismissed."""
+    set_source_states(hass)
+    persistent_notification.async_create(hass, "old error", title="old", notification_id=f"{mock_entry.data['entity_prefix']}_startup_notification")
+    await async_setup(hass, mock_entry)
+    coordinator = mock_entry.runtime_data
+    assert coordinator.started
+    assert _startup_notification(hass, coordinator) is None
+    await async_unload_and_join(hass, mock_entry)
+
+
+async def test_failed_startup_keeps_a_notification(hass: HomeAssistant, mock_entry) -> None:
+    set_source_states(hass)
+    with patch.object(CJPCoordinator, "_async_setup_buffers", side_effect=RuntimeError("boom")):
+        await async_setup(hass, mock_entry)
+    coordinator = mock_entry.runtime_data
+    assert not coordinator.started
+    notification = _startup_notification(hass, coordinator)
+    assert notification is not None
+    assert "boom" in notification["message"]
+    assert notification["title"].startswith("⛔")
+    await async_unload_and_join(hass, mock_entry)
+
+
+async def test_engine_error_in_the_startup_job_keeps_a_notification(hass: HomeAssistant, mock_entry) -> None:
+    """run_job catches an exception of the startup job: that is not a successful start."""
+    set_source_states(hass)
+    persistent_notification.async_create(hass, "old", title="old", notification_id=f"{mock_entry.data['entity_prefix']}_startup_notification")
+    with patch.object(CJPEngine, "startup", side_effect=RuntimeError("engine boom")):
+        await async_setup(hass, mock_entry)
+    coordinator = mock_entry.runtime_data
+    notification = _startup_notification(hass, coordinator)
+    assert notification is not None
+    assert "engine boom" in notification["message"]
+    assert notification["title"].startswith("⛔")
+    await async_unload_and_join(hass, mock_entry)
+
+
+async def test_solar_help_has_no_stray_placeholder_after_a_failed_startup(hass: HomeAssistant) -> None:
+    """Before the startup job has published the steps table (or when it never does) the help ends without a "?"."""
+    set_source_states(hass)
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar"})
+    with patch.object(CJPCoordinator, "_async_setup_buffers", side_effect=RuntimeError("boom")):
+        await async_setup(hass, entry)
+    help_text = hass.states.get(f"switch.{OBJECT_PREFIX}_solar_charging").attributes["help"]
+    assert "{charging_amps_table}" not in help_text
+    assert not help_text.rstrip().endswith("?")
+    await async_unload_and_join(hass, entry)
+
+
+async def test_solar_help_text_shows_the_charging_steps(hass: HomeAssistant) -> None:
+    """The steps table that used to be in the startup notification is in the help of the solar switch (dashboard)."""
+    set_source_states(hass)
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar"})
+    await async_setup(hass, entry)
+    help_text = hass.states.get(f"switch.{OBJECT_PREFIX}_solar_charging").attributes["help"]
+    assert "{charging_amps_table}" not in help_text
+    assert "| Overskud fra | Strøm | Faser | Ladeeffekt |" in help_text
+    assert "| 1455 W | 6 A | 1 | 1380 W |" in help_text
+    assert _startup_notification(hass, entry.runtime_data) is None
+    await async_unload_and_join(hass, entry)
 
 
 async def test_unload(hass: HomeAssistant, loaded_entry) -> None:

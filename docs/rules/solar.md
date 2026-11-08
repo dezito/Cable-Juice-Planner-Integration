@@ -27,6 +27,27 @@ Every interval CJP calculates the surplus and turns it into amps:
 - **Allowed difference:** how many watts above (+) or below (−) the surplus the car may charge (default
   −100 W: stay a little below, so nothing is bought).
 
+### See the steps for your setup
+
+The dashboard shows them under *Settings → Solar → Read more*: a table with the surplus each step starts
+at, the current, the phases and the charging power. It follows your charger voltage, the current limits
+above, the allowed difference and the inverter limit (*Solar panels → Inverter max power*, default 5000 W:
+steps above it are never used, so they are left out). It is rebuilt when CJP starts. With the defaults
+(240 V, 3-phase 16 A charger, 1-phase 6–16 A, 3-phase from 5 A, −100 W):
+
+| Surplus from | Current | Phases | Charging power |
+|---:|---:|---:|---:|
+| – | 0 A | – | 0 W |
+| 1515 W | 6 A | 1 | 1440 W |
+| 1660 W | 7 A | 1 | 1680 W |
+| 1900 W | 8 A | 1 | 1920 W |
+| … | … | … | … |
+| 3820 W | 16 A | 1 | 3840 W |
+| 4180 W | 6 A | 3 | 4320 W |
+
+The car charges at the step closest to the surplus, so a step starts halfway to the one below it. Below
+the first step it doesn't charge, and the last step is used for any surplus above it.
+
 ## In the plan
 
 The expected surplus of the week (Solcast and/or CJP's own history per weather type) is used by the
