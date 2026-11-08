@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import zoneinfo
 from copy import deepcopy
 from pathlib import Path
@@ -1189,6 +1190,78 @@ def test_no_hour_is_planned_without_a_price(caplog: pytest.LogCaptureFixture) ->
     assert "No price for" in caplog.text  # the step that adds the last hours was reached and refused the hours
     assert not [timestamp for timestamp in charge_hours(engine) if timestamp not in prices]
     assert not charge_hours(engine)
+
+
+def _battery_level_with(state: str, history: list[tuple[float, str]], real: bool = False) -> float:
+    """The planning level (real: the car's own level for measurements) when the car sensor says `state` and has had `history` (hours ago, state) before."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **PLUGGED_IN)
+    snap.states["sensor.ev_battery_level"] = state
+    snap.buffers = {
+        "sensor.ev_battery_level": sorted(((now - datetime.timedelta(hours=hours)).replace(tzinfo=TZ).timestamp(), value) for hours, value in history)
+    }
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    result = engine.run_job(snap, engine.battery_level, real)
+    assert result.error is None, result.error
+    return result.value
+
+
+def test_the_cars_own_level_for_measurements_still_looks_a_day_back() -> None:
+    """Only the level the plan starts from has the 6 hour limit for a broken value; drive and charging measurements keep the last value of the day."""
+    assert _battery_level_with("unavailable", [(8, "55"), (7, "unavailable")], real=True) == pytest.approx(55.0)
+    assert _battery_level_with("nan", [(8, "55"), (7, "nan")], real=True) == pytest.approx(55.0)
+    assert _battery_level_with("nan", [(30, "55"), (29, "nan")], real=True) == 0.0
+
+
+@pytest.mark.parametrize("state", ["nan", "inf", "-inf", "abc"])
+def test_a_broken_battery_level_is_the_last_known_one_for_6_hours(state: str) -> None:
+    # 55 % until 3 hours ago, then the sensor gave something that is not a number
+    assert _battery_level_with(state, [(7, "55"), (3, state)]) == pytest.approx(55.0)
+    # a level that has not changed since before the window counts too (55 % from 20 hours ago, broken since 4 hours ago)
+    assert _battery_level_with(state, [(20, "55"), (4, state), (1, state)]) == pytest.approx(55.0)
+
+
+@pytest.mark.parametrize("state", ["nan", "inf", "-inf", "abc"])
+def test_a_broken_battery_level_for_more_than_6_hours_starts_from_0(state: str) -> None:
+    assert _battery_level_with(state, [(8, "55"), (7, state)]) == 0.0
+    assert _battery_level_with(state, []) == 0.0
+    # a number that was recorded as nan/inf is not a level either
+    assert _battery_level_with(state, [(2, "nan"), (1, "inf")]) == 0.0
+
+
+@pytest.mark.parametrize("state", ["unavailable", "unknown"])
+def test_an_unavailable_battery_level_is_the_last_known_one_for_a_day(state: str) -> None:
+    """A car that is asleep is unavailable for hours: its last level counts for a day (as before), then the plan starts from 0 %."""
+    assert _battery_level_with(state, [(8, "55"), (7, state)]) == pytest.approx(55.0)
+    assert _battery_level_with(state, [(23, "55"), (22, state)]) == pytest.approx(55.0)
+    assert _battery_level_with(state, [(30, "55"), (29, state)]) == 0.0
+    assert _battery_level_with(state, []) == 0.0
+    assert _battery_level_with(state, [(2, "nan"), (1, "inf")]) == 0.0
+
+
+def test_a_good_battery_level_is_used_as_it_is() -> None:
+    assert _battery_level_with("62.5", [(3, "40"), (1, "55")]) == pytest.approx(62.5)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")], ids=["nan", "inf", "-inf"])
+def test_prices_that_are_not_finite_numbers_are_never_planned(bad: float) -> None:
+    """nan/inf rows are dropped like missing hours (no price history here): not planned at all, and no nan/inf in the plan."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+    attributes = snap.price_data["attributes"]["sensor.price"]
+    for row in attributes["raw_tomorrow"]:
+        if int(row["hour"][11:13]) in (1, 2, 3):
+            row["price"] = bad
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    tomorrow = DAY + datetime.timedelta(days=1)
+    assert not [hour for hour in (1, 2, 3) if datetime.datetime.combine(tomorrow, datetime.time(hour)) in engine.grid_price_cache["prices"]]
+    hours = charge_hours(engine)
+    assert hours
+    for timestamp in hours:
+        assert all(math.isfinite(engine.charge_hours[timestamp][key]) for key in ("Price", "Cost", "kWh")), timestamp
+    assert math.isfinite(engine.charge_hours["total_cost"])
 
 
 def test_offline_prices_use_the_same_weekday() -> None:

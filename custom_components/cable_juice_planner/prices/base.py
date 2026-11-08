@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -51,6 +52,11 @@ def sell_adder_sign(config: dict) -> float:
 
 def _naive(timestamp):
     return timestamp.replace(tzinfo=None) if isinstance(timestamp, datetime.datetime) else timestamp
+
+
+def is_number(value) -> bool:
+    """A usable price: a finite number (not None, text, a bool, NaN or infinity)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 class BasePriceProvider:
@@ -289,6 +295,8 @@ class CombinedPriceProvider(BasePriceProvider):
             try:
                 for timestamp, price in getattr(provider, f"get_{kind}_real_prices")().items():
                     timestamp = _naive(timestamp)
+                    if not is_number(price):
+                        continue  # NaN/infinity is no price: the hour gets another provider's price, else the price history's, else none
                     if timestamp not in prices:
                         price = round(price, 2)
                         prices[timestamp] = price
@@ -302,6 +310,8 @@ class CombinedPriceProvider(BasePriceProvider):
             try:
                 for timestamp, price in getattr(provider, f"get_{kind}_forecast_prices")().items():
                     timestamp = _naive(timestamp)
+                    if not is_number(price):
+                        continue
                     if timestamp not in prices:
                         prices[timestamp] = round(price, 2)
                         sources[timestamp] = f"{provider.source_name}:forecast"

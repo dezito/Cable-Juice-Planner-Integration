@@ -5,7 +5,7 @@ import datetime
 import logging
 
 from ..utils.helpers import days_between, reset_time_to_hour, to_datetime
-from .base import BasePriceProvider, _ZERO_TARIFFS, _naive
+from .base import BasePriceProvider, _ZERO_TARIFFS, _naive, is_number
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         for raw in rows or []:
             timestamp = _naive(to_datetime(raw["hour" if "hour" in raw else "time"]))
             price = raw["price"]
-            if isinstance(timestamp, datetime.datetime) and isinstance(price, (int, float)):
+            if isinstance(timestamp, datetime.datetime) and is_number(price):
                 yield timestamp, price
 
     def _get_real_prices(self, entity_id) -> dict:
