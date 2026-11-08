@@ -6,11 +6,12 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import SWITCH_SETTINGS
+from .const import DOMAIN, SWITCH_SETTINGS
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 
@@ -23,6 +24,12 @@ PRIMARY_SWITCHES = ("allow_manual_charging_now", "allow_manual_charging_solar", 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data
+    # no home battery: no unavailable entity left behind
+    key = "powerwall_discharge_above_needed"
+    if not requirement_met(coordinator, SWITCH_SETTINGS[key].get("requires")):
+        ent_reg = er.async_get(hass)
+        if entity_id := ent_reg.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_{key}"):
+            ent_reg.async_remove(entity_id)
     async_add_entities(
         CJPSwitch(coordinator, key, info) for key, info in SWITCH_SETTINGS.items() if requirement_met(coordinator, info.get("requires"))
     )

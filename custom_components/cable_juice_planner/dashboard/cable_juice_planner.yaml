@@ -1850,15 +1850,12 @@ views:
       heading: '@@section_solar@@'
       icon: mdi:solar-power-variant
     - type: markdown
+      card_mod: *id003
       content: |-
-        {% set ns = namespace(solar_help=none, powerwall_help=none) %}
-        {% set ns.solar_help = state_attr('switch.cjp_solar_charging', 'help') %}
-        {% set ns.powerwall_help = state_attr('number.cjp_ev_charge_after_powerwall_battery_level', 'help') %}
-        {% if ns.solar_help or ns.powerwall_help %}<details><summary>@@read_more@@</summary>
+        {% set solar_help = state_attr('switch.cjp_solar_charging', 'help') %}
+        {% if solar_help %}<details><summary>@@read_more@@</summary>
 
-        {% if ns.solar_help %}{{ ns.solar_help }}{% endif %}
-
-        {% if ns.powerwall_help %}{{ ns.powerwall_help }}{% endif %}
+        {{ solar_help }}
 
         </details>{% endif %}
       grid_options: *id001
@@ -1872,6 +1869,23 @@ views:
       - entity: sensor.cjp_solar_over_production_current_hour
         name:
           type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_powerwall@@'
+      icon: mdi:home-battery
+    - type: markdown
+      content: |-
+        {% set powerwall_help = state_attr('number.cjp_ev_charge_after_powerwall_battery_level', 'help') %}
+        {% if powerwall_help %}<details><summary>@@read_more@@</summary>
+
+        {{ powerwall_help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
       - entity: number.cjp_ev_charge_after_powerwall_battery_level
         name:
           type: entity

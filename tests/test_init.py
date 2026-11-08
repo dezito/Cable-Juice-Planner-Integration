@@ -444,6 +444,41 @@ async def test_solar_help_has_no_stray_placeholder_after_a_failed_startup(hass: 
     await async_unload_and_join(hass, entry)
 
 
+HOME_BATTERY_ENTITIES = (
+    ("number", "ev_charge_after_powerwall_battery_level"),
+    ("switch", "powerwall_discharge_above_needed"),
+)
+
+
+async def test_home_battery_entities_only_with_a_home_battery(hass: HomeAssistant) -> None:
+    """Without a configured home battery its two settings are neither created nor left behind unavailable."""
+    set_source_states(hass)
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    hass.states.async_set("sensor.powerwall_battery", "50", {"unit_of_measurement": "%", "device_class": "battery"})
+    ent_reg = er.async_get(hass)
+
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar"})
+    entry.add_to_hass(hass)
+    # entities of an earlier configuration with a home battery
+    for platform, key in HOME_BATTERY_ENTITIES:
+        ent_reg.async_get_or_create(platform, DOMAIN, f"{entry.entry_id}_{key}", config_entry=entry, suggested_object_id=f"{OBJECT_PREFIX}_{key}")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get(f"switch.{OBJECT_PREFIX}_solar_charging") is not None
+    for platform, key in HOME_BATTERY_ENTITIES:
+        assert ent_reg.async_get(f"{platform}.{OBJECT_PREFIX}_{key}") is None
+        assert hass.states.get(f"{platform}.{OBJECT_PREFIX}_{key}") is None
+    await async_unload_and_join(hass, entry)
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "powerwall_battery_level_entity_id": "sensor.powerwall_battery"})
+    await async_setup(hass, entry)
+    for platform, key in HOME_BATTERY_ENTITIES:
+        assert hass.states.get(f"{platform}.{OBJECT_PREFIX}_{key}") is not None
+    await async_unload_and_join(hass, entry)
+
+
 async def test_solar_help_text_shows_the_charging_steps(hass: HomeAssistant) -> None:
     """The steps table that used to be in the startup notification is in the help of the solar switch (dashboard)."""
     set_source_states(hass)

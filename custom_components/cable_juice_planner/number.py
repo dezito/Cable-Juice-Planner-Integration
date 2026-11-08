@@ -25,9 +25,9 @@ PRIMARY_NUMBERS = ("battery_level", "trip_charge_procent", "trip_range_needed", 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data
     # no unavailable entity left behind: the battery level (a car integration without the simulation),
-    # the public charging cost (no car location)
+    # the public charging cost (no car location), the home battery level to charge the car after (no home battery)
     ent_reg = er.async_get(hass)
-    for key in ("battery_level", "public_charging_session_cost"):
+    for key in ("battery_level", "public_charging_session_cost", "ev_charge_after_powerwall_battery_level"):
         if not requirement_met(coordinator, NUMBER_SETTINGS[key]["requires"]):
             if entity_id := ent_reg.async_get_entity_id("number", DOMAIN, f"{entry.entry_id}_{key}"):
                 ent_reg.async_remove(entity_id)
