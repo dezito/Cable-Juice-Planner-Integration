@@ -82,7 +82,7 @@ the cost of the battery level. When selling costs money, charging the car with t
 
 ## Home battery
 
-With a home battery configured (level and power):
+With a home battery configured (level and power) the dashboard shows these two settings in their own *Home battery* section under *Settings*. Without a home battery they are not created and not shown:
 
 | Setting | Meaning |
 |---|---|

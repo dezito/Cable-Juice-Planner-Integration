@@ -247,14 +247,74 @@ def test_settings_read_more_includes_each_help_group() -> None:
     settings = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"][1]
     contents = [card["content"] for card in _cards(settings) if card.get("type") == "markdown"]
     cheap_help = next(content for content in contents if "limits_help" in content)
-    solar_help = next(content for content in contents if "solar_help" in content)
+    solar_help = next(content for content in contents if "{{ solar_help }}" in content)
+    powerwall_help = next(content for content in contents if "{{ powerwall_help }}" in content)
 
     assert "state_attr('switch.cjp_tesla_cheap_grid_charging', 'help')" in cheap_help
     assert "state_attr('sensor.cjp_tesla_charge_very_cheap_battery_level', 'help')" in cheap_help
     assert "{{ ns.limits_help }}" in cheap_help and "{{ ns.targets_help }}" in cheap_help
+    # solar and the home battery each have their own section and their own read more
     assert "state_attr('switch.cjp_tesla_solar_charging', 'help')" in solar_help
-    assert "state_attr('number.cjp_tesla_ev_charge_after_powerwall_battery_level', 'help')" in solar_help
-    assert "{{ ns.solar_help }}" in solar_help and "{{ ns.powerwall_help }}" in solar_help
+    assert "powerwall" not in solar_help
+    assert "state_attr('number.cjp_tesla_ev_charge_after_powerwall_battery_level', 'help')" in powerwall_help
+    assert "solar_charging" not in powerwall_help
+
+
+def _settings_sections(options: dict, existing: set[str]) -> dict[str, list[str]]:
+    """Section heading -> entity ids of the Settings view."""
+    settings = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"][1]
+    sections = {}
+    for grid in (card for card in _cards(settings) if card.get("type") == "grid"):
+        heading = None
+        for card in grid["cards"]:
+            if card.get("type") == "heading":
+                heading = card["heading"]
+            elif card.get("type") == "entities":
+                sections.setdefault(heading, []).extend(row if isinstance(row, str) else row["entity"] for row in card["entities"] if isinstance(row, str) or "entity" in row)
+    return sections
+
+
+def test_home_battery_settings_have_their_own_section() -> None:
+    options = {
+        **OPTIONS,
+        "language": "en",
+        "production_entity_id": "sensor.solar",
+        "powerwall_battery_level_entity_id": "sensor.powerwall_battery",
+    }
+    existing = _own("tesla") | {
+        "sensor.ev_battery_level", "sensor.charger_status", "sensor.solar", "sensor.powerwall_battery",
+        "switch.cjp_tesla_solar_charging", "sensor.cjp_tesla_solar_over_production_current_hour",
+        "switch.cjp_tesla_powerwall_discharge_above_needed",
+        "number.cjp_tesla_ev_charge_after_powerwall_battery_level",
+    }
+    sections = _settings_sections(options, existing)
+    assert sections["Solar"] == ["switch.cjp_tesla_solar_charging", "sensor.cjp_tesla_solar_over_production_current_hour"]
+    assert sections["Home battery"] == [
+        "number.cjp_tesla_ev_charge_after_powerwall_battery_level",
+        "switch.cjp_tesla_powerwall_discharge_above_needed",
+    ]
+
+
+def test_no_home_battery_section_without_a_home_battery() -> None:
+    """Without a configured home battery its entities do not exist: neither the section nor its read more is left."""
+    options = {**OPTIONS, "language": "en", "production_entity_id": "sensor.solar"}
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.solar", "switch.cjp_tesla_solar_charging"}
+    settings = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"][1]
+    sections = _settings_sections(options, existing)
+    assert "Solar" in sections and "Home battery" not in sections
+    assert "powerwall" not in yaml.safe_dump(settings)
+
+
+def test_solar_read_more_has_the_table_style_of_overview_and_analysis() -> None:
+    """The solar steps table in "Read more" gets the same card-mod table style as the tables on Overview and Analysis."""
+    options = {**OPTIONS, "language": "da", "production_entity_id": "sensor.solar"}
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.solar", "switch.cjp_tesla_solar_charging"}
+    views = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"]
+    cards = [card for view in views for card in _cards(view) if card.get("type") == "markdown"]
+    solar = next(card for card in cards if "solar_help" in card["content"])
+    overview = next(card for card in cards if "sensor.cjp_tesla_overview" in card["content"])
+    assert solar["card_mod"] == overview["card_mod"]
+    assert "table, th, td" in solar["card_mod"]["style"]["ha-markdown$"]
 
 
 def test_entity_help_uses_spaced_bold_italic_labels() -> None:
