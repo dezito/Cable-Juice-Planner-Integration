@@ -4,6 +4,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import yaml
+from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
 
 from custom_components.cable_juice_planner import const
@@ -528,4 +529,24 @@ async def test_sidebar_dashboard_can_be_edited_and_reset(hass: HomeAssistant, ha
 
     await hass.services.async_call("button", "press", {"entity_id": f"button.{OBJECT_PREFIX}_reset_dashboard"}, blocking=True)
     assert await command({"type": "lovelace/config"}) == generated
+    await async_unload_and_join(hass, entry)
+
+
+async def test_sidebar_icon_follows_the_dashboard_icon_option(hass: HomeAssistant, tmp_path) -> None:
+    hass.config.config_dir = str(tmp_path)
+    set_source_states(hass)
+    entry = make_entry(options={**MOCK_OPTIONS, "dashboard": True})
+    await async_setup(hass, entry)
+    # no choice yet: the default icon
+    assert hass.data["frontend_panels"]["cjp-test"].sidebar_icon == "mdi:ev-station"
+
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "dashboard_icon": "mdi:car-electric"})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.data["frontend_panels"]["cjp-test"].sidebar_icon == "mdi:car-electric"
+    assert hass.data[LOVELACE_DATA].dashboards["cjp-test"].config["icon"] == "mdi:car-electric"
+
+    # a stored value that is not an icon name falls back to the default instead of breaking the sidebar
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "dashboard_icon": "not an icon"})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.data["frontend_panels"]["cjp-test"].sidebar_icon == "mdi:ev-station"
     await async_unload_and_join(hass, entry)

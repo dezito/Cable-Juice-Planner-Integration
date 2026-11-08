@@ -30,13 +30,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 CHARGER_ENTITIES = {key: value for key, value in CHARGER_OPTIONS.items() if key.endswith("_entity_id")}
 
 
-async def _start_instance(hass: HomeAssistant, prefix: str = "flow"):
+async def _start_instance(hass: HomeAssistant, prefix: str = "flow", **extra):
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert result["type"] is FlowResultType.MENU
     assert result["menu_options"] == ["instance", "site"]
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "instance"})
     assert result["step_id"] == "instance"
-    return await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_ENTITY_PREFIX: prefix, "language": "da"})
+    return await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_ENTITY_PREFIX: prefix, "language": "da", **extra})
 
 
 async def _configure(hass: HomeAssistant, result, step_id: str, user_input: dict):
@@ -53,7 +53,7 @@ async def _submit_defaults_until(hass: HomeAssistant, result, step_id: str | Non
 
 
 async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
-    result = await _start_instance(hass)
+    result = await _start_instance(hass, dashboard_icon="mdi:car-electric")
     result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
     result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
     # no site entry -> no load balancing page
@@ -81,6 +81,7 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     assert options["charging_loss"] == -0.05  # shown in %, stored as a fraction
     assert options["usable_battery_level_entity_id"] == EV_LEVEL
     assert options["dashboard"] is False
+    assert options["dashboard_icon"] == "mdi:car-electric"
 
 
 async def test_ev_entities_all_or_nothing(hass: HomeAssistant) -> None:
@@ -261,3 +262,40 @@ async def test_site_options_flow_keeps_the_circuits(hass: HomeAssistant) -> None
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert site.options[CONF_CIRCUITS] == [["a", "b"]]
     assert site.options["fuse_l2"] == 35.0
+
+
+async def test_options_flow_dashboard_icon(hass: HomeAssistant, loaded_entry) -> None:
+    async def open_general():
+        result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_general"})
+        assert result["step_id"] == "general"
+        return result
+
+    result = await open_general()
+    assert form_defaults(result)["dashboard_icon"] == "mdi:ev-station"
+
+    # not an icon name: rejected, the page is shown again
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), "dashboard_icon": "car"})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"dashboard_icon": "invalid_icon"}
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), "dashboard_icon": " mdi:car-electric "})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert loaded_entry.options["dashboard_icon"] == "mdi:car-electric"
+
+    # a cleared field is left out by the frontend (an empty string also counts): both mean the default icon
+    result = await open_general()
+    assert form_defaults(result)["dashboard_icon"] == "mdi:car-electric"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {k: v for k, v in form_defaults(result).items() if k != "dashboard_icon"})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert loaded_entry.options["dashboard_icon"] == "mdi:ev-station"
+
+
+async def test_config_flow_rejects_an_invalid_dashboard_icon(hass: HomeAssistant) -> None:
+    result = await _start_instance(hass, dashboard_icon="car")
+    assert result["step_id"] == "instance"
+    assert result["errors"] == {"dashboard_icon": "invalid_icon"}
+    # the icon is optional: left out it is the default one
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_ENTITY_PREFIX: "flow", "language": "da"})
+    assert result["step_id"] == "charger"

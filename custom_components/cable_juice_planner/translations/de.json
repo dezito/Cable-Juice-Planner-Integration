@@ -6,10 +6,12 @@
         "title": "Allgemein",
         "description": "Sprache von Texten und Benachrichtigungen.",
         "data": {
-          "language": "Sprache"
+          "language": "Sprache",
+          "dashboard_icon": "Symbol in der Seitenleiste"
         },
         "data_description": {
-          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen.",
+          "dashboard_icon": "Symbol des Dashboards in der Seitenleiste, z. B. mdi:ev-station. Leer lassen für das Standardsymbol."
         }
       },
       "charger": {
@@ -323,12 +325,14 @@
         "data": {
           "name": "Name des Autos",
           "entity_prefix": "Entitäts-Präfix",
-          "language": "Sprache"
+          "language": "Sprache",
+          "dashboard_icon": "Symbol in der Seitenleiste"
         },
         "data_description": {
           "name": "Optional, z. B. Tesla. Wird als Gerätename (z. B. Tesla Übersicht) und in Benachrichtigungen verwendet.",
           "entity_prefix": "Optional. Alle Entitäten beginnen mit cjp_, das Präfix folgt: tesla ergibt sensor.cjp_tesla_overview, leer ergibt sensor.cjp_overview. Für jedes Auto ein anderes Präfix verwenden.",
-          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen.",
+          "dashboard_icon": "Symbol des Dashboards in der Seitenleiste, z. B. mdi:ev-station. Leer lassen für das Standardsymbol."
         }
       },
       "site": {
@@ -381,6 +385,7 @@
       "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
       "simulation_needs_ev": "Die Simulation des Batteriestands erfordert Batteriestand, Reichweite und Kilometerzähler des Autos.",
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
+      "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
     },
@@ -409,10 +414,12 @@
         "title": "Allgemein",
         "description": "Sprache von Texten und Benachrichtigungen.",
         "data": {
-          "language": "Sprache"
+          "language": "Sprache",
+          "dashboard_icon": "Symbol in der Seitenleiste"
         },
         "data_description": {
-          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen.",
+          "dashboard_icon": "Symbol des Dashboards in der Seitenleiste, z. B. mdi:ev-station. Leer lassen für das Standardsymbol."
         }
       },
       "charger": {
@@ -759,6 +766,7 @@
       "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
       "simulation_needs_ev": "Die Simulation des Batteriestands erfordert Batteriestand, Reichweite und Kilometerzähler des Autos.",
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
+      "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
     },

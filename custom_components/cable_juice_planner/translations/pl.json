@@ -6,10 +6,12 @@
         "title": "Ogólne",
         "description": "Język tekstów i powiadomień.",
         "data": {
-          "language": "Język"
+          "language": "Język",
+          "dashboard_icon": "Ikona w pasku bocznym"
         },
         "data_description": {
-          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień.",
+          "dashboard_icon": "Ikona panelu na pasku bocznym, np. mdi:ev-station. Zostaw puste, aby użyć ikony domyślnej."
         }
       },
       "charger": {
@@ -323,12 +325,14 @@
         "data": {
           "name": "Nazwa auta",
           "entity_prefix": "Prefiks encji",
-          "language": "Język"
+          "language": "Język",
+          "dashboard_icon": "Ikona w pasku bocznym"
         },
         "data_description": {
           "name": "Opcjonalnie, np. Tesla. Używana jako nazwa urządzenia i w powiadomieniach.",
           "entity_prefix": "Opcjonalnie. Wszystkie encje zaczynają się od cjp_, prefiks jest dalej: tesla daje sensor.cjp_tesla_overview, puste daje sensor.cjp_overview. Inny prefiks dla każdego auta.",
-          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień.",
+          "dashboard_icon": "Ikona panelu na pasku bocznym, np. mdi:ev-station. Zostaw puste, aby użyć ikony domyślnej."
         }
       },
       "site": {
@@ -381,6 +385,7 @@
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
       "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
       "min_above_max": "Minimum nie może być większe niż maksimum.",
+      "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
     },
@@ -409,10 +414,12 @@
         "title": "Ogólne",
         "description": "Język tekstów i powiadomień.",
         "data": {
-          "language": "Język"
+          "language": "Język",
+          "dashboard_icon": "Ikona w pasku bocznym"
         },
         "data_description": {
-          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień.",
+          "dashboard_icon": "Ikona panelu na pasku bocznym, np. mdi:ev-station. Zostaw puste, aby użyć ikony domyślnej."
         }
       },
       "charger": {
@@ -759,6 +766,7 @@
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
       "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
       "min_above_max": "Minimum nie może być większe niż maksimum.",
+      "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
     },

@@ -47,6 +47,9 @@ The setup is split into pages. Every field has a help text – here are the ones
 - **Language** is used for the entity names, the dashboard, the charging rule and notifications. It can be
   changed later under **Configure → General**; the entry reloads and the entity names follow (names you
   renamed yourself are kept).
+- **Sidebar icon** (optional) is the icon of the car's dashboard in the sidebar (default `mdi:ev-station`). Pick another
+  one, e.g. `mdi:car-electric`, to tell the cars apart. It can be changed under **Configure → General**; leave the
+  field empty for the default icon.
 
 ### Charger
 
