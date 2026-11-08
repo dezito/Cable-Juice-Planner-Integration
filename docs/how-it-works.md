@@ -103,7 +103,9 @@ daily minimum, or the max. recommended limit.
 ## When something goes wrong
 
 - **Prices missing:** single hours are filled from the [price database](#prices). If all prices are gone,
-  CJP keeps the last prices for 2 hours, then plans entirely with the database.
+  CJP keeps the last prices for 2 hours, then plans entirely with the database. An hour that has no price
+  at all (not published and not in the database either) is never planned at a made-up price, so a need can
+  stay uncovered until prices are available again.
 - **Solcast missing:** the solar forecast uses CJP's own history.
 - **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the max.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.

@@ -1111,6 +1111,86 @@ def test_missing_hours_are_filled_from_the_price_history() -> None:
     assert engine.grid_price_cache["using_offline_prices"] is False
 
 
+def _short_of_hours_engine(departure: datetime.time, missing_hours: tuple[int, ...] = (), databases: dict | None = None) -> CJPEngine:
+    """Work plan whose need (150 km) cannot be met before departure: the planner then uses every hour until departure.
+
+    Planned at 03:30 on DAY; missing_hours are left out of today's published prices."""
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    settings = {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "workday_departure_thursday": departure,
+        "workday_distance_needed_thursday": 150.0,
+    }
+    snap = snapshot(now, level=20, settings=settings, **PLUGGED_IN)
+    attributes = snap.price_data["attributes"]["sensor.price"]
+    attributes["raw_today"] = [row for row in attributes["raw_today"] if int(row["hour"][11:13]) not in missing_hours]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, databases or {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    return engine
+
+
+def test_an_hour_the_price_integrations_lack_is_planned_at_its_price_from_the_history() -> None:
+    """With a stored price history the missing hour has a price (the same hour of the weekday), so it is planned like any other."""
+    engine = _short_of_hours_engine(datetime.time(8, 0), missing_hours=(5,), databases={"kwh_avg_prices": _price_history()})
+    timestamp = datetime.datetime.combine(DAY, datetime.time(5))
+    assert engine.grid_price_cache["sources"][timestamp] == "database"
+    assert timestamp in charge_hours(engine)
+    assert engine.charge_hours[timestamp]["Price"] == pytest.approx(engine.grid_price_cache["prices"][timestamp], abs=0.011)
+    assert engine.charge_hours[timestamp]["Price"] == pytest.approx(2.0 + DAY.weekday() / 10, abs=0.011)
+
+
+@pytest.mark.parametrize("departure", [datetime.time(8, 0), datetime.time(7, 30)])
+def test_hours_added_when_charging_falls_short_use_their_own_price(departure: datetime.time, caplog: pytest.LogCaptureFixture) -> None:
+    """The last hours before departure are added without a price search: each keeps the price of its hour, not a price left over from the search.
+
+    With a departure at 07:30 those hours are planned at :30 (the fallback does not align to clock hours),
+    so the price must be looked up by the hour they are in. Do not assert those :30 slots themselves."""
+    engine = _short_of_hours_engine(departure)
+    prices = engine.grid_price_cache["prices"]
+    hours = charge_hours(engine)
+    assert hours
+    # the planner reached the "add every hour until departure" step
+    assert "Not enought charging planned" in caplog.text
+    for timestamp in hours:
+        price = prices[timestamp.replace(minute=0)]
+        data = engine.charge_hours[timestamp]
+        assert data["Price"] == pytest.approx(price, abs=0.011), timestamp
+        assert data["Cost"] == pytest.approx(data["kWh"] * price, abs=0.02), timestamp
+
+
+def test_an_hour_without_a_price_is_skipped_and_its_neighbours_keep_their_price() -> None:
+    """One published hour is missing (no price database): it is not planned, the hours around it are."""
+    engine = _short_of_hours_engine(datetime.time(8, 0), missing_hours=(5,))
+    prices = engine.grid_price_cache["prices"]
+    hours = charge_hours(engine)
+    assert datetime.datetime.combine(DAY, datetime.time(5)) not in prices
+    assert datetime.datetime.combine(DAY, datetime.time(5)) not in hours
+    for hour in (4, 6, 7):
+        timestamp = datetime.datetime.combine(DAY, datetime.time(hour))
+        assert timestamp in hours
+        assert engine.charge_hours[timestamp]["Price"] == pytest.approx(prices[timestamp], abs=0.011), timestamp
+
+
+def test_no_hour_is_planned_without_a_price(caplog: pytest.LogCaptureFixture) -> None:
+    """Only old price rows are published: an hour without a price is never planned at some other hour's price."""
+    caplog.set_level("DEBUG", logger="custom_components.cable_juice_planner.engine.planner.future.scheduled")
+    now = datetime.datetime.combine(DAY, datetime.time(21, 30))
+    snap = snapshot(now, **PLUGGED_IN, settings={"workplan_charging": True, "workday_friday": True})
+    rows = snap.price_data["attributes"]["sensor.price"]["raw_today"]
+    snap.price_data["attributes"]["sensor.price"].update(
+        raw_today=[row for row in rows if int(row["hour"][11:13]) < 3], raw_tomorrow=[], tomorrow_valid=False, forecast=[]
+    )
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    prices = engine.grid_price_cache["prices"]
+    assert "No price for" in caplog.text  # the step that adds the last hours was reached and refused the hours
+    assert not [timestamp for timestamp in charge_hours(engine) if timestamp not in prices]
+    assert not charge_hours(engine)
+
+
 def test_offline_prices_use_the_same_weekday() -> None:
     now = datetime.datetime.combine(DAY, datetime.time(12, 0))
     snap = snapshot(now)
