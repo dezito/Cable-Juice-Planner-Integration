@@ -450,13 +450,11 @@ HOME_BATTERY_ENTITIES = (
 )
 
 
-async def test_home_battery_entities_only_with_a_home_battery(hass: HomeAssistant) -> None:
+async def test_no_home_battery_entities_without_a_home_battery(hass: HomeAssistant) -> None:
     """Without a configured home battery its two settings are neither created nor left behind unavailable."""
     set_source_states(hass)
     hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
-    hass.states.async_set("sensor.powerwall_battery", "50", {"unit_of_measurement": "%", "device_class": "battery"})
     ent_reg = er.async_get(hass)
-
     entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar"})
     entry.add_to_hass(hass)
     # entities of an earlier configuration with a home battery
@@ -469,9 +467,12 @@ async def test_home_battery_entities_only_with_a_home_battery(hass: HomeAssistan
         assert ent_reg.async_get(f"{platform}.{OBJECT_PREFIX}_{key}") is None
         assert hass.states.get(f"{platform}.{OBJECT_PREFIX}_{key}") is None
     await async_unload_and_join(hass, entry)
-    await hass.config_entries.async_remove(entry.entry_id)
-    await hass.async_block_till_done()
 
+
+async def test_home_battery_entities_with_a_home_battery(hass: HomeAssistant) -> None:
+    set_source_states(hass)
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    hass.states.async_set("sensor.powerwall_battery", "50", {"unit_of_measurement": "%", "device_class": "battery"})
     entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "powerwall_battery_level_entity_id": "sensor.powerwall_battery"})
     await async_setup(hass, entry)
     for platform, key in HOME_BATTERY_ENTITIES:
