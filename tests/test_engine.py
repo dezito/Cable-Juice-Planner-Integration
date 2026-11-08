@@ -1330,3 +1330,86 @@ def test_no_public_charging_without_a_location() -> None:
     _public_job(engine, 30, engine.ev_port_changed, "off", "on", level=70, port="off")
     assert engine.public_charging_sessions == []
     assert "public_charging_session_done" not in engine.sensor_states
+
+
+SOLAR_OPTIONS = {**OPTIONS, "production_entity_id": "sensor.solar", "allow_grid_charging_above_solar_available": -100.0}
+
+
+def _amps_rows(table: str) -> list[tuple[int, int, int, int]]:
+    import re
+
+    return [tuple(int(v) for v in m.groups()) for m in re.finditer(r"^\| (\d+) W \| (\d+) A \| (\d) \| (\d+) W \|$", table, re.MULTILINE)]
+
+
+def _check_table_against_schedule(engine: CJPEngine, limit: float, rows: list[tuple[int, int, int, int]]) -> None:
+    """Every row is where calc_charging_amps (called with the inverter limit, like the schedule) switches to it."""
+    previous_watt = 0
+    for start, amps, _phase, watt in rows:
+        above = engine.calc_charging_amps(start - 100.0 + 1, max_allowed=limit)
+        below = engine.calc_charging_amps(start - 100.0 - 1, max_allowed=limit)
+        assert (above[0], above[3]) == (amps, watt)
+        assert below[3] == previous_watt
+        previous_watt = watt
+    # the last row takes every larger surplus: no step above it is ever chosen
+    assert engine.calc_charging_amps(100000.0, max_allowed=limit)[3] == previous_watt
+
+
+def test_charging_amps_table_follows_the_solar_steps() -> None:
+    """The dashboard table starts each step where calc_charging_amps switches to it (surplus + allowed difference)."""
+    engine = CJPEngine(const.build_config({**SOLAR_OPTIONS, "inverter_discharging_power_limit": 20000.0}), "cjp_test", TEXTS)
+    table = engine.charging_amps_table()
+    assert table is not None
+    assert "-100 W" in table.splitlines()[0]
+    rows = _amps_rows(table)
+    # 1 phase 6-16 A on 230 V, then 3 phases from the first step above what 1 phase gives (3680 W)
+    assert rows[0] == (1455, 6, 1, 1380)
+    assert (4010, 6, 3, 4140) in rows
+    assert rows[-1] == (10795, 16, 3, 11040)
+    assert "| – | 0 A | – | 0 W |" in table
+    _check_table_against_schedule(engine, 20000.0, rows)
+
+
+def test_charging_amps_table_stops_at_the_inverter_limit() -> None:
+    """The schedule passes the inverter limit as max_allowed, so steps above it can never be chosen."""
+    engine = CJPEngine(const.build_config(SOLAR_OPTIONS), "cjp_test", TEXTS)
+    limit = engine.config["solar"]["inverter_discharging_power_limit"]
+    assert limit == 5000.0
+    rows = _amps_rows(engine.charging_amps_table())
+    assert rows[-1] == (4585, 7, 3, 4830)  # 8 A on 3 phases (5520 W) is above the limit
+    assert all(watt <= limit for *_rest, watt in rows)
+    _check_table_against_schedule(engine, limit, rows)
+
+
+def test_charging_amps_table_with_an_inverter_limit_below_the_first_step() -> None:
+    """calc_charging_amps raises a limit below the first step to the 0 A step: no charging, only the 0 A row."""
+    engine = CJPEngine(const.build_config({**SOLAR_OPTIONS, "inverter_discharging_power_limit": 1000.0}), "cjp_test", TEXTS)
+    table = engine.charging_amps_table()
+    assert _amps_rows(table) == []
+    assert "| – | 0 A | – | 0 W |" in table
+    assert engine.calc_charging_amps(100000.0, max_allowed=1000.0)[3] == 0.0
+
+
+def test_charging_amps_table_uses_the_allowed_difference() -> None:
+    engine = CJPEngine(const.build_config({**SOLAR_OPTIONS, "allow_grid_charging_above_solar_available": 0.0}), "cjp_test", TEXTS)
+    table = engine.charging_amps_table()
+    assert _amps_rows(table)[0] == (1355, 6, 1, 1380)
+    assert "0 W" in table.splitlines()[0]
+
+
+def test_charging_amps_without_solar_only_in_the_startup_log() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.charging_amps_table() is None
+    assert engine.charging_amps_report() == f"Max charging: 16.0A 3.0 phase = {float(MAX_WATT)}W"
+    result = engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {})
+    assert result.error is None
+    assert "charging_amps_table" not in result.states
+
+
+def test_startup_publishes_the_charging_amps_table_with_solar() -> None:
+    engine = CJPEngine(const.build_config(SOLAR_OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0)))
+    snap.states["sensor.solar"] = "0"
+    result = engine.run_job(snap, engine.startup, {})
+    assert result.error is None
+    assert result.states["charging_amps_table"] == engine.charging_amps_table()
+    assert result.value["amps_report"] == engine.charging_amps_table()

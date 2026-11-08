@@ -28,10 +28,46 @@ class ControlActions:
                 power_dict[watt] = {"amp": float(i), "phase": charger["charging_phases"], "watt": watt}
         return power_dict
 
-    def calc_charging_amps(self, power=0.0, max_allowed=None, report=False):
-        config = self.config
-        solar = config["solar"]
-        charger = config["charger"]
+    def charging_amps_table(self) -> str | None:
+        """Explanation and markdown table of the solar charging steps (None without solar).
+
+        calc_charging_amps picks the step closest to the available power (surplus plus the allowed
+        grid power), so a step starts halfway between it and the step below. The schedule always
+        passes the inverter limit as max_allowed, so steps above it are never chosen and are left out.
+        """
+        if not self.is_solar_configured():
+            return None
+        solar = self.config["solar"]
+        power_dict = self.charging_power_dict()
+        if not power_dict:
+            return None
+        allow = float(solar["allow_grid_charging_above_solar_available"])
+        t = self.t
+        lines = [
+            t("ui.charging_amps.explanation", allow=f"{allow:+.0f}" if allow else "0"),
+            "",
+            f"| {t('ui.charging_amps.surplus_from')} | {t('ui.charging_amps.amps')} | {t('ui.charging_amps.phases')} | {t('ui.charging_amps.power')} |",
+            "|---:|---:|---:|---:|",
+            "| – | 0 A | – | 0 W |",
+        ]
+        below = min(power_dict) - 50.0
+        limit = max(float(solar["inverter_discharging_power_limit"]), below)
+        for key in sorted(k for k in power_dict if k <= limit):
+            step = power_dict[key]
+            start = (below + key) / 2 - allow
+            lines.append(f"| {start:.0f} W | {int(step['amp'])} A | {int(step['phase'])} | {int(step['watt'])} W |")
+            below = key
+        return "\n".join(lines)
+
+    def charging_amps_report(self) -> str:
+        """The startup log text: the solar steps, or the maximum charging power without solar."""
+        if table := self.charging_amps_table():
+            return table
+        charger = self.config["charger"]
+        return f"Max charging: {charger['charging_max_amp']}A {charger['charging_phases']} phase = {self.max_watt_charging}W"
+
+    def calc_charging_amps(self, power=0.0, max_allowed=None):
+        charger = self.config["charger"]
         power = float(power)
         power_dict = self.charging_power_dict()
         min_watt = min(power_dict.keys()) - 50.0
@@ -39,25 +75,6 @@ class ControlActions:
         if max_allowed is not None and min_watt > max_allowed:
             _LOGGER.warning("Max allowed watt %s is lower than minimum watt in powerDict %s, setting max allowed to %s", max_allowed, min_watt, min_watt)
             max_allowed = min_watt
-
-        if report:
-            lines = []
-            if self.is_solar_configured():
-                allow = solar["allow_grid_charging_above_solar_available"]
-                lines.append("### Charging amps ###")
-                lines.append(f"Voltage above(+)/under(-) overproduction available: {allow}W")
-                lines.append("Solar overproduction examples:")
-                for n, base in enumerate((500, 1500, 3000, 4000, 5000), start=1):
-                    example = base + allow
-                    lines.append(f"{n}. overproduction {base}W + {allow}W={example}W {get_closest_key(example, power_dict)}{chr(10) if n == 5 else ''}")
-                lines.append("Solar overproduction charging:")
-                first = "<"
-                for key in sorted(power_dict):
-                    lines.append(f"{first}{int(key)} W: {int(power_dict[key]['amp'])} A {int(power_dict[key]['phase'])} phase = {int(power_dict[key]['watt'])} W")
-                    first = ""
-            else:
-                lines.append(f"Max charging: {charger['charging_max_amp']}A {charger['charging_phases']} phase = {self.max_watt_charging}W")
-            return "\n".join(lines)
 
         output = get_closest_key(power, power_dict, max_allowed=max_allowed)
         phase_1 = phase_2 = phase_3 = 0

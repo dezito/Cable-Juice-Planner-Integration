@@ -274,6 +274,13 @@
       "call_all_entities": "Call the pyscript.ev_all_entities service to view all entities",
       "imported_databases": "Imported existing databases: {databases}"
     },
+    "charging_amps": {
+      "explanation": "The car charges at the step closest to the solar surplus. Allowed grid power is added to the surplus: {allow} W. Below the first step there is no charging.",
+      "surplus_from": "Surplus from",
+      "amps": "Current",
+      "phases": "Phases",
+      "power": "Charging power"
+    },
     "charging_rule_changed": {
       "charging_rule_conflict": "Charging rule conflict",
       "deactivate_optimal_rule": "Deactivate Optimal weekly charging",
@@ -506,7 +513,7 @@
     "manual_charging": "Manual charging starts charging at once without waiting for the plan.\n• Allow manual charging now: charges with max current from the grid and solar.\n• Solar only: charges only with the solar surplus.\nBoth are turned off automatically when the car is plugged in again.",
     "cheap_targets": "Charge targets at cheap prices:\n• Very cheap target ({charge_very_cheap_battery_level} %): when the price is at most the average of the cheapest known prices of the coming week.\n• Ultra cheap target ({charge_ultra_cheap_battery_level} %): when the price is another 25 % lower.\nThe targets follow the expected solar surplus of the coming week.",
     "trip": "Trip charging is planned automatically when:\n• Trip charge percent is above 0 %, or Trip range needed is above 0 {distance}.\n• Trip departure and Trip homecoming are set in the future.\nIt charges what the trip needs (from the percent or the distance). Charging between {max_recommended_charge_limit_battery_level}-100 % happens just before departure to protect the battery.\nTrip reset clears the trip; it is also reset automatically 2 hours after departure.",
-    "solar_charging": "Enabled when there is solar surplus.\n• Charging: uses the surplus; switches between 1 and 3 phases depending on it.\n• Need: follows the surplus compared to the house consumption. Max charge {max_recommended_charge_limit_battery_level} %.\n• Available solar power: shows the power available in watts during the current hour.\n• Plan: the expected surplus of the week is used by Optimal weekly charging and Work plan charging, so the car charges as much solar as possible.",
+    "solar_charging": "Enabled when there is solar surplus.\n• Charging: uses the surplus; switches between 1 and 3 phases depending on it.\n• Need: follows the surplus compared to the house consumption. Max charge {max_recommended_charge_limit_battery_level} %.\n• Available solar power: shows the power available in watts during the current hour.\n• Plan: the expected surplus of the week is used by Optimal weekly charging and Work plan charging, so the car charges as much solar as possible.\n\n{charging_amps_table}",
     "fill_up": "Optimal weekly charging can be used on holiday (ignores the work plan).\n Every day: always enough for the typical daily distance ({typical_daily_distance} {distance}) plus the daily minimum ({min_daily_battery_level} %), in the cheapest hours of the day.\nThe rest up to the max recommended ({max_recommended_charge_limit_battery_level} %) only in the cheapest hours of the week (the cheapest 30 %), and only when the next 24 hours are not clearly cheaper.",
     "workplan": "Work plan charging: enable when you work within the next week.\n• Charging: plans daily charging over a week from workdays and days off.\n• Need: uses departure and homecoming time and the distance of every workday. Minimum battery level at homecoming {min_daily_battery_level} %, max charge {max_recommended_charge_limit_battery_level} %.\n• Plan: picks the cheapest available times before the workday departure; whether the target is reached depends on the charging windows and the amount of charging needed.\n• Learn driving distance: estimates suggested distance for each weekday and typical daily distance from the odometer readings over the last 8 weeks. With the switch on, the plan uses the higher of the entered value and the suggestion; the entered numbers are not changed. The suggestions are in the `learned_distance` attribute of the distance numbers.",
     "full_charge": "Recommended full charge: with an LFP battery a full charge is recommended at least every 14 days or as the car maker says. Set the number of days here; the last full charge is registered automatically.",

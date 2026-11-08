@@ -123,6 +123,10 @@ class ControlEvents:
         self.publish_simulated_battery_level()
         self.calc_kwh_price(self.now().minute, update_entities=True)
 
+        # the solar steps table shown in the help text of the solar charging switch (dashboard, Settings)
+        if amps_table := self.charging_amps_table():
+            self.set_state("charging_amps_table", amps_table)
+
         distance_per_percent = self.distance_per_percentage()
         info = {
             "charger_configured": self.is_charger_configured(),
@@ -133,7 +137,7 @@ class ControlEvents:
             "battery_level": self.battery_level(),
             "distance_per_percentage": distance_per_percent,
             "estimated_range": self.battery_level() * distance_per_percent,
-            "amps_report": self.calc_charging_amps(0.0, report=True),
+            "amps_report": self.charging_amps_report(),
         }
         _LOGGER.info(
             "Loaded databases: charging history %s entries, price history %s days, drive efficiency %s drives",
