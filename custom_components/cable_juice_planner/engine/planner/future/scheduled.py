@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ....utils.helpers import days_between, hours_between, in_between
+from ....utils.helpers import days_between, hours_between, in_between, reset_time_to_hour
 from ..charge_plan import FUNC_NAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -162,7 +162,13 @@ class FutureScheduled:
                         if what_day < 0:
                             continue
 
-                        battery_level_id, max_recommended_charge_limit_battery_level = self.what_battery_level(ctx, what_day, timestamp, price, day)
+                        # the hour's own price (not the loop variable of the price search above, which is some other hour's price)
+                        hour_price = ctx.grid_prices.get(reset_time_to_hour(timestamp))
+                        if hour_price is None:
+                            _LOGGER.debug(f"No price for {timestamp}, the hour is not planned")
+                            continue
+
+                        battery_level_id, max_recommended_charge_limit_battery_level = self.what_battery_level(ctx, what_day, timestamp, hour_price, day)
                         if not battery_level_id:
                             continue
 
@@ -170,7 +176,7 @@ class FutureScheduled:
                             '''if round(sum(charging_plan[what_day][battery_level_id]), 0) >= self.get_max_recommended_charge_limit_battery_level() - 1.0:
                                 #Workaround for cold battery percentage: ex. 90% normal temp = 89% cold temp
                                 continue'''
-                            kwh_needed_today, ctx.totalCost, ctx.totalkWh, battery_level_added, cost_added = self.add_to_charge_hours(ctx.chargeHours, ctx.charging_plan, kwh_needed_today, ctx.totalCost, ctx.totalkWh, timestamp, price, None, None, kwh_available, sum(ctx.charging_plan[what_day][battery_level_id]), check_max_charging_plan={"day": day, "what_day": what_day, "battery_level_id": battery_level_id}, max_recommended_battery_level=max_recommended_charge_limit_battery_level, rules=ctx.charging_plan[day]['rules'])
+                            kwh_needed_today, ctx.totalCost, ctx.totalkWh, battery_level_added, cost_added = self.add_to_charge_hours(ctx.chargeHours, ctx.charging_plan, kwh_needed_today, ctx.totalCost, ctx.totalkWh, timestamp, hour_price, None, None, kwh_available, sum(ctx.charging_plan[what_day][battery_level_id]), check_max_charging_plan={"day": day, "what_day": what_day, "battery_level_id": battery_level_id}, max_recommended_battery_level=max_recommended_charge_limit_battery_level, rules=ctx.charging_plan[day]['rules'])
 
                             if timestamp in ctx.chargeHours and battery_level_added:
                                 self.scheduled_charging_added(ctx, day, what_day, timestamp, battery_level_id, battery_level_added, cost_added)
