@@ -318,6 +318,35 @@ place and extend them to new code:
   and plug-in sends a "does it match the car?" notification. Planning/control
   use `battery_level()`; history and measurements use `battery_level(real=True)`.
 
+### Sell price (`calculate_sell_price()` in `prices/base.py`)
+
+Decided with the user (2026-11-08, same as BattMind): selling a kWh costs the **sell fee + Energinet's net
+tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
+
+`sell price = price − every tariff/tax/surcharge in the price − (sell_fee + transmissions_nettarif + systemtarif)`
+
+- Strømligning's sell sensor is a consumer price: it includes the distribution tariff (`tariffs`, per period),
+  net tariff, system tariff, electricity tax and surcharge, so all are subtracted, and the net and system tariff
+  once more as selling costs. Key mapping as Energi Data Service: distribution -> `tariffs`, nettariff ->
+  `transmissions_nettarif`. The distribution sensor only has today's periods; other days use the same time of
+  day from the latest known day (0 = too high a sell price). It is still 0 without a distribution sensor, when
+  it is unavailable, or for a time before its first row on the latest known day.
+- Missing tariff sensors (unavailable at startup) count as 0, which makes the sell price too high: net and system
+  tariff are in the price and subtracted again as selling costs. Open fail-safe gap, same as in BattMind.
+- Energi Data Service: a sell sensor with a `tariffs` attribute includes them. A sell sensor without it is a raw
+  price (tariffs in the price = 0); the selling costs (net and system tariff) then come from the buy sensor's
+  `tariffs` attribute (`get_sell_costs()` / `eds_sell_costs()`).
+- `sell_fee` is stored positive (`abs()`) and is always subtracted.
+- The dashboard's sell price chart subtracts the configured fee (`@@sell_fee_value@@`, set in
+  `render_dashboard()`); keep it in sync with `calculate_sell_price()`.
+- `kwh_avg_prices_db["history_sell"]` averages stored before this fix used the old sign (too high) and only
+  phase out as new days are stored.
+- The forecast adder (`PRICE_ADDER_DAY_BETWEEN_DIVIDER`) makes a forecast sale worth less (decided with the
+  user 2026-11-08, same as BattMind): it is subtracted from a forecast SELL price, and added with a fixed solar
+  sell price (`sell_adder_sign()` in `prices/base.py`; used by the providers, `get_sell_forecast_prices(adder=False)`
+  and `Pricing._database_prices` for `history_sell`). A forecast buy price is raised.
+- Default `sell_fee` is 0.03 (like BattMind); it is always subtracted.
+
 ### Load balancing (site)
 
 - A site config entry (`data site=True`, `site.py` `CJPSite` in

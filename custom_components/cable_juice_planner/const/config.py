@@ -122,7 +122,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "stromligning_sell_surcharge": "",
         },
         "refund": 0.0,
-        "sell_fee": 0.3,
+        "sell_fee": 0.03,
     },
     "solar": {
         "entity_ids": {

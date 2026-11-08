@@ -915,7 +915,7 @@ views:
               data_generator: |
                 const data = [];
 
-                const sellFee = 0.025;
+                const sellFee = Number('@@sell_fee_value@@') || 0;
 
                 const nettariff = Number(
                   hass.states[

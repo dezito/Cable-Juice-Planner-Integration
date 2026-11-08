@@ -6,6 +6,7 @@ import logging
 from copy import deepcopy
 
 from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
+from ..prices.base import sell_adder_sign
 from ..utils.formatting import get_list_values
 from ..utils.helpers import (
     average,
@@ -120,6 +121,9 @@ class Pricing:
             values = history.get(timestamp.hour, {}).get(timestamp.weekday(), [])
             if timestamp not in priced_hours and values:
                 adder = days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+                if history_key == "history_sell":
+                    # a sale at a price from the history is worth less too (see sell_adder_sign)
+                    adder *= sell_adder_sign(self.config)
                 missing[timestamp] = round(self.get_forecast_value(values) + adder, 2)
             timestamp += datetime.timedelta(hours=1)
         return missing

@@ -175,7 +175,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffer ved salg",
-        "description": "Ved salg fratrækkes tariffer og afgifter, og transport-/systemtarif og salgsgebyr lægges til. Lad et felt være tomt for at bruge 0.",
+        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.",
         "data": {
           "stromligning_sell_distribution": "Transporttarif",
           "stromligning_sell_electricity_tax": "Elafgift",
@@ -583,7 +583,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffer ved salg",
-        "description": "Ved salg fratrækkes tariffer og afgifter, og transport-/systemtarif og salgsgebyr lægges til. Lad et felt være tomt for at bruge 0.",
+        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.",
         "data": {
           "stromligning_sell_distribution": "Transporttarif",
           "stromligning_sell_electricity_tax": "Elafgift",

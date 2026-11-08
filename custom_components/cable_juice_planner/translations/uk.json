@@ -175,7 +175,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - тарифи при продажу",
-        "description": "Залиште порожнім, щоб використати 0.",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.",
         "data": {
           "stromligning_sell_distribution": "Тариф на розподіл",
           "stromligning_sell_electricity_tax": "Податок на електроенергію",
@@ -583,7 +583,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - тарифи при продажу",
-        "description": "Залиште порожнім, щоб використати 0.",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.",
         "data": {
           "stromligning_sell_distribution": "Тариф на розподіл",
           "stromligning_sell_electricity_tax": "Податок на електроенергію",

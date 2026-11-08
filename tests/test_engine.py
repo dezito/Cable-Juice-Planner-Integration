@@ -1207,6 +1207,22 @@ def test_failed_price_append_leaves_the_database_unchanged(caplog: pytest.LogCap
     assert "kwh_avg_prices" not in result.db_saves
 
 
+@pytest.mark.parametrize(("fixed", "sign"), [(-1.0, -1.0), (1.0, 1.0)], ids=["hourly sell price", "fixed solar sell price"])
+def test_history_sell_prices_get_the_adder_that_makes_a_sale_worth_less(fixed: float, sign: float) -> None:
+    """Hours filled from the price history get the same daily adder as the provider forecasts: a buy price goes
+    up, a sell price down (with a fixed solar sell price a sold kWh is worth fixed - hourly, so it goes up)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    engine = CJPEngine(const.build_config({**OPTIONS, "solar_sell_fixed_price": fixed}), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    target = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(12))  # a Saturday: 2.5 in the history
+    buy = engine.run_job(snap, engine._database_prices, "history", {}, 4)
+    sell = engine.run_job(snap, engine._database_prices, "history_sell", {}, 4)
+    assert buy.error is None and sell.error is None, (buy.error, sell.error)
+    assert buy.value[target] == pytest.approx(2.5 + 2 / 30, abs=0.006)
+    assert sell.value[target] == pytest.approx(2.5 + sign * 2 / 30, abs=0.006)
+
+
 def test_sell_value_with_fixed_solar_sell_price() -> None:
     """A fixed price settles the difference to the hourly price: fixed - hourly, also negative."""
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)

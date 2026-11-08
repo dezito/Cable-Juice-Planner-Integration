@@ -79,6 +79,29 @@ def test_currency_follows_home_assistant() -> None:
     assert "€/kWh" in text and "kr/kWh" not in text and "{valuta" not in text
 
 
+def test_sell_price_chart_subtracts_the_configured_sell_fee() -> None:
+    """The chart's sell price is spot - (net tariff + system tariff + sell fee), the fee being the planner's."""
+    options = {
+        **OPTIONS,
+        "language": "da",
+        "sell_fee": 0.07,
+        "stromligning_buy_current_price": "sensor.stromligning_current_price_vat",
+        "stromligning_sell_current_price": "sensor.stromligning_15min_current_price_ex_vat",
+    }
+    existing = _own("tesla") | {
+        "sensor.ev_battery_level",
+        "sensor.charger_status",
+        "sensor.stromligning_current_price_vat",
+        "sensor.stromligning_nettariff_vat",
+        "sensor.stromligning_systemtariff_vat",
+        "sensor.stromligning_15min_spotprice_ex_vat",
+    }
+    text = render_dashboard(const.build_config(options), "tesla", "entry1", existing)
+    assert "const sellFee = Number('0.07') || 0;" in text
+    assert "0.025" not in text and "@@sell_fee_value@@" not in text
+    assert "spotprice - sellCosts" in text
+
+
 def test_distance_follows_home_assistant() -> None:
     metric = load_texts("en", "GBP", "km")
     assert (metric["ui.common.distance_type"], metric["ui.common.distance_kwh"], metric["ui.common.valuta_distance"]) == ("km", "km/kWh", "£/km")

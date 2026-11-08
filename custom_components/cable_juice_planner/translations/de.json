@@ -175,7 +175,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - Tarife beim Verkauf",
-        "description": "Leer lassen, um 0 zu verwenden.",
+        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.",
         "data": {
           "stromligning_sell_distribution": "Netzentgelt",
           "stromligning_sell_electricity_tax": "Stromsteuer",
@@ -583,7 +583,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - Tarife beim Verkauf",
-        "description": "Leer lassen, um 0 zu verwenden.",
+        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.",
         "data": {
           "stromligning_sell_distribution": "Netzentgelt",
           "stromligning_sell_electricity_tax": "Stromsteuer",
