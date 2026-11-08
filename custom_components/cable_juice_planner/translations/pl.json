@@ -175,7 +175,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Zostaw puste, aby użyć 0.",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",
@@ -583,7 +583,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Zostaw puste, aby użyć 0.",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",

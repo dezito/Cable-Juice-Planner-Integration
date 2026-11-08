@@ -1,4 +1,4 @@
-"""The combined price provider: priority, snapshot, history and prices."""
+"""The combined price provider: priority, snapshot, history and prices, and the sell price."""
 from __future__ import annotations
 
 import datetime
@@ -11,6 +11,7 @@ from custom_components.cable_juice_planner.prices import (
     StromligningPriceProvider,
     create_price_provider,
 )
+from custom_components.cable_juice_planner.prices.base import BasePriceProvider, sell_adder_sign
 
 TODAY = datetime.date(2026, 10, 30)
 TOMORROW = TODAY + datetime.timedelta(days=1)
@@ -79,3 +80,250 @@ def test_combined_provider_reads_the_price_entities_and_merges_the_prices() -> N
     assert tomorrow not in provider.get_buy_real_prices()
     assert provider.get_current_price_timestamp(now) == datetime.datetime.combine(TODAY, datetime.time(10))
     assert provider.get_buy_price_entity_id() == "sensor.stromligning, sensor.eds"
+
+
+# --- the sell price: what selling a kWh costs is subtracted (same formula as BattMind) ---
+
+NOW = datetime.datetime.combine(TODAY, datetime.time(16, 40))
+# Strømligning tariffs ex VAT (a real export): distribution per period, the rest flat
+DISTRIBUTION = {hour: 0.9358 if 17 <= hour <= 20 else 0.3119 for hour in range(24)}
+FLAT_TARIFFS = {
+    "sensor.sell_tax": 0.008,
+    "sensor.sell_nettariff": 0.043,
+    "sensor.sell_systemtariff": 0.072,
+    "sensor.sell_surcharge": 0.04,
+}
+# not on a rounding boundary after the selling costs are subtracted
+SPOT = {TODAY: 2.611, TOMORROW: 2.213}
+
+
+def _config(**options):
+    return build_config({**default_options(), **options})
+
+
+def _load(provider: BasePriceProvider, attributes: dict, values: dict | None = None) -> BasePriceProvider:
+    provider.shared_data = {"attributes": attributes, "values": values or {}, "version": 1}
+    provider.now = NOW
+    provider.update_prices()
+    return provider
+
+
+def _rows(day: datetime.date, price) -> list[dict]:
+    return [{"start": start, "price": price(hour)} for hour, start in enumerate(_starts(day))]
+
+
+def _quarter_rows(day: datetime.date, price) -> list[dict]:
+    midnight = datetime.datetime.combine(day, datetime.time(0))
+    return [
+        {"start": (midnight + datetime.timedelta(minutes=15 * index)).isoformat() + "+01:00", "price": price(index // 4)}
+        for index in range(96)
+    ]
+
+
+def _sell_with_tariffs(day: datetime.date):
+    """Strømligning's sell sensor is the consumer price: spot plus every tariff."""
+    return lambda hour: SPOT[day] + DISTRIBUTION[hour] + sum(FLAT_TARIFFS.values())
+
+
+def _stromligning(sell_fee: float = 0.03, quarter: bool = False) -> StromligningPriceProvider:
+    """quarter: 15-minute sell prices (the distribution tariff stays per hour)."""
+    sell_rows = _quarter_rows if quarter else _rows
+    provider = StromligningPriceProvider(_config(**{
+        "stromligning_buy_current_price": "sensor.buy",
+        "stromligning_sell_current_price": "sensor.sell",
+        "stromligning_sell_tomorrow_available": "binary_sensor.sell_tomorrow",
+        "stromligning_sell_distribution": "sensor.sell_distribution",
+        "stromligning_sell_electricity_tax": "sensor.sell_tax",
+        "stromligning_sell_nettariff": "sensor.sell_nettariff",
+        "stromligning_sell_systemtariff": "sensor.sell_systemtariff",
+        "stromligning_sell_surcharge": "sensor.sell_surcharge",
+        "sell_fee": sell_fee,
+    }))
+    _load(
+        provider,
+        {
+            "sensor.buy": {"prices": _rows(TODAY, lambda hour: 4.0)},
+            "sensor.sell": {"prices": sell_rows(TODAY, _sell_with_tariffs(TODAY))},
+            "binary_sensor.sell_tomorrow": {"forecast_data": False, "prices": sell_rows(TOMORROW, _sell_with_tariffs(TOMORROW))},
+            # like the real sensor: only today's distribution tariffs
+            "sensor.sell_distribution": {"prices": _rows(TODAY, DISTRIBUTION.get)},
+            **{entity_id: {} for entity_id in FLAT_TARIFFS},
+        },
+        dict(FLAT_TARIFFS),
+    )
+    return provider
+
+
+@pytest.mark.parametrize("day", [TODAY, TOMORROW])
+@pytest.mark.parametrize("hour", [3, 17, 20, 21])
+def test_stromligning_sell_price_is_spot_minus_the_selling_costs(day: datetime.date, hour: int) -> None:
+    """Every tariff in the sell sensor is subtracted (also tomorrow's distribution tariff, which the
+    sensor doesn't have yet), and selling costs the sell fee plus Energinet's net and system tariff."""
+    provider = _stromligning()
+    timestamp = datetime.datetime.combine(day, datetime.time(hour))
+    assert provider.sell_real_prices[timestamp] == pytest.approx(round(SPOT[day] - 0.03 - 0.043 - 0.072, 2), abs=1e-9)
+
+
+def test_stromligning_tariffs_use_the_keys_of_energi_data_service() -> None:
+    """The distribution tariff is the grid company's `tariffs`, the net tariff Energinet's `transmissions_nettarif`."""
+    provider = _stromligning()
+    tariffs = provider.get_tariffs(17, 4, timestamp=datetime.datetime.combine(TODAY, datetime.time(17)))
+    assert tariffs["tariffs"] == pytest.approx(0.9358)
+    assert tariffs["transmissions_nettarif"] == pytest.approx(0.043)
+    assert tariffs["systemtarif"] == pytest.approx(0.072)
+    assert tariffs["elafgift"] == pytest.approx(0.008)
+    assert tariffs["surcharge"] == pytest.approx(0.04)
+    assert tariffs["tariff_sum"] == pytest.approx(0.9358 + 0.043 + 0.072 + 0.008 + 0.04)
+
+
+class _Provider(BasePriceProvider):
+    def __init__(self, config: dict, tariffs: dict, sell_costs: dict | None = None) -> None:
+        super().__init__(config)
+        self._tariffs = tariffs
+        self._sell_costs = sell_costs
+
+    def get_tariffs(self, hour, day_of_week, timestamp=None) -> dict:
+        return self._tariffs
+
+    def get_sell_costs(self, hour, day_of_week, timestamp=None):
+        return self._sell_costs
+
+
+def test_selling_costs_lower_the_sell_price() -> None:
+    tariffs = {"transmissions_nettarif": 0.1, "systemtarif": 0.1, "elafgift": 0.5, "tariffs": 0.2, "surcharge": 0.0, "tariff_sum": 0.9}
+    timestamp = datetime.datetime.combine(TODAY, datetime.time(17))
+    # 2.0 - 0.9 tariffs in the price - (0.03 fee + 0.1 net + 0.1 system tariff)
+    provider = _Provider(_config(sell_fee=0.03), tariffs)
+    assert provider.calculate_sell_price(timestamp, 2.0) == pytest.approx(0.87)
+    assert provider.sell_price_details[timestamp]["sell_tariffs"] == pytest.approx(0.23)
+    # the fee is stored positive and always subtracted
+    assert _Provider(_config(sell_fee=-0.03), tariffs).calculate_sell_price(timestamp, 2.0) == pytest.approx(0.87)
+    # a raw price without tariffs: only the selling costs
+    raw = {key: 0.0 for key in tariffs}
+    provider = _Provider(_config(sell_fee=0.03), raw, {"transmissions_nettarif": 0.05, "systemtarif": 0.09})
+    assert provider.calculate_sell_price(timestamp, 2.0) == pytest.approx(1.83)
+    details = provider.sell_price_details[timestamp]
+    assert details["sell_tariffs"] == pytest.approx(0.17)
+    # what was subtracted for selling, for the attributes of the solar price
+    assert (details["sell_transmissions_nettarif"], details["sell_systemtarif"]) == pytest.approx((0.05, 0.09))
+
+
+def _eds_provider(sell_tariffs: bool) -> EnergiDataServicePriceProvider:
+    provider = EnergiDataServicePriceProvider(_config(**{
+        "energidataservice_buy_entity_id": "sensor.eds_buy",
+        "energidataservice_sell_entity_id": "sensor.eds_sell",
+        "sell_fee": 0.03,
+    }))
+    tariffs = {
+        "additional_tariffs": {"transmissions_nettarif": 0.054, "systemtarif": 0.09, "elafgift": 0.01},
+        "tariffs": {str(hour): 1.17 if 17 <= hour <= 20 else 0.39 for hour in range(24)},
+    }
+    rows = [{"hour": start, "price": 2.5} for start in _starts(TODAY)]
+    sell = {"raw_today": rows, "tomorrow_valid": False}
+    if sell_tariffs:
+        sell["tariffs"] = tariffs
+    _load(provider, {"sensor.eds_buy": {"raw_today": rows, "tomorrow_valid": False, "tariffs": tariffs}, "sensor.eds_sell": sell})
+    return provider
+
+
+def test_raw_energi_data_service_sell_price_gets_the_selling_costs_from_the_buy_sensor() -> None:
+    """The sell sensor without tariffs is the spot price: only fee, net and system tariff are subtracted."""
+    timestamp = datetime.datetime.combine(TODAY, datetime.time(17))
+    raw = _eds_provider(False)
+    assert raw.sell_real_prices[timestamp] == pytest.approx(round(2.5 - 0.03 - 0.054 - 0.09, 2), abs=1e-9)
+    assert raw.sell_price_details[timestamp]["sell_tariffs"] == pytest.approx(0.03 + 0.054 + 0.09)
+    # with tariffs in the sell sensor they are subtracted, plus the selling costs
+    with_tariffs = _eds_provider(True)
+    assert with_tariffs.sell_real_prices[timestamp] == pytest.approx(round(2.5 - 1.324 - 0.03 - 0.054 - 0.09, 2), abs=1e-9)
+
+
+def test_energi_data_service_without_any_tariffs_sells_for_the_price_less_the_fee() -> None:
+    """One sensor for buying and selling with the tariffs switched off: nothing to subtract but the sell fee."""
+    provider = EnergiDataServicePriceProvider(_config(energidataservice_buy_entity_id="sensor.eds", sell_fee=0.03))
+    rows = [{"hour": start, "price": 2.5} for start in _starts(TODAY)]
+    _load(provider, {"sensor.eds": {"raw_today": rows, "tomorrow_valid": False}})
+    assert provider.sell_real_prices[datetime.datetime.combine(TODAY, datetime.time(17))] == pytest.approx(2.47)
+
+
+@pytest.mark.parametrize("day", [TODAY, TOMORROW])
+def test_quarter_hour_sell_prices_use_the_hourly_distribution_tariff(day: datetime.date) -> None:
+    """Every 15 minutes of an hour get that hour's distribution tariff, also tomorrow's (from today's periods)."""
+    provider = _stromligning(quarter=True)
+    for hour, minute in ((3, 15), (17, 0), (17, 45), (21, 30)):
+        timestamp = datetime.datetime.combine(day, datetime.time(hour, minute))
+        assert provider.sell_real_prices[timestamp] == pytest.approx(round(SPOT[day] - 0.03 - 0.043 - 0.072, 2), abs=1e-9)
+
+
+@pytest.mark.parametrize(("fixed", "sign"), [(-1.0, -1.0), (1.0, 1.0)], ids=["hourly sell price", "fixed solar sell price"])
+def test_forecast_adder_makes_a_forecast_buy_dearer_and_a_forecast_sale_worth_less(fixed: float, sign: float) -> None:
+    """A forecast price gets 1/30 per day ahead to prefer known prices: buying costs more, selling earns less
+    (with a fixed solar sell price a sold kWh is worth fixed - hourly, so there the hourly price goes up)."""
+    forecast_day = TODAY + datetime.timedelta(days=2)
+    timestamp = datetime.datetime.combine(forecast_day, datetime.time(12))
+    provider = StromligningPriceProvider(_config(**{
+        "stromligning_buy_current_price": "sensor.buy",
+        "stromligning_buy_forecasts": "sensor.buy_forecast",
+        "stromligning_sell_forecasts": "sensor.sell_forecast",
+        "sell_fee": 0.03,
+        "solar_sell_fixed_price": fixed,
+    }))
+    _load(provider, {
+        "sensor.buy": {"prices": _rows(TODAY, lambda hour: 4.0)},
+        "sensor.buy_forecast": {"prices": _rows(forecast_day, lambda hour: 1.5)},
+        "sensor.sell_forecast": {"prices": _rows(forecast_day, lambda hour: 1.5)},
+    })
+    assert provider.buy_forecast_prices[timestamp] == pytest.approx(1.5 + 2 / 30)
+    assert provider.sell_forecast_prices[timestamp] == pytest.approx(round(1.5 + sign * 2 / 30 - 0.03, 2), abs=1e-9)
+
+
+@pytest.mark.parametrize(("fixed", "sign"), [(-1.0, -1.0), (1.0, 1.0)], ids=["hourly sell price", "fixed solar sell price"])
+def test_forecast_in_the_tomorrow_entity_gets_the_same_adder(fixed: float, sign: float) -> None:
+    """Strømligning's tomorrow entity holds forecasts (forecast_data) until the real prices are published."""
+    tomorrow = TODAY + datetime.timedelta(days=1)
+    timestamp = datetime.datetime.combine(tomorrow, datetime.time(12))
+    provider = StromligningPriceProvider(_config(**{
+        "stromligning_buy_current_price": "sensor.buy",
+        "stromligning_buy_tomorrow_available": "binary_sensor.buy_tomorrow",
+        "stromligning_sell_tomorrow_available": "binary_sensor.sell_tomorrow",
+        "sell_fee": 0.03,
+        "solar_sell_fixed_price": fixed,
+    }))
+    forecast = {"forecast_data": True, "prices": _rows(tomorrow, lambda hour: 1.5)}
+    _load(provider, {
+        "sensor.buy": {"prices": _rows(TODAY, lambda hour: 4.0)},
+        "binary_sensor.buy_tomorrow": forecast,
+        "binary_sensor.sell_tomorrow": forecast,
+    })
+    assert provider.buy_forecast_prices[timestamp] == pytest.approx(1.5 + 1 / 30)
+    assert provider.sell_forecast_prices[timestamp] == pytest.approx(round(1.5 + sign / 30 - 0.03, 2), abs=1e-9)
+
+
+@pytest.mark.parametrize(("production_price", "sign"), [(-1, -1.0), (-1.0, -1.0), ("-1", -1.0), (0.85, 1.0), ("0.85", 1.0), (0, 1.0), ("", -1.0), (None, -1.0)])
+def test_sell_adder_sign_reads_the_fixed_solar_sell_price(production_price, sign: float) -> None:
+    """-1 = no fixed price; anything that isn't a number counts as no fixed price (the buy prices must still work)."""
+    assert sell_adder_sign({"solar": {"production_price": production_price}}) == sign
+
+
+@pytest.mark.parametrize(("fixed", "sign"), [(-1.0, -1.0), (1.0, 1.0)], ids=["hourly sell price", "fixed solar sell price"])
+def test_combined_sell_forecast_without_the_adder(fixed: float, sign: float) -> None:
+    """adder=False removes the penalty with the sign it was added with."""
+    forecast_day = TODAY + datetime.timedelta(days=2)
+    timestamp = datetime.datetime.combine(forecast_day, datetime.time(12))
+    provider = create_price_provider(build_config({
+        **default_options(),
+        "energidataservice_buy_entity_id": "sensor.eds",
+        "energidataservice_sell_entity_id": "sensor.eds_sell",
+        "sell_fee": 0.0,
+        "solar_sell_fixed_price": fixed,
+    }))
+    eds = {
+        "raw_today": [{"hour": start, "price": 3.0} for start in _starts(TODAY)],
+        "forecast": [{"hour": start, "price": 1.5} for start in _starts(forecast_day)],
+    }
+    states = {"sensor.eds": _State("3.0", eds), "sensor.eds_sell": _State("3.0", eds)}
+    provider.set_now(datetime.datetime.combine(TODAY, datetime.time(10, 30)))
+    provider.set_snapshot(provider.snapshot(states.get))
+    with_adder = provider.get_sell_forecast_prices()[timestamp]
+    without = provider.get_sell_forecast_prices(adder=False)[timestamp]
+    assert with_adder == pytest.approx(1.5 + sign * 2 / 30, abs=0.006)
+    assert without == pytest.approx(1.5, abs=0.011)

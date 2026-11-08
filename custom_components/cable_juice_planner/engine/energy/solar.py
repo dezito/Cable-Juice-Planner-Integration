@@ -373,7 +373,11 @@ class EnergySolar:
                 surcharge = details.get("surcharge", 0.0)
                 tariff_sum = details.get("tariff_sum", 0.0)
                 raw_price = details.get("raw_price", price)
-                sell_tariffs = details.get("sell_tariffs", solar_sell_price - raw_price)
+                # what selling costs (fee + net + system tariff), subtracted from the raw price; the details of an
+                # offline price (no provider details) don't have it
+                sell_tariffs = details.get("sell_tariffs", 0.0)
+                sell_nettarif = details.get("sell_transmissions_nettarif", transmissions_nettarif)
+                sell_systemtarif = details.get("sell_systemtarif", systemtarif)
                 key = "kwh_cost_price"
                 for item in (
                     "price", "price_timestamp", "transmissions_nettarif", "systemtarif", "elafgift", "tariffs", "surcharge", "tariff_sum",
@@ -392,8 +396,8 @@ class EnergySolar:
                 self.set_attr(key, "tariff_sum", f"{tariff_sum:.3f} {valuta_kwh}")
                 self.set_attr(key, "raw_price", f"{raw_price:.3f} {valuta_kwh}")
                 self.set_attr(key, "sell_tariffs_overview", "")
-                self.set_attr(key, "transmissions_nettarif_", f"{transmissions_nettarif:.3f} {valuta_kwh}")
-                self.set_attr(key, "systemtarif_", f"{systemtarif:.3f} {valuta_kwh}")
+                self.set_attr(key, "transmissions_nettarif_", f"{sell_nettarif:.3f} {valuta_kwh}")
+                self.set_attr(key, "systemtarif_", f"{sell_systemtarif:.3f} {valuta_kwh}")
                 if "sell_fee" in details:
                     self.set_attr(key, "sell_fee", f"{details['sell_fee']:.3f} {valuta_kwh}")
                 self.set_attr(key, "sell_tariffs", f"{sell_tariffs:.3f} {valuta_kwh}")
@@ -409,8 +413,8 @@ class EnergySolar:
                     "tariff_sum": round(tariff_sum, 3),
                     "raw_price": round(raw_price, 3),
                     "sell_tariffs_overview": "",
-                    "transmissions_nettarif_": round(transmissions_nettarif, 3),
-                    "systemtarif_": round(systemtarif, 3),
+                    "transmissions_nettarif_": round(sell_nettarif, 3),
+                    "systemtarif_": round(sell_systemtarif, 3),
                     "sell_tariffs": round(sell_tariffs, 3),
                     "solar_sell_price": round(solar_sell_price, 3),
                 }

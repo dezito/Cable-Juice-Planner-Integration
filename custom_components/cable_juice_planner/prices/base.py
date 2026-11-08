@@ -35,6 +35,20 @@ _ZERO_TARIFFS = {
 GetState = Callable[[str], Any]
 
 
+def sell_adder_sign(config: dict) -> float:
+    """+1 or -1: how the forecast adder moves a SELL price so that a sale is worth less.
+
+    A sold kWh is worth the hourly sell price, so a forecast sell price gets the adder subtracted (-1). With a
+    fixed solar sell price (production_price != -1) it is worth fixed price minus the hourly price, so the
+    hourly price has to be raised (+1) to make the sale worth less.
+    """
+    try:
+        return 1.0 if float(config["solar"]["production_price"]) != -1.0 else -1.0
+    except (TypeError, ValueError):
+        # not a number: like the default (-1, no fixed price), so the buy prices still work
+        return -1.0
+
+
 def _naive(timestamp):
     return timestamp.replace(tzinfo=None) if isinstance(timestamp, datetime.datetime) else timestamp
 
@@ -49,6 +63,7 @@ class BasePriceProvider:
         self.entity_ids = dict(prices_config.get("entity_ids", {}))
         self.refund = abs(prices_config.get("refund", 0.0))
         self.sell_fee = abs(prices_config.get("sell_fee", 0.0))
+        self.sell_adder_sign = sell_adder_sign(config)
         self.buy_real_prices: dict = {}
         self.buy_forecast_prices: dict = {}
         self.sell_real_prices: dict = {}
@@ -128,12 +143,28 @@ class BasePriceProvider:
     def get_tariffs(self, hour, day_of_week, timestamp=None) -> dict:
         raise NotImplementedError
 
+    def _forecast_adder(self, timestamp, sell: bool = False) -> float:
+        """Forecast prices get a small penalty per day ahead to prefer known prices.
+
+        A forecast buy price is dearer, and a sale at a forecast sell price is worth less (sell_adder_sign)."""
+        adder = days_between(reset_time_to_hour(self.now), timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+        return adder * self.sell_adder_sign if sell else adder
+
+    def get_sell_costs(self, hour, day_of_week, timestamp=None) -> dict | None:
+        """The net and system tariff paid when selling, None = those of get_tariffs()
+        (a raw sell price includes no tariffs, but selling still costs these)."""
+        return None
+
     def calculate_sell_price(self, timestamp, price) -> float:
+        """Sell price: every tariff, tax and surcharge in the price is subtracted (leaving the spot
+        price), and then what selling a kWh costs: the sell fee plus Energinet's net and system tariff."""
         timestamp = _naive(timestamp)
         tariff = self.get_tariffs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
+        sell_costs = self.get_sell_costs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
+        costs = tariff if sell_costs is None else sell_costs
         raw_price = price - tariff["tariff_sum"]
-        sell_tariffs = sum((self.sell_fee, tariff["transmissions_nettarif"], tariff["systemtarif"]))
-        sell_price = round(raw_price + sell_tariffs, 2)
+        sell_tariffs = sum((self.sell_fee, costs["transmissions_nettarif"], costs["systemtarif"]))
+        sell_price = round(raw_price - sell_tariffs, 2)
         self.sell_price_details[timestamp] = {
             "price": price,
             "price_timestamp": timestamp,
@@ -145,6 +176,8 @@ class BasePriceProvider:
             "tariff_sum": tariff["tariff_sum"],
             "raw_price": raw_price,
             "sell_fee": self.sell_fee,
+            "sell_transmissions_nettarif": costs["transmissions_nettarif"],
+            "sell_systemtarif": costs["systemtarif"],
             "sell_tariffs": sell_tariffs,
             "solar_sell_price": sell_price,
         }
@@ -305,16 +338,17 @@ class CombinedPriceProvider(BasePriceProvider):
         """The forecast buy prices; adder=False without the penalty per day ahead the providers
         add to prefer known prices."""
         self._sync_prices()
-        return self._forecast(self.buy_prices, self.buy_price_sources, adder)
+        return self._forecast(self.buy_prices, self.buy_price_sources, adder, 1.0)
 
     def get_sell_forecast_prices(self, adder: bool = True) -> dict:
+        """The forecast sell prices; adder=False without the penalty (which makes a sale worth less)."""
         self._sync_prices()
-        return self._forecast(self.sell_prices, self.sell_price_sources, adder)
+        return self._forecast(self.sell_prices, self.sell_price_sources, adder, self.sell_adder_sign)
 
-    def _forecast(self, prices: dict, sources: dict, adder: bool) -> dict:
+    def _forecast(self, prices: dict, sources: dict, adder: bool, sign: float) -> dict:
         current_hour = reset_time_to_hour(self.now)
         return {
-            timestamp: price if adder else price - days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+            timestamp: price if adder else price - sign * days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
             for timestamp, price in prices.items()
             if str(sources.get(timestamp, "")).endswith(":forecast")
         }

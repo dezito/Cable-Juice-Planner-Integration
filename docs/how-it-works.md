@@ -43,8 +43,15 @@ used alone. The surplus the car can use is subtracted from what has to be bought
 Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
 solar surplus.
 
+**Sell price:** the spot price less what selling a kWh costs. Every tariff, tax and surcharge in the sell
+price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings) plus Energinet's net tariff
+and system tariff. A sell sensor from Energi Data Service without tariffs is already the spot price, so its
+net and system tariff come from the buy sensor.
+
 **Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
-prices. With the switch *Correct the price forecast* on (default, *Settings → Advanced*), they are also corrected with how far off the
+prices: a forecast buy price is raised and a forecast sell price lowered (a sale is worth less; with a
+[fixed solar sell price](rules/solar.md#fixed-solar-sell-price) the hourly price is raised instead, as the
+sale is worth fixed price − hourly price). With the switch *Correct the price forecast* on (default, *Settings → Advanced*), they are also corrected with how far off the
 forecast was the last 30 days for that day ahead: if the forecast 2 days ahead was 0.15 kr too high on
 average, the plan subtracts 0.15 kr. A day ahead is only corrected after 7 days of measurements, and by at
 most ±0.50 kr. The [price forecast analysis](dashboard-analysis.md#price-forecast) shows the measurements

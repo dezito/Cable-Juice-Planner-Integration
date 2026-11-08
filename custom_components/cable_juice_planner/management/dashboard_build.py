@@ -374,6 +374,8 @@ def render_dashboard(
     if not is_ev_configured(config):
         template = _drop_sections(template, EV_SECTIONS)
     texts = load_texts(normalize_language(config.get("language")), currency, distance)
+    # the sell price chart subtracts the same sell fee as the planner
+    texts["dashboard.sell_fee_value"] = f"{abs(float(config['prices'].get('sell_fee', 0.0))):g}"
     template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 

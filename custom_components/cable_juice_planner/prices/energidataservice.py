@@ -4,7 +4,6 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
 from ..utils.helpers import days_between, reset_time_to_hour, to_datetime
 from .base import BasePriceProvider, _ZERO_TARIFFS, _naive
 
@@ -38,7 +37,7 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         return prices
 
     def _load_sell_forecast_prices(self):
-        prices = self._get_forecast_prices(self.sell_entity_id)
+        prices = self._get_forecast_prices(self.sell_entity_id, sell=True)
         for timestamp, price in prices.items():
             prices[timestamp] = self.calculate_sell_price(timestamp, price)
         return prices
@@ -61,14 +60,14 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
             prices.update(self._rows(attr.get("raw_tomorrow", [])))
         return dict(sorted(prices.items()))
 
-    def _get_forecast_prices(self, entity_id) -> dict:
+    def _get_forecast_prices(self, entity_id, sell=False) -> dict:
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
         prices = {}
         for timestamp, price in self._rows(self._get_entity_attr(entity_id).get("forecast", [])):
             if days_between(current_hour, timestamp) > 0:
-                prices[timestamp] = price + days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+                prices[timestamp] = price + self._forecast_adder(timestamp, sell)
         return dict(sorted(prices.items()))
 
     def get_tariffs(self, hour, day_of_week, timestamp=None) -> dict:
@@ -92,3 +91,22 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("get_tariffs(hour = %s, day_of_week = %s): %s", hour, day_of_week, err)
             return dict(_ZERO_TARIFFS)
+
+    def get_sell_costs(self, hour, day_of_week, timestamp=None) -> dict | None:
+        """A raw sell sensor (no tariffs attribute) includes no tariffs, but selling still costs
+        Energinet's net and system tariff: those of the buy sensor."""
+        if self._get_entity_attr(self.sell_entity_id).get("tariffs"):
+            return None
+        return eds_sell_costs(self._get_entity_attr(self.buy_entity_id))
+
+
+def eds_sell_costs(attributes: dict | None) -> dict[str, float] | None:
+    """Energinet's net and system tariff from an Energi Data Service tariffs attribute, else None."""
+    try:
+        additional = (attributes or {})["tariffs"]["additional_tariffs"]
+        return {
+            "transmissions_nettarif": float(additional["transmissions_nettarif"]),
+            "systemtarif": float(additional["systemtarif"]),
+        }
+    except (KeyError, TypeError, ValueError):
+        return None

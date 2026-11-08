@@ -175,7 +175,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, tariffs and taxes are subtracted and the distribution/system tariff and the sell fee are added. Leave a field empty to use 0.",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
@@ -583,7 +583,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, tariffs and taxes are subtracted and the distribution/system tariff and the sell fee are added. Leave a field empty to use 0.",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
