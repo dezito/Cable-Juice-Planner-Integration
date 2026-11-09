@@ -4,6 +4,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import yaml
+from jinja2 import Environment
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
 
@@ -276,11 +277,75 @@ def test_settings_read_more_includes_each_help_group() -> None:
     assert "state_attr('switch.cjp_tesla_cheap_grid_charging', 'help')" in cheap_help
     assert "state_attr('sensor.cjp_tesla_charge_very_cheap_battery_level', 'help')" in cheap_help
     assert "{{ ns.limits_help }}" in cheap_help and "{{ ns.targets_help }}" in cheap_help
+    learn_help = next(content for content in contents if "learn_help" in content)
+    assert "state_attr('switch.cjp_tesla_learn_driving_distance', 'help')" in learn_help
+    assert "ns.learn_help" in learn_help
     # solar and the home battery each have their own section and their own read more
     assert "state_attr('switch.cjp_tesla_solar_charging', 'help')" in solar_help
     assert "powerwall" not in solar_help
     assert "state_attr('number.cjp_tesla_ev_charge_after_powerwall_battery_level', 'help')" in powerwall_help
     assert "solar_charging" not in powerwall_help
+
+
+def test_learned_distance_switch_is_under_advanced_settings() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    switch = "switch.cjp_tesla_learn_driving_distance"
+
+    for language in ("da", "de", "en", "en-GB", "pl", "uk"):
+        sections = _settings_sections({**OPTIONS, "language": language}, existing)
+        workplan = next(ids for ids in sections.values() if "switch.cjp_tesla_workplan_charging" in ids)
+        advanced = next(ids for ids in sections.values() if "select.cjp_tesla_forecast_type" in ids)
+
+        assert switch not in workplan, language
+        assert switch in advanced, language
+        text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
+        assert "@@" not in text, language
+        settings = yaml.safe_load(text)["views"][1]
+        rows = next(
+            card["entities"] for card in _cards(settings)
+            if card.get("type") == "entities"
+            and any(row.get("entity") == "select.cjp_tesla_forecast_type" for row in card["entities"])
+        )
+        actual_order = [
+            row.get("entity", ("section", row.get("label")))
+            for row in rows
+        ]
+        assert actual_order == [
+            switch,
+            ("section", None),
+            "switch.cjp_tesla_auto_forecast_type",
+            "select.cjp_tesla_forecast_type",
+            ("section", None),
+            "switch.cjp_tesla_price_forecast_correction",
+        ], language
+        assert "learned_distance" not in load_texts(language, "GBP", "km")["entity_help.workplan"], language
+
+        read_more = next(content for content in _cards(settings) if content.get("type") == "markdown" and "learn_help" in content.get("content", ""))["content"]
+        attributes = {
+            ("switch.cjp_tesla_learn_driving_distance", "help"): "learn-help",
+            ("switch.cjp_tesla_auto_forecast_type", "help"): "forecast-help",
+            ("select.cjp_tesla_forecast_type", "description"): "forecast-type-description",
+            ("switch.cjp_tesla_price_forecast_correction", "help"): "price-help",
+        }
+        rendered_read_more = Environment().from_string(read_more).render(
+            state_attr=lambda entity, attribute: attributes.get((entity, attribute))
+        )
+        ordered_sections = (
+            "learn-help",
+            "---",
+            "forecast-help",
+            "forecast-type-description",
+            "---",
+            "price-help",
+        )
+        section_positions = []
+        cursor = 0
+        for section in ordered_sections:
+            position = rendered_read_more.index(section, cursor)
+            section_positions.append(position)
+            cursor = position + len(section)
+        assert section_positions == sorted(section_positions), language
+        assert rendered_read_more.count("---") == 2, language
 
 
 def _settings_sections(options: dict, existing: set[str]) -> dict[str, list[str]]:
