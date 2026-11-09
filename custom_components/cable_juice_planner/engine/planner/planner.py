@@ -21,7 +21,6 @@ from ...utils.helpers import (
     date_to_string,
     day_of_week_text,
     days_between,
-    hours_between,
     in_between,
     minutes_between,
     reset_datetime,
@@ -164,6 +163,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 "work_battery_level_needed": 0.0,
                 "work_kwh_needed": 0.0,
                 "work_goto": None,
+                "work_departure": None,
                 "work_homecoming": None,
                 "work_away": False,
                 "work_last_charging": None,
@@ -186,11 +186,18 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             if self.workplan_charging_enabled() and self.switch_state(f"workday_{day_text}") == "on":
                 work_goto = end_of_day_datetime.replace(hour=self.setting(f'workday_departure_{day_text}').hour, minute=self.setting(f'workday_departure_{day_text}').minute, second=0)
 
-                diff = minutes_between(now, work_goto)
-                if day == 0 and self.ready_to_charge() and in_between(diff, CHARGING_ALLOWED_AFTER_GOTO_TIME, 0):
-                    work_goto = work_goto + datetime.timedelta(hours=1)
-
+                work_departure = work_goto  # the departure as set, before it is moved for a car that is still plugged in
                 work_homecoming = end_of_day_datetime.replace(hour=self.setting(f'workday_homecoming_{day_text}').hour, minute=self.setting(f'workday_homecoming_{day_text}').minute, second=0)
+
+                diff = minutes_between(now, work_goto)
+                # from the departure minute itself (diff 0) up to the allowed time after it
+                if day == 0 and self.ready_to_charge() and in_between(diff, CHARGING_ALLOWED_AFTER_GOTO_TIME, 1):
+                    # still plugged in at home after the departure and the target is not reached: keep charging
+                    # until the allowed time after the departure has passed (the need is the same, so nothing is
+                    # planned once the car has the level). Never up to or past the homecoming (the window between the
+                    # departure and the homecoming would be upside down), so a short trip gives a shorter extension.
+                    moved = min(work_goto + datetime.timedelta(minutes=-CHARGING_ALLOWED_AFTER_GOTO_TIME), work_homecoming - datetime.timedelta(minutes=1))
+                    work_goto = max(work_goto, moved)
                 # away from home on today's workday: the way there is already driven (in the battery level),
                 # only the way back (half the distance) is left
                 away_on_workday = day == 0 and now < work_homecoming and not self.is_ev_home()
@@ -203,13 +210,11 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                     charging_plan[day]['workday'] = True
 
                     charging_plan[day]['work_goto'] = work_goto
+                    charging_plan[day]['work_departure'] = work_departure
                     charging_plan[day]['work_homecoming'] = work_homecoming
                     charging_plan[day]['work_away'] = away_on_workday
 
-                    hour_buffer = int(self.config['ev_car']['last_charging_hour_before_departure_buffer']) if isinstance(self.config['ev_car']['last_charging_hour_before_departure_buffer'], (float, int)) else 2
-                    hours_before = max(1, min(hour_buffer, hours_between(now, charging_plan[day]['work_goto'])))
-
-                    charging_plan[day]['work_last_charging'] = reset_time_to_hour(work_goto) - datetime.timedelta(hours=hours_before)
+                    charging_plan[day]['work_last_charging'] = self.last_charging_hour(work_goto)
 
                     charging_plan[day]['work_range_needed'] = self.get_entity_daily_distance(day_text = day_text)
                     if away_on_workday:
@@ -233,13 +238,13 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 charging_plan[day]['trip_homecoming'] = trip_homecoming_date_time
 
                 diff = minutes_between(now, charging_plan[day]['trip_goto'])
-                if day == 0 and self.ready_to_charge() and in_between(diff, CHARGING_ALLOWED_AFTER_GOTO_TIME, 0):
-                    charging_plan[day]['trip_goto'] = charging_plan[day]['trip_goto'] + datetime.timedelta(hours=1)
+                if day == 0 and self.ready_to_charge() and in_between(diff, CHARGING_ALLOWED_AFTER_GOTO_TIME, 1):
+                    moved = charging_plan[day]['trip_goto'] + datetime.timedelta(minutes=-CHARGING_ALLOWED_AFTER_GOTO_TIME)
+                    if trip_homecoming_date_time:
+                        moved = min(moved, trip_homecoming_date_time - datetime.timedelta(minutes=1))
+                    charging_plan[day]['trip_goto'] = max(charging_plan[day]['trip_goto'], moved)
 
-                hour_buffer = int(self.config['ev_car']['last_charging_hour_before_departure_buffer']) if isinstance(self.config['ev_car']['last_charging_hour_before_departure_buffer'], (float, int)) else 2
-                hours_before = max(1, min(hour_buffer, hours_between(now, charging_plan[day]['trip_goto'])))
-
-                charging_plan[day]['trip_last_charging'] = reset_time_to_hour(charging_plan[day]['trip_goto']) - datetime.timedelta(hours=hours_before)
+                charging_plan[day]['trip_last_charging'] = self.last_charging_hour(charging_plan[day]['trip_goto'])
                 charging_plan[day]['rules'].append("trip")
 
                 if trip_range:
@@ -264,8 +269,25 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                         charging_plan[day]['trip_last_charging'] = max(charging_plan[day]['work_last_charging'], self.current_hour())
                         last_charging = charging_plan[day]['trip_last_charging']
 
-                    for i in range(charging_hours):
-                        timestamp = last_charging - datetime.timedelta(hours=i)
+                    # back from the last charging hour, never before the current hour; if that is not enough hours
+                    # (the car is inside the buffer) the missing ones are the hours after it, up to the departure
+                    # (not in the hours the car is at work on the same day)
+                    def car_is_at_work(moment):
+                        return bool(charging_plan[day]['workday']) and in_between(moment, charging_plan[day]['work_goto'], charging_plan[day]['work_homecoming'])
+
+                    slots = []
+                    slot = last_charging
+                    while len(slots) < charging_hours and slot >= self.current_hour():
+                        if not car_is_at_work(slot):
+                            slots.append(slot)
+                        slot -= datetime.timedelta(hours=1)
+                    slot = last_charging + datetime.timedelta(hours=1)
+                    while len(slots) < charging_hours and slot < reset_time_to_hour(charging_plan[day]['trip_goto']):
+                        if not car_is_at_work(slot):
+                            slots.append(slot)
+                        slot += datetime.timedelta(hours=1)
+
+                    for timestamp in slots:
 
                         try:
                             hour_in_chargeHours, kwh_available = self.kwh_available_in_hour(chargeHours, timestamp)

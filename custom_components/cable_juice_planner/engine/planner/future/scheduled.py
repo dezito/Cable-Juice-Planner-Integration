@@ -152,8 +152,10 @@ class FutureScheduled:
 
                 if kwh_needed_today > 0.0 and self.kwh_to_percentage(kwh_needed_today, include_charging_loss = True) > 0.0:
                     _LOGGER.warning(f"Not enought charging planned for day {day} kwh_needed_today {kwh_needed_today}kWh, using all available hours until {next_departure} to fullfill needed kWh")
-                    for i in range(hours_between(ctx.current_hour, next_departure), 0, -1):
-                        timestamp = next_departure - datetime.timedelta(hours=i)
+                    # whole hours up to the departure hour (a departure at 07:30 is not allowed to book :30 slots on top of the hours)
+                    departure_hour = reset_time_to_hour(next_departure)
+                    for i in range(hours_between(ctx.current_hour, departure_hour), 0, -1):
+                        timestamp = departure_hour - datetime.timedelta(hours=i)
                         hour_in_chargeHours, kwh_available = self.kwh_available_in_hour(ctx.chargeHours, timestamp)
                         if hour_in_chargeHours and not kwh_available:
                             continue

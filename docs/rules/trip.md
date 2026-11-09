@@ -17,8 +17,8 @@ For a longer drive outside the normal pattern.
 3. Optionally turn on **Trip preheat**.
 
 The trip is planned automatically once these are set. What the trip needs is charged in the cheapest hours
-before departure. Charging between the max. recommended charge limit and 100 % happens **just before
-departure**, so the battery doesn't stand full for long.
+before departure. Charging between the max. recommended charge limit and 100 % happens in the **last hours
+before departure** (done *Hours before departure* before it), so the battery doesn't stand full for long.
 
 The **trip arrival battery level** (default 25 %) is the level the car must still have at homecoming from the
 trip.
@@ -26,6 +26,10 @@ trip.
 ## After the trip
 
 The trip is reset automatically 2 hours after departure. **Reset trip charging** clears it at once.
+
+If the car is still plugged in at home after the departure and hasn't reached the trip's level, it keeps
+charging for up to 2 hours after the departure (the trip is reset then), but not past the planned homecoming. The charging before departure is done *Hours before departure* before it, see
+[the buffer before departure](workplan.md#the-buffer-before-departure).
 
 ## Together with other rules
 

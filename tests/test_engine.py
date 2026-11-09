@@ -1192,6 +1192,159 @@ def test_no_hour_is_planned_without_a_price(caplog: pytest.LogCaptureFixture) ->
     assert not charge_hours(engine)
 
 
+def _workday_engine(
+    now_time: datetime.time,
+    *,
+    buffer: int = 2,
+    level: float = 25.0,
+    km: float = 60.0,
+    departure: datetime.time = datetime.time(7, 0),
+    prices: dict[int, float] | None = None,
+    settings: dict | None = None,
+) -> tuple[CJPEngine, object]:
+    """Work plan on DAY (a Thursday), planned at `now_time`, car plugged in at home.
+
+    prices: price per hour of DAY for the hours given, every other hour costs 2.0."""
+    now = datetime.datetime.combine(DAY, now_time)
+    settings = {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "workday_departure_thursday": departure,
+        "workday_distance_needed_thursday": km,
+        **(settings or {}),
+    }
+    snap = snapshot(now, level=level, settings=settings, **PLUGGED_IN)
+    if prices is not None:
+        snap.price_data["attributes"]["sensor.price"]["raw_today"] = [
+            {"hour": datetime.datetime.combine(DAY, datetime.time(hour), tzinfo=TZ).isoformat(), "price": prices.get(hour, 2.0)} for hour in range(24)
+        ]
+    engine = CJPEngine(const.build_config({**OPTIONS, "last_charging_hour_before_departure_buffer": float(buffer)}), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    return engine, result
+
+
+@pytest.mark.parametrize("buffer", [0, 1, 2, 3])
+def test_charging_is_done_the_set_number_of_hours_before_departure(buffer: int) -> None:
+    """Departure 07:00: the last hour that is charged ends `buffer` hours before it, also when a later hour is cheaper."""
+    engine, _ = _workday_engine(datetime.time(1, 30), buffer=buffer, prices={6: 0.1, 5: 0.2, 4: 0.3})
+    departure = datetime.datetime.combine(DAY, datetime.time(7))
+    # the hours planned for this departure (the evening's charging to the daily level has its own hours)
+    hours = [timestamp for timestamp in charge_hours(engine) if engine.charge_hours[timestamp].get("first_workday_preparation")]
+    assert hours
+    assert max(hours) + datetime.timedelta(hours=1) <= departure - datetime.timedelta(hours=buffer)
+    # the cheapest hour that is still allowed is used
+    cheapest_allowed = datetime.datetime.combine(DAY, datetime.time(6 - buffer)) if buffer <= 2 else None
+    assert cheapest_allowed is None or cheapest_allowed in hours
+
+
+@pytest.mark.parametrize(
+    ("now_time", "action"),
+    [(datetime.time(7, 30), "charge"), (datetime.time(8, 30), "charge"), (datetime.time(9, 30), "stop")],
+    ids=["30 min after departure", "90 min after departure", "150 min after departure"],
+)
+def test_charging_continues_up_to_2_hours_after_departure_when_the_target_is_not_reached(now_time: datetime.time, action: str) -> None:
+    """The car is still plugged in at home after its departure and is below what the day needs: it keeps charging for 2 hours."""
+    engine, _ = _workday_engine(now_time, level=20, km=150)
+    assert engine.charger_action == action
+
+
+@pytest.mark.parametrize("hour", [7, 8], ids=["30 min after", "90 min after"])
+def test_trip_charging_continues_up_to_2_hours_after_departure(hour: int) -> None:
+    """Trip departure 07:00 today, the car is still plugged in at home and below the trip's target (run() plans at :30).
+
+    The trip is reset 2 hours after the departure, so there is no later case."""
+    settings = {
+        "trip_date_time": datetime.datetime.combine(DAY, datetime.time(7)),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(18)),
+        "trip_charge_procent": 80.0,
+    }
+    engine, _ = run(hour, level=30, settings=settings, **PLUGGED_IN)
+    assert engine.charger_action == "charge"
+
+
+def test_charging_does_not_stop_in_the_departure_minute() -> None:
+    """At 07:00 sharp (the cron runs at whole minutes) the car is still plugged in and below its level: it keeps charging."""
+    for now_time in (datetime.time(6, 55), datetime.time(7, 0), datetime.time(7, 5)):
+        engine, _ = _workday_engine(now_time, level=20, km=150)
+        assert engine.charger_action == "charge", now_time
+
+
+def test_a_trip_above_the_max_level_is_never_charged_in_hours_that_have_passed() -> None:
+    """Trip at 09:00 to 100 % with the max level at 60 %, planned at 06:30 (inside the 2 hour buffer): only hours from now on."""
+    settings = {
+        "trip_date_time": datetime.datetime.combine(DAY, datetime.time(9)),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(18)),
+        "trip_charge_procent": 100.0,
+        "max_recommended_charge_limit_battery_level": 60.0,
+    }
+    engine, _ = run(6, level=40, settings=settings, **PLUGGED_IN)
+    trip_hours = [timestamp for timestamp in charge_hours(engine) if engine.charge_hours[timestamp].get("trip")]
+    assert trip_hours
+    assert min(trip_hours) >= datetime.datetime.combine(DAY, datetime.time(6)), trip_hours
+    # the hours inside the buffer are used, up to the departure hour
+    assert max(trip_hours) < datetime.datetime.combine(DAY, datetime.time(9)), trip_hours
+
+
+def test_a_short_workday_gives_a_shorter_extension_after_the_departure() -> None:
+    """Departure 07:00, homecoming 08:30: the extension stops before the homecoming, it is not dropped."""
+    settings = {"workday_homecoming_thursday": datetime.time(8, 30)}
+    for now_time in (datetime.time(7, 30), datetime.time(8, 15)):
+        engine, _ = _workday_engine(now_time, level=20, km=150, settings=settings)
+        assert engine.charger_action == "charge", now_time
+        plan = engine.charging_plan[0]
+        assert plan["work_goto"] < plan["work_homecoming"]
+
+
+def test_a_trip_after_work_is_not_charged_while_the_car_is_at_work() -> None:
+    """Work 07:00-16:00 and a trip at 17:00 to 100 % (max level 60 %), planned at 05:30: no trip hour while the car is away."""
+    settings = {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "trip_date_time": datetime.datetime.combine(DAY, datetime.time(17)),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(21)),
+        "trip_charge_procent": 100.0,
+        "max_recommended_charge_limit_battery_level": 60.0,
+    }
+    engine, _ = run(5, level=40, settings=settings, **PLUGGED_IN)
+    trip_hours = [timestamp for timestamp in charge_hours(engine) if engine.charge_hours[timestamp].get("trip")]
+    assert trip_hours
+    at_work = [timestamp for timestamp in trip_hours if datetime.datetime.combine(DAY, datetime.time(7)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(16))]
+    assert not at_work, at_work
+
+
+def test_the_analysis_saves_one_departure_as_set_while_the_car_is_charged_after_it() -> None:
+    """The plan's goto moves up to 2 hours later for a car still plugged in; the analysis saves the set departure once, not a later one too."""
+    settings = {"workplan_charging": True, "workday_thursday": True, "workday_distance_needed_thursday": 150.0}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    for index, now_time in enumerate((datetime.time(6, 55), datetime.time(7, 5), datetime.time(9, 0))):
+        snap = snapshot(datetime.datetime.combine(DAY, now_time), level=20, settings=settings, **PLUGGED_IN)
+        if index == 0:
+            assert engine.run_job(snap, engine.startup, {}).error is None
+        assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+        assert engine.run_job(snap, engine.analysis_check_departure).error is None
+    departures = engine.analysis_db["departures"]
+    assert len(departures) == 1
+    assert departures[0]["departure"] == datetime.datetime.combine(DAY, datetime.time(7)).replace(tzinfo=TZ).timestamp()
+
+
+def test_no_charging_after_departure_when_the_target_is_reached() -> None:
+    engine, _ = _workday_engine(datetime.time(7, 30), level=90, km=60)
+    assert engine.charger_action == "stop"
+    assert not charge_hours(engine)
+
+
+@pytest.mark.parametrize("departure", [datetime.time(7, 0), datetime.time(7, 30)])
+def test_hours_added_when_charging_falls_short_stay_within_the_hour_capacity(departure: datetime.time) -> None:
+    """Also with a departure at 07:30 an hour is booked once: no slots at :30 on top of the whole hours (up to 16.5 kWh in one hour)."""
+    engine = _short_of_hours_engine(departure)
+    hours = [timestamp for timestamp in charge_hours(engine) if timestamp.date() == DAY]
+    assert hours
+    assert not [timestamp for timestamp in hours if timestamp.minute], hours
+    assert max(engine.charge_hours[timestamp]["kWh"] for timestamp in hours) <= MAX_WATT / 1000 + 0.01
+
+
 def _battery_level_with(state: str, history: list[tuple[float, str]], real: bool = False) -> float:
     """The planning level (real: the car's own level for measurements) when the car sensor says `state` and has had `history` (hours ago, state) before."""
     now = datetime.datetime.combine(DAY, datetime.time(12, 30))
