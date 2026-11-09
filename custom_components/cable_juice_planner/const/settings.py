@@ -27,6 +27,7 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     "calculate_charging_loss": {"default": False},
     # the plan uses the continuously measured charging loss instead of the configured one
     "use_measured_charging_loss": {"default": False, "requires": "ev"},
+    "learn_soc_charge_power": {"default": False, "requires": "ev"},
     "powerwall_discharge_above_needed": {"default": False, "requires": "powerwall_level"},
     # correct the price forecast with its measured bias (engine/analysis)
     "price_forecast_correction": {"default": True},
@@ -113,6 +114,7 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "last_full_charge": (None, "timestamp", None, None),
     # the measured charging loss at the max charging power, the model in the attributes
     "charging_loss_model": ("%", None, None, "ev"),
+    "soc_charging_power_model": (None, None, None, "ev"),
     # this month's saving compared with daily charging, the months in the attributes
     "economy": ("{valuta}", None, None, None),
     # the share of the last 30 departures with the required battery level, the analysis in the attributes

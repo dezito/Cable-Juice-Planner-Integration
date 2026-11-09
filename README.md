@@ -142,6 +142,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - **Use measured charging loss:** the plan uses the measured loss per hour at that hour's power instead of the
     configured one
   - a one-time measurement from low to full is still possible
+- **Learned charging power by SOC:** the plan can use stable measurements by SOC and phase to account for
+  lower charging power at higher battery levels; see [Analysis](docs/dashboard-analysis.md#charging-power-by-soc)
 - **[Learn driving distance](docs/learn-distance.md)**
   - the odometer is read every evening (missed evenings come from Home Assistant's statistics or history),
     and from the last 8 weeks CJP suggests the **km per workday** in the work plan
@@ -157,7 +159,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - planned the evening before against actually charged
   - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
   - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate; optionally the most accurate type is chosen automatically
-  - battery capacity over time, and the charging loss per power
+  - battery capacity over time, charging loss by power and learned charging power by SOC
 - **CO₂ emissions** and **kWh charged by solar**
 - **Very detailed charging history**
   - each charge: time, charging reason, percentage, kWh, price and price/kWh
@@ -171,7 +173,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   [When something goes wrong](docs/how-it-works.md#when-something-goes-wrong)
 - **[Ready-made dashboard](docs/dashboard-analysis.md)** in the sidebar, one per car, built from your setup
   - **Overview:** battery level forecast, prices with solar and the charging plan, status, trip, manual charging and history
-  - **Settings:** all charging rules, work plan per weekday, battery levels and charging loss, each with "Read more"
+  - **Settings:** all charging rules, work plan per weekday, battery levels, charging loss and the SOC-power option, each with "Read more"
   - **Analysis:** the analysis above plus the history of battery, charge limit, driving efficiency and solar
 - **Languages:** Danish, English, German, Polish and Ukrainian
 - **Does not run in Home Assistant's main thread:** all calculations run in the integration's own

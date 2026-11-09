@@ -1209,6 +1209,8 @@ def test_price_period_capacity_tracks_each_interval_and_current_time() -> None:
         hour_kwh_capacity=lambda _timestamp: MAX_WATT / 1000,
     )
     engine.price_period_end = lambda timestamp: ChargePlan.price_period_end(engine, timestamp)
+    engine.charge_plan_start = lambda timestamp: ChargePlan.charge_plan_start(engine, timestamp)
+    engine.period_charge_capacity = lambda timestamp, battery_level=None: ChargePlan.period_charge_capacity(engine, timestamp, battery_level)
 
     assert ChargePlan.period_kwh_capacity(engine, start) == pytest.approx(MAX_WATT / 1000 * 0.25)
     assert ChargePlan.period_kwh_capacity(engine, start + datetime.timedelta(minutes=15)) == pytest.approx(MAX_WATT / 1000 * 0.5)

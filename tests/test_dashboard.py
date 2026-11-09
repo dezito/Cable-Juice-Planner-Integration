@@ -298,6 +298,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
 
         assert switch not in workplan, language
         assert switch in advanced, language
+        assert "switch.cjp_tesla_learn_soc_charge_power" in advanced, language
         text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
         assert "@@" not in text, language
         settings = yaml.safe_load(text)["views"][1]
@@ -317,10 +318,14 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
             "select.cjp_tesla_forecast_type",
             ("section", None),
             "switch.cjp_tesla_price_forecast_correction",
+            ("section", None),
+            "switch.cjp_tesla_learn_soc_charge_power",
         ], language
         assert "learned_distance" not in load_texts(language, "GBP", "km")["entity_help.workplan"], language
 
         read_more = next(content for content in _cards(settings) if content.get("type") == "markdown" and "learn_help" in content.get("content", ""))["content"]
+        assert "state_attr('switch.cjp_tesla_learn_soc_charge_power', 'help')" in read_more, language
+        assert "ns.soc_power_help" in read_more, language
         attributes = {
             ("switch.cjp_tesla_learn_driving_distance", "help"): "learn-help",
             ("switch.cjp_tesla_auto_forecast_type", "help"): "forecast-help",
@@ -597,8 +602,36 @@ def test_charging_loss_section_on_analysis() -> None:
     )
     assert "Brug målt ladetab" not in analysis_help
     # without a car integration there is nothing to measure: the section is gone
-    no_ev = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": ""}), "tesla", "entry1", _own("tesla") - {"sensor.cjp_tesla_charging_loss_model", "button.cjp_tesla_recalculate_charging_loss", "switch.cjp_tesla_use_measured_charging_loss"}))
+    no_ev_entities = _own("tesla") - {
+        "sensor.cjp_tesla_charging_loss_model",
+        "sensor.cjp_tesla_soc_charging_power_model",
+        "button.cjp_tesla_recalculate_charging_loss",
+        "switch.cjp_tesla_use_measured_charging_loss",
+    }
+    no_ev_config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": ""})
+    no_ev = yaml.safe_load(render_dashboard(no_ev_config, "tesla", "entry1", no_ev_entities))
     assert "Ladetab pr. effekt" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
+    assert "Ladeeffekt efter SOC" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
+
+
+def test_soc_power_section_on_analysis() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
+    analysis = yaml.safe_load(text)["views"][2]
+    section = next(
+        section for section in analysis["sections"]
+        if any(card.get("heading") == "Ladeeffekt efter SOC" for card in section["cards"])
+    )
+    explanation, table, chart = section["cards"][1:]
+
+    assert "Grafen og tabellen" in explanation["content"]
+    assert "styrer ikke ladeboksen" in explanation["content"]
+    assert "row.sample_sessions" in table["content"]
+    assert "row.sessions" in table["content"]
+    assert "row.cap_kw" in table["content"]
+    assert [series["name"] for series in chart["series"]] == ["1 fase", "3 faser"]
+    assert " %'" in chart["apex_config"]["xaxis"]["labels"]["formatter"]
+    assert " %'" in chart["apex_config"]["tooltip"]["x"]["formatter"]
 
 
 def test_economy_section_on_analysis() -> None:
@@ -606,7 +639,9 @@ def test_economy_section_on_analysis() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
     analysis = yaml.safe_load(text)["views"][2]
-    assert [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"][0] == "Økonomi"
+    headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
+    assert headings[0] == "Ladeeffekt efter SOC"
+    assert "Økonomi" in headings
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]
     assert len(charts) == 2
 
@@ -616,7 +651,7 @@ def test_analysis_sections() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
     headings = [c["heading"] for c in _cards(yaml.safe_load(text)["views"][2]) if c.get("type") == "heading"]
-    for heading in ("Kørsel og temperatur", "Klar til afgang", "Lært kørselsafstand", "Planlagt mod faktisk ladet", "Batterikapacitet"):
+    for heading in ("Ladeeffekt efter SOC", "Kørsel og temperatur", "Klar til afgang", "Lært kørselsafstand", "Planlagt mod faktisk ladet", "Batterikapacitet"):
         assert heading in headings
 
 

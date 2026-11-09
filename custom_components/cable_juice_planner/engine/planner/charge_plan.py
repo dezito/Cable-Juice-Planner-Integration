@@ -116,12 +116,25 @@ class ChargePlan:
             return interval[1]
         return reset_time_to_hour(timestamp) + datetime.timedelta(hours=1)
 
-    def period_kwh_capacity(self, timestamp):
+    def period_kwh_capacity(self, timestamp, battery_level=None):
         """Charger capacity in the covered part of the price interval."""
+        return self.period_charge_capacity(timestamp, battery_level)[0]
+
+    def period_charge_capacity(self, timestamp, battery_level=None):
+        """(kWh, kW) available in the covered part of a price interval."""
         interval_end = self.price_period_end(timestamp)
         start = self.charge_plan_start(timestamp)
         duration_hours = max((interval_end - start).total_seconds() / 3600, 0.0)
-        return self.hour_kwh_capacity(timestamp) * duration_hours
+        base_kw = self.hour_kwh_capacity(timestamp)
+        if duration_hours <= 0.0 or battery_level is None:
+            return base_kw * duration_hours, base_kw
+        base_kwh = base_kw * duration_hours
+        soc_end = min(
+            100.0,
+            battery_level + self.kwh_to_percentage(base_kwh, include_charging_loss=True, kw=base_kw),
+        )
+        plan_kw = self.planning_kw_capacity(timestamp, battery_level, soc_end, base_kw)
+        return plan_kw * duration_hours, plan_kw
 
     def charge_plan_start(self, timestamp):
         return max(timestamp, naive_timestamp(self.now()))
@@ -197,11 +210,13 @@ class ChargePlan:
 
         try:
             cost = 0.0
-            kwh = self.period_kwh_capacity(hour)
+            kwh, hour_kw = self.period_charge_capacity(hour, battery_level)
             min_charging_kwh = max(min(min_charging_kwh_cron, min_charging_kwh_ev), 0.2)
             # the charging loss at this hour's power (measured model); kwhNeeded is at the
             # default loss, so the same battery level takes kwh_ratio times the kWh this hour
-            hour_kw = self.hour_kwh_capacity(hour)
+            if self.soc_power_learning_enabled():
+                min_charging_kwh_cron = self.config["cron_interval"] / 60 * hour_kw / 2
+                min_charging_kwh = max(min(min_charging_kwh_cron, min_charging_kwh_ev), 0.2)
             kwh_ratio = (1 + self.charging_loss_factor(hour_kw)) / (1 + self.charging_loss_factor())
 
             battery_level_added = False
@@ -218,12 +233,15 @@ class ChargePlan:
                 if kwh_diff < 0.0:
                     kwh = max(kwh + kwh_diff, 0.0)
 
-            if kwh_available == True and hour in chargeHours:
+            if hour in chargeHours and (kwh_available or self.soc_power_learning_enabled()):
                 kwh -= chargeHours[hour]['kWh']
 
             if check_max_charging_plan and check_max_charging_plan['day'] is not None:
                 kwh_allowed = self.check_max_battery_level_allowed(charging_plan, check_max_charging_plan['day'], check_max_charging_plan['what_day'], check_max_charging_plan['battery_level_id'], max_recommended_battery_level, self.kwh_to_percentage(kwh, include_charging_loss = True, kw = hour_kw))
                 kwh = (kwh + kwh_allowed * kwh_ratio) if kwh_allowed < 0.0 else kwh_allowed * kwh_ratio
+
+            if self.soc_power_learning_enabled():
+                min_charging_kwh = min(min_charging_kwh, max(kwh, 0.0) / 2)
 
             if kwh > min_charging_kwh:
                 if hour not in chargeHours:

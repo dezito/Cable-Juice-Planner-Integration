@@ -116,6 +116,7 @@ class ControlEvents:
         self.load_analysis_db(databases.get("analysis"))
         self.publish_analysis()
         self.publish_charging_loss_model()
+        self.publish_soc_power_model()
 
         self.solar_charged_percentage()
         self.is_battery_fully_charged()
