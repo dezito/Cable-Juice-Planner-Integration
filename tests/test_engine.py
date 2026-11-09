@@ -1420,13 +1420,18 @@ def test_workday_need_above_100_percent_never_plans_past_battery_capacity() -> N
     ("work_need", "trip_need", "expected_work_cost", "expected_trip_cost"),
     [(100.0, 100.0, -30.0, 0.0), (40.0, 20.0, -20.0, -10.0)],
 )
+@pytest.mark.parametrize("trip_first", [False, True])
 def test_scheduled_cost_split_uses_only_capacity_available_to_each_rule(
     monkeypatch: pytest.MonkeyPatch,
     work_need: float,
     trip_need: float,
     expected_work_cost: float,
     expected_trip_cost: float,
+    trip_first: bool,
 ) -> None:
+    if trip_first:
+        # the earlier departure takes the capacity: an over-capacity trip need leaves nothing for work
+        expected_work_cost, expected_trip_cost = (0.0, -30.0) if work_need == trip_need else (expected_work_cost, expected_trip_cost)
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
     monkeypatch.setattr(engine, "remove_solar_prediction_from_charge_hours", lambda *args, **kwargs: None)
     monkeypatch.setattr(engine, "add_charging_session_to_day", lambda *args, **kwargs: "battery_level_before_work")
@@ -1438,6 +1443,8 @@ def test_scheduled_cost_split_uses_only_capacity_available_to_each_rule(
                 "trip_battery_level_above_max": 0.0,
                 "work_battery_level_needed": work_need,
                 "workday": True,
+                "work_goto": datetime.datetime.combine(DAY, datetime.time(8)),
+                "trip_goto": datetime.datetime.combine(DAY, datetime.time(6 if trip_first else 9)),
                 "rules": ["trip", "first_workday_preparation"],
                 "trip_total_cost": 0.0,
                 "work_total_cost": 0.0,
@@ -1541,6 +1548,77 @@ def test_a_trip_after_work_is_not_charged_while_the_car_is_at_work() -> None:
     assert trip_hours
     at_work = [timestamp for timestamp in trip_hours if datetime.datetime.combine(DAY, datetime.time(7)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(16))]
     assert not at_work, at_work
+
+
+def _work_and_trip_settings(trip_goto: datetime.time, work_km: float) -> dict:
+    return {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "workday_departure_thursday": datetime.time(7),
+        "workday_homecoming_thursday": datetime.time(14),
+        "workday_distance_needed_thursday": work_km,
+        "trip_date_time": datetime.datetime.combine(DAY, trip_goto),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(23)),
+        "trip_charge_procent": 100.0,
+        "max_recommended_charge_limit_battery_level": 100.0,
+    }
+
+
+def test_a_trip_before_the_workday_homecoming_is_charged_to_full_before_work() -> None:
+    """Work 07:00-14:00 (20 %) and a trip at 13:00 to 100 %: the car cannot charge in between, so it is
+    full at 07:00, work uses its 20 % and the trip leaves with the 80 % that is left."""
+    engine, _ = run(1, level=30, settings=_work_and_trip_settings(datetime.time(13), 60.0), **PLUGGED_IN)
+    plan = engine.charging_plan[0]
+    hours = [timestamp for timestamp in charge_hours(engine) if timestamp.date() == DAY]
+    assert plan["work_battery_level_needed"] == pytest.approx(20.0, abs=0.1)
+    assert sum(plan["battery_level_before_work"]) == pytest.approx(100.0, abs=0.5)
+    assert hours and max(hours) < datetime.datetime.combine(DAY, datetime.time(7))
+    # the cost of the hours before work is split by the level each one gets: 20 % work, the rest the trip
+    assert plan["work_total_cost"] / (plan["work_total_cost"] + plan["trip_total_cost"]) == pytest.approx(20 / 70, abs=0.01)
+
+
+def test_a_trip_after_the_workday_homecoming_charges_the_rest_between_homecoming_and_departure() -> None:
+    """Work 07:00-14:00 and a trip at 18:00 to 100 %: whatever is not reached before work is charged
+    after the homecoming, up to the trip."""
+    engine, _ = run(1, level=30, settings=_work_and_trip_settings(datetime.time(18), 100.0), **PLUGGED_IN)
+    after_homecoming = [
+        timestamp
+        for timestamp in charge_hours(engine)
+        if datetime.datetime.combine(DAY, datetime.time(14)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(18))
+    ]
+    assert after_homecoming
+    assert all(engine.charge_hours[timestamp].get("trip") for timestamp in after_homecoming)
+    assert not [
+        timestamp
+        for timestamp in charge_hours(engine)
+        if datetime.datetime.combine(DAY, datetime.time(7)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(14))
+    ]
+
+
+def test_the_buffer_before_a_trip_is_used_when_the_target_is_not_reached_before_work() -> None:
+    """Work 07:00-14:00 and a trip at 16:00 to 100 %: what the night cannot reach is charged after the
+    homecoming, also inside the buffer before the trip."""
+    engine, _ = run(1, level=5, settings=_work_and_trip_settings(datetime.time(16), 60.0), **PLUGGED_IN)
+    after_homecoming = [
+        timestamp
+        for timestamp in charge_hours(engine)
+        if datetime.datetime.combine(DAY, datetime.time(14)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(16))
+    ]
+    assert after_homecoming
+
+
+def test_the_part_above_the_max_level_is_charged_after_the_homecoming_when_the_trip_is_later() -> None:
+    """Work 07:00-14:00 and a trip at 16:00 to 100 % with a max recommended level of 80 %: the 20 % above it
+    is charged after the homecoming (inside the buffer), not before work where the battery is already full."""
+    settings = _work_and_trip_settings(datetime.time(16), 60.0)
+    settings["max_recommended_charge_limit_battery_level"] = 80.0
+    engine, _ = run(1, level=30, settings=settings, **PLUGGED_IN)
+    after_homecoming = [
+        timestamp
+        for timestamp in charge_hours(engine)
+        if datetime.datetime.combine(DAY, datetime.time(14)) <= timestamp < datetime.datetime.combine(DAY, datetime.time(16))
+    ]
+    assert len(after_homecoming) == 2
 
 
 def test_the_analysis_saves_one_departure_as_set_while_the_car_is_charged_after_it() -> None:

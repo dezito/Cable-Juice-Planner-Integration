@@ -51,13 +51,24 @@ class FutureScheduled:
                 max(self.get_max_recommended_charge_limit_battery_level(), total_trip_battery_level_needed),
                 100.0,
             )
-            # Over capacity, reserve the daily minimum, then prioritize work before the trip.
+            # Over capacity: the earlier departure gets the capacity first (work wins a tie),
+            # the later one only what is left up to the limit, with the daily minimum reserved for work.
             if work_battery_level_needed + daily_minimum + total_trip_battery_level_needed > battery_level_limit:
-                work_battery_level_needed = min(work_battery_level_needed, max(battery_level_limit - daily_minimum, 0.0))
-                total_trip_battery_level_needed = min(
-                    total_trip_battery_level_needed,
-                    max(battery_level_limit - daily_minimum - work_battery_level_needed, 0.0),
-                )
+                work_goto = ctx.charging_plan[day].get('work_goto')
+                trip_goto = ctx.charging_plan[day].get('trip_goto')
+                trip_first = bool(work_goto and trip_goto and trip_goto < work_goto)
+                if trip_first:
+                    total_trip_battery_level_needed = min(total_trip_battery_level_needed, battery_level_limit)
+                    work_battery_level_needed = min(
+                        work_battery_level_needed,
+                        max(battery_level_limit - daily_minimum - total_trip_battery_level_needed, 0.0),
+                    )
+                else:
+                    work_battery_level_needed = min(work_battery_level_needed, max(battery_level_limit - daily_minimum, 0.0))
+                    total_trip_battery_level_needed = min(
+                        total_trip_battery_level_needed,
+                        max(battery_level_limit - daily_minimum - work_battery_level_needed, 0.0),
+                    )
 
         battery_level_sum = total_trip_battery_level_needed + work_battery_level_needed
 
@@ -177,9 +188,18 @@ class FutureScheduled:
                     _LOGGER.warning(f"Not enought charging planned for day {day} kwh_needed_today {kwh_needed_today}kWh, using all available hours until {next_departure} to fullfill needed kWh")
                     # whole hours up to the departure hour (a departure at 07:30 is not allowed to book :30 slots on top of the hours)
                     departure_hour = reset_time_to_hour(next_departure)
+                    # a later trip after the homecoming from work: the buffer is only a buffer, so what is still missing is charged up to the trip
+                    trip_window = None
+                    if ctx.charging_plan[day]['workday'] and ctx.charging_plan[day]['trip'] and ctx.charging_plan[day]['trip_goto'] > ctx.charging_plan[day]['work_homecoming'] > ctx.charging_plan[day]['work_goto']:
+                        trip_window = (reset_time_to_hour(ctx.charging_plan[day]['work_homecoming']), reset_time_to_hour(ctx.charging_plan[day]['trip_goto']))
                     for timestamp in sorted(ctx.grid_prices):
-                        if timestamp < ctx.current_hour or timestamp >= departure_hour:
+                        in_trip_window = trip_window is not None and trip_window[0] <= timestamp < trip_window[1]
+                        if timestamp < ctx.current_hour or (timestamp >= departure_hour and not in_trip_window):
                             continue
+                        if in_trip_window:
+                            working, on_trip = self.available_for_charging_prediction(ctx.charging_plan, timestamp, ctx.trip_date_time, ctx.trip_homecoming_date_time)
+                            if working or on_trip:
+                                continue
                         hour_in_chargeHours, kwh_available = self.kwh_available_in_hour(ctx.chargeHours, timestamp)
                         if hour_in_chargeHours and not kwh_available:
                             continue

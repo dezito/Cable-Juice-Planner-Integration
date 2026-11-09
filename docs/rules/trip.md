@@ -33,5 +33,11 @@ charging for up to 2 hours after the departure (the trip is reset then), but not
 
 ## Together with other rules
 
-A trip and a workday on the same day are added up. With [load balancing](../load-balancing.md), a car with
+A trip and a workday on the same day each have their own need and their own departure, and the battery
+never goes above the battery limit (100 % at most). The earlier departure is served first and stops at its
+level. The later one gets what the car can still reach: if the trip departs before the homecoming from work,
+only the charging before work counts, so work gets what it needs and the trip gets the rest. If the trip
+departs after the homecoming, the car is charged to full before work (when that is cheapest) and the rest is
+charged between homecoming and the trip. The [buffer before departure](workplan.md#the-buffer-before-departure) is only a buffer: if the target is not reached, the car charges what it can in it.
+Work wins when both depart at the same time. With [load balancing](../load-balancing.md), a car with
 a trip soon (default within 12 hours) goes first.
