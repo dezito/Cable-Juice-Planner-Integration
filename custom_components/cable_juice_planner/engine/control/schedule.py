@@ -16,6 +16,7 @@ from ...const import (
 )
 from ...utils.formatting import emoji_parse
 from ...utils.helpers import date_to_string, minutes_between, reset_datetime, round_up
+from ...prices.intervals import naive_timestamp, price_interval_at
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -236,11 +237,19 @@ class ControlSchedule:
         return False
 
     def current_hour_in_charge_hours(self):
-        current_hour = self.current_hour()
-        for timestamp in self.charge_hours:
-            if isinstance(timestamp, datetime.datetime) and timestamp.replace(minute=0, second=0, microsecond=0) == current_hour:
-                return timestamp
-        return False
+        now = naive_timestamp(self.now())
+        interval = price_interval_at(self.get_grid_prices(), now)
+        if interval is None:
+            return False
+        candidates = [
+            timestamp
+            for timestamp in self.charge_hours
+            if isinstance(timestamp, datetime.datetime) and interval[0] <= timestamp < interval[1]
+        ]
+        if not candidates:
+            return False
+        upcoming = [timestamp for timestamp in candidates if timestamp > now]
+        return min(upcoming) if upcoming else max(candidates)
 
     def charge_if_needed(self, force_recalculate=False):
         """Plan and set the action entities, then publish the mode and the heartbeat.

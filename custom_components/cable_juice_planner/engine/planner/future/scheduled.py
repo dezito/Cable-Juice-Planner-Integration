@@ -4,7 +4,8 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ....utils.helpers import days_between, hours_between, in_between, reset_time_to_hour
+from ....utils.helpers import days_between, in_between, reset_time_to_hour
+from ....prices.intervals import price_interval_at
 from ..charge_plan import FUNC_NAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,7 +114,10 @@ class FutureScheduled:
                                 _LOGGER.info(f"Enought battery level for work, planning for trip {sum(ctx.charging_plan[day]['battery_level_before_work'])} >= ({ctx.charging_plan[day]['work_battery_level_needed']} + {self.get_min_trip_battery_level()})")
                                 break
 
+                        price_interval = price_interval_at(ctx.grid_prices, timestamp)
                         timestamp = self.change_timestamp_with_minutes(ctx.charging_plan, timestamp)
+                        if price_interval is not None and timestamp >= price_interval[1]:
+                            continue
 
                         if not in_between(timestamp, ctx.current_hour, ctx.last_charging + datetime.timedelta(hours=1)):
                             continue
@@ -173,8 +177,9 @@ class FutureScheduled:
                     _LOGGER.warning(f"Not enought charging planned for day {day} kwh_needed_today {kwh_needed_today}kWh, using all available hours until {next_departure} to fullfill needed kWh")
                     # whole hours up to the departure hour (a departure at 07:30 is not allowed to book :30 slots on top of the hours)
                     departure_hour = reset_time_to_hour(next_departure)
-                    for i in range(hours_between(ctx.current_hour, departure_hour), 0, -1):
-                        timestamp = departure_hour - datetime.timedelta(hours=i)
+                    for timestamp in sorted(ctx.grid_prices):
+                        if timestamp < ctx.current_hour or timestamp >= departure_hour:
+                            continue
                         hour_in_chargeHours, kwh_available = self.kwh_available_in_hour(ctx.chargeHours, timestamp)
                         if hour_in_chargeHours and not kwh_available:
                             continue
@@ -184,10 +189,7 @@ class FutureScheduled:
                             continue
 
                         # the hour's own price (not the loop variable of the price search above, which is some other hour's price)
-                        hour_price = ctx.grid_prices.get(reset_time_to_hour(timestamp))
-                        if hour_price is None:
-                            _LOGGER.debug(f"No price for {timestamp}, the hour is not planned")
-                            continue
+                        hour_price = ctx.grid_prices[timestamp]
 
                         battery_level_id, max_recommended_charge_limit_battery_level = self.what_battery_level(ctx, what_day, timestamp, hour_price, day)
                         if not battery_level_id:

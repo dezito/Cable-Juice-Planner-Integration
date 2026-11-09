@@ -6,6 +6,7 @@ import logging
 from copy import deepcopy
 
 from ...utils.helpers import average, in_between, reset_time_to_hour, ultra_cheap_limit
+from ...prices.intervals import hourly_price_averages
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -233,10 +234,18 @@ class EnergyPrice:
             max_length = self.config["database"]["kwh_avg_prices_db_data_to_save"]
             refund = self.price_provider.refund
 
-            today_grid_prices = {timestamp.hour: price for timestamp, price in grid_prices.items() if timestamp.date() == today}
+            today_grid_prices = {
+                timestamp.hour: price
+                for timestamp, price in hourly_price_averages(grid_prices).items()
+                if timestamp.date() == today
+            }
             today_sell_prices = {}
             if self.is_solar_configured():
-                today_sell_prices = {timestamp.hour: price for timestamp, price in sell_prices.items() if timestamp.date() == today}
+                today_sell_prices = {
+                    timestamp.hour: price
+                    for timestamp, price in hourly_price_averages(sell_prices).items()
+                    if timestamp.date() == today
+                }
 
             if len(today_grid_prices) < 23:
                 _LOGGER.warning("Missing some hours in today's power prices, not saving to database. Added hours: %s", len(today_grid_prices))

@@ -43,6 +43,13 @@ used alone. The surplus the car can use is subtracted from what has to be bought
 Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
 solar surplus.
 
+Price timestamps mark the start of each interval. CJP supports different interval lengths in the same hour:
+each price applies until the next timestamp, up to the end of that hour. After a longer gap, CJP limits the
+last interval to the previous interval's duration (at most one hour), leaving the rest uncovered rather than
+extending a price. A partially covered hour remains usable, and its charging capacity is limited to the time
+covered by prices. The four most expensive hours and the average of the 15 cheapest hours are still calculated
+per hour; interval prices are combined into duration-weighted hourly averages for those comparisons.
+
 **Sell price:** the spot price less what selling a kWh costs. Every tariff, tax and surcharge in the sell
 price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings) plus Energinet's net tariff
 and system tariff. A sell sensor from Energi Data Service without tariffs is already the spot price, so its

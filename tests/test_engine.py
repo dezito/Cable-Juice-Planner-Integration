@@ -20,6 +20,10 @@ from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.utils.codec import decode
 from custom_components.cable_juice_planner.engine.control.preheat import preheat_lead_time
 from custom_components.cable_juice_planner.engine import CJPEngine, Snapshot
+from custom_components.cable_juice_planner.engine.planner.charge_plan import ChargePlan
+from custom_components.cable_juice_planner.engine.planner.planner import Planner
+from custom_components.cable_juice_planner.engine.pricing import Pricing
+from custom_components.cable_juice_planner.engine.control.schedule import ControlSchedule
 
 TZ = zoneinfo.ZoneInfo("Europe/Copenhagen")
 ASTRAL = Observer(57.02, 8.68, 0)
@@ -1175,9 +1179,8 @@ def test_an_hour_without_a_price_is_skipped_and_its_neighbours_keep_their_price(
         assert engine.charge_hours[timestamp]["Price"] == pytest.approx(prices[timestamp], abs=0.011), timestamp
 
 
-def test_no_hour_is_planned_without_a_price(caplog: pytest.LogCaptureFixture) -> None:
-    """Only old price rows are published: an hour without a price is never planned at some other hour's price."""
-    caplog.set_level("DEBUG", logger="custom_components.cable_juice_planner.engine.planner.future.scheduled")
+def test_no_hour_is_planned_without_a_price() -> None:
+    """Only published price rows are planned; absent intervals are never priced as another hour."""
     now = datetime.datetime.combine(DAY, datetime.time(21, 30))
     snap = snapshot(now, **PLUGGED_IN, settings={"workplan_charging": True, "workday_friday": True})
     rows = snap.price_data["attributes"]["sensor.price"]["raw_today"]
@@ -1188,9 +1191,140 @@ def test_no_hour_is_planned_without_a_price(caplog: pytest.LogCaptureFixture) ->
     assert engine.run_job(snap, engine.startup, {}).error is None
     assert engine.run_job(snap, engine.charge_if_needed, True).error is None
     prices = engine.grid_price_cache["prices"]
-    assert "No price for" in caplog.text  # the step that adds the last hours was reached and refused the hours
     assert not [timestamp for timestamp in charge_hours(engine) if timestamp not in prices]
     assert not charge_hours(engine)
+
+
+def test_price_period_capacity_tracks_each_interval_and_current_time() -> None:
+    start = datetime.datetime.combine(DAY, datetime.time(12))
+    prices = {
+        start: 1.0,
+        start + datetime.timedelta(minutes=15): 2.0,
+        start + datetime.timedelta(minutes=45): 3.0,
+        start + datetime.timedelta(hours=1): 4.0,
+    }
+    engine = SimpleNamespace(
+        get_grid_prices=lambda: prices,
+        now=lambda: start - datetime.timedelta(hours=1),
+        hour_kwh_capacity=lambda _timestamp: MAX_WATT / 1000,
+    )
+    engine.price_period_end = lambda timestamp: ChargePlan.price_period_end(engine, timestamp)
+
+    assert ChargePlan.period_kwh_capacity(engine, start) == pytest.approx(MAX_WATT / 1000 * 0.25)
+    assert ChargePlan.period_kwh_capacity(engine, start + datetime.timedelta(minutes=15)) == pytest.approx(MAX_WATT / 1000 * 0.5)
+
+    engine.now = lambda: start + datetime.timedelta(minutes=30)
+    assert ChargePlan.period_kwh_capacity(engine, start + datetime.timedelta(minutes=15)) == pytest.approx(MAX_WATT / 1000 * 0.25)
+    assert ChargePlan.charge_plan_start(engine, start + datetime.timedelta(minutes=15)) == start + datetime.timedelta(minutes=30)
+    assert ChargePlan.charge_plan_end(engine, start + datetime.timedelta(minutes=15), MAX_WATT / 1000 * 0.25) == start + datetime.timedelta(minutes=45)
+    engine.now = lambda: start + datetime.timedelta(minutes=50)
+    assert ChargePlan.period_kwh_capacity(engine, start + datetime.timedelta(minutes=15)) == 0.0
+
+
+def test_charge_overview_merges_only_contiguous_actual_charging_periods() -> None:
+    start = datetime.datetime.combine(DAY, datetime.time(12))
+    timestamps = [start + datetime.timedelta(minutes=15 * index) for index in range(3)]
+    now = start + datetime.timedelta(minutes=7)
+    ends = {
+        timestamps[0]: timestamps[1],
+        timestamps[1]: timestamps[2],
+        timestamps[2]: timestamps[2] + datetime.timedelta(minutes=15),
+    }
+    planner = SimpleNamespace(
+        charge_plan_start=lambda timestamp: max(timestamp, now),
+        charge_plan_end=lambda timestamp, _kwh: ends[timestamp],
+    )
+    periods = [
+        (timestamp, {"kWh": 1.0, "Cost": index + 1.0, "Price": index + 1.0, "battery_level": 5.0})
+        for index, timestamp in enumerate(timestamps)
+    ]
+
+    merged, has_combined = Planner.merge_charge_intervals(planner, periods)
+
+    assert has_combined
+    assert len(merged) == 1
+    assert merged[0]["start"] == now
+    assert merged[0]["end"] == ends[timestamps[-1]]
+    assert merged[0]["unit"] == pytest.approx(2.0)
+
+    ends[timestamps[0]] = start + datetime.timedelta(minutes=10)
+    separated, has_combined = Planner.merge_charge_intervals(planner, periods[:2])
+    assert has_combined is False
+    assert len(separated) == 2
+    assert separated[0]["start"] == now
+
+
+def test_current_charging_slot_follows_the_active_price_interval() -> None:
+    start = datetime.datetime.combine(DAY, datetime.time(12))
+    prices = {
+        start: 1.0,
+        start + datetime.timedelta(minutes=15): 2.0,
+        start + datetime.timedelta(minutes=45): 3.0,
+    }
+    active = start + datetime.timedelta(minutes=15)
+    engine = SimpleNamespace(
+        get_grid_prices=lambda: prices,
+        now=lambda: start + datetime.timedelta(minutes=20),
+        charge_hours={active: {"kWh": 1.0}},
+    )
+
+    assert ControlSchedule.current_hour_in_charge_hours(engine) == active
+
+
+def test_expensive_hours_and_cheap_average_remain_hour_based() -> None:
+    prices = {
+        datetime.datetime.combine(DAY, datetime.time(hour, minute)): float(hour)
+        for hour in range(24)
+        for minute in (0, 15, 30, 45)
+    }
+    engine = SimpleNamespace(
+        now=lambda: datetime.datetime.combine(DAY, datetime.time(11, 30)),
+        get_grid_prices=lambda: prices,
+        config={"database": {"kwh_avg_prices_db_data_to_save": 15}},
+    )
+
+    expensive = Pricing.get_expensive_hours(engine)
+    assert len(expensive) == 4
+    assert list(expensive) == [datetime.datetime.combine(DAY, datetime.time(hour)) for hour in (23, 22, 21, 20)]
+    assert ChargePlan.cheap_price_check(engine, [], prices, 5.0) == [True, True]
+
+    mixed_interval_prices = {
+        datetime.datetime.combine(DAY, datetime.time(hour, minute)): float(hour)
+        for hour in range(10)
+        for minute in (0, 15, 30, 45)
+    }
+    mixed_interval_prices.update(
+        {datetime.datetime.combine(DAY, datetime.time(hour)): float(hour) for hour in range(10, 24)}
+    )
+    assert ChargePlan.fill_up_price_limit(engine, [], mixed_interval_prices) == pytest.approx(6.0)
+
+
+def test_scheduled_planner_books_quarter_hour_price_periods() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12))
+    settings = {
+        "workplan_charging": True,
+        "workday_friday": True,
+        "workday_distance_needed_friday": 150.0,
+    }
+    snap = snapshot(now, level=10, settings=settings, **PLUGGED_IN)
+    rows = snap.price_data["attributes"]["sensor.price"]["raw_today"]
+    snap.price_data["attributes"]["sensor.price"]["raw_today"] = [
+        row for row in rows if int(row["hour"][11:13]) != 12
+    ] + [
+        {"hour": (now + datetime.timedelta(minutes=minute)).replace(tzinfo=TZ).isoformat(), "price": 0.1 + minute / 100}
+        for minute in (0, 15, 30, 45)
+    ]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+
+    planned_periods = [timestamp for timestamp in charge_hours(engine) if timestamp.hour == 12]
+    assert planned_periods
+    assert any(timestamp.minute for timestamp in planned_periods)
+    assert all(
+        engine.charge_hours[timestamp]["kWh"] <= engine.hour_kwh_capacity(timestamp) * 0.25 + 0.01
+        for timestamp in planned_periods
+    )
 
 
 def _workday_engine(
@@ -1605,6 +1739,23 @@ def test_price_history_never_stores_the_filled_hours() -> None:
     assert engine.grid_price_cache["sources"][now.replace(hour=15)] == "database"
     # 21 real hours: the day is not stored, so the filled hours never become history
     assert engine.kwh_avg_prices_db["history"][15][DAY.weekday()] == _price_history()["history"][15][DAY.weekday()]
+
+
+def test_price_history_averages_mixed_intervals_by_covered_duration() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12))
+    snap = snapshot(now)
+    rows = snap.price_data["attributes"]["sensor.price"]["raw_today"]
+    snap.price_data["attributes"]["sensor.price"]["raw_today"] = [
+        row for row in rows if row["hour"][11:13] != "12"
+    ] + [
+        {"hour": (now + datetime.timedelta(minutes=minute)).replace(tzinfo=TZ).isoformat(), "price": price}
+        for minute, price in ((0, 0.1), (15, 0.2), (45, 0.4))
+    ]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+
+    assert engine.kwh_avg_prices_db["history"][12][DAY.weekday()][0] == pytest.approx(0.225)
 
 
 def _assert_price_history_repaired(engine: CJPEngine, good: dict) -> None:

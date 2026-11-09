@@ -5,6 +5,7 @@ import datetime
 
 from ...utils.formatting import emoji_parse, emoji_text_format
 from ...utils.helpers import days_between, in_between, reset_time_to_hour
+from ...prices.intervals import price_interval_at
 
 
 class HoursPlan:
@@ -72,7 +73,13 @@ class HoursPlan:
                             elif timestamp == workday_end:
                                 not_home_end_emoji += self.charging_plan[day]["emoji"]
 
-                emojis = emoji_parse(self.charge_hours.get(timestamp, dict()))
+                interval = price_interval_at(prices, timestamp)
+                planned = {}
+                if interval is not None:
+                    for planned_timestamp, charge_data in self.charge_hours.items():
+                        if isinstance(planned_timestamp, datetime.datetime) and interval[0] <= planned_timestamp < interval[1]:
+                            planned.update(charge_data)
+                emojis = emoji_parse(planned)
 
                 color_start, color_end = (f'<font color="{color}">', "</font>") if color else ("", "")
 
