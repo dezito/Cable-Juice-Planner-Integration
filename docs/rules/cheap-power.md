@@ -17,10 +17,13 @@ hours filled from the [price database](../how-it-works.md#prices)) and calculate
 | Level | The hour's price | Charged to |
 |---|---|---|
 | Very cheap | at most that average | *charge level for very cheap electricity* (70 %) |
-| Ultra cheap | at most 75 % of that average | *charge level for ultra cheap electricity* (90 %) |
+| Ultra cheap | at most 25 % under that average | *charge level for ultra cheap electricity* (90 %) |
 
 **Example:** the 15 cheapest hours of the week average 0.80 kr/kWh. An hour at 0.75 kr is very cheap (charge to
 70 %), an hour at 0.55 kr is ultra cheap (charge to 90 %).
+
+With **negative prices** (you are paid to charge) the same applies: if the average is −2.00 kr/kWh, an hour at
+−2.00 kr is very cheap, and ultra cheap starts at −2.50 kr, 25 % further below zero.
 
 The sensors `sensor.cjp_<prefix>_charge_very_cheap_battery_level` and `_charge_ultra_cheap_battery_level`
 show the levels in use. They follow the expected solar surplus of the coming week: if the sun will charge

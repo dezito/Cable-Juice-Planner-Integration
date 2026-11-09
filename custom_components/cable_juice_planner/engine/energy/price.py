@@ -5,7 +5,7 @@ import datetime
 import logging
 from copy import deepcopy
 
-from ...utils.helpers import average, in_between, reset_time_to_hour
+from ...utils.helpers import average, in_between, reset_time_to_hour, ultra_cheap_limit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -280,4 +280,4 @@ class EnergyPrice:
     def set_low_forecast_price(self) -> None:
         price = round(self.get_forecast_value(self.kwh_avg_prices_db["min"]), 3)
         self.set_attr("charge_very_cheap_battery_level", "low_forecast_price", round(price, 2))
-        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round((price * 0.75), 2))
+        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round(ultra_cheap_limit(price), 2))

@@ -1345,6 +1345,75 @@ def test_hours_added_when_charging_falls_short_stay_within_the_hour_capacity(dep
     assert max(engine.charge_hours[timestamp]["kWh"] for timestamp in hours) <= MAX_WATT / 1000 + 0.01
 
 
+def _cheap_power_engine(tomorrow: dict[int, float], very: float = 40.0, ultra: float = 90.0) -> CJPEngine:
+    """Only 'Charge on cheap power' is on; today costs 1.0 all day, tomorrow `tomorrow` (hour -> price, other hours 1.0)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    settings = {
+        "cheap_grid_charging": True,
+        "very_cheap_grid_charging_max_battery_level": very,
+        "ultra_cheap_grid_charging_max_battery_level": ultra,
+        "max_recommended_charge_limit_battery_level": 100.0,
+    }
+    snap = snapshot(now, level=10, settings=settings, **PLUGGED_IN)
+    attributes = snap.price_data["attributes"]["sensor.price"]
+    next_day = DAY + datetime.timedelta(days=1)
+    attributes["raw_today"] = [{"hour": datetime.datetime.combine(DAY, datetime.time(hour), tzinfo=TZ).isoformat(), "price": 1.0} for hour in range(24)]
+    attributes["raw_tomorrow"] = [
+        {"hour": datetime.datetime.combine(next_day, datetime.time(hour), tzinfo=TZ).isoformat(), "price": tomorrow.get(hour, 1.0)} for hour in range(24)
+    ]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    return engine
+
+
+def test_ultra_cheap_is_cheaper_than_very_cheap_also_with_a_negative_average() -> None:
+    """The 15 lowest prices average -2.0 (paid to charge). An hour at that average is very cheap, not ultra cheap:
+    ultra cheap is 25 % under the average (-2.5), where 75 % of -2.0 (-1.5) would be above it."""
+    engine = _cheap_power_engine({hour: -2.0 for hour in range(15)})
+    hours = charge_hours(engine)
+    assert hours
+    assert all(engine.charge_hours[timestamp].get("under_min_avg_price") for timestamp in hours)
+    assert not [timestamp for timestamp in hours if engine.charge_hours[timestamp].get("half_min_avg_price")]
+    # so the plan only charges to the very cheap level (40 %), not to the ultra cheap level (90 %)
+    assert 10 + sum(engine.charge_hours[timestamp]["battery_level"] for timestamp in hours) == pytest.approx(40.0, abs=1.5)
+
+
+def test_ultra_cheap_hours_with_a_negative_average_are_25_percent_under_it() -> None:
+    """2 hours at -5.0, 8 at -3.0, 5 at -0.5: the average is -2.43, ultra cheap starts at -3.04.
+    The -5.0 hours are ultra cheap, the -3.0 hours only very cheap (with 75 % of the average, -1.83, they were ultra cheap too)
+    and the -0.5 hours are not cheap at all. Very cheap power charges to 40 %, ultra cheap to 90 %."""
+    engine = _cheap_power_engine({**{hour: -5.0 for hour in range(2)}, **{hour: -3.0 for hour in range(2, 10)}, **{hour: -0.5 for hour in range(10, 15)}})
+    tomorrow = DAY + datetime.timedelta(days=1)
+    hours = {timestamp: engine.charge_hours[timestamp] for timestamp in charge_hours(engine) if timestamp.date() == tomorrow}
+    by_price = {price: [data for data in hours.values() if data["Price"] == price] for price in (-5.0, -3.0, -0.5)}
+    assert by_price[-5.0] and all(data.get("half_min_avg_price") for data in by_price[-5.0])
+    assert by_price[-3.0] and all(data.get("under_min_avg_price") and not data.get("half_min_avg_price") for data in by_price[-3.0])
+    assert not by_price[-0.5]
+    # 10 % + the two ultra cheap hours (28 %) + a little of the very cheap ones: the very cheap level
+    assert 10 + sum(data["battery_level"] for data in hours.values()) == pytest.approx(40.0, abs=1.5)
+
+
+def test_the_ultra_cheap_limit_keeps_the_75_percent_for_a_positive_average() -> None:
+    from custom_components.cable_juice_planner.utils.helpers import ultra_cheap_limit
+
+    assert ultra_cheap_limit(2.0) == 2.0 * 0.75
+    assert ultra_cheap_limit(0.0) == 0.0
+    assert ultra_cheap_limit(-2.0) == pytest.approx(-2.5)
+
+
+def test_the_low_forecast_price_of_ultra_cheap_follows_the_same_limit() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, **PLUGGED_IN)
+    engine.run_job(snap, engine.startup, {})
+    for minimum, ultra in ((2.0, 1.5), (-2.0, -2.5)):
+        engine.kwh_avg_prices_db = {"min": [minimum]}
+        result = engine.run_job(snap, engine.set_low_forecast_price)
+        assert result.error is None, result.error
+        assert result.attributes["charge_ultra_cheap_battery_level"]["low_forecast_price"] == pytest.approx(ultra, abs=0.01)
+
+
 def _battery_level_with(state: str, history: list[tuple[float, str]], real: bool = False) -> float:
     """The planning level (real: the car's own level for measurements) when the car sensor says `state` and has had `history` (hours ago, state) before."""
     now = datetime.datetime.combine(DAY, datetime.time(12, 30))
