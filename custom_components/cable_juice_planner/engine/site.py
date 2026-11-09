@@ -20,6 +20,7 @@ import datetime
 import logging
 
 from ..utils.helpers import hours_between, reset_datetime, reset_time_to_hour
+from .soc_power import planning_power_cap
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,6 +78,16 @@ class Site:
     def hour_charging_amps(self, hour: datetime.datetime):
         site = self.hour_site_amps(hour)
         return self.config["charger"]["charging_max_amp"] if site is None else site[0]
+
+    def soc_power_learning_enabled(self) -> bool:
+        return bool(self._snap is not None and self._snap.settings.get("learn_soc_charge_power", False))
+
+    def planning_kw_capacity(self, hour: datetime.datetime, soc_start: float, soc_end: float, base_kw: float) -> float:
+        if not self.soc_power_learning_enabled():
+            return base_kw
+        site = self.hour_site_amps(hour)
+        phases = site[1] if site is not None else int(self.config["charger"]["charging_phases"])
+        return planning_power_cap(self.soc_power_model, phases, soc_start, soc_end, base_kw)
 
     # ------------------------------------------------------------------ #
     # Live limit

@@ -1947,11 +1947,12 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set ns = namespace(learn_help=none, forecast_help=none, forecast_type_description=none, price_help=none, sections=[], forecast_section='') %}
+        {% set ns = namespace(learn_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
         {% set ns.learn_help = state_attr('switch.cjp_learn_driving_distance', 'help') %}
         {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
         {% set ns.forecast_type_description = state_attr('select.cjp_forecast_type', 'description') %}
         {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
+        {% set ns.soc_power_help = state_attr('switch.cjp_learn_soc_charge_power', 'help') %}
         {% if ns.learn_help %}{% set ns.sections = ns.sections + [ns.learn_help] %}{% endif %}
         {% if ns.forecast_help %}{% set ns.forecast_section = ns.forecast_help %}{% endif %}
         {% if ns.forecast_type_description %}
@@ -1960,6 +1961,7 @@ views:
         {% endif %}
         {% if ns.forecast_section %}{% set ns.sections = ns.sections + [ns.forecast_section] %}{% endif %}
         {% if ns.price_help %}{% set ns.sections = ns.sections + [ns.price_help] %}{% endif %}
+        {% if ns.soc_power_help %}{% set ns.sections = ns.sections + [ns.soc_power_help] %}{% endif %}
         {% if ns.sections %}<details><summary>@@read_more@@</summary>
 
         {{ ns.sections | join('\n\n---\n\n') }}
@@ -1984,6 +1986,10 @@ views:
       - entity: switch.cjp_price_forecast_correction
         name:
           type: entity
+      - type: section
+      - entity: switch.cjp_learn_soc_charge_power
+        name:
+          type: entity
       grid_options: *id001
     - type: heading
       heading: '@@section_problem@@'
@@ -2006,6 +2012,79 @@ views:
   dense_section_placement: true
   sections:
   # charging economy per month (engine/economy.py)
+  # SOC-dependent charge-power observations and the planner's per-interval caps
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_soc_power@@'
+      icon: mdi:car-electric-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@soc_power_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set rows = state_attr('sensor.cjp_soc_charging_power_model', 'bands') or [] %}
+        {% set minimum = state_attr('sensor.cjp_soc_charging_power_model', 'minimum_sessions') or 3 %}
+        {% if rows %}
+        | @@soc_power_phases@@ | @@soc_power_soc@@ | @@soc_power_samples@@ | @@soc_power_tapers@@ | @@soc_power_cap@@ |
+        |:---:|:---:|---:|---:|---:|
+        {% for row in rows -%}
+        | {{ row.phases }} | {{ row.soc_start }}-{{ row.soc_end }} % | {{ row.sample_sessions }} | {{ row.sessions }} / {{ minimum }} | {{ (row.cap_kw ~ ' kW') if row.cap_kw is not none else '@@soc_power_no_cap@@' }} |
+        {% endfor -%}
+        {% else %}
+        @@soc_power_no_data@@
+        {% endif %}
+      grid_options: *id001
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@soc_power_chart_title@@'
+        show_states: false
+      graph_span: 100h
+      span:
+        start: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 1
+      all_series_config:
+        unit: ' kW'
+        float_precision: 1
+        extend_to: false
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 300px
+        xaxis:
+          labels:
+            formatter: |
+              EVAL:function (_value, timestamp) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((timestamp - b.getTime()) / 3600000).toFixed(0) + ' %'; }
+        tooltip:
+          shared: true
+          intersect: false
+          x:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000).toFixed(0) + ' %'; }
+      series:
+      - entity: sensor.cjp_soc_charging_power_model
+        name: '@@soc_power_1_phase@@'
+        color: '#2a78d6'
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.bands || []).filter(r => r.phases === 1 && r.cap_kw !== null).map(r => [b.getTime() + (r.soc_start + 5) * 3600000, r.cap_kw]);
+      - entity: sensor.cjp_soc_charging_power_model
+        name: '@@soc_power_3_phases@@'
+        color: '#eb6834'
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.bands || []).filter(r => r.phases === 3 && r.cap_kw !== null).map(r => [b.getTime() + (r.soc_start + 5) * 3600000, r.cap_kw]);
+      grid_options: *id001
   - type: grid
     column_span: 2
     cards:

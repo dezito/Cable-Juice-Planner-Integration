@@ -26,6 +26,8 @@ import logging
 import statistics
 from typing import Any
 
+from .soc_power import build_soc_power_model, merge_power_segments
+
 _LOGGER = logging.getLogger(__name__)
 
 LOSS_GROUPS = ((0.0, 2.5, "< 2,5 kW"), (2.5, 4.0, "2,5-4 kW"), (4.0, 7.0, "4-7 kW"), (7.0, 100.0, "> 7 kW"))
@@ -112,7 +114,20 @@ def _power_continuous(power: list[tuple[float, float, float, float]], ts_from: f
     )
 
 
-def _segment(start: float, end: float, kwh_in: float, soc_delta: float, battery_size: float, phases: int, source: str) -> dict | None:
+def _segment(
+    start: float,
+    end: float,
+    kwh_in: float,
+    soc_delta: float,
+    battery_size: float,
+    phases: int,
+    source: str,
+    soc_start: float,
+    soc_end: float,
+    phase_observed: bool,
+    power_min_w: float | None = None,
+    power_max_w: float | None = None,
+) -> dict | None:
     hours = (end - start) / 3600
     if kwh_in <= 0.0 or hours <= 0.0:
         return None
@@ -128,11 +143,15 @@ def _segment(start: float, end: float, kwh_in: float, soc_delta: float, battery_
         "kwh": round(kwh_in, 3),
         "kwh_battery": round(kwh_battery, 3),
         "soc_delta": round(soc_delta, 1),
+        "soc_start": round(soc_start, 1),
+        "soc_end": round(soc_end, 1),
         "kw": round(kw, 3),
         "phases": phases,
+        "phase_observed": phase_observed,
         "loss": round(share, 4),
         "source": source,
         "group": _group(kw),
+        **({"power_min_w": power_min_w, "power_max_w": power_max_w} if power_min_w is not None and power_max_w is not None else {}),
     }
 
 
@@ -167,9 +186,16 @@ def find_segments(soc: Series, meter: Series, power, phase_series: list[Series],
         t_b, v_b = ticks[j]
         if v_b - v_a >= LOSS_MIN_SOC_DELTA:
             phases = _phase_count(phase_series, t_a, t_b)
-            if phases is None or phases == 0:
+            phase_observed = phases is not None and phases > 0
+            if not phase_observed:
                 phases = _infer_phases((kwh_b - kwh_a) / ((t_b - t_a) / 3600), configured_phases)
-            if (segment := _segment(t_a, t_b, kwh_b - kwh_a, v_b - v_a, battery_size, phases, source)) is not None:
+            observed_power = [row for row in power if t_a - 300 < row[0] < t_b]
+            power_min_w = min((row[2] for row in observed_power), default=None)
+            power_max_w = max((row[3] for row in observed_power), default=None)
+            if (segment := _segment(
+                t_a, t_b, kwh_b - kwh_a, v_b - v_a, battery_size, phases, source,
+                v_a, v_b, phase_observed, power_min_w, power_max_w,
+            )) is not None:
                 segments.append(segment)
             i = j
         else:
@@ -206,7 +232,10 @@ def find_statistics_segments(hours: list[dict], battery_size: float, configured_
             start, end = run[0]["start"] + 1800, run[-1]["start"] + 1800
             if soc_delta >= LOSS_MIN_SOC_DELTA:
                 phases = _infer_phases(kwh / ((end - start) / 3600), configured_phases)
-                if (segment := _segment(start, end, kwh, soc_delta, battery_size, phases, "statistics")) is not None:
+                if (segment := _segment(
+                    start, end, kwh, soc_delta, battery_size, phases, "statistics",
+                    run[0]["soc"], run[-1]["soc"], False,
+                )) is not None:
                     segments.append(segment)
         run = [hour] if hour is not None and charging(hour) else []
     return segments
@@ -351,6 +380,8 @@ class Loss:
         if self.charging_loss_db.get("segment_version") != LOSS_SEGMENT_VERSION:
             self.charging_loss_db.update(segments=[], backfilled=False, segment_version=LOSS_SEGMENT_VERSION)
             self.mark_dirty("charging_loss")
+        self.charging_loss_db.setdefault("soc_power_segments", [])
+        self.soc_power_model = build_soc_power_model(self.charging_loss_db["soc_power_segments"])
 
     def _fallback_loss_share(self) -> float:
         loss = abs(self.config["charger"]["charging_loss"])  # kWh from the charger = kWh in the car * (1 + loss)
@@ -371,6 +402,17 @@ class Loss:
             found += find_segments(data["soc"], data["meter"], data.get("power") or [], data.get("phases") or [], battery_size, configured, data.get("source", "history"))
         if data.get("hours"):
             found += find_statistics_segments(data["hours"], battery_size, configured)
+        if data.get("soc") and data.get("meter"):
+            power_segments = merge_power_segments(
+                self.charging_loss_db.get("soc_power_segments", []),
+                found,
+                min(data["soc"][0][0], data["meter"][0][0]),
+                self._snap.now.timestamp(),
+            )
+            if power_segments != self.charging_loss_db.get("soc_power_segments", []):
+                self.charging_loss_db["soc_power_segments"] = power_segments
+                self.mark_dirty("charging_loss")
+            self.soc_power_model = build_soc_power_model(power_segments)
         segments = merge_segments(self.charging_loss_db.get("segments", []), found)
         # every segment counts per month, also those not kept: kWh per % over time (battery capacity)
         months = self.charging_loss_db.setdefault("months", {})
@@ -392,13 +434,23 @@ class Loss:
             self.mark_dirty("charging_loss")
         _LOGGER.debug("Charging loss: %s new segments, %s kept", len(found), len(segments))
         self.publish_charging_loss_model()
+        self.publish_soc_power_model()
         return {name: sum(1 for s in segments if s["group"] == name) for _, _, name in LOSS_GROUPS}
 
     def charging_loss_reset(self) -> None:
         """button recalculate_charging_loss: forget the segments, the coordinator reads the history again."""
-        self.charging_loss_db = {"segments": [], "backfilled": False, "segment_version": LOSS_SEGMENT_VERSION}
+        self.charging_loss_db = {"segments": [], "soc_power_segments": [], "backfilled": False, "segment_version": LOSS_SEGMENT_VERSION}
+        self.soc_power_model = build_soc_power_model([])
         self.mark_dirty("charging_loss")
         self.publish_charging_loss_model()
+        self.publish_soc_power_model()
+
+    def publish_soc_power_model(self) -> None:
+        if not self.is_ev_configured():
+            return
+        self.set_state("soc_charging_power_model", self.soc_power_model["status"])
+        self.set_attr("soc_charging_power_model", "bands", self.soc_power_model["bands"])
+        self.set_attr("soc_charging_power_model", "minimum_sessions", self.soc_power_model["min_sessions"])
 
     def publish_charging_loss_model(self) -> None:
         """The sensor: the loss at the max charging power, kWh from the charger per 1 % (what the

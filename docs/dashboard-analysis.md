@@ -38,19 +38,21 @@ full charge, solar, home battery (only with a home battery), charging loss, the 
 integration and the simulation on) and, under *Advanced*, the forecast type,
 [choose the forecast type automatically](#forecast-accuracy) and
 [correct the price forecast](how-it-works.md#prices). Preheating is only shown with a car
-integration that has a climate entity.
+integration that has a climate entity. *Learn charge power by SOC* is also under *Advanced* when a car is
+configured.
 
 The plan is recalculated 5 seconds after a change.
 
 ## Analysis
 
-Everything is calculated from Home Assistant's history and CJP's own data, and refreshed every night. The
-comparisons need plug-in times and hourly prices, which the recorder has for its `purge_keep_days` – the
-longer, the more there is from the first day (e.g. 30 days). After that CJP saves the prices every hour itself.
+Most analysis data is calculated from Home Assistant's history and CJP's own data, and refreshed every night.
+Charging-loss and SOC-power learning update hourly. The comparisons need plug-in times and hourly prices,
+which the recorder has for its `purge_keep_days` – the longer, the more there is from the first day (e.g. 30
+days). After that CJP saves the prices every hour itself.
 
 Without a car integration, *Driving and temperature*, *Ready at departure*, *Learned driving distance*,
-*Battery capacity* and *Charging loss per power* are left out, and *Forecast accuracy* shows only the house
-consumption.
+*Battery capacity*, *Charging loss per power* and *Charging power by SOC* are left out, and *Forecast
+accuracy* shows only the house consumption.
 
 ### Economy
 
@@ -245,6 +247,19 @@ See [Charging loss](charging-loss.md).
 <p align="center"><img src="../images/charging-loss-per-power.png" alt="Measured charging loss per power group" width="760"></p>
 
 </details>
+
+### Charging power by SOC
+
+The graph and table show stable, phase-specific charging-power observations by 10% SOC band. A learned cap
+appears only when at least 3 separate sessions show a drop of at least 10% from a lower-SOC band in the same
+session. This comparison helps separate vehicle taper from charger, solar, or site limits, but cannot rule out
+changes in those external limits. Unstable data, unconfirmed phases, and bands without enough evidence do not
+change the plan's existing capacity assumption.
+
+With *Learn charge power by SOC* enabled, the planner applies the learned cap to price intervals that cross a
+trained band, while keeping the existing charger and site limits. The switch is off by default, and this
+estimate does not control the charger. Only raw recorder history is used; hourly long-term statistics are too
+coarse for this model.
 
 ### History
 

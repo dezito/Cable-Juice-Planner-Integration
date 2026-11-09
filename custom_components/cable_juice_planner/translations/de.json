@@ -876,6 +876,9 @@
       "learn_driving_distance": {
         "name": "Fahrstrecke lernen"
       },
+      "learn_soc_charge_power": {
+        "name": "Ladeleistung nach SOC lernen"
+      },
       "use_measured_charging_loss": {
         "name": "Gemessenen Ladeverlust nutzen"
       },
@@ -1128,6 +1131,9 @@
       },
       "last_full_charge": {
         "name": "Letzte Vollladung"
+      },
+      "soc_charging_power_model": {
+        "name": "Ladeleistung nach SOC"
       },
       "charging_loss_model": {
         "name": "Gemessener Ladeverlust"

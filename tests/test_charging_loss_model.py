@@ -62,6 +62,17 @@ def test_segments_match_the_simulated_loss() -> None:
         assert segment["loss"] == pytest.approx(expected, abs=0.01)
         assert segment["kw"] == pytest.approx(11.04, rel=0.01)
 
+def test_raw_segments_include_confirmed_phases_and_power_stability() -> None:
+    start = 1_760_000_000.0
+    soc, meter, power = _session(start, 11.04, 3, 3)
+    phases = [[(start - 600, 16.0)] for _ in range(3)]
+
+    segments = find_segments(soc, meter, power, phases, BATTERY, 3)
+
+    assert segments
+    assert all(segment["phase_observed"] for segment in segments)
+    assert all(segment["power_max_w"] - segment["power_min_w"] <= segment["kw"] * 100 for segment in segments)
+
 
 def test_variable_power_is_still_a_segment() -> None:
     soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)

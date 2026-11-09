@@ -82,6 +82,21 @@ missing:
 The hours with prices from the database are listed under *Using offline prices for some hours* in the
 overview. The database is part of the [backup](../README.md#backup-export-and-import-of-data).
 
+### Vehicle charging power by SOC
+
+The planner normally uses the charger and site capacity. With *Learn charge power by SOC* enabled, it can
+also cap a planned price interval to a measured vehicle-power limit for the SOC bands that interval crosses.
+The cap is learned only from stable raw-history segments with confirmed phase counts: in the same session,
+power must be at least 10% lower in the higher-SOC band, and the drop must appear in at least 3 separate
+sessions for that phase and band. Unstable segments, uncertain phases, and under-sampled bands leave the
+existing capacity assumption unchanged. The learned cap never raises the charger or site limit.
+
+The comparison within a session reduces, but cannot eliminate, the effect of solar, charger, or site limits on
+the observed power. Phase grouping uses CJP's recorded per-phase amp settings, not separate measurements of
+current on each physical phase. This is a planning estimate only; the integration does not send a lower-power
+command to the charger. The [SOC power analysis](dashboard-analysis.md#charging-power-by-soc) shows the learned
+bands.
+
 ### What a solar kWh costs
 
 Charging the car with solar is not free: the kWh could have been sold. So a solar kWh costs what it would

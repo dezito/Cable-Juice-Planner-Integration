@@ -154,7 +154,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.charging_loss_charging_completed = False
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
         self.learned_distances: dict[str, float] = {}  # number key -> learned distance with enough days
-        self.charging_loss_db: dict = {"segments": [], "backfilled": False}
+        self.charging_loss_db: dict = {"segments": [], "soc_power_segments": [], "backfilled": False}
+        self.soc_power_model: dict = {"status": "no_data", "min_sessions": 3, "bands": []}
         self.economy_db: dict = {"windows": []}
         self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
         self.charging_no_rule_count = 0
