@@ -176,6 +176,14 @@ def in_between(check, start, end) -> bool:
         return False
 
 
+def ultra_cheap_limit(average_price: float) -> float:
+    """The price at or under which power is ultra cheap: 25 % under the average of the lowest prices.
+
+    75 % of a negative average (paid to charge) would be above the average itself, so ultra cheap would be
+    easier to reach than very cheap. A negative average therefore gets 25 % more negative instead."""
+    return average_price * (0.75 if average_price >= 0.0 else 1.25)
+
+
 def round_up(n, decimals=0) -> float:
     n = max(n, 0.0)
     multiplier = 10**decimals

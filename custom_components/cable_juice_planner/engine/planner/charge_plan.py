@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ...utils.helpers import average, days_between, end_of_day, in_between, reset_time_to_hour
+from ...utils.helpers import average, days_between, end_of_day, in_between, reset_time_to_hour, ultra_cheap_limit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -294,7 +294,7 @@ class ChargePlan:
             average_price = cheap_average_price[0]
             if round(price, 3) <= average_price:
                 very_cheap_price = True
-            if round(price, 3) <= (average_price * 0.75):
+            if round(price, 3) <= ultra_cheap_limit(average_price):
                 ultra_cheap_price = True
         except Exception as e:
             if "min" not in self.kwh_avg_prices_db or not isinstance(self.kwh_avg_prices_db['min'], list) or len(self.kwh_avg_prices_db['min']) < 1:
@@ -304,7 +304,7 @@ class ChargePlan:
             forecast_price = round(self.get_forecast_value(self.kwh_avg_prices_db['min']), 3)
             if round(price, 3) <= forecast_price:
                 very_cheap_price = True
-            if round(price, 3) <= (forecast_price * 0.75):
+            if round(price, 3) <= ultra_cheap_limit(forecast_price):
                 ultra_cheap_price = True
 
         return [very_cheap_price, ultra_cheap_price]
