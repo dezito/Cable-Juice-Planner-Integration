@@ -17,6 +17,17 @@ FORECAST_DRIVE_TIME = datetime.timedelta(minutes=30)  # dashboard chart only: on
 class ChargePlan:
     """Helpers of the charging plan: hours, limits, prices and warnings."""
 
+    def last_charging_hour(self, departure: datetime.datetime) -> datetime.datetime:
+        """The last hour a departure is charged in: charging is done `last_charging_hour_before_departure_buffer`
+        hours before the departure, so it is the hour that ends then (07:00 and 2 hours: the 04:00 hour, done at 05:00).
+
+        Never before the current hour: the car is already inside the buffer, and what is missing is charged from now on
+        (a window that ends before it starts would wrap around midnight in in_between() and match nearly every hour)."""
+        buffer = self.config['ev_car']['last_charging_hour_before_departure_buffer']
+        hours = int(buffer) if isinstance(buffer, (float, int)) and not isinstance(buffer, bool) else 2
+        last = reset_time_to_hour(departure - datetime.timedelta(hours=max(hours, 0))) - datetime.timedelta(hours=1)
+        return max(last, self.current_hour())
+
     def change_timestamp_with_minutes(self, charging_plan, timestamp: datetime.datetime):
         sub_func_name = "change_timestamp_with_minutes"
 

@@ -56,9 +56,11 @@ class AnalysisStorage:
         today = plan.get(0) if isinstance(plan, dict) else None
         now = self.now()
         pending = self.analysis_db.get("pending_departure")
-        if today and today.get("workday") and today.get("work_goto") and now < today["work_goto"]:
+        # the departure as set: work_goto is moved up to 2 hours later for a car that is still plugged in after it
+        departure = today.get("work_departure") or today.get("work_goto") if today else None
+        if today and today.get("workday") and departure and now < departure:
             self.analysis_db["pending_departure"] = {
-                "date": now.date().isoformat(), "departure": self._analysis_ts(today["work_goto"]),
+                "date": now.date().isoformat(), "departure": self._analysis_ts(departure),
                 "target": round(float(today.get("battery_level_before_work_sum", 0.0)), 1),
                 "required": round(float(today.get("work_battery_level_needed", 0.0)) + self.get_min_daily_battery_level(), 1),
             }

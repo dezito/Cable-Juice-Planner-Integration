@@ -38,6 +38,18 @@ battery, so 60 km ≈ 14 %. With 30 % daily minimum the car needs 44 % at depart
 
 Very small needs (below 1 % of the battery) are skipped, so the car isn't started for a few hundred Wh.
 
+### The buffer before departure
+
+Charging is planned to be **done *Hours before departure* (default 2) before the departure**, so there is time
+to catch up if something goes wrong or the charger is slow at the end. With 07:00 and 2 hours, the last
+planned hour is 04:00–05:00. If energy is still missing (a big need, or the car is plugged in too late), the
+missing energy is also charged in the hours inside the buffer, up to the departure hour (a departure at
+07:30 uses the hours until 07:00).
+
+If the car is **still plugged in at home after the departure** and hasn't reached the level it needs, charging
+continues for up to **2 hours after the departure**, but not past the planned homecoming. The same applies to
+a [trip](trip.md).
+
 ### While the car is at work
 
 When the car is away on a workday and hasn't come home yet, only the way back (half the distance) is left
