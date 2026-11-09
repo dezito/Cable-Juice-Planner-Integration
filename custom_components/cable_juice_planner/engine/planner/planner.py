@@ -305,7 +305,10 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
 
                     last_charging = charging_plan[day]['trip_last_charging']
 
-                    if (charging_plan[day]['workday'] and
+                    # a trip after the homecoming from work: the car is home again, so the part above the max level is charged then
+                    trip_after_work_homecoming = bool(charging_plan[day]['workday']) and charging_plan[day]['work_goto'] < charging_plan[day]['work_homecoming'] < charging_plan[day]['trip_goto']
+
+                    if (charging_plan[day]['workday'] and not trip_after_work_homecoming and
                     ((charging_plan[day]['trip_last_charging'] < charging_plan[day]['work_homecoming'] and charging_plan[day]['trip_last_charging'] > charging_plan[day]['work_last_charging']) or
                     (self.now() > charging_plan[day]['work_last_charging'] and self.battery_level() < max_recommended_battery_level))):
                         charging_plan[day]['trip_last_charging'] = max(charging_plan[day]['work_last_charging'], self.current_hour())
@@ -318,6 +321,12 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                         return bool(charging_plan[day]['workday']) and in_between(moment, charging_plan[day]['work_goto'], charging_plan[day]['work_homecoming'])
 
                     slots = []
+                    if trip_after_work_homecoming and last_charging < charging_plan[day]['work_homecoming']:
+                        # the last charging hour is while the car is at work: the buffer is only a buffer, so the hours after the homecoming are used
+                        slot = max(reset_time_to_hour(charging_plan[day]['work_homecoming']), self.current_hour())
+                        while len(slots) < charging_hours and slot < reset_time_to_hour(charging_plan[day]['trip_goto']):
+                            slots.append(slot)
+                            slot += datetime.timedelta(hours=1)
                     slot = last_charging
                     while len(slots) < charging_hours and slot >= self.current_hour():
                         if not car_is_at_work(slot):
