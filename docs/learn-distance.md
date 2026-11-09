@@ -1,6 +1,11 @@
 # Learn driving distance
 
-**Switch:** *Learn driving distance* (off by default) · needs an EV integration with an odometer
+**Settings → Advanced:** *Learn driving distance* (off by default) · needs an EV integration with an odometer
+
+The switch controls whether learned distances are used; odometer-based suggestions are still
+calculated and shown when it is off. With it on, *Work plan* uses the learned distance for a
+weekday only while that work plan is active, and *Optimal weekly charging* uses the learned
+typical daily distance only while that rule is active.
 
 Instead of guessing the km per workday, CJP can learn them from the odometer.
 

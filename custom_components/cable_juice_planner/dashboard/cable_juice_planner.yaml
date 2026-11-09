@@ -1600,9 +1600,6 @@ views:
       - entity: switch.cjp_workplan_charging
         name:
           type: entity
-      - entity: switch.cjp_learn_driving_distance
-        name:
-          type: entity
       - type: section
         label: '@@monday@@'
       - entity: switch.cjp_workday_monday
@@ -1950,14 +1947,22 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set ns = namespace(forecast_help=none, price_help=none) %}
+        {% set ns = namespace(learn_help=none, forecast_help=none, forecast_type_description=none, price_help=none, sections=[], forecast_section='') %}
+        {% set ns.learn_help = state_attr('switch.cjp_learn_driving_distance', 'help') %}
         {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
+        {% set ns.forecast_type_description = state_attr('select.cjp_forecast_type', 'description') %}
         {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
-        {% if ns.forecast_help or ns.price_help %}<details><summary>@@read_more@@</summary>
+        {% if ns.learn_help %}{% set ns.sections = ns.sections + [ns.learn_help] %}{% endif %}
+        {% if ns.forecast_help %}{% set ns.forecast_section = ns.forecast_help %}{% endif %}
+        {% if ns.forecast_type_description %}
+        {% if ns.forecast_section %}{% set ns.forecast_section = ns.forecast_section ~ '\n\n' %}{% endif %}
+        {% set ns.forecast_section = ns.forecast_section ~ ns.forecast_type_description %}
+        {% endif %}
+        {% if ns.forecast_section %}{% set ns.sections = ns.sections + [ns.forecast_section] %}{% endif %}
+        {% if ns.price_help %}{% set ns.sections = ns.sections + [ns.price_help] %}{% endif %}
+        {% if ns.sections %}<details><summary>@@read_more@@</summary>
 
-        {% if ns.forecast_help %}{{ ns.forecast_help }}{% endif %}
-
-        {% if ns.price_help %}{{ ns.price_help }}{% endif %}
+        {{ ns.sections | join('\n\n---\n\n') }}
 
         </details>{% endif %}
       grid_options: *id001
@@ -1965,12 +1970,17 @@ views:
       state_color: true
       show_header_toggle: false
       entities:
-      - entity: select.cjp_forecast_type
+      - entity: switch.cjp_learn_driving_distance
         name:
           type: entity
+      - type: section
       - entity: switch.cjp_auto_forecast_type
         name:
           type: entity
+      - entity: select.cjp_forecast_type
+        name:
+          type: entity
+      - type: section
       - entity: switch.cjp_price_forecast_correction
         name:
           type: entity
