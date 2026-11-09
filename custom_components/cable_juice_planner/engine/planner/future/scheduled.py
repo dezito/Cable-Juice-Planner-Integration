@@ -43,7 +43,22 @@ class FutureScheduled:
         self.remove_solar_prediction_from_charge_hours(ctx.charging_plan, ctx.energy_prediction_db, timestamp, day, battery_level_added)
 
         total_trip_battery_level_needed = ctx.charging_plan[day]['trip_battery_level_needed'] + ctx.charging_plan[day]['trip_battery_level_above_max']
-        battery_level_sum = total_trip_battery_level_needed + ctx.charging_plan[day]['work_battery_level_needed']
+        work_battery_level_needed = ctx.charging_plan[day]['work_battery_level_needed']
+        if ctx.charging_plan[day]['workday']:
+            daily_minimum = self.get_min_daily_battery_level()
+            battery_level_limit = min(
+                max(self.get_max_recommended_charge_limit_battery_level(), total_trip_battery_level_needed),
+                100.0,
+            )
+            # Over capacity, reserve the daily minimum, then prioritize work before the trip.
+            if work_battery_level_needed + daily_minimum + total_trip_battery_level_needed > battery_level_limit:
+                work_battery_level_needed = min(work_battery_level_needed, max(battery_level_limit - daily_minimum, 0.0))
+                total_trip_battery_level_needed = min(
+                    total_trip_battery_level_needed,
+                    max(battery_level_limit - daily_minimum - work_battery_level_needed, 0.0),
+                )
+
+        battery_level_sum = total_trip_battery_level_needed + work_battery_level_needed
 
         if battery_level_sum > 0.0:
             if "trip" in ctx.charging_plan[day]['rules']:
@@ -52,7 +67,7 @@ class FutureScheduled:
 
             for rule in ctx.charging_plan[day].get('rules', []):
                 if 'workday_preparation' in rule:
-                    cost_work = (ctx.charging_plan[day]['work_battery_level_needed'] / battery_level_sum) * cost_added
+                    cost_work = (work_battery_level_needed / battery_level_sum) * cost_added
                     ctx.charging_plan[day]['work_total_cost'] += cost_work
                     break
 
@@ -72,7 +87,11 @@ class FutureScheduled:
                     ctx.last_charging = min(ctx.charging_plan[day]['work_last_charging'], ctx.charging_plan[day]['trip_last_charging']) if ctx.charging_plan[day]['workday'] else ctx.charging_plan[day]['trip_last_charging']
                     next_departure = min(ctx.charging_plan[day]['work_goto'], ctx.charging_plan[day]['trip_goto']) if ctx.charging_plan[day]['workday'] else ctx.charging_plan[day]['trip_goto']
 
-                kwh_needed_today = max(self.kwh_needed_for_charging(ctx.charging_plan[day]['work_battery_level_needed'] + self.get_min_daily_battery_level(), sum(ctx.charging_plan[day]['battery_level_before_work'])), 0.0)
+                work_battery_level_needed = min(
+                    ctx.charging_plan[day]['work_battery_level_needed'] + self.get_min_daily_battery_level(),
+                    100.0,
+                )
+                kwh_needed_today = max(self.kwh_needed_for_charging(work_battery_level_needed, sum(ctx.charging_plan[day]['battery_level_before_work'])), 0.0)
                 ctx.charging_plan[day]['work_kwh_needed'] = kwh_needed_today
                 kwh_needed_today += ctx.charging_plan[day]['trip_kwh_needed']
 

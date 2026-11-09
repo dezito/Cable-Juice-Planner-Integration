@@ -34,20 +34,19 @@ class FutureSupport:
             what_day_battery_level_after_work = max(sum(ctx.charging_plan[what_day]['battery_level_after_work']), sum(ctx.charging_plan[what_day]['battery_level_at_midnight']))
             after_what_day_battery_level_after_work = max(sum(ctx.charging_plan[min(what_day + 1, 7)]['battery_level_after_work']), sum(ctx.charging_plan[min(what_day + 1, 7)]['battery_level_at_midnight']))
 
-            if price >= 0.0:
-                if ctx.charging_plan[what_day]['workday'] and hour < ctx.charging_plan[what_day]['work_goto']:
-                    battery_level_id = "battery_level_before_work"
+            if ctx.charging_plan[what_day]['workday'] and hour < ctx.charging_plan[what_day]['work_goto']:
+                battery_level_id = "battery_level_before_work"
 
-                    if what_day_battery_level_before_work >= max_recommended_charge_limit_battery_level:
-                        _LOGGER.debug(f"Max battery level reached for day ({what_day}) before work {hour} {price}. {what_day_battery_level_before_work}% >= {max_recommended_charge_limit_battery_level}%")
-                        return return_fail_list
-                else:
-                    if what_day_battery_level_after_work >= max_recommended_charge_limit_battery_level:
-                        _LOGGER.debug(f"Max battery level reached for day ({what_day}) at midnight {hour} {price}. {what_day_battery_level_after_work}% >= {max_recommended_charge_limit_battery_level}%")
-                        return return_fail_list
-                    if what_day + 1 < 7 and after_what_day_battery_level_after_work >= max_recommended_charge_limit_battery_level:
-                        _LOGGER.debug(f"Max battery level reached for next day ({what_day + 1}) at midnight {hour} {price}. {after_what_day_battery_level_after_work}% >= {max_recommended_charge_limit_battery_level}%")
-                        return return_fail_list
+                if what_day_battery_level_before_work >= max_recommended_charge_limit_battery_level:
+                    _LOGGER.debug(f"Max battery level reached for day ({what_day}) before work {hour} {price}. {what_day_battery_level_before_work}% >= {max_recommended_charge_limit_battery_level}%")
+                    return return_fail_list
+            else:
+                if what_day_battery_level_after_work >= max_recommended_charge_limit_battery_level:
+                    _LOGGER.debug(f"Max battery level reached for day ({what_day}) at midnight {hour} {price}. {what_day_battery_level_after_work}% >= {max_recommended_charge_limit_battery_level}%")
+                    return return_fail_list
+                if what_day + 1 < 7 and after_what_day_battery_level_after_work >= max_recommended_charge_limit_battery_level:
+                    _LOGGER.debug(f"Max battery level reached for next day ({what_day + 1}) at midnight {hour} {price}. {after_what_day_battery_level_after_work}% >= {max_recommended_charge_limit_battery_level}%")
+                    return return_fail_list
         except Exception as e:
             _LOGGER.error(f"Error in {sub_sub_func_name} what_day:{what_day} hour:{hour} price:{price} day:{day}: {e} {type(e)}")
             self.persistent_notification(
