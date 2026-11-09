@@ -11,6 +11,7 @@ import math
 import zoneinfo
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from astral import Observer
@@ -1223,6 +1224,98 @@ def _workday_engine(
     result = engine.run_job(snap, engine.charge_if_needed, True)
     assert result.error is None, result.error
     return engine, result
+
+
+def test_negative_prices_obey_max_recommended_level() -> None:
+    engine, _ = _workday_engine(
+        datetime.time(1, 30),
+        level=25,
+        km=300,
+        prices={2: -1.0, 3: -0.9, 4: -0.8, 5: -0.7, 6: -0.6},
+    )
+    work_hours = [engine.charge_hours[timestamp] for timestamp in charge_hours(engine) if engine.charge_hours[timestamp].get("first_workday_preparation")]
+    assert engine.charging_plan[0]["work_battery_level_needed"] + engine.config["ev_car"]["min_daily_battery_level"] > 90
+    assert sum(engine.charging_plan[0]["battery_level_before_work"]) == pytest.approx(90, abs=0.1)
+    assert max(
+        sum(engine.charging_plan[0][key])
+        for key in ("battery_level_before_work", "battery_level_after_work", "battery_level_at_midnight")
+    ) <= 90.1
+    assert sum(hour["battery_level"] for hour in work_hours) == pytest.approx(65, abs=0.1)
+    assert sum(hour["kWh"] for hour in work_hours) <= engine.percentage_to_kwh(65, include_charging_loss=True) + 0.1
+    assert engine.charging_plan[0]["work_total_cost"] == pytest.approx(sum(hour["Cost"] for hour in work_hours), abs=0.05)
+    assert engine.charge_hours["total_cost"] == pytest.approx(
+        sum(engine.charge_hours[timestamp]["Cost"] for timestamp in charge_hours(engine)), abs=0.05
+    )
+
+
+def test_negative_prices_do_not_overcharge_when_workday_need_is_below_limit() -> None:
+    engine, _ = _workday_engine(
+        datetime.time(1, 30),
+        level=25,
+        km=50,
+        prices={2: -1.0, 3: -0.9, 4: -0.8, 5: -0.7, 6: -0.6},
+    )
+    target = engine.charging_plan[0]["work_battery_level_needed"] + engine.config["ev_car"]["min_daily_battery_level"]
+    assert target < 90
+    level = sum(engine.charging_plan[0]["battery_level_before_work"])
+    assert target <= level <= 90.1
+
+
+def test_workday_need_above_100_percent_never_plans_past_battery_capacity() -> None:
+    engine, _ = _workday_engine(
+        datetime.time(1, 30),
+        level=25,
+        km=500,
+        departure=datetime.time(10),
+        prices={2: -1.0, 3: -0.9, 4: -0.8, 5: -0.7, 6: -0.6, 7: -0.5, 8: -0.4, 9: -0.3},
+        settings={"max_recommended_charge_limit_battery_level": 100.0},
+    )
+    work_hours = [engine.charge_hours[timestamp] for timestamp in charge_hours(engine) if engine.charge_hours[timestamp].get("first_workday_preparation")]
+    assert engine.charging_plan[0]["work_battery_level_needed"] + engine.config["ev_car"]["min_daily_battery_level"] > 100
+    assert sum(engine.charging_plan[0]["battery_level_before_work"]) <= 100.1
+    assert sum(hour["battery_level"] for hour in work_hours) <= 75.1
+    assert sum(hour["kWh"] for hour in work_hours) <= engine.percentage_to_kwh(75, include_charging_loss=True) + 0.1
+    assert engine.charge_hours["total_cost"] == pytest.approx(
+        sum(engine.charge_hours[timestamp]["Cost"] for timestamp in charge_hours(engine)), abs=0.05
+    )
+
+
+@pytest.mark.parametrize(
+    ("work_need", "trip_need", "expected_work_cost", "expected_trip_cost"),
+    [(100.0, 100.0, -30.0, 0.0), (40.0, 20.0, -20.0, -10.0)],
+)
+def test_scheduled_cost_split_uses_only_capacity_available_to_each_rule(
+    monkeypatch: pytest.MonkeyPatch,
+    work_need: float,
+    trip_need: float,
+    expected_work_cost: float,
+    expected_trip_cost: float,
+) -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    monkeypatch.setattr(engine, "remove_solar_prediction_from_charge_hours", lambda *args, **kwargs: None)
+    monkeypatch.setattr(engine, "add_charging_session_to_day", lambda *args, **kwargs: "battery_level_before_work")
+    monkeypatch.setattr(engine, "add_charging_to_days", lambda *args, **kwargs: None)
+    ctx = SimpleNamespace(
+        charging_plan={
+            0: {
+                "trip_battery_level_needed": trip_need,
+                "trip_battery_level_above_max": 0.0,
+                "work_battery_level_needed": work_need,
+                "workday": True,
+                "rules": ["trip", "first_workday_preparation"],
+                "trip_total_cost": 0.0,
+                "work_total_cost": 0.0,
+            }
+        },
+        energy_prediction_db={},
+    )
+
+    engine.scheduled_charging_added(
+        ctx, 0, 0, datetime.datetime.combine(DAY, datetime.time(2)), "battery_level_before_work", 1.0, -30.0
+    )
+
+    assert ctx.charging_plan[0]["work_total_cost"] == pytest.approx(expected_work_cost)
+    assert ctx.charging_plan[0]["trip_total_cost"] == pytest.approx(expected_trip_cost)
 
 
 @pytest.mark.parametrize("buffer", [0, 1, 2, 3])
