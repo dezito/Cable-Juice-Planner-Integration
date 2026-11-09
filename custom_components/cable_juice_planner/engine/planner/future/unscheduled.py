@@ -5,6 +5,7 @@ import datetime
 import logging
 
 from ....utils.helpers import days_between, in_between
+from ....prices.intervals import price_interval_at
 from ..charge_plan import FUNC_NAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,7 +61,10 @@ class FutureUnscheduled:
                         if not in_between(timestamp, ctx.current_hour, ctx.last_charging + datetime.timedelta(hours=1)):
                             continue
 
+                        price_interval = price_interval_at(ctx.grid_prices, timestamp)
                         timestamp = self.change_timestamp_with_minutes(ctx.charging_plan, timestamp)
+                        if price_interval is not None and timestamp >= price_interval[1]:
+                            continue
 
                         hour_in_chargeHours, kwh_available = self.kwh_available_in_hour(ctx.chargeHours, timestamp)
                         if hour_in_chargeHours and not kwh_available:

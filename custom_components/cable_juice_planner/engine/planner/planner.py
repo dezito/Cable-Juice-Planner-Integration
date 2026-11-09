@@ -40,6 +40,48 @@ FUNC_NAME = "cheap_grid_charge_hours"
 class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
     """The charging plan, the departure plan and the overview markdown."""
 
+    def merge_charge_intervals(self, charge_hours):
+        merged_intervals = []
+        has_combined = False
+        current_interval = None
+
+        for timestamp, value in sorted(charge_hours):
+            if current_interval is None:
+                current_interval = {
+                    "start": self.charge_plan_start(timestamp),
+                    "end": self.charge_plan_end(timestamp, value['kWh']),
+                    "type": emoji_parse(value),
+                    "percentage": value['battery_level'],
+                    "kWh": round(value['kWh'], 2),
+                    "cost": round(value['Cost'], 2),
+                    "unit": round(value['Price'], 2),
+                }
+            elif timestamp == current_interval["end"] and days_between(current_interval["start"], timestamp) == 0:
+                has_combined = True
+                current_interval["end"] = self.charge_plan_end(timestamp, value['kWh'])
+                current_interval["type"] = join_unique_emojis(current_interval["type"], emoji_parse(value))
+                current_interval["percentage"] += value['battery_level']
+                current_interval["kWh"] += round(value['kWh'], 2)
+                current_interval["cost"] += round(value['Cost'], 2)
+                if current_interval["kWh"] > 0.0:
+                    current_interval["unit"] = current_interval["cost"] / current_interval["kWh"]
+            else:
+                merged_intervals.append(current_interval)
+                current_interval = {
+                    "start": self.charge_plan_start(timestamp),
+                    "end": self.charge_plan_end(timestamp, value['kWh']),
+                    "type": emoji_parse(value),
+                    "percentage": value['battery_level'],
+                    "kWh": round(value['kWh'], 2),
+                    "cost": round(value['Cost'], 2),
+                    "unit": round(value['Price'], 2),
+                }
+
+        if current_interval:
+            merged_intervals.append(current_interval)
+
+        return merged_intervals, has_combined
+
     def cheap_grid_charge_hours(self, force_recalculate=False):  # noqa: C901 - ported as one function
         func_name = "cheap_grid_charge_hours"
 
@@ -483,8 +525,8 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
         self.set_attr("current_charging_rule", "charging_plan", charging_plan_attr)
         self.set_attr("current_charging_rule", "charging_hours", charging_hours_attr)
 
-        # plain data for the dashboard charts: the planned hours and the expected battery level;
-        # end = when the hour's kWh are charged at the hour's capacity (at most the end of the hour)
+        # Plain data for the dashboard charts: each price-period charge and the expected battery level.
+        # End is the time the planned kWh are charged at the hour's capacity, capped at the price interval.
         self.set_attr("current_charging_rule", "charge_plan", [
             {"time": timestamp.isoformat(), "end": self.charge_plan_end(timestamp, value["kWh"]).isoformat(), "kwh": value["kWh"], "battery_level": value["battery_level"], "price": value["Price"], "cost": value["Cost"], "emoji": emoji_parse(value)}
             for timestamp, value in sorted((k, v) for k, v in chargeHours.items() if isinstance(k, datetime.datetime))
@@ -562,43 +604,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 key=lambda kv: kv[0]
             )
 
-            merged_intervals = []
-            has_combined = False
-            current_interval = None
-
-            for timestamp, value in sorted_charge_hours:
-                if current_interval is None:
-                    current_interval = {
-                        "start": timestamp,
-                        "end": timestamp,
-                        "type": emoji_parse(value),
-                        "percentage": value['battery_level'],
-                        "kWh": round(value['kWh'], 2),
-                        "cost": round(value['Cost'], 2),
-                        "unit": round(value['Price'], 2),
-                    }
-                else:
-                    if timestamp == current_interval["end"].replace(minute=0) + datetime.timedelta(hours=1) and days_between(current_interval["start"], timestamp) == 0:
-                        has_combined = True
-                        current_interval["end"] = timestamp
-                        current_interval["type"] = join_unique_emojis(current_interval["type"], emoji_parse(value))
-                        current_interval["percentage"] += value['battery_level']
-                        current_interval["kWh"] += round(value['kWh'], 2)
-                        current_interval["cost"] += round(value['Cost'], 2)
-                    else:
-                        merged_intervals.append(current_interval)
-                        current_interval = {
-                            "start": timestamp,
-                            "end": timestamp,
-                            "type": emoji_parse(value),
-                            "percentage": value['battery_level'],
-                            "kWh": round(value['kWh'], 2),
-                            "cost": round(value['Cost'], 2),
-                            "unit": round(value['Price'], 2),
-                        }
-
-            if current_interval:
-                merged_intervals.append(current_interval)
+            merged_intervals, has_combined = self.merge_charge_intervals(sorted_charge_hours)
 
             overview.append("<center>\n")
             overview.append(f"## 📖 {self.t('ui.cheap_grid_charge_hours.charging_overview_title')} ##")
@@ -608,10 +614,12 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 overview.append("|---:|:---:|---:|---:|:---:|---:|")
 
                 for d in merged_intervals:
-                    if d['start'].strftime('%H') == d['end'].strftime('%H'):
+                    if d['start'] == d['end']:
                         time_range = f"{d['start'].strftime('%d/%m %H:%M')}"
+                    elif d['start'].date() == d['end'].date():
+                        time_range = f"{d['start'].strftime('%d/%m %H:%M')}-{d['end'].strftime('%H:%M')}"
                     else:
-                        time_range = f"{d['start'].strftime('%d/%m %H')}-{d['end'].strftime('%H:%M')}"
+                        time_range = f"{d['start'].strftime('%d/%m %H:%M')}-{d['end'].strftime('%d/%m %H:%M')}"
 
                     overview.append(f"| {emoji_text_format(d['type'], group_size=3)} | **{time_range}** | **{int(round(d['percentage'], 0))}** | **{d['kWh']:.2f}** | **{d['unit']:.2f}** | **{d['cost']:.2f}** |")
 

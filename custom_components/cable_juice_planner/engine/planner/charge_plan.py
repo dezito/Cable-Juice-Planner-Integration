@@ -5,6 +5,7 @@ import datetime
 import logging
 
 from ...utils.helpers import average, days_between, end_of_day, in_between, reset_time_to_hour, ultra_cheap_limit
+from ...prices.intervals import hourly_price_averages, naive_timestamp, price_interval_at
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class ChargePlan:
                 notification_id=f"{self.name}_{FUNC_NAME}_{sub_func_name}_error"
             )
 
-        return timestamp.replace(minute=max(work_minute, trip_minute, 0))
+        return timestamp.replace(minute=max(work_minute, trip_minute, timestamp.minute, 0))
 
     def available_for_charging_prediction(self, charging_plan, timestamp: datetime.datetime, trip_datetime = None, trip_homecoming_datetime = None):
         sub_func_name = "available_for_charging_prediction"
@@ -95,12 +96,7 @@ class ChargePlan:
         kwh_available = False
 
         try:
-            kwh = self.hour_kwh_capacity(hour) - 1.0
-
-            percentage_missed = hour.minute / 60
-            kwh_missed = kwh * percentage_missed
-
-            kwh -= kwh_missed
+            kwh = self.period_kwh_capacity(hour) - 1.0
             if hour in chargeHours:
                 hour_in_chargeHours = True
                 if chargeHours[hour]['kWh'] < kwh:
@@ -113,6 +109,22 @@ class ChargePlan:
                 notification_id=f"{self.name}_{FUNC_NAME}_{sub_func_name}_error"
             )
         return [hour_in_chargeHours, kwh_available]
+
+    def price_period_end(self, timestamp):
+        interval = price_interval_at(self.get_grid_prices(), timestamp)
+        if interval is not None:
+            return interval[1]
+        return reset_time_to_hour(timestamp) + datetime.timedelta(hours=1)
+
+    def period_kwh_capacity(self, timestamp):
+        """Charger capacity in the covered part of the price interval."""
+        interval_end = self.price_period_end(timestamp)
+        start = self.charge_plan_start(timestamp)
+        duration_hours = max((interval_end - start).total_seconds() / 3600, 0.0)
+        return self.hour_kwh_capacity(timestamp) * duration_hours
+
+    def charge_plan_start(self, timestamp):
+        return max(timestamp, naive_timestamp(self.now()))
 
     def check_max_battery_level_allowed(self, charging_plan, day, what_day, battery_level_id, max_recommended_battery_level, battery_level_to_added):
         sub_func_name = "check_max_battery_level_allowed"
@@ -185,21 +197,17 @@ class ChargePlan:
 
         try:
             cost = 0.0
-            kwh = self.hour_kwh_capacity(hour)
+            kwh = self.period_kwh_capacity(hour)
             min_charging_kwh = max(min(min_charging_kwh_cron, min_charging_kwh_ev), 0.2)
             # the charging loss at this hour's power (measured model); kwhNeeded is at the
             # default loss, so the same battery level takes kwh_ratio times the kWh this hour
-            hour_kw = kwh
+            hour_kw = self.hour_kwh_capacity(hour)
             kwh_ratio = (1 + self.charging_loss_factor(hour_kw)) / (1 + self.charging_loss_factor())
 
             battery_level_added = False
 
             price = float(price)
             kwhNeeded = float(kwhNeeded)
-
-            percentage_missed = hour.minute / 60
-            kwh_missed = kwh * percentage_missed
-            kwh -= kwh_missed
 
             if battery_level:
                 if max_recommended_battery_level is None:
@@ -268,7 +276,7 @@ class ChargePlan:
     def fill_up_price_limit(self, fill_up_price_limits, grid_prices):
         """Fill up above the floor only in the cheapest FILL_UP_PRICE_FRACTION of the known hours."""
         if not fill_up_price_limits:
-            prices = sorted(grid_prices.values())
+            prices = sorted(hourly_price_averages(grid_prices).values())
             fill_up_price_limits.append(prices[max(int(len(prices) * FILL_UP_PRICE_FRACTION) - 1, 0)] if prices else 0.0)
         return fill_up_price_limits[0]
 
@@ -279,7 +287,7 @@ class ChargePlan:
             return False
         hour = reset_time_to_hour(timestamp)
         horizon = end_of_day(hour) + datetime.timedelta(days=1)
-        ahead = [p for t, p in grid_prices.items() if hour < t <= horizon]
+        ahead = [p for t, p in hourly_price_averages(grid_prices).items() if hour < t <= horizon]
         return not ahead or price <= min(ahead) * (1 + FILL_UP_LOOK_AHEAD_TOLERANCE)
 
     def cheap_price_check(self, cheap_average_price, grid_prices, price):
@@ -289,7 +297,8 @@ class ChargePlan:
 
         try:
             if not cheap_average_price:
-                lowest_values = sorted(grid_prices.values())[:self.config['database']['kwh_avg_prices_db_data_to_save']]
+                hourly_prices = hourly_price_averages(grid_prices)
+                lowest_values = sorted(hourly_prices.values())[:self.config['database']['kwh_avg_prices_db_data_to_save']]
                 cheap_average_price.append(round(average(lowest_values), 3))
             average_price = cheap_average_price[0]
             if round(price, 3) <= average_price:
@@ -345,11 +354,12 @@ class ChargePlan:
         charging_plan_warnings[plan].append(warning)
 
     def charge_plan_end(self, timestamp, kwh):
-        hour_end = reset_time_to_hour(timestamp) + datetime.timedelta(hours=1)
+        period_end = self.price_period_end(timestamp)
         capacity = self.hour_kwh_capacity(timestamp)
         if capacity <= 0.0:
-            return hour_end
-        return min(timestamp + datetime.timedelta(hours=kwh / capacity), hour_end)
+            return period_end
+        start = self.charge_plan_start(timestamp)
+        return min(start + datetime.timedelta(hours=kwh / capacity), period_end)
 
     def planned_driving(self, charging_plan, now):
         """The driving of every active rule for the dashboard chart, for the bars and the battery

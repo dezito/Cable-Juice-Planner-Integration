@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
 from ..prices.base import sell_adder_sign
+from ..prices.intervals import hourly_price_averages
 from ..utils.formatting import get_list_values
 from ..utils.helpers import (
     average,
@@ -148,7 +149,8 @@ class Pricing:
         count = 0
         expensive = {}
         day_timestamp = self.now().date() + datetime.timedelta(days=day)
-        for timestamp, price in sorted(self.get_grid_prices().items(), key=lambda kv: (kv[1], kv[0]), reverse=True):
+        hourly_prices = hourly_price_averages(self.get_grid_prices())
+        for timestamp, price in sorted(hourly_prices.items(), key=lambda kv: (kv[1], kv[0]), reverse=True):
             if timestamp.date() == day_timestamp:
                 if count < 4:
                     expensive[timestamp] = price
