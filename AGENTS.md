@@ -445,7 +445,9 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   work, so work gets its percentage and the trip the rest. A trip after the
   homecoming gets the rest between homecoming and departure. The part above
   the max recommended level is charged after the homecoming when the trip is
-  after it.
+  after it. That part is charged in the last hours before the departure
+  regardless of price (to spare the battery's lifetime); a later feature may
+  choose the cheapest hours instead, at the cost of the battery's lifetime.
 - Ultra cheap power is 25 % under the average of the 15 lowest known prices,
   also when the average is negative (then 25 % further below zero).
 - Negative prices obey the max recommended charge limit like positive prices.
