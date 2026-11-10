@@ -14,6 +14,7 @@ from homeassistant.util.unit_conversion import DistanceConverter
 from ..const import ENTITY_UNAVAILABLE_STATES
 from ..engine.distance import DISTANCE_WEEKS
 from ..engine.loss import LOSS_GROUP_SIZE, as_series, resample_steps
+from ..engine.soc_power import SOC_POWER_HISTORY_DAYS
 from ..utils.helpers import float_or_none
 from .constants import CHARGING_LOSS_STATISTICS_CHUNK_DAYS, CHARGING_LOSS_STATISTICS_DAYS, CONNECTED_STATUS
 
@@ -109,10 +110,13 @@ class CoordinatorRefresh:
             return
 
         # older charging from the hourly statistics, 30 days at a time, only as far back as a
-        # group still misses measurements (a full group keeps its newest anyway)
+        # group still misses measurements (a full group keeps its newest anyway) and as the charging
+        # power by battery level keeps its statistics
         chunk_end = raw_start
+        statistics_ok = True
         for _ in range(CHARGING_LOSS_STATISTICS_DAYS // CHARGING_LOSS_STATISTICS_CHUNK_DAYS):
-            if groups and all(count >= LOSS_GROUP_SIZE for count in groups.values()):
+            soc_power_done = (end - chunk_end).days >= SOC_POWER_HISTORY_DAYS
+            if groups and all(count >= LOSS_GROUP_SIZE for count in groups.values()) and soc_power_done:
                 break
             chunk_start = chunk_end - datetime.timedelta(days=CHARGING_LOSS_STATISTICS_CHUNK_DAYS)
             try:
@@ -121,6 +125,7 @@ class CoordinatorRefresh:
                 )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Charging loss: could not load the statistics: %s", err)
+                statistics_ok = False
                 break
             if not hourly.get(power_id):
                 break  # before the statistics of the power sensor began
@@ -138,7 +143,7 @@ class CoordinatorRefresh:
             _LOGGER.debug("Charging loss: statistics %s - %s, %s hours", chunk_start.date(), chunk_end.date(), len(hours))
             groups = (await self.async_run_job("charging_loss_update", {"hours": [{"start": ts, **values} for ts, values in hours.items()]})).value or groups
             chunk_end = chunk_start
-        await self.async_run_job("charging_loss_update", {"backfill": True})
+        await self.async_run_job("charging_loss_update", {"backfill": True, "soc_power_statistics_done": statistics_ok})
         _LOGGER.info("Charging loss: history read back to %s, measurements per group %s", chunk_end.date(), groups)
 
     @callback

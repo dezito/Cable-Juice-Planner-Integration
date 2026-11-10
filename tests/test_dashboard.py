@@ -607,6 +607,7 @@ def test_charging_loss_section_on_analysis() -> None:
         "sensor.cjp_tesla_soc_charging_power_model",
         "button.cjp_tesla_recalculate_charging_loss",
         "switch.cjp_tesla_use_measured_charging_loss",
+        "switch.cjp_tesla_learn_soc_charge_power",
     }
     no_ev_config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": ""})
     no_ev = yaml.safe_load(render_dashboard(no_ev_config, "tesla", "entry1", no_ev_entities))
@@ -622,7 +623,9 @@ def test_soc_power_section_on_analysis() -> None:
         section for section in analysis["sections"]
         if any(card.get("heading") == "Ladeeffekt efter SOC" for card in section["cards"])
     )
-    explanation, table, chart = section["cards"][1:]
+    explanation, switch, table, chart = section["cards"][1:]
+
+    assert any(e["entity"] == "switch.cjp_learn_soc_charge_power" or e["entity"].endswith("learn_soc_charge_power") for e in switch["entities"])
 
     assert "Grafen og tabellen" in explanation["content"]
     assert "styrer ikke ladeboksen" in explanation["content"]
@@ -640,8 +643,7 @@ def test_economy_section_on_analysis() -> None:
     assert "@@" not in text
     analysis = yaml.safe_load(text)["views"][2]
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
-    assert headings[0] == "Ladeeffekt efter SOC"
-    assert "Økonomi" in headings
+    assert headings[0] == "Økonomi"
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]
     assert len(charts) == 2
 

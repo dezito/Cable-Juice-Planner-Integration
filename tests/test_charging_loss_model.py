@@ -231,6 +231,24 @@ def test_statistics_segments_from_variable_power_hours() -> None:
     assert segments[0]["hours"] == pytest.approx(3)
 
 
+def test_statistics_power_segments_need_steady_hours_and_certain_phases() -> None:
+    from custom_components.cable_juice_planner.engine.loss import find_statistics_power_segments
+
+    def hour(i: int, kwh: float, soc: float, pmin: float = 5000.0) -> dict:
+        return {"start": 1_760_000_000.0 + i * 3600, "power_mean": kwh * 1000, "power_min": pmin, "power_max": kwh * 1000 + 100, "kwh": kwh, "soc": soc}
+
+    steady = [hour(0, 6.0, 40.0), hour(1, 6.0, 50.0), hour(2, 6.0, 60.0)]
+    one = find_statistics_power_segments(steady, BATTERY, 1)
+    assert len(one) == 2 and one[0]["phases"] == 1 and one[0]["source"] == "statistics"
+    assert not one[0]["phase_observed"]
+    assert find_statistics_power_segments(steady, BATTERY, 3)[0]["phases"] == 3
+    low = [hour(0, 3.0, 40.0), hour(1, 3.0, 50.0)]
+    assert find_statistics_power_segments(low, BATTERY, 3) == []
+    assert find_statistics_power_segments([hour(0, 6.0, 40.0), hour(1, 6.0, 50.0, pmin=0.0)], BATTERY, 1) == []
+    assert find_statistics_power_segments([hour(0, 6.0, 40.0), hour(2, 6.0, 50.0)], BATTERY, 1) == []
+    assert find_statistics_power_segments([hour(0, 6.0, 40.0), hour(1, 6.0, 41.0)], BATTERY, 1) == []
+
+
 def test_old_segments_are_invalidated_for_backfill() -> None:
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
     snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0)))

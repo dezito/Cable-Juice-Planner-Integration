@@ -221,7 +221,8 @@ class CoordinatorLifecycle:
             self._register_triggers()
             self.started = True
             # the first time the whole history, then every hour the last day
-            self._background(self._async_charging_loss_refresh(backfill=not self.engine.charging_loss_backfilled()), "charging_loss_history")
+            backfill = not self.engine.charging_loss_backfilled() or not self.engine.soc_power_statistics_read()
+            self._background(self._async_charging_loss_refresh(backfill=backfill), "charging_loss_history")
             self._background(self._async_economy_refresh(), "economy")
             self._background(self._async_analysis_refresh(), "analysis")
             self._background(self._async_distance_refresh(), "learned_distance")
