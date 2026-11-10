@@ -56,7 +56,7 @@ def test_dashboard_for_a_car_without_solar() -> None:
     assert "cjp_tesla_fill_up" in text and "switch.cjp_fill_up" not in text
     assert "sensor.ev_battery_level" in text
     dashboard = yaml.safe_load(text)
-    assert [view["title"] for view in dashboard["views"]] == ["Oversigt", "Indstillinger", "Analyse"]
+    assert [view["title"] for view in dashboard["views"]] == ["Oversigt", "Indstillinger", "Analyse", "What-if"]
     headings = [card["heading"] for card in _cards(dashboard) if card.get("type") == "heading"]
     # no solar, no virtual car: their sections are gone with their headings
     assert "Sol og husbatteri" not in headings and "Virtuel elbil" not in headings
@@ -134,7 +134,7 @@ def test_every_language_has_every_text() -> None:
 def test_dashboard_layout() -> None:
     config = const.build_config({**OPTIONS, "language": "da"})
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "binary_sensor.cjp_tesla_public_charging_session_done"}
-    overview, settings, _ = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))["views"]
+    overview, settings, *_ = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))["views"]
     headings = lambda view: [card["heading"] for card in _cards(view) if card.get("type") == "heading"]  # noqa: E731
     # the charging history above the overview, like the old dashboard
     contents = [card.get("content") for card in _cards(overview) if card.get("type") == "markdown"]
@@ -237,7 +237,7 @@ def test_simulated_battery_level_on_the_dashboard() -> None:
     config = const.build_config({**OPTIONS, "language": "da", "simulate_battery_level_while_charging": True})
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "number.cjp_tesla_battery_level"}
     dashboard = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
-    overview, settings, _ = dashboard["views"]
+    overview, settings, *_ = dashboard["views"]
     status = next(card for card in _cards(overview) if card.get("type") == "entities" and any(row.get("entity") == "sensor.ev_battery_level" for row in card["entities"]))
     assert [row["entity"] for row in status["entities"]][:2] == ["sensor.ev_battery_level", "number.cjp_tesla_battery_level"]
     graph = next(card for card in _cards(dashboard) if card.get("type") == "history-graph" and any(row.get("entity") == "sensor.ev_battery_level" for row in card["entities"]))
@@ -641,15 +641,81 @@ def test_economy_section_on_analysis() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
-    assert "number.cjp_tesla_subscription_monthly_price" in text
-    assert "Fast månedlig ladepris" in text
-    assert "En positiv forskel betyder, at abonnementet ville have været billigere." in text
     analysis = yaml.safe_load(text)["views"][2]
-    assert "manglende historik kan gøre månedsomkostningen for lav" in text
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
     assert headings[0] == "Økonomi"
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]
     assert len(charts) == 2
+    # the simulated subscription comparison lives on the What-if view, not under Economy
+    analysis_text = yaml.safe_dump(analysis, allow_unicode=True)
+    assert "subscription_monthly_price" not in analysis_text and "subscription_total" not in analysis_text
+    assert "abonnementet ville have været billigere" not in analysis_text
+
+
+def test_what_if_view_holds_the_subscription_comparison() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
+    assert "@@" not in text
+    view = yaml.safe_load(text)["views"][3]
+    assert view["path"] == "what-if" and view["title"] == "What-if"
+    headings = [c["heading"] for c in _cards(view) if c.get("type") == "heading"]
+    assert headings == ["What-if-sammenligninger"]
+    entities = [row["entity"] for c in _cards(view) if c.get("type") == "entities" for row in c["entities"]]
+    assert entities == ["number.cjp_tesla_subscription_monthly_price"]
+    markdown = "\n".join(c.get("content", "") for c in _cards(view) if c.get("type") == "markdown")
+    # Read more covers the simulated nature, the price field, completed months and the recorded-history limit
+    assert "ændrer aldrig den aktuelle plan" in markdown
+    assert "0 slår det fra" in markdown and "0 slår sammenligningen fra" in markdown
+    assert "Kun afsluttede måneder sammenlignes" in markdown
+    assert "manglende historik kan gøre månedsomkostningen for lav" in markdown
+    assert "indtast ikke hele prisen på flere biler" in markdown
+    # the table
+    assert "Fast månedlig ladepris" in markdown
+    assert "En positiv forskel betyder, at abonnementet ville have været billigere." in markdown
+    assert "Kun sessioner registreret i CJP indgår" in markdown
+    assert "subscription_total" in markdown and "subscription_saving" in markdown
+    assert "Indtast en fast månedlig ladepris ovenfor" in markdown
+
+
+def test_what_if_subscription_template_branches() -> None:
+    """Run the What-if table template for: off, on without months, current month only, completed months."""
+    import re
+    from types import SimpleNamespace
+
+    from jinja2 import Environment
+
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    view = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing))["views"][3]
+    template = next(c["content"] for c in _cards(view) if c.get("type") == "markdown" and "subscription_total" in c.get("content", ""))
+    sensor = re.search(r"states\.sensor\.(\w+)\.attributes", template).group(1)
+
+    def render(attributes: dict) -> str:
+        states = SimpleNamespace(sensor=SimpleNamespace(**{sensor: SimpleNamespace(attributes=attributes)}))
+        return Environment().from_string(template).render(states=states)
+
+    off = {"subscription_total": {"enabled": False}, "months": []}
+    assert "Indtast en fast månedlig ladepris ovenfor" in render(off)
+    assert "Indtast en fast månedlig ladepris ovenfor" in render({})  # attributes missing
+    on_empty = render({"subscription_total": {"enabled": True, "comparable_months": 0}, "months": []})
+    assert "ingen registrerede ladeforløb" in on_empty and "Indtast en fast" not in on_empty
+
+    current_only = render({
+        "subscription_total": {"enabled": True, "comparable_months": 0},
+        "months": [{"month": "2026-11", "cost": 12.4, "subscription_status": "current"}],
+    })
+    assert "Indeværende måned er ikke afsluttet" in current_only and "Sammenlignelige måneder" not in current_only
+
+    full = render({
+        "subscription_total": {"enabled": True, "comparable_months": 1, "recorded_cost": 150.0, "price": 100.0, "saving": 50.0},
+        "months": [
+            {"month": "2026-11", "cost": 12.4, "subscription_status": "current"},
+            {"month": "2026-10", "cost": 150.0, "subscription_status": "recorded", "subscription_recorded_cost": 150.0, "subscription_price": 100.0, "subscription_saving": 50.0},
+            {"month": "2026-09", "cost": None, "subscription_status": "incomplete"},
+        ],
+    })
+    assert re.search(r"\| \*\*2026-10\*\* \| 150(\.0)? kr \| 100(\.0)? kr \| 50(\.0)? kr \|", full)
+    assert "Ufuldstændig ladehistorik" in full
+    assert "Sammenlignelige måneder (1):" in full
 
 
 def test_analysis_sections() -> None:

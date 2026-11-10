@@ -2019,14 +2019,7 @@ views:
       heading: '@@section_economy@@'
       icon: mdi:cash-multiple
     - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@economy_explain@@\n\n@@economy_subscription_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: entities
-      entities:
-      - entity: number.cjp_subscription_monthly_price
-        name:
-          type: entity
+      content: "<details><summary>@@read_more@@</summary>\n\n@@economy_explain@@\n\n</details>"
       grid_options:
         columns: full
     - type: markdown
@@ -2065,27 +2058,6 @@ views:
         {%- else -%}
         <ha-alert alert-type="info">@@economy_no_data@@</ha-alert>
         {%- endif %}
-
-        {% set sub = e.subscription_total %}
-        {% if sub and sub.enabled %}
-        ### @@economy_subscription_title@@
-
-        @@economy_subscription_intro@@
-
-        | @@economy_month@@ | @@economy_subscription_recorded@@ | @@economy_subscription_price@@ | @@economy_subscription_difference@@ |
-        |:---|---:|---:|---:|
-        {% for m in e.months | reverse -%}
-        {% if m.subscription_status == 'recorded' -%}
-        | **{{ m.month }}** | {{ m.subscription_recorded_cost | round(0) }} @@valuta@@ | {{ m.subscription_price | round(0) }} @@valuta@@ | {{ m.subscription_saving | round(0) }} @@valuta@@ |
-        {% elif m.subscription_status == 'current' -%}
-        | **{{ m.month }}** | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '&ndash;' }} | &ndash; | *@@economy_subscription_current@@* |
-        {% elif m.subscription_status == 'incomplete' -%}
-        | **{{ m.month }}** | &ndash; | &ndash; | *@@economy_subscription_incomplete@@* |
-        {% endif -%}
-        {% endfor %}
-
-        {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ sub.recorded_cost | round(0) }} @@valuta@@ &rarr; {{ sub.price | round(0) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ sub.saving | round(0) }} @@valuta@@{% endif %}
-        {% endif %}
       grid_options:
         columns: full
     - type: custom:apexcharts-card
@@ -3131,3 +3103,69 @@ views:
       - entity: sensor.cjp_solar_charged_percentage
       grid_options: *id001
     column_span: 1
+- type: sections
+  path: what-if
+  title: '@@view_what_if@@'
+  max_columns: 4
+  dense_section_placement: true
+  sections:
+  # simulated comparisons that never change the plan, the settings, the car or the charger
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_what_if@@'
+      icon: mdi:compare-horizontal
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_explain@@\n\n@@economy_subscription_explain@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      entities:
+      - entity: number.cjp_subscription_monthly_price
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      card_mod:
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+      content: |-
+        {% set e = states.sensor.cjp_economy.attributes %}
+        {% set sub = e.subscription_total %}
+        ### @@economy_subscription_title@@
+
+        {% if not (sub and sub.enabled) -%}
+        <ha-alert alert-type="info">@@what_if_subscription_off@@</ha-alert>
+        {%- elif not e.months -%}
+        <ha-alert alert-type="info">@@what_if_subscription_empty@@</ha-alert>
+        {%- else -%}
+        @@economy_subscription_intro@@
+
+        | @@economy_month@@ | @@economy_subscription_recorded@@ | @@economy_subscription_price@@ | @@economy_subscription_difference@@ |
+        |:---|---:|---:|---:|
+        {% for m in e.months | reverse -%}
+        {% if m.subscription_status == 'recorded' -%}
+        | **{{ m.month }}** | {{ m.subscription_recorded_cost | round(0) }} @@valuta@@ | {{ m.subscription_price | round(0) }} @@valuta@@ | {{ m.subscription_saving | round(0) }} @@valuta@@ |
+        {% elif m.subscription_status == 'current' -%}
+        | **{{ m.month }}** | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '&ndash;' }} | &ndash; | *@@economy_subscription_current@@* |
+        {% elif m.subscription_status == 'incomplete' -%}
+        | **{{ m.month }}** | &ndash; | &ndash; | *@@economy_subscription_incomplete@@* |
+        {% endif -%}
+        {% endfor %}
+
+        {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ sub.recorded_cost | round(0) }} @@valuta@@ &rarr; {{ sub.price | round(0) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ sub.saving | round(0) }} @@valuta@@{% endif %}
+        {%- endif %}
+      grid_options: *id001
