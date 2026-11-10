@@ -335,7 +335,7 @@ are not stored in the recorder database.
 ## Dashboard
 
 With **Dashboard in the sidebar** enabled (default), each car gets its own dashboard,
-e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with three views. You choose its sidebar icon when adding the car, and can change it under **Configure → General**:
+e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choose its sidebar icon when adding the car, and can change it under **Configure → General**:
 
 - **Overview:** battery level with forecast and planned charging hours, electricity prices with solar and the
   charging plan, current charging rule, status, manual and forced charging, trip, public charging, the
@@ -344,6 +344,8 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with three views. You choo
   solar/home battery, charging loss and virtual EV – with "Read more"
 - **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price
   forecast, battery capacity and charging loss
+- **What-if:** simulated comparisons that never change the plan, currently the cost recorded in the charging
+  history against a fixed monthly charging price
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to
