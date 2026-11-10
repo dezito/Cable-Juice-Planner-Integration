@@ -657,7 +657,7 @@ def test_what_if_view_holds_the_subscription_comparison() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
     view = yaml.safe_load(text)["views"][3]
-    assert view["path"] == "what-if" and view["title"] == "What-if"
+    assert view["path"] == "what-if" and view["title"] == "What-if" and view["icon"] == "mdi:flask-outline"
     headings = [c["heading"] for c in _cards(view) if c.get("type") == "heading"]
     assert headings == ["What-if-sammenligninger"]
     entities = [row["entity"] for c in _cards(view) if c.get("type") == "entities" for row in c["entities"]]
