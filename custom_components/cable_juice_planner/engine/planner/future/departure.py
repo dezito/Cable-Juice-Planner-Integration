@@ -35,8 +35,8 @@ class FutureDeparture:
                 from_battery_solar = 0.0
                 if ctx.charging_plan[day][event_type]:
                     if event_type in ('workday', 'trip') and ctx.charging_plan[day][event_type]:
-                        goto_key = 'trip_goto' if event_type == 'trip' else 'work_goto'
-                        event_time_start = ctx.charging_plan[day][goto_key]
+                        goto_key = 'trip_departure' if event_type == 'trip' else 'work_departure'
+                        event_time_start = ctx.charging_plan[day][goto_key] or ctx.charging_plan[day]['trip_goto' if event_type == 'trip' else 'work_goto']
                         event_time_end = ctx.charging_plan[day]['trip_homecoming'] if event_type == 'trip' else ctx.charging_plan[day]['work_homecoming']
 
                         emoji = emoji_parse({'trip': True}) if event_type == 'trip' else ctx.charging_plan[day]['emoji']

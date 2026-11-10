@@ -107,6 +107,11 @@ class FutureScheduled:
                 ctx.charging_plan[day]['work_kwh_needed'] = kwh_needed_today
                 kwh_needed_today += ctx.charging_plan[day]['trip_kwh_needed']
 
+                def departure_for(timestamp):
+                    # a trip after the homecoming from work: the hours after the homecoming end at the trip, not at the earlier work departure
+                    if ctx.charging_plan[day]['workday'] and ctx.charging_plan[day]['trip'] and ctx.charging_plan[day]['trip_goto'] > ctx.charging_plan[day]['work_homecoming'] > ctx.charging_plan[day]['work_goto'] and timestamp >= reset_time_to_hour(ctx.charging_plan[day]['work_homecoming']):
+                        return ctx.charging_plan[day]['trip_goto']
+                    return next_departure
                 #Workaround for cold weather
                 if kwh_needed_today <= max((self.config['ev_car']['battery_size'] / 100), 0.3):
                     kwh_needed_today = 0.0
@@ -175,7 +180,7 @@ class FutureScheduled:
                                 #Workaround for cold battery percentage: ex. 90% normal temp = 89% cold temp
                                 continue'''
 
-                            kwh_needed_today, ctx.totalCost, ctx.totalkWh, battery_level_added, cost_added = self.add_to_charge_hours(ctx.chargeHours, ctx.charging_plan, kwh_needed_today, ctx.totalCost, ctx.totalkWh, timestamp, price, None, None, kwh_available, sum(ctx.charging_plan[what_day][battery_level_id]), check_max_charging_plan={"day": day, "what_day": what_day, "battery_level_id": battery_level_id}, max_recommended_battery_level=max_recommended_charge_limit_battery_level, rules=ctx.charging_plan[day]['rules'])
+                            kwh_needed_today, ctx.totalCost, ctx.totalkWh, battery_level_added, cost_added = self.add_to_charge_hours(ctx.chargeHours, ctx.charging_plan, kwh_needed_today, ctx.totalCost, ctx.totalkWh, timestamp, price, None, None, kwh_available, sum(ctx.charging_plan[what_day][battery_level_id]), check_max_charging_plan={"day": day, "what_day": what_day, "battery_level_id": battery_level_id},                             max_recommended_battery_level=max_recommended_charge_limit_battery_level, rules=ctx.charging_plan[day]['rules'], until=departure_for(timestamp))
 
                             if timestamp in ctx.chargeHours and battery_level_added:
                                 self.scheduled_charging_added(ctx, day, what_day, timestamp, battery_level_id, battery_level_added, cost_added)
