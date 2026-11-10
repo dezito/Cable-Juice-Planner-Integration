@@ -120,9 +120,11 @@ class ChargePlan:
         """Charger capacity in the covered part of the price interval."""
         return self.period_charge_capacity(timestamp, battery_level)[0]
 
-    def period_charge_capacity(self, timestamp, battery_level=None):
-        """(kWh, kW) available in the covered part of a price interval."""
+    def period_charge_capacity(self, timestamp, battery_level=None, until=None):
+        """(kWh, kW) available in the covered part of a price interval, up to `until` (the departure) when it falls inside it."""
         interval_end = self.price_period_end(timestamp)
+        if until is not None and timestamp < until:
+            interval_end = min(interval_end, until)
         start = self.charge_plan_start(timestamp)
         duration_hours = max((interval_end - start).total_seconds() / 3600, 0.0)
         base_kw = self.hour_kwh_capacity(timestamp)
@@ -189,7 +191,7 @@ class ChargePlan:
 
         return self.percentage_to_kwh(battery_level_to_added, include_charging_loss = True)
 
-    def add_to_charge_hours(self, chargeHours, charging_plan, kwhNeeded, totalCost, totalkWh, hour, price, very_cheap_price, ultra_cheap_price, kwh_available, battery_level = None, check_max_charging_plan = None, max_recommended_battery_level = None, rules = None):
+    def add_to_charge_hours(self, chargeHours, charging_plan, kwhNeeded, totalCost, totalkWh, hour, price, very_cheap_price, ultra_cheap_price, kwh_available, battery_level = None, check_max_charging_plan = None, max_recommended_battery_level = None, rules = None, until = None):
         sub_func_name = "add_to_charge_hours"
 
         # a copy: the price rules of this hour must not stick to the caller's list
@@ -210,7 +212,7 @@ class ChargePlan:
 
         try:
             cost = 0.0
-            kwh, hour_kw = self.period_charge_capacity(hour, battery_level)
+            kwh, hour_kw = self.period_charge_capacity(hour, battery_level, until)
             min_charging_kwh = max(min(min_charging_kwh_cron, min_charging_kwh_ev), 0.2)
             # the charging loss at this hour's power (measured model); kwhNeeded is at the
             # default loss, so the same battery level takes kwh_ratio times the kWh this hour
@@ -396,11 +398,11 @@ class ChargePlan:
                 driving.append({"start": start, "end": end, "km": typical_distance * part,
                                 "battery_level": self.calc_distance_to_battery_level(typical_distance) * part, "away": False, "spread": True})
             if plan_day["workday"]:
-                driving.append({"start": plan_day["work_goto"], "end": plan_day["work_homecoming"], "km": plan_day["work_range_needed"],
+                driving.append({"start": plan_day["work_departure"] or plan_day["work_goto"], "end": plan_day["work_homecoming"], "km": plan_day["work_range_needed"],
                                 "battery_level": plan_day["work_battery_level_needed"], "away": plan_day["work_away"], "spread": False})
             if plan_day["trip"]:
                 used = max(plan_day["trip_battery_level_needed"] + plan_day["trip_battery_level_above_max"] - self.get_min_trip_battery_level(), 0.0)
-                driving.append({"start": plan_day["trip_goto"], "end": plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"]),
+                driving.append({"start": plan_day["trip_departure"] or plan_day["trip_goto"], "end": plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"]),
                                 "km": trip_range or self.calc_battery_level_to_distance(used), "battery_level": used, "away": False, "spread": False})
         return driving
 

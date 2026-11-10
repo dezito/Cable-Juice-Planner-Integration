@@ -1523,6 +1523,33 @@ def test_a_trip_above_the_max_level_is_never_charged_in_hours_that_have_passed()
     assert max(trip_hours) < datetime.datetime.combine(DAY, datetime.time(9)), trip_hours
 
 
+def test_the_displays_show_the_set_departure_while_the_car_is_charged_after_it() -> None:
+    """The plan's goto moves up to 2 hours later for a car still plugged in; the overview, the driving forecast and the attribute show the departure as set."""
+    departure = datetime.datetime.combine(DAY, datetime.time(7))
+    engine, result = _workday_engine(datetime.time(7, 30), level=20, km=150)
+    today = engine.charging_plan[0]
+    assert today["work_goto"] > departure and today["work_departure"] == departure
+    assert str(departure) in str(result.attributes)
+    assert "*07:00*" in str(result.attributes) and "*07:30*" not in str(result.attributes)
+
+    settings = {
+        "trip_date_time": departure,
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(18)),
+        "trip_charge_procent": 80.0,
+    }
+    engine, result = run(7, level=30, settings=settings, **PLUGGED_IN)
+    today = engine.charging_plan[0]
+    assert today["trip_goto"] > departure and today["trip_departure"] == departure
+    assert str(departure) in str(result.attributes)
+
+
+def test_the_departure_hour_is_not_booked_as_a_whole_hour() -> None:
+    """Departure 09:30 planned at 09:10: only the 20 minutes left before the departure can be charged, not the rest of the 09:00 hour."""
+    engine, _ = _workday_engine(datetime.time(9, 10), level=20, km=150, departure=datetime.time(9, 30))
+    departure_hour = datetime.datetime.combine(DAY, datetime.time(9))
+    assert engine.charge_hours[departure_hour]["kWh"] <= MAX_WATT / 1000 * (20 / 60) + 0.01
+
+
 def test_a_short_workday_gives_a_shorter_extension_after_the_departure() -> None:
     """Departure 07:00, homecoming 08:30: the extension stops before the homecoming, it is not dropped."""
     settings = {"workday_homecoming_thursday": datetime.time(8, 30)}

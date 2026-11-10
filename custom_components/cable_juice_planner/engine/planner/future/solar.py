@@ -25,16 +25,18 @@ class FutureSolar:
                 sunset_text = f"{emoji_parse({'sunset': True})}{date_to_string(date = sunset, format = '%H:%M')}"
 
                 timeperiod = []
+                work_departure = ctx.charging_plan[day]['work_departure'] or ctx.charging_plan[day]['work_goto']
+                trip_departure = ctx.charging_plan[day]['trip_departure'] or ctx.charging_plan[day]['trip_goto']
                 if ctx.charging_plan[day]['workday']:
-                    if sunrise <= ctx.charging_plan[day]['work_goto']:
-                        timeperiod.append(f"{sunrise_text}-{emoji_parse({'goto': True})}{date_to_string(date = ctx.charging_plan[day]['work_goto'], format = '%H:%M')}")
+                    if sunrise <= work_departure:
+                        timeperiod.append(f"{sunrise_text}-{emoji_parse({'goto': True})}{date_to_string(date = work_departure, format = '%H:%M')}")
                         if sunset >= ctx.charging_plan[day]['work_homecoming']:
                             timeperiod.append("<br>")
                     if sunset >= ctx.charging_plan[day]['work_homecoming']:
                         timeperiod.append(f"{emoji_parse({'homecoming': True})}{date_to_string(date = ctx.charging_plan[day]['work_homecoming'], format = '%H:%M')}-{sunset_text}")
                 elif ctx.charging_plan[day]['trip']:
-                    if sunrise <= ctx.charging_plan[day]['trip_goto']:
-                        timeperiod.append(f"{sunrise_text}-{emoji_parse({'trip': True})}{date_to_string(date = ctx.charging_plan[day]['trip_goto'], format = '%H:%M')}")
+                    if sunrise <= trip_departure:
+                        timeperiod.append(f"{sunrise_text}-{emoji_parse({'trip': True})}{date_to_string(date = trip_departure, format = '%H:%M')}")
                         if sunset >= ctx.charging_plan[day]['trip_homecoming']:
                             timeperiod.append("<br>")
                     if sunset >= ctx.charging_plan[day]['trip_homecoming']:

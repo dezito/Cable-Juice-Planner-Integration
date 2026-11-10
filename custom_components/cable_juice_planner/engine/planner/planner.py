@@ -189,6 +189,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 "end_of_day": end_of_day_datetime,
                 "trip": False,
                 "trip_goto": None,
+                "trip_departure": None,
                 "trip_homecoming": None,
                 "trip_last_charging": None,
                 "trip_kwh_needed": 0.0,
@@ -277,6 +278,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             if self.is_trip_planned() and trip_date_time and day == days_between(self.now(), trip_date_time):
                 charging_plan[day]['trip'] = True
                 charging_plan[day]['trip_goto'] = trip_date_time
+                charging_plan[day]['trip_departure'] = trip_date_time  # as set, before trip_goto is moved for a car that is still plugged in
                 charging_plan[day]['trip_homecoming'] = trip_homecoming_date_time
 
                 diff = minutes_between(now, charging_plan[day]['trip_goto'])
@@ -493,7 +495,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
 
                         if (k == "workday" and v) or (k == "trip" and v):
                             if k == "workday":
-                                charging_plan_attr[title]["Work goto"] = f"{value['work_goto']}"
+                                charging_plan_attr[title]["Work goto"] = f"{value['work_departure'] or value['work_goto']}"
                                 charging_plan_attr[title]["Work homecoming"] = f"{value['work_homecoming']}"
                                 charging_plan_attr[title]["Work last_charging"] = f"{value['work_last_charging']}"
                                 charging_plan_attr[title]["Work range_needed"] = f"{value['work_range_needed']} {self.t('ui.common.distance_type')}"
@@ -501,7 +503,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                                 charging_plan_attr[title]["Work battery level needed"] = f"{value['work_battery_level_needed']:.2f}%"
                                 charging_plan_attr[title]["Work kwh_needed"] = f"{value['work_kwh_needed']:.2f} kWh"
                             if k == "trip":
-                                charging_plan_attr[title]["Trip goto"] = f"{value['trip_goto']}"
+                                charging_plan_attr[title]["Trip goto"] = f"{value['trip_departure'] or value['trip_goto']}"
                                 charging_plan_attr[title]["Trip homecoming"] = f"{value['trip_homecoming']}"
                                 charging_plan_attr[title]["Trip last charging"] = f"{value['trip_last_charging']}"
                                 charging_plan_attr[title]["Trip total cost"] = f"{value['trip_total_cost']:.2f} {self.t('ui.common.valuta')}"
