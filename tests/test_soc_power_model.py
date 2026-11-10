@@ -76,14 +76,33 @@ def test_insufficient_or_unstable_sessions_do_not_create_a_cap() -> None:
         *_session(1_760_172_800.0),
     ]
     unknown_phases = build_soc_power_model([{**segment, "phase_observed": False} for segment in confirmed_raw])
-    hourly_statistics = build_soc_power_model([{**segment, "source": "statistics"} for segment in confirmed_raw])
-
     assert two_sessions["status"] == "learning"
     assert all(row["cap_kw"] is None for row in two_sessions["bands"])
     assert unstable["status"] == "learning"
     assert all(row["cap_kw"] is None for row in unstable["bands"])
     assert unknown_phases["status"] == "no_data"
-    assert hourly_statistics["status"] == "no_data"
+
+
+def test_statistics_give_a_marked_start_cap_until_own_data_exists() -> None:
+    statistics = [{**segment, "source": "statistics", "phase_observed": False} for start in (1_760_000_000.0, 1_760_086_400.0, 1_760_172_800.0) for segment in _session(start)]
+    model = build_soc_power_model(statistics)
+    capped = next(row for row in model["bands"] if row["cap_kw"] is not None)
+    assert capped["source"] == "statistics"
+    assert capped["cap_kw"] == 5.0
+
+    own = [segment for start in (1_760_000_000.0, 1_760_086_400.0, 1_760_172_800.0) for segment in _session(start, high_kw=6.0)]
+    combined = build_soc_power_model([*own, *statistics])
+    row = next(row for row in combined["bands"] if row["soc_start"] == 80)
+    assert row["cap_kw"] == 6.0
+    assert "source" not in row
+
+
+def test_merge_statistics_segments_dedups() -> None:
+    from custom_components.cable_juice_planner.engine.soc_power import merge_statistics_segments
+
+    seg = {"start": 1_760_000_000.0, "end": 1_760_000_600.0, "phases": 1, "kw": 5.0, "source": "statistics"}
+    merged = merge_statistics_segments([seg], [dict(seg)], 1_760_001_000.0)
+    assert len(merged) == 1
 
 
 def test_soc_reset_splits_sessions_and_cannot_create_a_false_taper() -> None:

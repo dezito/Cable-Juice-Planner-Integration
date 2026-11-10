@@ -258,8 +258,10 @@ change the plan's existing capacity assumption.
 
 With *Learn charge power by SOC* enabled, the planner applies the learned cap to price intervals that cross a
 trained band, while keeping the existing charger and site limits. The switch is off by default, and this
-estimate does not control the charger. Only raw recorder history is used; hourly long-term statistics are too
-coarse for this model.
+estimate does not control the charger. Until a band has its own measurements, stable hourly long-term
+statistics give start values, marked 📊 in the table. They have no phase data, so they only count where the
+phase count is certain (a 1-phase charger, or above 3.8 kW on a 3-phase charger). Own measurements always win.
+The section sits below the charging-loss section.
 
 ### History
 

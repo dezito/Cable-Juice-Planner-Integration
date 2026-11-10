@@ -26,7 +26,7 @@ import logging
 import statistics
 from typing import Any
 
-from .soc_power import build_soc_power_model, merge_power_segments
+from .soc_power import build_soc_power_model, merge_power_segments, merge_statistics_segments
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ LOSS_OUTLIER_MIN_RESIDUAL = 0.05
 LOSS_METER_MAX_GAP = 20 * 60  # s between the meter readings around a change of the battery level
 LOSS_POWER_MAX_GAP = 15 * 60  # s without a power value inside a segment
 LOSS_STATISTICS_WEIGHT = 0.5
+LOSS_STATISTICS_POWER_MIN_SOC_DELTA = 3.0  # % between two hourly means for the charging power by battery level
 LOSS_SEGMENT_VERSION = 2
+SOC_POWER_STATISTICS_VERSION = 1
 LOSS_SHARE_LIMITS = (-0.3, 0.6)  # a wrong battery size moves the loss, so the limits are wide
 CAPACITY_MONTHS = 36
 LOSS_THREE_PHASE_MIN_KW = 3.8  # above the most 1 phase can give (16 A * 230 V = 3.7 kW)
@@ -241,6 +243,47 @@ def find_statistics_segments(hours: list[dict], battery_size: float, configured_
     return segments
 
 
+def find_statistics_power_segments(hours: list[dict], battery_size: float, configured_phases: int) -> list[dict]:
+    """Hour pairs of steady charging, for the charging power by battery level (soc_power).
+
+    hours as in find_statistics_segments. The mean level is the level at the middle of the
+    hour, so a segment runs from the middle of one hour to the middle of the next, with half
+    of each hour's kWh. An hour that is not steady (it started or stopped, or the power
+    changed) is left out. The hourly statistics have no phases: they are known from the
+    power only when the charger has 1 phase, or above what 1 phase can give; a lower power
+    on a 3 phase charger is ambiguous and left out.
+    """
+    def steady(hour):
+        return (
+            (hour.get("power_min") or 0.0) >= LOSS_MIN_POWER
+            and (hour.get("kwh") or 0.0) > 0.0
+            and hour.get("soc") is not None
+        )
+
+    segments = []
+    ordered = sorted(hours, key=lambda h: h["start"])
+    for first, second in zip(ordered, ordered[1:]):
+        if second["start"] - first["start"] != 3600 or not steady(first) or not steady(second):
+            continue
+        soc_delta = second["soc"] - first["soc"]
+        if soc_delta < LOSS_STATISTICS_POWER_MIN_SOC_DELTA:
+            continue
+        kwh = (first["kwh"] + second["kwh"]) / 2
+        if configured_phases >= 3:
+            if kwh <= LOSS_THREE_PHASE_MIN_KW:
+                continue
+            phases = 3
+        else:
+            phases = 1
+        if (segment := _segment(
+            first["start"] + 1800, second["start"] + 1800, kwh, soc_delta, battery_size, phases, "statistics",
+            first["soc"], second["soc"], False,
+            min(first["power_min"], second["power_min"]), max(first.get("power_max") or 0.0, second.get("power_max") or 0.0),
+        )) is not None:
+            segments.append(segment)
+    return segments
+
+
 def merge_segments(old: list[dict], new: list[dict]) -> list[dict]:
     """Add new segments (the same charging found again is skipped), newest LOSS_GROUP_SIZE per group."""
     merged = list(old)
@@ -381,7 +424,17 @@ class Loss:
             self.charging_loss_db.update(segments=[], backfilled=False, segment_version=LOSS_SEGMENT_VERSION)
             self.mark_dirty("charging_loss")
         self.charging_loss_db.setdefault("soc_power_segments", [])
-        self.soc_power_model = build_soc_power_model(self.charging_loss_db["soc_power_segments"])
+        self.charging_loss_db.setdefault("soc_power_statistics", [])
+        self._rebuild_soc_power_model()
+
+    def _rebuild_soc_power_model(self) -> None:
+        self.soc_power_model = build_soc_power_model([
+            *self.charging_loss_db.get("soc_power_segments", []),
+            *self.charging_loss_db.get("soc_power_statistics", []),
+        ])
+
+    def soc_power_statistics_read(self) -> bool:
+        return self.charging_loss_db.get("soc_power_statistics_version") == SOC_POWER_STATISTICS_VERSION
 
     def _fallback_loss_share(self) -> float:
         loss = abs(self.config["charger"]["charging_loss"])  # kWh from the charger = kWh in the car * (1 + loss)
@@ -412,7 +465,19 @@ class Loss:
             if power_segments != self.charging_loss_db.get("soc_power_segments", []):
                 self.charging_loss_db["soc_power_segments"] = power_segments
                 self.mark_dirty("charging_loss")
-            self.soc_power_model = build_soc_power_model(power_segments)
+        if data.get("hours"):
+            statistics_segments = merge_statistics_segments(
+                self.charging_loss_db.get("soc_power_statistics", []),
+                find_statistics_power_segments(data["hours"], battery_size, configured),
+                self._snap.now.timestamp(),
+            )
+            if statistics_segments != self.charging_loss_db.get("soc_power_statistics", []):
+                self.charging_loss_db["soc_power_statistics"] = statistics_segments
+                self.mark_dirty("charging_loss")
+        if data.get("soc_power_statistics_done"):
+            self.charging_loss_db["soc_power_statistics_version"] = SOC_POWER_STATISTICS_VERSION
+            self.mark_dirty("charging_loss")
+        self._rebuild_soc_power_model()
         segments = merge_segments(self.charging_loss_db.get("segments", []), found)
         # every segment counts per month, also those not kept: kWh per % over time (battery capacity)
         months = self.charging_loss_db.setdefault("months", {})
@@ -439,8 +504,8 @@ class Loss:
 
     def charging_loss_reset(self) -> None:
         """button recalculate_charging_loss: forget the segments, the coordinator reads the history again."""
-        self.charging_loss_db = {"segments": [], "soc_power_segments": [], "backfilled": False, "segment_version": LOSS_SEGMENT_VERSION}
-        self.soc_power_model = build_soc_power_model([])
+        self.charging_loss_db = {"segments": [], "soc_power_segments": [], "soc_power_statistics": [], "backfilled": False, "segment_version": LOSS_SEGMENT_VERSION}
+        self._rebuild_soc_power_model()
         self.mark_dirty("charging_loss")
         self.publish_charging_loss_model()
         self.publish_soc_power_model()

@@ -27,6 +27,23 @@ def _stable(segment: dict[str, Any]) -> bool:
         return False
 
 
+def _trusted(segment: dict[str, Any]) -> bool:
+    """Raw history with observed phases, or hourly statistics whose phases were unambiguous."""
+    source = segment.get("source")
+    return (source == "history" and segment.get("phase_observed") is True) or source == "statistics"
+
+
+def merge_statistics_segments(old: list[dict[str, Any]], new: list[dict[str, Any]], now: float) -> list[dict[str, Any]]:
+    """Add hourly-statistics segments (the same hours found again replace each other), bounded like the raw ones."""
+    cutoff = now - SOC_POWER_HISTORY_DAYS * 86400
+    unique = {
+        (segment["start"], segment["end"], segment["phases"]): segment
+        for segment in [*old, *new]
+        if isinstance(segment, dict) and segment.get("source") == "statistics" and segment.get("start", 0) >= cutoff
+    }
+    return sorted(unique.values(), key=lambda segment: segment["start"])[-SOC_POWER_MAX_SEGMENTS:]
+
+
 def merge_power_segments(
     old: list[dict[str, Any]],
     new: list[dict[str, Any]],
@@ -73,8 +90,7 @@ def _sessions(segments: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
             continue
         if (
             not _stable(segment)
-            or segment.get("source") != "history"
-            or segment.get("phase_observed") is not True
+            or not _trusted(segment)
             or phases not in (1, 3)
             or end <= start
             or not 0 <= soc_start < soc_end <= 100
@@ -96,8 +112,8 @@ def _sessions(segments: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     return sessions
 
 
-def build_soc_power_model(segments: list[dict[str, Any]]) -> dict[str, Any]:
-    """Learn a band's cap only when it repeatedly tapers within distinct stable sessions."""
+def _band_rows(segments: list[dict[str, Any]]) -> dict[tuple[int, int], dict[str, Any]]:
+    """The rows per (phases, band) from segments of one source."""
     samples: dict[tuple[int, int], dict[float, float]] = {}
     tapered: dict[tuple[int, int], dict[float, float]] = {}
 
@@ -130,18 +146,36 @@ def build_soc_power_model(segments: list[dict[str, Any]]) -> dict[str, Any]:
             if candidate_caps:
                 tapered.setdefault((phases, band), {})[session_id] = min(candidate_caps)
 
-    rows = []
+    rows = {}
     for phases, band in sorted(set(samples) | set(tapered)):
         observations = tapered.get((phases, band), {})
         cap = min(observations.values()) if len(observations) >= SOC_POWER_MIN_SESSIONS else None
-        rows.append({
+        rows[(phases, band)] = {
             "phases": phases,
             "soc_start": band,
             "soc_end": band + SOC_POWER_BAND_SIZE,
             "sessions": len(observations),
             "sample_sessions": len(samples.get((phases, band), {})),
             "cap_kw": round(cap, 2) if cap is not None else None,
-        })
+        }
+    return rows
+
+
+def build_soc_power_model(segments: list[dict[str, Any]]) -> dict[str, Any]:
+    """Learn a band's cap only when it repeatedly tapers within distinct stable sessions.
+
+    A band without a cap from the raw history takes the cap of the hourly statistics (marked
+    source "statistics") until the raw history has measured it itself.
+    """
+    own = _band_rows([segment for segment in segments if segment.get("source") == "history"])
+    older = _band_rows([segment for segment in segments if segment.get("source") == "statistics"])
+    rows = []
+    for key in sorted(set(own) | set(older)):
+        row = own.get(key)
+        fallback = older.get(key)
+        if fallback is not None and (row is None or (row["cap_kw"] is None and fallback["cap_kw"] is not None)):
+            row = {**fallback, "source": "statistics"}
+        rows.append(row)
     return {
         "status": "ready" if any(row["cap_kw"] is not None for row in rows) else "learning" if rows else "no_data",
         "min_sessions": SOC_POWER_MIN_SESSIONS,
