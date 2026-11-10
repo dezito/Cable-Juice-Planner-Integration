@@ -73,6 +73,21 @@ Older months (before the recorder's history) only show kWh per source, cost and 
 the work plan as it is set now. `sensor.cjp_<prefix>_economy` holds this month's saving, the months in the
 attributes.
 
+#### Fixed monthly charging price
+
+Enter a fixed monthly charging price in the Economy section to compare it with the cost recorded in CJP's
+charging history. A value of 0 disables the comparison. Only completed calendar months with recorded costs
+are compared; the current month is shown as incomplete and is not extrapolated.
+
+The difference is **recorded charging cost minus the fixed price**, so a positive difference means the
+subscription would have been cheaper. Solar and home-battery energy keep the same economic value used by
+CJP's charging history. This is therefore a comparison with CJP's recorded charging cost, not necessarily
+the cash amount on the electricity bill. Missing months are not treated as zero-cost months, and the total
+states exactly how many recorded, completed months it covers. The price belongs to this CJP car entry; do
+not set the full price on several cars when one subscription covers them together.
+Only sessions present in CJP's charging history are included. Missing older or public-charging history can
+therefore understate a month's recorded cost.
+
 <details>
 <summary>Screenshot</summary>
 

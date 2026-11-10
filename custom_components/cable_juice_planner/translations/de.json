@@ -961,6 +961,9 @@
       },
       "public_charging_session_cost": {
         "name": "Kosten für öffentliches Laden"
+      },
+      "subscription_monthly_price": {
+        "name": "Fester monatlicher Ladepreis"
       }
     },
     "select": {

@@ -154,6 +154,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - **[Analysis](docs/dashboard-analysis.md#analysis)**
   - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km
   - saved compared with daily charging, and a score for how close the price came to the lowest possible
+  - recorded charging cost compared with an optional fixed monthly all-inclusive charging price
   - driving efficiency against the outdoor temperature (how much more the car uses at 0 °C)
   - whether the car was ready at each work plan departure
   - planned the evening before against actually charged

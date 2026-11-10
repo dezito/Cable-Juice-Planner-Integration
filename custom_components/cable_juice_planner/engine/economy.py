@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 from typing import Any
 
 from ..const import WEEKDAYS
@@ -32,6 +33,10 @@ ECONOMY_MONTHS = 13
 ECONOMY_DB_VERSION = 2
 ECONOMY_PRICE_DAYS = 400  # hourly prices kept for the comparisons
 ECONOMY_WINDOW_SETTLE = 2 * 3600  # s after unplugging before a window is calculated (the last hour is recalculated)
+
+
+def _finite(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def fill_cheapest(prices: dict[float, float], start: float, end: float, kwh: float, kw: float) -> float | None:
@@ -160,6 +165,8 @@ class Economy:
             if "achieved" in window or window["end"] is None or now - window["end"] < ECONOMY_WINDOW_SETTLE:
                 continue
             inside = [s for s in sessions if window["start"] - 600 <= s["ts"] <= window["end"] and not s["public"]]
+            if any(not session["cost_valid"] for session in inside):
+                continue  # incomplete history must never become a favourable zero-cost comparison
             kwh = sum(s["kwh"] for s in inside)
             if kwh <= 0.0:
                 window["achieved"] = 0.0
@@ -200,9 +207,10 @@ class Economy:
             public = "public_charging" in str(value.get("charging_type", "")) or bool(value.get("kWh_from_public"))
             kwh = float(value.get("kWh") or 0.0)
             local = float(value.get("kWh_from_local_energy") or 0.0)
+            cost_valid = _finite(value.get("cost"))
             sessions.append({
                 "ts": self._economy_ts(key), "month": key.strftime("%Y-%m"), "public": public,
-                "kwh": kwh, "cost": float(value.get("cost") or 0.0),
+                "kwh": kwh, "cost": float(value["cost"]) if cost_valid else 0.0, "cost_valid": cost_valid,
                 "grid": 0.0 if public else max(float(value.get("kWh_from_grid", kwh - local) or 0.0), 0.0),
                 "solar": float(value.get("solar_kwh_of_local_energy") or 0.0),
                 "powerwall": float(value.get("powerwall_kwh_of_local_energy") or 0.0),
@@ -220,12 +228,15 @@ class Economy:
             return months.setdefault(key, {
                 "month": key, "kwh": 0.0, "cost": 0.0, "grid": 0.0, "solar": 0.0, "powerwall": 0.0, "public": 0.0, "public_cost": 0.0,
                 "compared_kwh": 0.0, "achieved": 0.0, "average": 0.0, "daily": 0.0, "lowest": 0.0, "windows": 0,
+                "charging_sessions": 0, "cost_valid": True,
             })
 
         for s in self._economy_sessions():
             m = month(s["month"])
             m["kwh"] += s["kwh"]
             m["cost"] += s["cost"]
+            m["charging_sessions"] += 1
+            m["cost_valid"] = m["cost_valid"] and s["cost_valid"]
             m["grid"] += s["grid"]
             m["solar"] += s["solar"]
             m["powerwall"] += s["powerwall"]
@@ -242,27 +253,54 @@ class Economy:
                 m[key] += window[key]
 
         result = []
+        subscription_price = self.setting("subscription_monthly_price", 0.0)
+        subscription_price = float(subscription_price) if _finite(subscription_price) and subscription_price > 0.0 else 0.0
+        current_month = self.now().strftime("%Y-%m")
         for key in sorted(months)[-ECONOMY_MONTHS:]:
             m = months[key]
             km = odometer_months.get(key)
             compared = m["compared_kwh"]
             row = {k: round(v, 3) if isinstance(v, float) else v for k, v in m.items()}
+            row["cost"] = round(m["cost"], 3) if m["cost_valid"] else None
             row["km"] = round(km, 1) if km else None
-            row["price_per_km"] = round(m["cost"] / km, 3) if km else None
-            row["unit_price"] = round(m["cost"] / m["kwh"], 3) if m["kwh"] else None
+            row["price_per_km"] = round(m["cost"] / km, 3) if m["cost_valid"] and km else None
+            row["unit_price"] = round(m["cost"] / m["kwh"], 3) if m["cost_valid"] and m["kwh"] else None
             for ref in ("achieved", "average", "daily", "lowest"):
                 row[f"{ref}_unit"] = round(m[ref] / compared, 3) if compared else None
             row["saving_daily"] = round(m["daily"] - m["achieved"], 2) if compared else None
             possible = m["average"] - m["lowest"]
             row["score"] = round(min(max((m["average"] - m["achieved"]) / possible, -1.0), 1.0), 3) if compared and possible > 0.01 else None
+            row["subscription_recorded_cost"] = round(m["cost"], 2) if m["cost_valid"] and m["charging_sessions"] else None
+            row["subscription_price"] = round(subscription_price, 2) if subscription_price else None
+            row["subscription_saving"] = None
+            if not subscription_price:
+                row["subscription_status"] = "disabled"
+            elif key >= current_month:
+                row["subscription_status"] = "current"
+            elif not m["cost_valid"] or not m["charging_sessions"]:
+                row["subscription_status"] = "incomplete"
+            else:
+                row["subscription_status"] = "recorded"
+                row["subscription_saving"] = round(m["cost"] - subscription_price, 2)
             result.append(row)
 
         current = result[-1] if result else {}
         self.set_state("economy", current.get("saving_daily"))
         self.set_attr("economy", "months", result)
-        totals = {key: round(sum(r[key] or 0.0 for r in result), 2) for key in ("kwh", "cost", "achieved", "daily", "lowest", "average", "compared_kwh")}
+        totals = {key: round(sum(r[key] or 0.0 for r in result), 2) for key in ("kwh", "achieved", "daily", "lowest", "average", "compared_kwh")}
+        totals["cost"] = None if any(row["cost"] is None for row in result) else round(
+            sum(row["cost"] for row in result), 2)
         totals["saving_daily"] = round(totals["daily"] - totals["achieved"], 2)
         possible = totals["average"] - totals["lowest"]
         totals["score"] = round(min(max((totals["average"] - totals["achieved"]) / possible, -1.0), 1.0), 3) if possible > 0.01 else None
+        comparable = [row for row in result if row["subscription_status"] == "recorded"]
+        subscription_total = {
+            "enabled": bool(subscription_price),
+            "comparable_months": len(comparable),
+            "recorded_cost": round(sum(row["subscription_recorded_cost"] for row in comparable), 2),
+            "price": round(subscription_price * len(comparable), 2),
+            "saving": round(sum(row["subscription_saving"] for row in comparable), 2),
+        }
         self.set_attr("economy", "total", totals)
+        self.set_attr("economy", "subscription_total", subscription_total)
         self.set_attr("economy", "open_window", bool(self.economy_db["windows"] and self.economy_db["windows"][-1].get("end") is None))

@@ -961,6 +961,9 @@
       },
       "public_charging_session_cost": {
         "name": "Вартість публічного заряджання"
+      },
+      "subscription_monthly_price": {
+        "name": "Фіксована місячна ціна заряджання"
       }
     },
     "select": {
