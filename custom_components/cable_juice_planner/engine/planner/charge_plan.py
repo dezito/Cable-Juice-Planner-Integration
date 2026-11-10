@@ -326,11 +326,13 @@ class ChargePlan:
             if round(price, 3) <= ultra_cheap_limit(average_price):
                 ultra_cheap_price = True
         except Exception as e:
-            if "min" not in self.kwh_avg_prices_db or not isinstance(self.kwh_avg_prices_db['min'], list) or len(self.kwh_avg_prices_db['min']) < 1:
+            minimums = self.kwh_avg_prices_db.get('min')
+            if not isinstance(minimums, list) or len(minimums) < 1:
                 _LOGGER.error(f"Missing min in self.kwh_avg_prices_db or not a list or len < 1: {self.kwh_avg_prices_db}")
+                return [False, False]
 
             _LOGGER.warning(f"Using local low prices to calc very/ultra cheap price: {e} {type(e)}")
-            forecast_price = round(self.get_forecast_value(self.kwh_avg_prices_db['min']), 3)
+            forecast_price = round(self.get_forecast_value(minimums), 3)
             if round(price, 3) <= forecast_price:
                 very_cheap_price = True
             if round(price, 3) <= ultra_cheap_limit(forecast_price):

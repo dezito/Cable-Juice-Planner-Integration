@@ -422,6 +422,39 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   both (minimum is 2025.1).
 - To analyse a file handed in by the user, run from the repo root:
   `PYTHONPATH=../ha-dev/windows %LOCALAPPDATA%/ha-dev-tests/venv/Scripts/python.exe tests/debug_replay.py <file> [failed|planning|<index>]`.
+- An hour with no price from any price integration and none in the price
+  history is not planned; it is never given another hour's price. A price that
+  is not a finite number (`nan`, `inf`) is dropped like a missing hour, also
+  when it sits in the saved price database (removed on load).
+- A car battery level that is `unavailable`, `unknown` or missing from Home
+  Assistant (e.g. during startup) is the last number reported in the last 24
+  hours, otherwise 0 % for planning. A broken value (`nan`, `inf`, text) only
+  counts 6 hours back, otherwise 0 %. Measurements always look a day back and
+  ask `battery_level(real=True, unknown=None)`: with no level at all they are
+  skipped (public charging session, drive efficiency) instead of using 0 %. A
+  real 0 % counts as a level.
+- "Hours before departure" means charging is done that many hours before the
+  departure (07:00 and 2 hours: the 04:00–05:00 hour is the last). Missing
+  energy is charged in the hours inside the buffer. A car still plugged in at
+  home after the departure keeps charging for up to 2 hours after it, never
+  past the planned homecoming. The displays show the set departure time
+  (`work_departure` / `trip_departure`), and the departure hour is not booked
+  as a whole hour when the departure is later in the current hour.
+- Work and trip share the battery: the earliest departure is served first and
+  never above 100 %. A trip before the homecoming from work is charged before
+  work, so work gets its percentage and the trip the rest. A trip after the
+  homecoming gets the rest between homecoming and departure. The part above
+  the max recommended level is charged after the homecoming when the trip is
+  after it. That part is charged in the last hours before the departure
+  regardless of price (to spare the battery's lifetime); a later feature may
+  choose the cheapest hours instead, at the cost of the battery's lifetime.
+- Ultra cheap power is 25 % under the average of the 15 lowest known prices,
+  also when the average is negative (then 25 % further below zero).
+- Negative prices obey the max recommended charge limit like positive prices.
+- 15-minute prices are planned as 15-minute slots; expensive hours and the
+  average of the lowest prices stay in whole hours.
+- The autumn night with two 02:00 hours shares one price key (wall-clock
+  time); this is accepted (twice a year) and only covered by a test.
 
 ## Tests and validation
 

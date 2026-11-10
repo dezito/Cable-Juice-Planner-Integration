@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 from copy import deepcopy
 
 from ...utils.helpers import average, in_between, reset_time_to_hour, ultra_cheap_limit
@@ -175,6 +176,8 @@ class EnergyPrice:
         for name in ("history", "history_sell"):
             if self._normalize_price_history(name, version):
                 force_save = True
+        if self._drop_non_finite_prices():
+            force_save = True
         if force_save and self.price_provider is not None:
             self.append_kwh_prices()
         self.mark_dirty("kwh_avg_prices")
@@ -216,6 +219,25 @@ class EnergyPrice:
             _LOGGER.info("Transforming price database %s from version %s to 2.0", name, version)
         if repaired:
             _LOGGER.warning("Repaired price database %s: an earlier migration had nested every weekday twice", name)
+        return changed
+
+    def _drop_non_finite_prices(self) -> bool:
+        """Remove nan/inf (stored before they were dropped on arrival) from the saved price lists."""
+        def finite(value) -> bool:
+            return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+        changed = False
+        lists = [self.kwh_avg_prices_db[name] for name in ("max", "mean", "min")]
+        for name in ("history", "history_sell"):
+            for days in self.kwh_avg_prices_db[name].values():
+                lists.extend(days.values())
+        for values in lists:
+            kept = [value for value in values if finite(value)]
+            if len(kept) != len(values):
+                values[:] = kept
+                changed = True
+        if changed:
+            _LOGGER.warning("Removed prices that were not numbers from the price database")
         return changed
 
     def append_kwh_prices(self) -> None:
