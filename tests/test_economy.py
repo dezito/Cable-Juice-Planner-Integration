@@ -158,3 +158,60 @@ def test_old_results_are_calculated_again() -> None:
     old = {"windows": [{"start": 1.0, "end": 2.0, "kwh": 5.0, "achieved": 1.0, "daily": 0.1, "lowest": 0.5, "average": 2.0}]}
     assert engine.run_job(snap, engine.startup, {"economy": old}).error is None
     assert "daily" not in engine.economy_db["windows"][0] and engine.economy_db["version"] == 2
+
+def test_subscription_compares_completed_recorded_months() -> None:
+    """The fixed fee uses existing history cost, including local energy, and skips the current month."""
+    engine, snap = _engine({"subscription_monthly_price": 100.0})
+    previous = datetime.datetime.combine(DAY.replace(day=1) - datetime.timedelta(days=1), datetime.time(2))
+    older = previous.replace(day=1) - datetime.timedelta(days=1)
+    current = datetime.datetime.combine(DAY, datetime.time(2))
+    engine.charging_history_db.update({
+        older: {"kWh": 20.0, "cost": 140.0, "kWh_from_grid": 10.0, "kWh_from_local_energy": 10.0, "solar_kwh_of_local_energy": 10.0},
+        previous: {"kWh": 10.0, "cost": 80.0, "kWh_from_public": 10.0, "charging_type": "public_charging"},
+        current: {"kWh": 10.0, "cost": 200.0, "kWh_from_grid": 10.0},
+    })
+
+    attrs = engine.run_job(snap, engine.publish_economy).attributes["economy"]
+    months = {row["month"]: row for row in attrs["months"]}
+    assert months[older.strftime("%Y-%m")]["subscription_saving"] == 40.0
+    assert months[previous.strftime("%Y-%m")]["subscription_saving"] == -20.0
+    assert months[current.strftime("%Y-%m")]["subscription_status"] == "current"
+    assert months[current.strftime("%Y-%m")]["subscription_saving"] is None
+    assert attrs["subscription_total"] == {
+        "enabled": True,
+        "comparable_months": 2,
+        "recorded_cost": 220.0,
+        "price": 200.0,
+        "saving": 20.0,
+    }
+
+
+def test_subscription_disabled_and_invalid_cost_is_incomplete() -> None:
+    previous = datetime.datetime.combine(DAY.replace(day=1) - datetime.timedelta(days=1), datetime.time(2))
+    engine, snap = _engine()
+    engine.charging_history_db[previous] = {"kWh": 10.0, "cost": 50.0, "kWh_from_grid": 10.0}
+    attrs = engine.run_job(snap, engine.publish_economy).attributes["economy"]
+    assert attrs["months"][-1]["subscription_status"] == "disabled"
+    assert attrs["subscription_total"]["enabled"] is False
+
+    engine, snap = _engine({"subscription_monthly_price": 100.0})
+    engine.charging_history_db[previous] = {"kWh": 10.0, "cost": float("nan"), "kWh_from_grid": 10.0}
+    start = previous - datetime.timedelta(hours=1)
+    end = previous + datetime.timedelta(hours=1)
+    prices = {
+        _ts(start.date(), start.hour): 1.0,
+        _ts(previous.date(), previous.hour): 2.0,
+    }
+    attrs = engine.run_job(
+        snap,
+        engine.economy_update,
+        {"prices": prices, "windows": [(_ts(start.date(), start.hour), _ts(end.date(), end.hour))]},
+    ).attributes["economy"]
+    month = next(row for row in attrs["months"] if row["month"] == previous.strftime("%Y-%m"))
+    assert month["subscription_status"] == "incomplete"
+    assert month["subscription_recorded_cost"] is None
+    assert month["cost"] is None
+    assert month["achieved_unit"] is None
+    assert month["saving_daily"] is None
+    assert month["score"] is None
+    assert attrs["subscription_total"]["comparable_months"] == 0

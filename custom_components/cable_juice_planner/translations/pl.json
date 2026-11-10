@@ -961,6 +961,9 @@
       },
       "public_charging_session_cost": {
         "name": "Koszt ładowania publicznego"
+      },
+      "subscription_monthly_price": {
+        "name": "Stała miesięczna cena ładowania"
       }
     },
     "select": {

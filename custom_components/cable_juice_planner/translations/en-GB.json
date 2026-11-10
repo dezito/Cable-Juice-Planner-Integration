@@ -961,6 +961,9 @@
       },
       "public_charging_session_cost": {
         "name": "Cost of public charging"
+      },
+      "subscription_monthly_price": {
+        "name": "Fixed monthly charging price"
       }
     },
     "select": {

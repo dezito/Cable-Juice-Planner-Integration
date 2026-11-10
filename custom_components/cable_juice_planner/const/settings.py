@@ -64,6 +64,8 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "full_charge_recommended": {"min": 0, "max": 60, "step": 1, "mode": "slider", "unit": "d", "default": 0.0},
     "ev_charge_after_powerwall_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "slider", "unit": "%", "default": 0.0, "config": "solar.ev_charge_after_powerwall_battery_level", "requires": "powerwall_level"},
     "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "public_charging"},
+    # 0 disables the Economy comparison with an ideal all-inclusive monthly charging fee
+    "subscription_monthly_price": {"min": 0, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0},
 }
 
 FORECAST_TYPE_OPTIONS = ["Average", "EMA (Exponential Moving Average)", "Trend"]

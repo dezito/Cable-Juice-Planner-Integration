@@ -158,6 +158,9 @@
       },
       "public_charging_session_cost": {
         "default": "mdi:cash-edit"
+      },
+      "subscription_monthly_price": {
+        "default": "mdi:cash-clock"
       }
     },
     "select": {

@@ -641,7 +641,11 @@ def test_economy_section_on_analysis() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
+    assert "number.cjp_tesla_subscription_monthly_price" in text
+    assert "Fast månedlig ladepris" in text
+    assert "En positiv forskel betyder, at abonnementet ville have været billigere." in text
     analysis = yaml.safe_load(text)["views"][2]
+    assert "manglende historik kan gøre månedsomkostningen for lav" in text
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
     assert headings[0] == "Økonomi"
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]

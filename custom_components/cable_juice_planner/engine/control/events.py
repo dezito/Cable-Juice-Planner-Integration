@@ -187,6 +187,7 @@ class ControlEvents:
         self.publish_simulated_battery_level()
         # use_measured_charging_loss may have changed what the plan uses
         self.publish_charging_loss_model()
+        self.publish_economy()
 
     def hour_end(self) -> None:
         """cron_hour_end (minute 59)."""

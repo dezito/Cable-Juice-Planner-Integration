@@ -2019,7 +2019,14 @@ views:
       heading: '@@section_economy@@'
       icon: mdi:cash-multiple
     - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@economy_explain@@\n\n</details>"
+      content: "<details><summary>@@read_more@@</summary>\n\n@@economy_explain@@\n\n@@economy_subscription_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: entities
+      entities:
+      - entity: number.cjp_subscription_monthly_price
+        name:
+          type: entity
       grid_options:
         columns: full
     - type: markdown
@@ -2051,13 +2058,34 @@ views:
         | @@economy_month@@ | kWh | @@economy_paid@@ | @@valuta_kwh@@ | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | Score | @@valuta@@/@@distance@@ |
         |:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
         {% for m in e.months | reverse -%}
-        | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ m.cost | round(0) }} @@valuta@@ | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' @@valuta@@') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
+        | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '–' }} | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' @@valuta@@') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
         {% endfor %}
 
-        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ e.total.cost | round(0) }} @@valuta@@{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} @@valuta@@ @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
+        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ (e.total.cost | round(0) | string + ' @@valuta@@') if e.total.cost is not none else '–' }}{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} @@valuta@@ @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
         {%- else -%}
         <ha-alert alert-type="info">@@economy_no_data@@</ha-alert>
         {%- endif %}
+
+        {% set sub = e.subscription_total %}
+        {% if sub and sub.enabled %}
+        ### @@economy_subscription_title@@
+
+        @@economy_subscription_intro@@
+
+        | @@economy_month@@ | @@economy_subscription_recorded@@ | @@economy_subscription_price@@ | @@economy_subscription_difference@@ |
+        |:---|---:|---:|---:|
+        {% for m in e.months | reverse -%}
+        {% if m.subscription_status == 'recorded' -%}
+        | **{{ m.month }}** | {{ m.subscription_recorded_cost | round(0) }} @@valuta@@ | {{ m.subscription_price | round(0) }} @@valuta@@ | {{ m.subscription_saving | round(0) }} @@valuta@@ |
+        {% elif m.subscription_status == 'current' -%}
+        | **{{ m.month }}** | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '&ndash;' }} | &ndash; | *@@economy_subscription_current@@* |
+        {% elif m.subscription_status == 'incomplete' -%}
+        | **{{ m.month }}** | &ndash; | &ndash; | *@@economy_subscription_incomplete@@* |
+        {% endif -%}
+        {% endfor %}
+
+        {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ sub.recorded_cost | round(0) }} @@valuta@@ &rarr; {{ sub.price | round(0) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ sub.saving | round(0) }} @@valuta@@{% endif %}
+        {% endif %}
       grid_options:
         columns: full
     - type: custom:apexcharts-card

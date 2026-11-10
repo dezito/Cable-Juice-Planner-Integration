@@ -961,6 +961,9 @@
       },
       "public_charging_session_cost": {
         "name": "Omkostning ved offentlig ladning"
+      },
+      "subscription_monthly_price": {
+        "name": "Fast månedlig ladepris"
       }
     },
     "select": {
