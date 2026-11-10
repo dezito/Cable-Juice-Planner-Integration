@@ -264,7 +264,9 @@ class HistoryEfficiency:
                 self.preheating = False
                 return
             if state in EV_UNPLUGGED_STATES + CHARGER_NOT_READY_STATUS:
-                if self.battery_level(real=True) <= 0.0:
+                level = self.battery_level(real=True, unknown=None)
+                # a real 0 % counts for a car; only a missing level (or an unset entered level) is skipped
+                if level is None or (not self.is_ev_configured() and level <= 0.0):
                     return
                 if not self.preheating:
                     self.drive_efficiency_save_car_stats()
@@ -275,6 +277,10 @@ class HistoryEfficiency:
             if state not in EV_PLUGGED_STATES + CHARGER_READY_STATUS:
                 return
             if "reported" in self.last_drive_efficiency_data and self.last_drive_efficiency_data["reported"]:
+                return
+
+            if self.is_ev_configured() and self.battery_level(real=True, unknown=None) is None:
+                _LOGGER.warning("No battery level from the car, ignoring drive")
                 return
 
             if not self.is_ev_configured():
@@ -311,6 +317,9 @@ class HistoryEfficiency:
                     return
                 distance_per_kwh = kilometers / used_kwh
                 distance_per_percentage = kilometers / used_battery
+                if self.battery_level(real=True) <= 0.0:
+                    _LOGGER.warning("The car is at 0%, its range per percentage is unknown, ignoring drive")
+                    return
                 cars_distance_per_percentage = round(self.battery_range() / self.battery_level(real=True), 2)
                 efficiency = abs(round((distance_per_percentage / cars_distance_per_percentage) * 100.0, 2))
                 if kilometers <= 5.0 or used_battery <= 2.0:

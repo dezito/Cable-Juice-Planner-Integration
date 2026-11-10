@@ -51,12 +51,21 @@ class HistorySession:
         if entity_state in EV_PLUGGED_STATES and self._is_not_home():
             if sessions and "end_battery_level" not in sessions[-1]:
                 return None
-            sessions.append({"start_battery_level": self.battery_level(real=True)})
+            sessions.append({"start_battery_level": self.battery_level(real=True, unknown=None)})
             self.mark_dirty("runtime")
         elif sessions and entity_state in EV_UNPLUGGED_STATES and self._is_not_home():
+            start_level = sessions[-1]["start_battery_level"]
+            end_level = self.battery_level(real=True, unknown=None)
+            if start_level is None or end_level is None:
+                # no level to measure from (car integration down), which is not the same as 0 %
+                _LOGGER.warning("Public charging session: No battery level at the %s, not measuring it", "start" if start_level is None else "end")
+                sessions.pop(-1)
+                if not self.finished_public_charging_sessions():
+                    self._set_public_session_done("off")
+                return None
             sessions[-1].update({
-                "end_battery_level": self.battery_level(real=True),
-                "added_percentage": round(self.battery_level(real=True) - sessions[-1]["start_battery_level"], 1),
+                "end_battery_level": end_level,
+                "added_percentage": round(end_level - start_level, 1),
                 "timestamp": self.now(),
             })
             self.mark_dirty("runtime")

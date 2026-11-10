@@ -164,26 +164,28 @@ class Battery:
     def calc_battery_level_to_distance(self, battery_level):
         return battery_level * self.distance_per_percentage()
 
-    def battery_level(self, real: bool = False) -> float:
+    def battery_level(self, real: bool = False, unknown: float | None = 0.0) -> float | None:
         """The car's battery level (the virtual one without a car integration).
 
         With simulate_battery_level_while_charging the planning and charger control get the
         simulated level; measurements and history (drive efficiency, charging loss, public
         charging, departures, full charge) ask for the car's own level with real=True.
+        `unknown` is what comes back when there is no level at all: 0 % for planning (plans more
+        charging, never less), None for measurements that must not mistake it for a real 0 %.
         """
         try:
             if not self.is_ev_configured():
                 return float(self.number_state("battery_level", error_state=0.0))
             entity_id = self.config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"]
-            if not self.is_entity_available(entity_id):
-                return 0.0
+            self.is_entity_available(entity_id)  # warns/notifies when the car integration is offline
             level = self.get_state(entity_id, try_history=False, float_type=True, error_state=None)
             if not isinstance(level, float) or not math.isfinite(level):
                 # unavailable, unknown, text, "nan" or "inf": the last number the sensor gave (also one that
                 # never changed since), else 0 % (plans more charging, never less). A car that is unavailable
                 # or unknown (e.g. asleep) keeps the window of a day; text, "nan" and "inf" are a broken value
                 # and only count 6 hours back for planning. Measurements (real=True) always look a day back.
-                unavailable = self.get_state(entity_id, try_history=False, error_state=None) in ENTITY_UNAVAILABLE_STATES
+                state = self.get_state(entity_id, try_history=False, error_state=None)
+                unavailable = state is None or state in ENTITY_UNAVAILABLE_STATES
                 max_age = datetime.timedelta(days=1) if real or unavailable else BATTERY_LEVEL_MAX_AGE
                 level = self.history.get_last_value(entity_id, float_type=True, error_state=None, max_age=max_age, warn=False)
                 if not isinstance(level, float) or not math.isfinite(level):
@@ -191,10 +193,10 @@ class Battery:
                     if not self._job_cache.get("battery_level_warned"):
                         self._job_cache["battery_level_warned"] = True
                         _LOGGER.warning("No battery level from %s the last %s, using 0%%", entity_id, max_age)
-                    return 0.0
+                    return unknown
         except Exception as err:  # noqa: BLE001
             _LOGGER.error(err)
-            return 0.0
+            return unknown
         return level if real else self.simulated_battery_level(level)
 
     def simulated_battery_level(self, real_level: float) -> float:

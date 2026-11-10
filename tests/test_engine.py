@@ -1795,6 +1795,49 @@ def test_an_unavailable_battery_level_is_the_last_known_one_for_a_day(state: str
     assert _battery_level_with(state, [(2, "nan"), (1, "inf")]) == 0.0
 
 
+def test_a_car_integration_that_is_not_loaded_gives_the_last_known_level_of_the_day() -> None:
+    """No state at all for the sensor (e.g. Home Assistant is starting): the history is used like for an unavailable car."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+
+    def level(history: list[tuple[float, str]]) -> float:
+        snap = snapshot(now, **PLUGGED_IN)
+        snap.states.pop("sensor.ev_battery_level")
+        snap.buffers = {"sensor.ev_battery_level": sorted(((now - datetime.timedelta(hours=h)).replace(tzinfo=TZ).timestamp(), v) for h, v in history)}
+        engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+        result = engine.run_job(snap, engine.battery_level)
+        assert result.error is None, result.error
+        return result.value
+
+    assert level([(0.2, "55")]) == pytest.approx(55.0)
+    assert level([(30, "55"), (29, "unavailable")]) == 0.0
+    assert level([]) == 0.0
+
+
+def test_not_finite_prices_in_the_saved_price_database_are_dropped_on_load() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    database = _price_history()
+    database["min"] = [float("nan"), 1.0, float("inf")]
+    database["history"][15][DAY.weekday()] = [float("nan"), 2.5]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now), engine.startup, {"kwh_avg_prices": database}).error is None
+    assert all(math.isfinite(value) for value in engine.kwh_avg_prices_db["min"])
+    assert 1.0 in engine.kwh_avg_prices_db["min"]
+    assert 2.5 in engine.kwh_avg_prices_db["history"][15][DAY.weekday()]
+    assert all(math.isfinite(value) for value in engine.kwh_avg_prices_db["history"][15][DAY.weekday()])
+
+
+def test_cheap_price_check_falls_back_to_the_saved_low_prices_and_survives_missing_ones() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0))), engine.startup, {})
+    engine.kwh_avg_prices_db = {"min": [2.0]}
+    # a price that is not a number makes the normal route fail: the saved minimum is used
+    assert engine.cheap_price_check([], None, 1.4) == [True, True]
+    assert engine.cheap_price_check([], None, 1.8) == [True, False]
+    assert engine.cheap_price_check([], None, 2.5) == [False, False]
+    engine.kwh_avg_prices_db = {}
+    assert engine.cheap_price_check([], None, 1.0) == [False, False]
+
+
 def test_a_good_battery_level_is_used_as_it_is() -> None:
     assert _battery_level_with("62.5", [(3, "40"), (1, "55")]) == pytest.approx(62.5)
 
@@ -2032,6 +2075,63 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     _public_job(engine, 50, engine.public_charging_session, "off", level=90, port="off")
     assert engine.sensor_states["public_charging_session_done"] == "on"
     assert [s["added_percentage"] for s in queue()] == [25]
+
+
+def test_an_autumn_night_with_25_price_rows_is_planned_with_one_price_for_the_repeated_hour() -> None:
+    """The clock repeats 02:00 once a year: both rows share one naive key, one of them is used and nothing breaks."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+    rows = snap.price_data["attributes"]["sensor.price"]["raw_tomorrow"]
+    stamp = [row["hour"] for row in rows if row["hour"][11:13] == "02"][0]
+    rows.insert(3, {"hour": stamp, "price": 0.123})
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    tomorrow_2 = datetime.datetime.combine(DAY + datetime.timedelta(days=1), datetime.time(2))
+    assert engine.grid_price_cache["prices"][tomorrow_2] in (pytest.approx(0.12, abs=0.01), pytest.approx(0.82, abs=0.01))
+    hours = charge_hours(engine)
+    assert hours
+    assert math.isfinite(engine.charge_hours["total_cost"])
+
+
+def _public_job_with_level(engine: CJPEngine, minute: int, state: str, *, level: str, port: str) -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, minute))
+    snap = snapshot(now, port=port)
+    snap.states["sensor.ev_battery_level"] = level
+    snap.states["device_tracker.ev"] = "not_home"
+    result = engine.run_job(snap, engine.public_charging_session, state)
+    assert result.error is None, result.error
+
+
+def test_a_car_driven_down_to_0_percent_counts_in_a_public_charging_session() -> None:
+    engine = _loss_engine()
+    _public_job_with_level(engine, 0, "on", level="0", port="on")
+    _public_job_with_level(engine, 30, "off", level="60", port="off")
+    assert [s["added_percentage"] for s in engine.sensor_attrs["public_charging_session_done"]["public_charging_session"]] == [60]
+
+
+def test_a_public_charging_session_without_a_battery_level_is_not_measured() -> None:
+    """No level at all (car integration down, nothing in the last day) is not a 0 % level."""
+    engine = _loss_engine()
+    _public_job_with_level(engine, 0, "on", level="unavailable", port="on")
+    _public_job_with_level(engine, 30, "off", level="60", port="off")
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+    _public_job_with_level(engine, 40, "on", level="30", port="on")
+    _public_job_with_level(engine, 50, "off", level="unavailable", port="off")
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+
+
+def test_the_battery_level_for_measurements_can_be_unknown_instead_of_0() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, **PLUGGED_IN)
+    snap.states["sensor.ev_battery_level"] = "unavailable"
+    assert engine.run_job(snap, engine.battery_level, True, None).value is None
+    assert engine.run_job(snap, engine.battery_level, True).value == 0.0
+    snap.states["sensor.ev_battery_level"] = "0"
+    assert engine.run_job(snap, engine.battery_level, True, None).value == 0.0
 
 
 @pytest.mark.parametrize(
