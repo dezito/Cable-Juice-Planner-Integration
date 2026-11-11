@@ -38,7 +38,7 @@ def _result(**kwargs) -> dict:
 async def _render(hass: HomeAssistant, language: str, result: dict | None) -> str:
     content = _content(language)
     hass.states.async_set(re.search(r"states\.(sensor\.\w+)\.attributes", content).group(1), "0", {"result": result})
-    return Template(content, hass).async_render(parse_result=False)
+    return Template(content, hass).async_render(parse_result=False, strict=True)  # like the frontend: an undefined attribute is an error
 
 
 def test_the_view_has_a_scenario_d_section_that_asks_for_nothing_and_reads_its_own_sensor() -> None:

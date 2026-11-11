@@ -996,10 +996,10 @@
         "name": "Рівень батареї what-if при першому підключенні"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if альтернативний щоденний резерв"
+        "name": "What-if альтернативний мін. рівень при поверненні"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if альтернативний максимальний рівень батареї"
+        "name": "What-if альтернативна макс. рекомендована межа EV"
       }
     },
     "select": {

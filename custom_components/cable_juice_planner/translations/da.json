@@ -996,10 +996,10 @@
         "name": "What-if-batteriniveau ved første tilslutning"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternativ daglig reserve"
+        "name": "What-if alternativ daglig hjemkomst batteri niveau"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternativt maksimalt batteriniveau"
+        "name": "What-if alternativ elbilens maks anbefalet ladingsprocent"
       }
     },
     "select": {

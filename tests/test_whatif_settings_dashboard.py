@@ -43,7 +43,7 @@ def _attributes() -> dict:
 async def _render(hass: HomeAssistant, language: str, attributes: dict) -> str:
     content = _content(language)
     hass.states.async_set(re.search(r"states\.(sensor\.\w+)\.attributes", content).group(1), "0", attributes)
-    return Template(content, hass).async_render(parse_result=False)
+    return Template(content, hass).async_render(parse_result=False, strict=True)  # like the frontend: an undefined attribute is an error
 
 
 def test_the_view_has_a_scenario_b_section_with_its_entities_and_a_read_more() -> None:
@@ -72,7 +72,7 @@ async def test_a_result_shows_both_settings_the_difference_and_the_readiness(has
     attributes = _attributes()
     out = await _render(hass, "en", attributes)
     for expected in (
-        "Latest result", "Current settings", "Alternative", "Daily reserve at homecoming", "Maximum recommended level", "Adjusted difference",
+        "Latest result", "Current settings", "Alternative", "Daily arrival battery level", "EV max recommended charging limit", "Adjusted difference",
         "Homecomings below the current reserve", "Lowest homecoming level", "Per month", "Coverage", "entered", "current setting",
         "A simplified model of the CJP planning rule", "not the plan CJP made at the time", "latest connection is left out",
     ):

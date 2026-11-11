@@ -154,6 +154,7 @@ def _derived_connections(
             info["derived_gaps_without_use"] += 1
     info["windows_derived"] = len(windows)
     info["derived_first_soc"] = kept[0][2] if kept else None
+    info["derived_soc_by_start"] = {s: soc_in for s, _, soc_in, _ in kept}
     return windows, gaps, final, info
 
 
@@ -247,15 +248,6 @@ def build_replay_input(
     modelled_chosen, modelled_gap_drives, modelled_final_drive, modelled_info = _modelled_connections(
         work_plan, tz, windows, drives, period_start, derived_info, derived, real
     )
-    chosen = [*modelled_chosen, *real]
-    estimated = [*modelled_chosen, *derived_chosen]
-    if modelled_chosen:
-        # nothing records the level at a modelled connection (and an entered or read level belongs to the first measured one,
-        # a car that may have been away at the modelled time): the first connection only brings the car to a common level
-        start_soc, start_soc_source = None, "unavailable"
-    elif derived_chosen:
-        # the level at the first estimated connection comes from the statistics too: an entered or read level belongs to the first measured one
-        start_soc, start_soc_source = float(derived_info["derived_first_soc"]), "battery_statistics"
 
     hourly: dict[float, float] = {}
     invalid_prices = 0
@@ -269,6 +261,32 @@ def build_replay_input(
             hourly[ts] = float(price) - refund  # the basis CJP prices its own grid energy at (the stored prices are gross)
         else:
             invalid_prices += 1
+
+    # An estimated connection (statistics or work plan) is itself an estimate: its prices are not estimated on top of that.
+    # Only the connections after the last one with an hour without a price are kept (a stretch of the past that no price
+    # reaches back to must not pull the share of priced connections under the replay's limit and cost the whole result).
+    ordered_estimates = [*modelled_chosen, *derived_chosen]
+    last_unpriced = max((i for i, w in enumerate(ordered_estimates) if any(h not in hourly for h in _hours(w))), default=-1)
+    unpriced_left_out = last_unpriced + 1
+    if unpriced_left_out:
+        kept = ordered_estimates[unpriced_left_out:]
+        first_kept_end = kept[0].end if kept else math.inf
+        modelled_chosen = [w for w in modelled_chosen if any(w is k for k in kept)]
+        derived_chosen = [w for w in derived_chosen if any(w is k for k in kept)]
+        modelled_gap_drives = [d for d in modelled_gap_drives if d[0] > first_kept_end] if modelled_chosen else []
+        derived_gap_drives = [d for d in derived_gap_drives if d[0] > first_kept_end] if derived_chosen else []
+        modelled_final_drive = modelled_final_drive if modelled_chosen else None
+        derived_final_drive = derived_final_drive if derived_chosen else None
+    chosen = [*modelled_chosen, *derived_chosen, *measured_chosen]
+    real = [*derived_chosen, *measured_chosen]
+    estimated = [*modelled_chosen, *derived_chosen]
+    if modelled_chosen:
+        # nothing records the level at a modelled connection (and an entered or read level belongs to the first measured one,
+        # a car that may have been away at the modelled time): the first connection only brings the car to a common level
+        start_soc, start_soc_source = None, "unavailable"
+    elif derived_chosen:
+        # the level at the first estimated connection comes from the statistics too: an entered or read level belongs to the first measured one
+        start_soc, start_soc_source = float(derived_info["derived_soc_by_start"][derived_chosen[0].start]), "battery_statistics"
 
     first = chosen[0].start if chosen else period_start
     last = chosen[-1].end if chosen else period_start
@@ -325,9 +343,10 @@ def build_replay_input(
     coverage = {
         "windows": len(chosen),
         "windows_measured": len(measured_chosen),
-        "windows_derived": derived_info["windows_derived"],
+        "windows_derived": len(derived_chosen),
+        "estimated_unpriced_left_out": unpriced_left_out,
         "derived_plan_bounds": bool(derived.get("plan_bounds")) if isinstance(derived, Mapping) else False,
-        "windows_modelled": modelled_info["windows_modelled"],
+        "windows_modelled": len(modelled_chosen),
         "modelled_status": modelled_info["modelled_status"],
         "modelled_reason": modelled_info["modelled_reason"],
         "modelled_validation": modelled_info["modelled_validation"],
@@ -392,6 +411,8 @@ def build_replay_input(
         warnings.append("connections_before_drive_history_left_out")
     if derived_chosen:
         warnings.append("connections_estimated_from_battery_statistics")  # older connections: when the car was parked, not plugged in
+    if unpriced_left_out:
+        warnings.append("estimated_connections_without_prices_left_out")  # no price is estimated for a connection that is itself an estimate
     if modelled_chosen:
         warnings.append("connections_modelled_from_work_plan")  # the plan as set now, not a record of what happened
     if modelled_info.get("modelled_reason") == "not_validated":

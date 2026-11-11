@@ -996,10 +996,10 @@
         "name": "What-if-Akkustand beim ersten Anstecken"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternative Tagesreserve"
+        "name": "What-if alternatives tägliches Heimkehr-Niveau"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternativer maximaler Akkustand"
+        "name": "What-if alternative max. empfohlene Ladegrenze des EV"
       }
     },
     "select": {
