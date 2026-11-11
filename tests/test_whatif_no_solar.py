@@ -90,7 +90,7 @@ def test_the_plan_replays_the_period_and_compares_it_with_the_recorded_charging(
     _, result = _run(engine, snap)
     r = result.value
     assert r["status"] == "ok" and r["method"] == "strict" and r["settings"] == {"reserve": 30.0, "maximum": 90.0}
-    assert r["windows"] == {"total": 5, "replayed": 4} and r["plan"]["unit"] is not None
+    assert r["windows"] == {"total": 5, "replayed": 4, "derived": 0} and r["plan"]["unit"] is not None
     recorded = r["recorded"]
     assert recorded["sessions"] == 2 and recorded["kwh"] == 20.0 and recorded["cost"] == 18.0 and recorded["solar_kwh"] == 8.0
     estimate = r["estimate"]

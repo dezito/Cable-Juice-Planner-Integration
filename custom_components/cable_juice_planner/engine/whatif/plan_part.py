@@ -116,9 +116,16 @@ class WhatIfNoSolar:
         if result.plan is None:
             return published
 
+        # CJP's recorded sessions only exist from when it began recording, like the measured connections: the recorded span
+        # and the price per kWh the estimate uses are those of the measured connections, not of the connections that were
+        # estimated from the battery level statistics (a different, possibly much longer and differently priced, span)
+        measured_rows = [w for w in result.plan.windows if not w.derived] or result.plan.windows
         # the calibrating first connection charges nothing in the plan: the recorded span starts after it
-        first = result.plan.windows[1].start if result.plan.calibrated and len(result.plan.windows) > 1 else result.plan.windows[0].start
+        first = measured_rows[1].start if result.plan.calibrated and len(measured_rows) > 1 else measured_rows[0].start
         last = result.plan.windows[-1].end
+        measured_grid = sum(w.grid_kwh for w in measured_rows)
+        measured_unit = _round(sum(w.cost for w in measured_rows) / measured_grid, 3) if measured_grid > 1e-9 else None
+        published["windows"]["derived"] = sum(1 for w in result.plan.windows if w.derived)
         inside = [s for s in sessions if first <= s["ts"] < last and not s["public"]]
         kwh = sum(s["kwh"] for s in inside)
         cost_valid = bool(inside) and all(s["cost_valid"] for s in inside)
@@ -133,17 +140,17 @@ class WhatIfNoSolar:
         # what the recorded energy would have cost from the grid at the price the planned charging paid per kWh: an estimate,
         # because the recorded energy also holds drives and standby that the replay does not have
         # only with recorded solar energy: without it there is nothing to value, and a difference would only be timing
-        if recorded_cost is not None and kwh > 1e-9 and solar > 1e-9 and plan and plan["unit"] is not None:
-            without_solar = kwh * plan["unit"]
+        if recorded_cost is not None and kwh > 1e-9 and solar > 1e-9 and plan and measured_unit is not None:
+            without_solar = kwh * measured_unit
             published["estimate"] = {
                 "cost_without_solar": _round(without_solar, 2), "recorded_cost": _round(recorded_cost, 2),
-                "solar_advantage": _round(without_solar - recorded_cost, 2), "kwh": _round(kwh, 3), "unit": plan["unit"],
+                "solar_advantage": _round(without_solar - recorded_cost, 2), "kwh": _round(kwh, 3), "unit": measured_unit,
             }
 
         months: dict[str, dict[str, Any]] = {}
 
         def month_of(key: str) -> dict[str, Any]:
-            return months.setdefault(key, {"month": key, "windows": 0, "planned_kwh": 0.0, "planned_cost": 0.0, "recorded_kwh": 0.0, "recorded_cost": 0.0, "recorded_valid": True})
+            return months.setdefault(key, {"month": key, "windows": 0, "planned_kwh": 0.0, "planned_cost": 0.0, "recorded_kwh": 0.0, "recorded_cost": 0.0, "recorded_valid": None})
 
         # both sides by the start of the connection / the session
         for row in result.plan.windows:
@@ -155,7 +162,7 @@ class WhatIfNoSolar:
             month = month_of(self._economy_local(session["ts"]).strftime("%Y-%m"))
             month["recorded_kwh"] += session["kwh"]
             month["recorded_cost"] += session["cost"]
-            month["recorded_valid"] = month["recorded_valid"] and session["cost_valid"]
+            month["recorded_valid"] = month["recorded_valid"] is not False and session["cost_valid"]  # None: no session yet
         published["months"] = [
             {
                 "month": m["month"], "windows": m["windows"], "planned_kwh": _round(m["planned_kwh"], 2), "planned_cost": _round(m["planned_cost"], 2),

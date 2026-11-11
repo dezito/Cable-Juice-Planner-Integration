@@ -17,6 +17,7 @@ from typing import Any
 from ...const import WEEKDAYS
 from ..soc_power import planning_power_cap
 from ..analysis.helpers import ANALYSIS_DRIVES
+from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
 from .replay import PolicyResult, ReplayResult, replay
 
@@ -111,6 +112,8 @@ class WhatIf:
             prices={**history, **copies, **stored},
             history_hours=list(history),
             refund=self._solar_refund() or 0.0,
+            derived=self.economy_db.get("derived_windows"),
+            work_plan=self.what_if_work_plan(),
             drives=self.analysis_db.get("drives", []),
             public_sessions=public,
             period_start=period_start,
@@ -130,6 +133,40 @@ class WhatIf:
             dst_copied_hours=list(copies),
         )
         return data, coverage, sessions
+
+    def what_if_work_plan(self) -> dict[str, Any] | None:
+        """The work plan as it is set now, per weekday (Monday = 0): workday or not, the departure and homecoming time in seconds
+        after local midnight and the distance needed (the day's own distance, else the typical one; the live battery range is
+        not applied). It describes today's plan, not what the plan was in the past."""
+        days: dict[int, dict[str, Any]] = {}
+        for index, day in enumerate(WEEKDAYS):
+            try:
+                entry: dict[str, Any] = {
+                    "workday": self.switch_state(f"workday_{day}", error_state="off") == "on",
+                    "km": float(self.get_entity_daily_distance(day_text=day, ignore_realistic_estimated_range=True)),
+                }
+                departure, homecoming = self.setting(f"workday_departure_{day}"), self.setting(f"workday_homecoming_{day}")
+                if departure is not None and homecoming is not None:
+                    entry["departure"] = departure.hour * 3600 + departure.minute * 60
+                    entry["homecoming"] = homecoming.hour * 3600 + homecoming.minute * 60
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("What-if: no work plan for %s: %s", day, err)
+                continue
+            days[index] = entry
+        return {"days": days} if days else None
+
+    def store_derived_windows(self, data: dict[str, Any]) -> None:
+        """economy_update: the connections from before CJP's own records, estimated from the daily-read statistics of the
+        battery level and the charger power (derive.py). Without "ev_hours" in the data (the statistics could not be read)
+        what was stored stays."""
+        hours = data.get("ev_hours")
+        if not isinstance(hours, dict):
+            return
+        measured = [(w["start"], w["end"]) for w in self.economy_db["windows"] if w.get("end") is not None]
+        result = derive_windows(hours, measured, self.what_if_work_plan(), self._snap.tz)
+        result["computed_at"] = self._economy_ts(self.now())
+        self.economy_db["derived_windows"] = result
+        self.mark_dirty("economy")
 
     def what_if_prepare(self) -> dict[str, Any]:
         """Fixes the period and the first connection the starting level belongs to (the same selection the run uses)."""
@@ -228,6 +265,7 @@ class WhatIf:
             "months": [],
             "rows": [],
             "recorded_reference": None,
+            "derived": None,
         }
         if result.smart is None or result.asap is None:
             return published
@@ -236,8 +274,9 @@ class WhatIf:
         rows = []
         for smart, asap in zip(result.smart.windows, result.asap.windows):
             key = self._economy_local(smart.end).strftime("%Y-%m")
-            month = months.setdefault(key, {"month": key, "windows": 0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0})
+            month = months.setdefault(key, {"month": key, "windows": 0, "derived_windows": 0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0})
             month["windows"] += 1
+            month["derived_windows"] += 1 if smart.derived else 0
             month["smart_cost"] += smart.cost
             month["asap_cost"] += asap.cost
             month["grid_kwh"] += smart.grid_kwh
@@ -252,6 +291,16 @@ class WhatIf:
             {k: (_round(v, 3) if isinstance(v, float) else v) for k, v in month.items()} for _, month in sorted(months.items())
         ]
         published["rows"] = rows[-WHAT_IF_WINDOW_ROWS:]
+        # the connections estimated from the battery level statistics, apart from the measured ones
+        older = [(s, a) for s, a in zip(result.smart.windows, result.asap.windows) if s.derived]
+        published["derived"] = {
+            "windows": len(older),
+            "modelled": sum(1 for s, _ in older if s.modelled),
+            "smart_cost": _round(sum(s.cost for s, _ in older), 2),
+            "asap_cost": _round(sum(a.cost for _, a in older), 2),
+            "difference": _round(sum(s.cost - a.cost for s, a in older), 3),
+            "grid_kwh": _round(sum(s.grid_kwh for s, _ in older), 3),
+        } if older else None
 
         # what CJP recorded in the same span: a reference only, never subtracted (see TODO_WHAT_IF.md)
         first, last = result.smart.windows[0].start, result.smart.windows[-1].end

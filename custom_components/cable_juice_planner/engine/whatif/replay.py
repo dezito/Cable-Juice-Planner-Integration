@@ -90,6 +90,8 @@ class Window:
     start: float
     end: float
     weekday: int | None = None
+    derived: bool = False  # estimated (from the battery level statistics, see derive.py, or modelled from the work plan), not measured
+    modelled: bool = False  # of those: modelled from the work plan (see modelled.py)
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,8 @@ class WindowResult:
     drive_shortfall_kwh: float = 0.0  # driving after this window that the battery could not cover
     estimated: bool = False  # a price in this connection was estimated (see _with_estimated_prices)
     calibrated: bool = False  # the level before this connection was unknown: it only brings the car to a common level
+    derived: bool = False  # the connection itself was estimated (from the battery level statistics or modelled from the work plan)
+    modelled: bool = False  # of those: modelled from the work plan
 
     @property
     def loss_kwh(self) -> float:
@@ -466,6 +470,8 @@ def _run(
             window.start, window.end, soc, soc,
             estimated=not (calibrating and index == 0) and any(slot.hour in data.estimated_hours for slot in slots),
             calibrated=calibrating and index == 0,
+            derived=window.derived,
+            modelled=window.modelled,
         )
         target = targets[index] if targets is not None else data.target_soc
         if not row.calibrated:

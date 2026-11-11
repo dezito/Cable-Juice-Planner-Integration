@@ -347,7 +347,7 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choos
   forecast, battery capacity and charging loss
 - **What-if:** simulated comparisons that never change the plan: daily smart charging to the maximum
   recommended level against immediate charging, the current daily reserve and maximum level against alternative
-  ones, the charging planned from the grid only (without solar), the EV's solar energy replaced by grid energy, and the cost recorded in the charging history against a fixed monthly charging price
+  ones, the charging planned from the grid only (without solar), the EV's solar energy replaced by grid energy, and the cost recorded in the charging history against a fixed monthly charging price. Connections from before CJP began recording are estimated from the recorder's battery level and charger power statistics (only after they have been checked against the measured connections) and are labelled
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to

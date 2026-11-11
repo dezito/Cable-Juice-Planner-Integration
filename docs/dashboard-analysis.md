@@ -411,6 +411,71 @@ the current setting's level) and nothing in it is charged or counted, and the re
 The result then has the method *estimated* and the warnings say what was estimated; with measured data only it is
 *strict*.
 
+**Connections from before CJP began recording.** CJP measures the connections itself (plug-in to unplug), and
+the first time it also reads the charger status back as far as the recorder keeps raw history (10 days by default),
+so without more they only reach back as far as CJP has been running. The long-term hourly statistics of the
+battery level and of the charger power reach much further, so the older connections are *estimated* from them
+(`economy_db["derived_windows"]`, updated by the daily economy update; the price statistics are read as far back as
+the prices are kept, 400 days):
+
+- an hour is *away* when the battery level moved by at least 1.5 % (more than a whole-percent tick or standby
+  drain) while the charger delivered no power (under 500 W), or when it started lower than the hour before ended
+  (the car left in an hour that was still charging): the car was driving. A run of consecutive hours that are not
+  away and contain home charging is a parked period at the charger. An hour without a battery level or without a
+  power reading ends the period; it is never taken as parked;
+- the connection is that period, anchored at its end (the departure) with the short typical length (the 25th
+  percentile of the measured lengths), moved earlier only as far as needed to include the first observed charging,
+  and never longer than the long typical length (the 75th percentile, in whole hours), because parked is not the
+  same as plugged in. A parked period with charging far apart (a long stay, or a level sensor that stood still) is
+  several connections, none longer than that;
+- the battery level at the start and end of a connection comes from the same statistics, so the drive between two
+  connections is the net battery use between them (public charging, small drives and standby drain inside it, which
+  the recorded drives lack). A recorded drive in the gap before the first measured connection wins over it; a
+  recorded drive inside the estimated period is not counted again. The battery level at the first estimated
+  connection comes from the statistics too (an entered or read level belongs to the first measured connection and
+  is not used then). Without the level at the first measured connection no estimated connection is used, because
+  the use in the gap before it would be missing.
+
+The estimate is checked before it is used: the same method is run over the period CJP measured. It has to find at
+least 70 % of the measured connections that had home charging (at least 10 of them, which is also what the typical
+lengths are taken from), at least 70 % of the estimated connections must overlap a measured one, at least 80 % of
+the time it calls a connection must lie inside measured connections (a window that is too long or on the wrong
+hours claims time the car was not plugged in), and the median error of the departure time must be at most
+2 hours. If it fails, or without the statistics, or with fewer than 10 measured connections, no older connection
+is used (the reason is in the coverage of the result sensor, and the card warns when the check failed). The
+estimated connections come first in the calculation (the others are unchanged), the warning says they are
+estimates, and the card shows what they contributed to the daily smart charging comparison on its own line. The
+same connections are used by the reserve and maximum level comparison and by the comparison without solar; there
+the recorded energy is valued at the price per kWh of the measured connections only, because CJP's recorded
+sessions only exist from when it began recording. A smart charger that was used in the past already charged in
+cheap hours, so the estimate of the connection length matters: an estimate that is too short understates the
+difference, one that is too long overstates it. The check does not prove the estimate: it shows that the method
+reproduces the connections that are known.
+
+**The work plan.** The plan (per weekday: workday or not, departure, homecoming and the distance needed, as it is
+set now, not as it was in the past) is used in two ways:
+
+- *as a bound* on the estimated connections: a connection is not allowed to begin before the planned homecoming of
+  its first day or end after the planned departure of its last one, as long as it keeps the observed charging. The
+  plan can only shorten a connection. It is used when that version also passes the check against the measured
+  connections, otherwise the connections are used as the statistics show them (the coverage says which);
+- *as a model* for the time before any record: before the first estimated or measured connection, and before the
+  battery level statistics begin, the car is home from the homecoming time until the next workday's departure (a
+  weekend in one stay, kept within the length of the longer measured connections), and the battery use between two
+  connections is the distance of the days in the gap (a workday's when it leaves in the gap, a day off's when its
+  noon is in it) times the battery percent per km of the recorded drives (the median, at least 10 drives; never a
+  default). The battery level at the first modelled connection is not known, so the level entered or read for the
+  period is used, else the first connection only brings the car to a common level, like any unknown start. The model
+  is only used when, run over the period CJP measured, it passes the same check as the statistics (it finds the
+  measured connections, does not claim time the car was away, ends them at about the right time) and its battery use
+  is between 0.6 and 1.6 times the recorded drives'. It is a model of what the plan says today, not a record: the
+  warning says so, and the card shows how many of the estimated connections were modelled.
+
+Every result table also shows the settings it used: the target battery level (and whether it is the live setting
+or the temporary target) and the days with smart charging for the daily smart charging comparison, the current and
+the alternative daily reserve and maximum level for the settings comparison, and the daily reserve and maximum
+level for the comparison without solar.
+
 ### EV solar energy replaced by grid energy
 
 Shows what the energy your EV took from solar would have cost if the EV had charged **at the same times from

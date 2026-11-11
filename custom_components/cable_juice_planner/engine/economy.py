@@ -122,6 +122,8 @@ class Economy:
         # Sessions that started before this did not record their solar energy as energy (see
         # engine/energy/solar.py calc_local_energy_kwh), so the What-if solar comparison does not use them
         self.economy_db.setdefault("solar_energy_since", self._economy_ts(self.now()))
+        if not isinstance(self.economy_db.get("derived_windows"), dict):
+            self.economy_db.pop("derived_windows", None)
 
     # connection windows ------------------------------------------------ #
 
@@ -317,6 +319,10 @@ class Economy:
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
         self.mark_dirty("economy")
         self.publish_economy(data.get("odometer_months") or {})
+        try:
+            self.store_derived_windows(data)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("The What-if older connections could not be estimated: %s %s", err, type(err))
         try:
             self.store_solar_statistics(data)
         except Exception as err:  # noqa: BLE001

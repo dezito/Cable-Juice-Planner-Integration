@@ -26,6 +26,8 @@ import math
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
+from .derive import used_between
+from .modelled import model_connections
 from .replay import GAP_TOLERANCE, Event, LossFactor, PowerCap, ReplayInput, Window
 
 HOUR = 3600.0
@@ -90,6 +92,110 @@ def select_windows(
     return chosen, counts
 
 
+def _derived_connections(
+    derived: Mapping[str, Any] | None, measured: list[Window], period_start: float, period_end: float, tz: datetime.tzinfo | None
+) -> tuple[list[Window], list[tuple[float, float]], tuple[float, float] | None, dict[str, Any]]:
+    """The connections estimated from the battery level statistics (derive.py) that belong to the period.
+
+    Returns (windows, the net battery use in the gaps between them as (time, percent), the use in the gap before the
+    first measured connection, info for the coverage). They only come before the first measured connection and are
+    never used when the estimate was not validated against the measured ones.
+    """
+    info: dict[str, Any] = {"windows_derived": 0, "derived_gaps_without_use": 0, "derived_entries_invalid": 0}
+    if not isinstance(derived, Mapping):
+        return [], [], None, info
+    info["derived_status"] = derived.get("status")
+    info["derived_reason"] = derived.get("reason")
+    info["derived_validation"] = derived.get("validation")
+    if derived.get("status") != "ok":
+        return [], [], None, info
+    rows: list[tuple[float, float, float, float]] = []
+    for entry in derived.get("windows") or []:
+        values = tuple(entry.get(key) if isinstance(entry, Mapping) else None for key in ("start", "end", "soc_in", "soc_out"))
+        if not all(_finite(v) for v in values) or values[1] <= values[0] or not all(0.0 <= v <= 100.0 for v in values[2:]):
+            info["derived_entries_invalid"] += 1
+            continue
+        start, end, soc_in, soc_out = (float(v) for v in values)  # type: ignore[arg-type]
+        if start < period_start or end > period_end or (measured and end > measured[0].start):
+            continue
+        rows.append((start, end, soc_in, soc_out))
+    rows.sort()
+    kept: list[tuple[float, float, float, float]] = []
+    for row in rows:
+        if kept and row[0] < kept[-1][1]:
+            info["derived_entries_invalid"] += 1  # overlapping connections cannot both be real
+            continue
+        kept.append(row)
+    anchor = derived.get("anchor")
+    if kept and measured and not (
+        isinstance(anchor, Mapping) and anchor.get("start") == measured[0].start and _finite(anchor.get("soc_in"))
+    ):
+        # the battery level at the first measured connection is not known from the statistics (or that connection is not the
+        # one the estimate was made for, e.g. an older measured one was left out): the use in the gap before it would be
+        # missing, so no estimated connection is used rather than a demand of zero
+        info["derived_reason"] = "anchor_mismatch"
+        return [], [], None, info
+    windows = [
+        Window(s, e, datetime.datetime.fromtimestamp(e, tz).weekday() if tz is not None else None, derived=True) for s, e, _, _ in kept
+    ]
+    gaps: list[tuple[float, float]] = []
+    for (_, end, _, out), (start, _, soc_in, _) in zip(kept, kept[1:]):
+        used = used_between(out, soc_in)
+        if used is None:
+            info["derived_gaps_without_use"] += 1
+        else:
+            gaps.append(((end + start) / 2.0, used))
+    final = None
+    if kept and measured:
+        used = used_between(kept[-1][3], float(anchor["soc_in"]))
+        if used is not None:
+            final = ((kept[-1][1] + measured[0].start) / 2.0, used)
+        else:
+            info["derived_gaps_without_use"] += 1
+    info["windows_derived"] = len(windows)
+    info["derived_first_soc"] = kept[0][2] if kept else None
+    return windows, gaps, final, info
+
+
+def _modelled_connections(
+    work_plan: Mapping[str, Any] | None, tz: datetime.tzinfo | None, windows: Iterable[Mapping[str, Any]],
+    drives: list[Mapping[str, Any]], period_start: float, derived_info: Mapping[str, Any], derived: Mapping[str, Any] | None,
+    real: list[Window],
+) -> tuple[list[Window], list[tuple[float, float]], tuple[float, float] | None, dict[str, Any]]:
+    """The connections modelled from the work plan (modelled.py) for the part of the period before any record.
+
+    That is before the first estimated or measured connection of the period, and before the battery level statistics begin
+    when connections were estimated from them. Returns (windows, the battery use in the gaps between them, the use in the
+    gap before the first real connection, info for the coverage).
+    """
+    info: dict[str, Any] = {"windows_modelled": 0, "modelled_status": None, "modelled_reason": None, "modelled_validation": None}
+    if work_plan is None or tz is None or not real:
+        return [], [], None, info
+    region_end = real[0].start
+    statistics_from = derived.get("statistics_from") if isinstance(derived, Mapping) else None
+    if derived_info.get("windows_derived") and _finite(statistics_from):
+        region_end = min(region_end, float(statistics_from))
+    if region_end <= period_start:
+        return [], [], None, info
+    complete = [
+        (float(w["start"]), float(w["end"])) for w in windows
+        if isinstance(w, Mapping) and _finite(w.get("start")) and _finite(w.get("end")) and w["end"] > w["start"]
+    ]
+    model = model_connections(work_plan, tz, complete, drives, period_start, region_end, real[0].start)
+    info.update(modelled_status=model["status"], modelled_reason=model["reason"], modelled_validation=model["validation"])
+    if model["status"] != "ok":
+        return [], [], None, info
+    built = [
+        Window(float(s), float(e), datetime.datetime.fromtimestamp(e, tz).weekday(), derived=True, modelled=True)
+        for s, e in model["windows"]
+    ]
+    last_end = built[-1].end
+    between = [(float(t), float(u)) for t, u in model["drives"] if t <= last_end]
+    final = next(((float(t), float(u)) for t, u in model["drives"] if t > last_end), None)
+    info["windows_modelled"] = len(built)
+    return built, between, final, info
+
+
 def build_replay_input(
     *,
     windows: Iterable[Mapping[str, Any]],
@@ -113,14 +219,37 @@ def build_replay_input(
     dst_copied_hours: Iterable[float] = (),
     history_hours: Iterable[float] = (),
     refund: float = 0.0,
+    derived: Mapping[str, Any] | None = None,
+    work_plan: Mapping[str, Any] | None = None,
 ) -> tuple[ReplayInput, dict[str, Any]]:
-    """The replay input for [period_start, period_end) and what the data covered."""
+    """The replay input for [period_start, period_end) and what the data covered.
+
+    derived: the connections before CJP's own records, estimated from the battery level statistics (see derive.py).
+    When there are some, the battery level at the first of them comes from the same statistics and replaces start_soc.
+    work_plan: the work plan as set now (see engine_part.what_if_work_plan). For the time before the first estimated or
+    measured connection, and before the statistics begin, the connections and the battery use are modelled from it (see
+    modelled.py), when that model has found the measured connections. Their start level is not known: start_soc is used.
+    """
     drives = list(drives)
     valid_drives = [d for d in drives if _finite(d.get("start")) and _finite(d.get("used")) and d["used"] >= 0]
     full = drive_history_limit is not None and len(drives) >= drive_history_limit
     oldest = min((d["start"] for d in valid_drives), default=None) if full else None
+    windows = list(windows)
     chosen, left_out = select_windows(windows, period_start, period_end, oldest)
     chosen = [Window(w.start, w.end, datetime.datetime.fromtimestamp(w.end, tz).weekday() if tz is not None else None) for w in chosen]
+    measured_chosen = chosen
+    derived_chosen, derived_gap_drives, derived_final_drive, derived_info = _derived_connections(
+        derived, measured_chosen, period_start, period_end, tz
+    )
+    real = [*derived_chosen, *measured_chosen]
+    modelled_chosen, modelled_gap_drives, modelled_final_drive, modelled_info = _modelled_connections(
+        work_plan, tz, windows, drives, period_start, derived_info, derived, real
+    )
+    chosen = [*modelled_chosen, *real]
+    estimated = [*modelled_chosen, *derived_chosen]
+    if derived_chosen and not modelled_chosen:
+        # the level at the first estimated connection comes from the statistics too: an entered or read level belongs to the first measured one
+        start_soc, start_soc_source = float(derived_info["derived_first_soc"]), "battery_statistics"
 
     hourly: dict[float, float] = {}
     invalid_prices = 0
@@ -139,12 +268,28 @@ def build_replay_input(
     last = chosen[-1].end if chosen else period_start
     events: list[Event] = []
     drive_count = drives_outside = 0
+    # a recorded drive before the end of the last estimated connection belongs to a gap that is already covered by the
+    # net battery use from the statistics: counting both would drive the same trip twice
+    estimated_until = estimated[-1].end - GAP_TOLERANCE if estimated else None
+    drives_replaced = 0
     for drive in valid_drives:
         if first <= drive["start"] < last:
+            if estimated_until is not None and drive["start"] < estimated_until:
+                drives_replaced += 1
+                continue
             events.append(Event(ts=float(drive["start"]), kind="drive", soc_percent=float(drive["used"])))
             drive_count += 1
         else:
             drives_outside += 1
+    # the gap before the first measured connection: a recorded drive in it is better than the net use from the statistics
+    if derived_final_drive is not None and not any(estimated_until <= e.ts < measured_chosen[0].start for e in events):  # type: ignore[operator]
+        derived_gap_drives = [*derived_gap_drives, derived_final_drive]
+    # likewise the gap before the first connection that is not modelled: a recorded drive wins over the modelled use
+    if modelled_final_drive is not None and not any(modelled_chosen[-1].end - GAP_TOLERANCE <= e.ts < real[0].start for e in events):
+        modelled_gap_drives = [*modelled_gap_drives, modelled_final_drive]
+    estimated_drives = [*modelled_gap_drives, *derived_gap_drives]
+    events.extend(Event(ts=ts, kind="drive", soc_percent=min(used, 100.0)) for ts, used in estimated_drives)
+    drive_count += len(estimated_drives)
     invalid_drives = len(drives) - len(valid_drives)
 
     # public charges are already inside the net battery use of the drive they belong to; one in a
@@ -173,6 +318,21 @@ def build_replay_input(
     from_history = len(from_history_hours)
     coverage = {
         "windows": len(chosen),
+        "windows_measured": len(measured_chosen),
+        "windows_derived": derived_info["windows_derived"],
+        "derived_plan_bounds": bool(derived.get("plan_bounds")) if isinstance(derived, Mapping) else False,
+        "windows_modelled": modelled_info["windows_modelled"],
+        "modelled_status": modelled_info["modelled_status"],
+        "modelled_reason": modelled_info["modelled_reason"],
+        "modelled_validation": modelled_info["modelled_validation"],
+        "modelled_drives": len(modelled_gap_drives),
+        "derived_status": derived_info.get("derived_status"),
+        "derived_reason": derived_info.get("derived_reason"),
+        "derived_validation": derived_info.get("derived_validation"),
+        "derived_drives": len(derived_gap_drives),
+        "derived_gaps_without_use": derived_info["derived_gaps_without_use"],
+        "derived_entries_invalid": derived_info["derived_entries_invalid"],
+        "drives_replaced_by_derived": drives_replaced,
         "windows_outside_period": left_out["outside"],
         "windows_still_open": left_out["open"],
         "windows_invalid": left_out["invalid"],
@@ -197,7 +357,12 @@ def build_replay_input(
         "last_window": last if chosen else None,
     }
     provenance = {
-        "windows": "measured",
+        "windows": (
+            "measured" if not estimated else
+            "measured_and_modelled_from_work_plan" if modelled_chosen and not derived_chosen else
+            "measured_and_estimated_from_battery_statistics" if not modelled_chosen else
+            "measured_estimated_from_battery_statistics_and_modelled_from_work_plan"
+        ),
         "prices": "measured" if not legacy and not copied and not from_history else "measured_partly_unverified",
         "drives": "measured_accepted_drives_only_net_of_public_charging",
         "public_charges": "recorded_only_counted",
@@ -219,6 +384,14 @@ def build_replay_input(
         warnings.append("many_connections_without_drive")  # the demand is probably understated a lot
     if left_out["before_drive_history"]:
         warnings.append("connections_before_drive_history_left_out")
+    if derived_chosen:
+        warnings.append("connections_estimated_from_battery_statistics")  # older connections: when the car was parked, not plugged in
+    if modelled_chosen:
+        warnings.append("connections_modelled_from_work_plan")  # the plan as set now, not a record of what happened
+    if modelled_info.get("modelled_reason") == "not_validated":
+        warnings.append("work_plan_model_not_validated")
+    if derived_info.get("derived_reason") == "not_validated":
+        warnings.append("older_connections_not_validated")  # the method did not find the measured connections: not used
     data = ReplayInput(
         windows=tuple(chosen),
         events=tuple(events),
