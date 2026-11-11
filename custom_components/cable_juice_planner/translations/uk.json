@@ -1204,6 +1204,9 @@
       },
       "what_if_settings": {
         "name": "What-if налаштувань CJP"
+      },
+      "what_if_solar": {
+        "name": "What-if перевага сонця для авто"
       }
     },
     "binary_sensor": {

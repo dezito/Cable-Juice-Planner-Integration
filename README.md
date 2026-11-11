@@ -328,7 +328,7 @@ affect the plan).
 The results include `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
 `_emoji_description`, `_kwh_cost_price`, `_drive_efficiency`, `_km_per_kwh`, `_estimated_range`,
 `_co2_emitted`, `_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
-full), `_charging_loss_model`, `_economy`, `_what_if` and `_what_if_settings` (the latest What-if results) and `_analysis`. Large attributes (markdown, plans, measurements)
+full), `_charging_loss_model`, `_economy`, `_what_if`, `_what_if_settings` and `_what_if_solar` (the What-if results) and `_analysis`. Large attributes (markdown, plans, measurements)
 are not stored in the recorder database.
 
 ---
@@ -347,7 +347,7 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choos
   forecast, battery capacity and charging loss
 - **What-if:** simulated comparisons that never change the plan: daily smart charging to the maximum
   recommended level against immediate charging, the current daily reserve and maximum level against alternative
-  ones, and the cost recorded in the charging history against a fixed monthly charging price
+  ones, the EV's solar energy replaced by grid energy, and the cost recorded in the charging history against a fixed monthly charging price
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to

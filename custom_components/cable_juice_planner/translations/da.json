@@ -1204,6 +1204,9 @@
       },
       "what_if_settings": {
         "name": "What-if CJP-indstillinger"
+      },
+      "what_if_solar": {
+        "name": "What-if bilens solfordel"
       }
     },
     "binary_sensor": {

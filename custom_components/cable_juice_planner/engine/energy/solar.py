@@ -439,21 +439,31 @@ class EnergySolar:
         return sell_price
 
     def calc_local_energy_kwh(self, period=60, ev_kwh=None, solar_period_current_hour=False):
+        """The energy (kWh) of the last `period` minutes that came from local energy: (local, solar, home battery).
+
+        ev_kwh is the energy the EV charged in those minutes. local_energy_available() gives average
+        POWER (W) over the period, so the energy is that power times the period: only for exactly 60
+        minutes is a kW the same number as a kWh (CJP used to return the kW as if it were kWh, which
+        overstated a shorter period and understated a longer one). The local share can never be more
+        than the EV charged, and solar plus home battery never more than the local share.
+        """
         if not self.is_solar_configured():
             return 0.0, 0.0, 0.0
         minutes = self.now().minute if solar_period_current_hour else period
+        hours = minutes / 60.0 if minutes and minutes > 0 else 1.0
         if ev_kwh is None:
             now = self.now()
             past = now - datetime.timedelta(minutes=minutes)
-            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], past, now, convert_to="kW", error_state=0.0))), 3)
-        ev_watt = ev_kwh * 1000.0
+            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], past, now, convert_to="kW", error_state=0.0))) * hours, 3)
+        ev_watt = ev_kwh * 1000.0 / hours  # the EV's average power over the period
         _available, watts_from_local_energy, solar_watts, powerwall_watts = self.local_energy_available(
             period=minutes, include_local_energy_distribution=True, without_all_exclusion=True
         )
         if watts_from_local_energy > ev_watt:
-            miscalculated_ratio = watts_from_local_energy / ev_watt if ev_watt > 0.0 else 0.0
-            solar_watts = solar_watts * miscalculated_ratio
-            powerwall_watts = powerwall_watts * miscalculated_ratio
+            # the sources can not have given more than the EV used: scale all three down together
+            share = ev_watt / watts_from_local_energy if watts_from_local_energy > 0.0 else 0.0
+            solar_watts = solar_watts * share
+            powerwall_watts = powerwall_watts * share
             watts_from_local_energy = ev_watt
-        solar_kwh_available = round(max(watts_from_local_energy, 0.0) / 1000, 3)
-        return round(min(solar_kwh_available, ev_kwh), 3), round(solar_watts / 1000, 3), round(powerwall_watts / 1000, 3)
+        local_kwh = round(max(watts_from_local_energy, 0.0) * hours / 1000.0, 3)
+        return round(min(local_kwh, ev_kwh), 3), round(solar_watts * hours / 1000.0, 3), round(powerwall_watts * hours / 1000.0, 3)
