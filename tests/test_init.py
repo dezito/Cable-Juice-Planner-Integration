@@ -627,8 +627,11 @@ async def test_economy_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> 
     ]}
     hour = now.replace(minute=0, second=0, microsecond=0)
 
-    def statistics(_hass, _start, _end, ids, period, *_args):
+    price_starts: list = []
+
+    def statistics(_hass, start, _end, ids, period, *_args):
         if period == "hour":
+            price_starts.append((start, set(ids)))
             return {next(iter(ids)): [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 1.0 + h / 100} for h in range(48)]}
         return {next(iter(ids)): [{"start": hour.replace(day=1).timestamp(), "change": 812.0}]}
 
@@ -644,6 +647,9 @@ async def test_economy_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> 
     windows = coordinator.engine.economy_db["windows"]
     assert (windows[0]["start"], windows[0]["end"]) == (plugged.timestamp(), unplugged.timestamp())
     assert coordinator.engine.economy_db["backfilled"]
+    # the price statistics are read as far back as the prices are kept, not only as far as the raw history (keep_days 30)
+    price_ids = set(coordinator.price_provider.buy_price_entity_ids())
+    assert price_ids and any(ids == price_ids and now - start >= datetime.timedelta(days=399) for start, ids in price_starts)
     months = hass.states.get(f"sensor.{OBJECT_PREFIX}_economy").attributes["months"]
     assert months and 812.0 in coordinator.engine.economy_db["odometer_months"].values()
 

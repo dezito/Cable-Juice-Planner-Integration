@@ -13,6 +13,7 @@ from homeassistant.util.unit_conversion import DistanceConverter
 
 from ..const import ENTITY_UNAVAILABLE_STATES
 from ..engine.distance import DISTANCE_WEEKS
+from ..engine.economy import ECONOMY_PRICE_DAYS
 from ..engine.loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from ..engine.soc_power import SOC_POWER_HISTORY_DAYS
 from ..utils.helpers import float_or_none
@@ -175,8 +176,9 @@ class CoordinatorRefresh:
 
         try:
             if price_ids:
+                # long-term statistics are not purged with the raw history: as far back as the economy keeps prices
                 stats = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, end - datetime.timedelta(days=keep_days + 5), end, set(price_ids), "hour", None, {"mean"}
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=ECONOMY_PRICE_DAYS), end, set(price_ids), "hour", None, {"mean"}
                 )
                 recorded = {}
                 for price_id in price_ids:
@@ -195,6 +197,7 @@ class CoordinatorRefresh:
                     recorded[price_id] = hourly
                 data["prices"] = provider.combine_history(recorded)
             await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts)
+            await self._async_economy_ev_statistics(instance, data, end, stat_ts)
             if odometer_id:
                 months = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, end - datetime.timedelta(days=400), end, {odometer_id}, "month", None, {"change"}
@@ -261,6 +264,35 @@ class CoordinatorRefresh:
                     data["power_hours"] = hours
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Economy: could not load the solar statistics: %s", err)
+
+    async def _async_economy_ev_statistics(self, instance, data: dict[str, Any], end: datetime.datetime, stat_ts) -> None:
+        """The What-if older connections: the hourly battery level (mean, lowest, highest) and the charger power (W) from
+        the long-term statistics, as far back as the economy keeps its prices. Without the entities, or without statistics
+        for them, "ev_hours" is empty (nothing is estimated); when the statistics cannot be read the key is left out
+        and what was stored stays."""
+        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+
+        soc_id = self.config["ev_car"]["entity_ids"].get("usable_battery_level_entity_id") if self.ev_configured else ""
+        power_id = self.config["charger"]["entity_ids"].get("power_consumtion_entity_id")
+        if not soc_id or not power_id:
+            data["ev_hours"] = {}
+            return
+        try:
+            stats = await instance.async_add_executor_job(
+                statistics_during_period, self.hass, end - datetime.timedelta(days=ECONOMY_PRICE_DAYS), end, {soc_id, power_id},
+                "hour", {"power": "W"}, {"mean", "min", "max"},
+            )
+            hours: dict[float, list[float | None]] = {}
+            for row in stats.get(soc_id, []):
+                if None not in (row.get("mean"), row.get("min"), row.get("max")):
+                    hours[stat_ts(row)] = [row["mean"], row["min"], row["max"], None]
+            for row in stats.get(power_id, []):
+                ts = stat_ts(row)
+                if ts in hours and row.get("mean") is not None:
+                    hours[ts][3] = abs(float(row["mean"]))
+            data["ev_hours"] = hours
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Economy: could not load the battery level statistics: %s", err)
 
     @callback
     def _analysis_daily(self, _now) -> None:
