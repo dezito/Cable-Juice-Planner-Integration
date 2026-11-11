@@ -75,6 +75,16 @@ class WhatIf:
     def _what_if_build(self, period_start: float, period_end: float, start_soc: float | None, source: str):
         """The replay input for the period and what the data covered (shared by prepare and run)."""
         target, target_source = self.what_if_target()
+        data, coverage, sessions = self._what_if_inputs(
+            period_start, period_end, start_soc, source, target, self.what_if_smart_weekdays()
+        )
+        return data, coverage, target, target_source, sessions
+
+    def _what_if_inputs(
+        self, period_start: float, period_end: float, start_soc: float | None, source: str,
+        target: float, smart_weekdays: frozenset[int] | None,
+    ):
+        """The replay input and coverage for a target and day selection (Scenarios A and B)."""
         battery = self.config["ev_car"].get("battery_size")
         max_kw = float(self.max_kwh_charging)
         kws = {round(watt / 1000.0, 3) for watt in self.charging_power_dict()} | {round(max_kw, 3)}
@@ -107,11 +117,11 @@ class WhatIf:
             prices_averaged_since=self.economy_db.get("prices_averaged_since"),
             start_soc_source=source,
             tz=self._snap.tz,
-            smart_weekdays=self.what_if_smart_weekdays(),
+            smart_weekdays=smart_weekdays,
             drive_history_limit=ANALYSIS_DRIVES,
             dst_copied_hours=list(copies),
         )
-        return data, coverage, target, target_source, sessions
+        return data, coverage, sessions
 
     def what_if_prepare(self) -> dict[str, Any]:
         """Fixes the period and the first connection the starting level belongs to (the same selection the run uses)."""

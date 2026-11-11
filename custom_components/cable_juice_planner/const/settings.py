@@ -73,11 +73,15 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "what_if_days": {"min": 7, "max": 365, "step": 1, "mode": "box", "unit": "d", "default": 30.0},
     "what_if_target_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
     "what_if_start_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0},
+    # What-if Scenario B: the alternative daily homecoming reserve and maximum recommended level (0 = the live setting)
+    "what_if_min_daily_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
+    "what_if_max_recommended_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
 }
 
 # the What-if settings only feed a simulation: changing one must not recalculate the live plan
 WHAT_IF_SETTING_KEYS = (
     "what_if_days", "what_if_target_battery_level", "what_if_start_battery_level", "what_if_day_selection",
+    "what_if_min_daily_battery_level", "what_if_max_recommended_battery_level",
     *(f"what_if_day_{day}" for day in WEEKDAYS),
 )
 
@@ -100,7 +104,8 @@ DATETIME_SETTINGS: dict[str, dict[str, Any]] = {
 }
 
 # run_what_if: the What-if view's Scenario A (daily smart charging to the maximum recommended level)
-BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if")
+# run_what_if_settings: its Scenario B (the daily homecoming reserve and maximum recommended level)
+BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if", "run_what_if_settings")
 # only with a car integration (the charging loss is measured with its battery level)
 EV_BUTTON_KEYS = ("recalculate_charging_loss",)
 
@@ -140,6 +145,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "analysis": ("%", None, None, None),
     # the adjusted cost difference of the latest What-if Scenario A (smart minus immediate), the result in the attributes
     "what_if": ("{valuta}", None, None, None),
+    # the adjusted cost difference of the latest What-if Scenario B (alternative settings minus current settings)
+    "what_if_settings": ("{valuta}", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)

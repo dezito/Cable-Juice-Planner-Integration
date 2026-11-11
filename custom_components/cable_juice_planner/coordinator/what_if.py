@@ -1,4 +1,4 @@
-"""What-if Scenario A: button run_what_if (reads the starting battery level, then runs the job)."""
+"""What-if Scenarios A and B: the buttons (read the starting battery level, then run the job)."""
 from __future__ import annotations
 
 import datetime
@@ -21,26 +21,34 @@ class CoordinatorWhatIf:
     _what_if_running = False
 
     async def async_run_what_if(self) -> None:
-        """button run_what_if. One calculation at a time; the live plan and settings are never touched."""
+        """button run_what_if (Scenario A). One calculation at a time; the live plan and settings are never touched."""
+        await self._async_run_what_if_jobs("what_if")
+
+    async def async_run_what_if_settings(self) -> None:
+        """button run_what_if_settings (Scenario B). Shares the one-at-a-time guard with Scenario A."""
+        await self._async_run_what_if_jobs("what_if_settings")
+
+    async def _async_run_what_if_jobs(self, name: str) -> None:
+        """prepare -> read the starting level -> run, for the jobs "<name>_prepare", "<name>_run" and "<name>_fail"."""
         if self._what_if_running:
             return
         self._what_if_running = True
         try:
-            prepared = await self.async_run_job("what_if_prepare")
+            prepared = await self.async_run_job(f"{name}_prepare")
             if prepared.error or not isinstance(prepared.value, dict):
-                await self.async_run_job("what_if_fail", "internal_error")
+                await self.async_run_job(f"{name}_fail", "internal_error")
                 return
             start = await self._async_what_if_start_soc(prepared.value)
             # the run uses the same period and first connection the starting level was read for
             start = {**start, "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]}
-            result = await self.async_run_job("what_if_run", start)
+            result = await self.async_run_job(f"{name}_run", start)
             if result.error:
                 _LOGGER.warning("What-if could not be calculated: %s", result.error)
-                await self.async_run_job("what_if_fail", "internal_error")
+                await self.async_run_job(f"{name}_fail", "internal_error")
         except Exception:  # noqa: BLE001
             # never leave the attempt "running": the saved result stays and the reason is shown
             _LOGGER.exception("What-if failed")
-            await self.async_run_job("what_if_fail", "internal_error")
+            await self.async_run_job(f"{name}_fail", "internal_error")
         finally:
             self._what_if_running = False
 

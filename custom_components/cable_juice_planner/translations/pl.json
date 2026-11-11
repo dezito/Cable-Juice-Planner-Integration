@@ -994,6 +994,12 @@
       },
       "what_if_start_battery_level": {
         "name": "Poziom baterii what-if przy pierwszym podłączeniu"
+      },
+      "what_if_min_daily_battery_level": {
+        "name": "What-if alternatywna dzienna rezerwa"
+      },
+      "what_if_max_recommended_battery_level": {
+        "name": "What-if alternatywny maksymalny poziom baterii"
       }
     },
     "select": {
@@ -1084,6 +1090,9 @@
       },
       "run_what_if": {
         "name": "Uruchom what-if"
+      },
+      "run_what_if_settings": {
+        "name": "Oblicz what-if ustawień"
       }
     },
     "sensor": {
@@ -1192,6 +1201,9 @@
       },
       "what_if": {
         "name": "What-if codzienne ładowanie"
+      },
+      "what_if_settings": {
+        "name": "What-if ustawień CJP"
       }
     },
     "binary_sensor": {
