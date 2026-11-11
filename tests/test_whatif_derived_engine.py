@@ -100,6 +100,8 @@ def test_the_plan_without_solar_values_the_recorded_energy_at_the_price_of_the_m
     assert r["recorded"]["sessions"] == 2 and r["estimate"] is not None
     # the older period is three times dearer: valuing the recorded energy at the price of the whole replay would inflate the solar advantage
     assert r["estimate"]["unit"] < r["plan"]["unit"]
+    # the table compares the recorded charging with the plan over the same (measured) span
+    assert r["plan_measured"]["unit"] == r["estimate"]["unit"] and r["plan_measured"]["cost"] < r["plan"]["cost"]
     assert all(m["recorded_cost"] is None for m in r["months"] if m["recorded_kwh"] == 0)  # no recorded sessions: unknown, not 0
 
 

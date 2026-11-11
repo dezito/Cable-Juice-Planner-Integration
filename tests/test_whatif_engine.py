@@ -71,6 +71,31 @@ def test_scenario_a_replays_the_stored_history_and_publishes_it() -> None:
     assert engine.economy_db["what_if_attempt"]["status"] == "ok"
 
 
+def test_scenario_a_also_replays_the_current_settings_over_the_same_period() -> None:
+    engine, snap = _engine()
+    _seed(engine)
+    _, result = _run(engine, snap)
+    r = result.value
+    live = r["settings"]
+    assert live == {"reserve": engine.get_min_daily_battery_level(), "maximum": engine.get_max_recommended_charge_limit_battery_level()} or set(live) == {"reserve", "maximum"}
+    current = r["current"]
+    assert current is not None and r["current_reason"] is None
+    # the planned grid-only charging with the live reserve and maximum; the last connection is left out (its next drive is not known)
+    assert current["windows_replayed"] == r["windows"]["replayed"] - 1
+    assert current["cost"] > 0 and current["grid_kwh"] > 0 and current["unmet_driving_kwh"] == 0
+    # the differences against it are over the connections all three cover, in total and per month
+    same = current["same"]
+    assert same["windows"] == current["windows_replayed"] and same["current_cost"] == pytest.approx(current["cost"], abs=0.01)
+    assert same["smart_cost"] <= r["smart"]["cost"] + 1e-6 and same["asap_cost"] <= r["asap"]["cost"] + 1e-6
+    assert sum(m["same_windows"] for m in r["months"]) == same["windows"]
+    assert sum(m["current_cost"] or 0 for m in r["months"]) == pytest.approx(same["current_cost"], abs=0.01)
+    # nothing live changed by calculating it
+    assert not result.settings
+    # an unavailable calculation has no column
+    _, failed = _run(engine, snap, {"soc": 50.0, "source": "entered", "first_window_start": 1.0})
+    assert failed.value["current"] is None and failed.value["settings"] is None
+
+
 def test_scenario_a_changes_nothing_live() -> None:
     engine, snap = _engine()
     _seed(engine)

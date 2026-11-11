@@ -171,16 +171,18 @@ def _modelled_connections(
     info: dict[str, Any] = {"windows_modelled": 0, "modelled_status": None, "modelled_reason": None, "modelled_validation": None}
     if work_plan is None or tz is None or not real:
         return [], [], None, info
-    region_end = real[0].start
+    complete = [
+        (float(w["start"]), float(w["end"])) for w in windows
+        if isinstance(w, Mapping) and _finite(w.get("start")) and _finite(w.get("end")) and w["end"] > w["start"]
+    ]
+    # never over a time a measured connection exists in, also one that is left out of the replay (outside the period, or
+    # before the drive history): the model only fills in what nothing records
+    region_end = min(real[0].start, min((s for s, _ in complete), default=real[0].start))
     statistics_from = derived.get("statistics_from") if isinstance(derived, Mapping) else None
     if derived_info.get("windows_derived") and _finite(statistics_from):
         region_end = min(region_end, float(statistics_from))
     if region_end <= period_start:
         return [], [], None, info
-    complete = [
-        (float(w["start"]), float(w["end"])) for w in windows
-        if isinstance(w, Mapping) and _finite(w.get("start")) and _finite(w.get("end")) and w["end"] > w["start"]
-    ]
     model = model_connections(work_plan, tz, complete, drives, period_start, region_end, real[0].start)
     info.update(modelled_status=model["status"], modelled_reason=model["reason"], modelled_validation=model["validation"])
     if model["status"] != "ok":
@@ -247,7 +249,11 @@ def build_replay_input(
     )
     chosen = [*modelled_chosen, *real]
     estimated = [*modelled_chosen, *derived_chosen]
-    if derived_chosen and not modelled_chosen:
+    if modelled_chosen:
+        # nothing records the level at a modelled connection (and an entered or read level belongs to the first measured one,
+        # a car that may have been away at the modelled time): the first connection only brings the car to a common level
+        start_soc, start_soc_source = None, "unavailable"
+    elif derived_chosen:
         # the level at the first estimated connection comes from the statistics too: an entered or read level belongs to the first measured one
         start_soc, start_soc_source = float(derived_info["derived_first_soc"]), "battery_statistics"
 

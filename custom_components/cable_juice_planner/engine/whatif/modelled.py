@@ -141,7 +141,10 @@ def model_connections(
     span = (measured[0][0], max(e for _, e in measured))
     over = model_windows(plan, tz, span[0] - 2 * 86400.0, span[1], long)
     validation = validate([DerivedWindow(s, e, 0.0, 0.0) for s, e in over], measured, None)
-    in_gaps = [(e, measured[i + 1][0]) for i, (_, e) in enumerate(measured[:-1]) if measured[i + 1][0] > e]
+    # the battery use is compared in the gaps between the MODELLED connections (the ones a replay would use), against the
+    # recorded drives in those same gaps: a weekend the model cuts to the long length has days off in its gap, which a
+    # comparison in the gaps between the measured connections would never see
+    in_gaps = [(e, over[i + 1][0]) for i, (_, e) in enumerate(over[:-1]) if over[i + 1][0] > e]
     modelled_use = sum(gap_use(plan, tz, a, b, per_km) for a, b in in_gaps)
     recorded_use = sum(
         float(d["used"]) for d in drives if isinstance(d, Mapping) and _number(d.get("start")) is not None and _number(d.get("used")) is not None
@@ -151,6 +154,9 @@ def model_connections(
     validation = {**validation, "use_ratio": None if ratio is None else round(ratio, 3)}
     if not validation["passed"] or ratio is None or not USE_RATIO[0] <= ratio <= USE_RATIO[1]:
         return result("unavailable", "not_validated", validation=validation, per_km=per_km)
+    # the model's battery use is brought to the recorded one over the measured period (it can neither be more nor less
+    # than the drives show per km that the plan's distances account for)
+    per_km = per_km / ratio
     windows = model_windows(plan, tz, period_start, region_end, long)
     if not windows:
         return result("unavailable", "no_modelled_connections", validation=validation, per_km=per_km)

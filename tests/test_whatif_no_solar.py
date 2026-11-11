@@ -181,7 +181,7 @@ async def test_the_card_shows_the_plan_the_recorded_charging_the_estimate_and_th
     attributes = _attributes()
     out = await _render(hass, "en", attributes)
     for expected in (
-        "Latest result", "Planned from the grid", "Recorded (with solar)", "Price per kWh", "Of which solar energy", "Estimate for the recorded energy",
+        "Latest result", "Current settings, from the grid (no solar)", "Recorded (with solar)", "Difference (without solar - recorded)", "Price per kWh", "Of which solar energy", "Estimate for the recorded energy",
         "Solar advantage (estimate)", "Per month", "Coverage", "Estimate: part of the data was missing", "first connection is only used to bring the car",
         "All energy is bought from the grid", "Assumptions and what is not included", "Homecomings below the current reserve",
     ):
