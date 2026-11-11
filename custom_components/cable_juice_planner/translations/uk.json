@@ -887,6 +887,27 @@
       },
       "auto_forecast_type": {
         "name": "Автоматично вибирати тип прогнозу"
+      },
+      "what_if_day_monday": {
+        "name": "What-if понеділок"
+      },
+      "what_if_day_tuesday": {
+        "name": "What-if вівторок"
+      },
+      "what_if_day_wednesday": {
+        "name": "What-if середа"
+      },
+      "what_if_day_thursday": {
+        "name": "What-if четвер"
+      },
+      "what_if_day_friday": {
+        "name": "What-if п’ятниця"
+      },
+      "what_if_day_saturday": {
+        "name": "What-if субота"
+      },
+      "what_if_day_sunday": {
+        "name": "What-if неділя"
       }
     },
     "number": {
@@ -964,11 +985,30 @@
       },
       "subscription_monthly_price": {
         "name": "Фіксована місячна ціна заряджання"
+      },
+      "what_if_days": {
+        "name": "Період what-if"
+      },
+      "what_if_target_battery_level": {
+        "name": "Цільовий рівень батареї what-if"
+      },
+      "what_if_start_battery_level": {
+        "name": "Рівень батареї what-if при першому підключенні"
       }
     },
     "select": {
       "forecast_type": {
         "name": "Виберіть тип прогнозу"
+      },
+      "what_if_day_selection": {
+        "name": "Дні розумного заряджання what-if",
+        "state": {
+          "all": "Усі дні",
+          "work_plan": "Дні плану роботи",
+          "monday_friday": "Понеділок–п’ятниця",
+          "weekend": "Вихідні",
+          "selected": "Вибрані дні"
+        }
       }
     },
     "time": {
@@ -1041,6 +1081,9 @@
       },
       "recalculate_charging_loss": {
         "name": "Перерахувати втрати заряджання"
+      },
+      "run_what_if": {
+        "name": "Запустити what-if"
       }
     },
     "sensor": {
@@ -1146,6 +1189,9 @@
       },
       "analysis": {
         "name": "Готовий до виїзду"
+      },
+      "what_if": {
+        "name": "What-if щоденне заряджання"
       }
     },
     "binary_sensor": {

@@ -887,6 +887,27 @@
       },
       "auto_forecast_type": {
         "name": "Vælg prognosetype automatisk"
+      },
+      "what_if_day_monday": {
+        "name": "What-if mandag"
+      },
+      "what_if_day_tuesday": {
+        "name": "What-if tirsdag"
+      },
+      "what_if_day_wednesday": {
+        "name": "What-if onsdag"
+      },
+      "what_if_day_thursday": {
+        "name": "What-if torsdag"
+      },
+      "what_if_day_friday": {
+        "name": "What-if fredag"
+      },
+      "what_if_day_saturday": {
+        "name": "What-if lørdag"
+      },
+      "what_if_day_sunday": {
+        "name": "What-if søndag"
       }
     },
     "number": {
@@ -964,11 +985,30 @@
       },
       "subscription_monthly_price": {
         "name": "Fast månedlig ladepris"
+      },
+      "what_if_days": {
+        "name": "What-if-periode"
+      },
+      "what_if_target_battery_level": {
+        "name": "What-if-mål for batteriniveau"
+      },
+      "what_if_start_battery_level": {
+        "name": "What-if-batteriniveau ved første tilslutning"
       }
     },
     "select": {
       "forecast_type": {
         "name": "Vælg prognose type"
+      },
+      "what_if_day_selection": {
+        "name": "What-if-dage med smart opladning",
+        "state": {
+          "all": "Alle dage",
+          "work_plan": "Arbejdsplanens dage",
+          "monday_friday": "Mandag til fredag",
+          "weekend": "Weekend",
+          "selected": "Valgte dage"
+        }
       }
     },
     "time": {
@@ -1041,6 +1081,9 @@
       },
       "recalculate_charging_loss": {
         "name": "Genberegn ladetab"
+      },
+      "run_what_if": {
+        "name": "Kør what-if"
       }
     },
     "sensor": {
@@ -1146,6 +1189,9 @@
       },
       "analysis": {
         "name": "Klar til afgang"
+      },
+      "what_if": {
+        "name": "What-if daglig opladning"
       }
     },
     "binary_sensor": {

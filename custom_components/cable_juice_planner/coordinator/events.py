@@ -16,7 +16,7 @@ from homeassistant.helpers.event import (
     async_track_time_change,
 )
 
-from ..const import CHARGING_LOSS_METER_TIMEOUT, NUMBER_SETTINGS, SIGNAL_HELP_VALUES_CHANGED
+from ..const import CHARGING_LOSS_METER_TIMEOUT, NUMBER_SETTINGS, SIGNAL_HELP_VALUES_CHANGED, WHAT_IF_SETTING_KEYS
 from ..utils.formatting import format_charging_rule
 from ..utils.helpers import float_or_none
 from .constants import BATTERY_LEVEL_WAIT, CHARGE_TRIGGER_KEYS, PUBLIC_CHARGING_COST_DELAY, RULE_KEYS, SETTINGS_DEBOUNCE_SECONDS, TRIP_KEYS
@@ -150,7 +150,7 @@ class CoordinatorEvents:
             async_dispatcher_send(self.hass, self.signal, key)
         _LOGGER.debug("Setting %s changed from %s to %s (%s)", key, old, value, source)
         triggered_charge = self._setting_trigger(key, value, old)
-        if source == "user" and not triggered_charge:
+        if source == "user" and not triggered_charge and key not in WHAT_IF_SETTING_KEYS:
             if self._settings_debounce:
                 self._settings_debounce()
             self._settings_debounce = async_call_later(self.hass, SETTINGS_DEBOUNCE_SECONDS, self._settings_changed)
@@ -188,6 +188,8 @@ class CoordinatorEvents:
             self._background(self.async_run_job("trips_changed", key, None), "trip_reset")
         elif key == "recalculate_charging_loss":
             self._background(self.async_recalculate_charging_loss(), "charging_loss_recalculate")
+        elif key == "run_what_if":
+            self._background(self.async_run_what_if(), "what_if")
 
     async def _async_public_cost_flow(self, value) -> None:
         result = await self.async_run_job("public_charging_cost_changed", float_or_none(value))

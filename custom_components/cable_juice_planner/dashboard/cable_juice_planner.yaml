@@ -3110,13 +3110,149 @@ views:
   max_columns: 4
   dense_section_placement: true
   sections:
+  # Scenario A: daily smart charging to the maximum recommended level (engine/whatif)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@what_if_a_title@@'
+      icon: mdi:battery-charging-high
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_a_explain@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_what_if_days
+        name:
+          type: entity
+      - entity: number.cjp_what_if_target_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_what_if_start_battery_level
+        name:
+          type: entity
+      - entity: select.cjp_what_if_day_selection
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_monday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_tuesday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_wednesday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_thursday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_friday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_saturday
+        name:
+          type: entity
+      - entity: switch.cjp_what_if_day_sunday
+        name:
+          type: entity
+      - entity: button.cjp_run_what_if
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      card_mod:
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+      content: |-
+        {% set a = states.sensor.cjp_what_if.attributes %}
+        {% set r = a.result %}
+        {% set at = a.attempt %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'public_overfill': '@@what_if_reason_public_overfill@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@'} %}
+        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@', 'departure_buffer_not_modelled': '@@what_if_note_departure_buffer_not_modelled@@'} %}
+        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% if at and at.status == 'running' -%}
+        <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
+        {%- elif at and at.status == 'unavailable' -%}
+        <ha-alert alert-type="warning">@@what_if_failed@@: {{ reasons.get(at.reason, at.reason) }}</ha-alert>
+        {%- endif %}
+        {% if not r -%}
+        <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
+        {%- else -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ r.smart.start_soc }} % ({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+
+        {% if r.status == 'partial' -%}
+        <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
+        {%- endif %}
+        {% if not r.comparable -%}
+        <ha-alert alert-type="warning">@@what_if_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}</ha-alert>
+        {%- endif %}
+        {% set d = r.difference %}
+        | | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_difference@@ |
+        |:---|---:|---:|---:|
+        | @@what_if_row_cost@@ | {{ r.smart.cost }} @@valuta@@ | {{ r.asap.cost }} @@valuta@@ | {{ (d.cost ~ ' @@valuta@@') if d else '&ndash;' }} |
+        {% if d -%}
+        | @@what_if_row_terminal@@ | | | {{ d.terminal_adjustment }} @@valuta@@ ({{ d.terminal_energy_kwh }} kWh) |
+        | **@@what_if_row_adjusted@@** | | | **{{ d.adjusted_cost }} @@valuta@@** |
+        {% endif -%}
+        | @@what_if_row_grid@@ | {{ r.smart.grid_kwh }} kWh | {{ r.asap.grid_kwh }} kWh | {{ (d.grid_kwh ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_loss@@ | {{ r.smart.loss_kwh }} kWh | {{ r.asap.loss_kwh }} kWh | {{ (d.loss_kwh ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_targets@@ | {{ r.smart.targets_met }} / {{ r.smart.windows }} | {{ r.asap.targets_met }} / {{ r.asap.windows }} | |
+        | @@what_if_row_unmet_target@@ | {{ r.smart.unmet_target_kwh }} kWh | {{ r.asap.unmet_target_kwh }} kWh | |
+        | @@what_if_row_unmet_driving@@ | {{ r.smart.unmet_driving_kwh }} kWh | {{ r.asap.unmet_driving_kwh }} kWh | |
+        | @@what_if_row_lowest@@ | {{ r.smart.lowest_soc }} % | {{ r.asap.lowest_soc }} % | |
+        | @@what_if_row_final@@ | {{ r.smart.final_soc }} % | {{ r.asap.final_soc }} % | |
+
+        {% if r.months -%}
+        **@@what_if_months@@**
+
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_difference@@ | @@what_if_row_targets@@ |
+        |:---|---:|---:|---:|---:|---:|
+        {% for m in r.months | reverse -%}
+        | **{{ m.month }}** | {{ m.windows }} | {{ m.smart_cost | round(2) }} @@valuta@@ | {{ m.asap_cost | round(2) }} @@valuta@@ | {{ (m.smart_cost - m.asap_cost) | round(2) }} @@valuta@@ | {{ m.targets_met }} / {{ m.windows }} |
+        {% endfor %}
+        {%- endif %}
+        **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
+        {% if r.recorded_reference and r.recorded_reference.sessions -%}
+
+        @@what_if_recorded_reference@@: {{ r.recorded_reference.sessions }} @@what_if_sessions@@, {{ r.recorded_reference.kwh }} kWh{% if r.recorded_reference.cost is not none %}, {{ r.recorded_reference.cost }} @@valuta@@{% endif %}
+        {%- endif %}
+        {% if r.warnings -%}
+
+        {% for w in r.warnings -%}
+        <ha-alert alert-type="warning">{{ warnings.get(w, w) }}</ha-alert>
+        {% endfor %}
+        {%- endif %}
+
+        <details><summary>@@what_if_assumptions@@</summary>
+
+        {% for n in r.notes -%}
+        - {{ notes.get(n, n) }}
+        {% endfor %}
+        </details>
+        {%- endif %}
+      grid_options: *id001
   # simulated comparisons that never change the plan, the settings, the car or the charger
   - type: grid
     column_span: 2
     cards:
     - type: heading
-      heading: '@@section_what_if@@'
-      icon: mdi:flask-outline
+      heading: '@@economy_subscription_title@@'
+      icon: mdi:cash-clock
     - type: markdown
       content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_explain@@\n\n@@economy_subscription_explain@@\n\n</details>"
       grid_options: *id001
@@ -3146,8 +3282,6 @@ views:
       content: |-
         {% set e = states.sensor.cjp_economy.attributes %}
         {% set sub = e.subscription_total %}
-        ### @@economy_subscription_title@@
-
         {% if not (sub and sub.enabled) -%}
         <ha-alert alert-type="info">@@what_if_subscription_off@@</ha-alert>
         {%- elif not e.months -%}

@@ -84,6 +84,27 @@
       },
       "auto_forecast_type": {
         "default": "mdi:auto-mode"
+      },
+      "what_if_day_monday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_tuesday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_wednesday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_thursday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_friday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_saturday": {
+        "default": "mdi:calendar-check"
+      },
+      "what_if_day_sunday": {
+        "default": "mdi:calendar-check"
       }
     },
     "number": {
@@ -161,11 +182,23 @@
       },
       "subscription_monthly_price": {
         "default": "mdi:cash-clock"
+      },
+      "what_if_days": {
+        "default": "mdi:calendar-range"
+      },
+      "what_if_target_battery_level": {
+        "default": "mdi:battery-charging-high"
+      },
+      "what_if_start_battery_level": {
+        "default": "mdi:battery-arrow-up"
       }
     },
     "select": {
       "forecast_type": {
         "default": "mdi:form-select"
+      },
+      "what_if_day_selection": {
+        "default": "mdi:calendar-week"
       }
     },
     "time": {
@@ -238,6 +271,9 @@
       },
       "recalculate_charging_loss": {
         "default": "mdi:database-refresh"
+      },
+      "run_what_if": {
+        "default": "mdi:flask-outline"
       }
     },
     "sensor": {
@@ -343,6 +379,9 @@
       },
       "analysis": {
         "default": "mdi:car-clock"
+      },
+      "what_if": {
+        "default": "mdi:flask-outline"
       }
     },
     "binary_sensor": {

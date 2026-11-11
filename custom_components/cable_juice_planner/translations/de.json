@@ -887,6 +887,27 @@
       },
       "auto_forecast_type": {
         "name": "Prognosetyp automatisch wählen"
+      },
+      "what_if_day_monday": {
+        "name": "What-if Montag"
+      },
+      "what_if_day_tuesday": {
+        "name": "What-if Dienstag"
+      },
+      "what_if_day_wednesday": {
+        "name": "What-if Mittwoch"
+      },
+      "what_if_day_thursday": {
+        "name": "What-if Donnerstag"
+      },
+      "what_if_day_friday": {
+        "name": "What-if Freitag"
+      },
+      "what_if_day_saturday": {
+        "name": "What-if Samstag"
+      },
+      "what_if_day_sunday": {
+        "name": "What-if Sonntag"
       }
     },
     "number": {
@@ -964,11 +985,30 @@
       },
       "subscription_monthly_price": {
         "name": "Fester monatlicher Ladepreis"
+      },
+      "what_if_days": {
+        "name": "What-if-Zeitraum"
+      },
+      "what_if_target_battery_level": {
+        "name": "What-if-Ziel-Akkustand"
+      },
+      "what_if_start_battery_level": {
+        "name": "What-if-Akkustand beim ersten Anstecken"
       }
     },
     "select": {
       "forecast_type": {
         "name": "Prognose-Typ auswählen"
+      },
+      "what_if_day_selection": {
+        "name": "What-if-Tage mit Smart-Laden",
+        "state": {
+          "all": "Alle Tage",
+          "work_plan": "Tage des Arbeitsplans",
+          "monday_friday": "Montag bis Freitag",
+          "weekend": "Wochenende",
+          "selected": "Ausgewählte Tage"
+        }
       }
     },
     "time": {
@@ -1041,6 +1081,9 @@
       },
       "recalculate_charging_loss": {
         "name": "Ladeverlust neu berechnen"
+      },
+      "run_what_if": {
+        "name": "What-if ausführen"
       }
     },
     "sensor": {
@@ -1146,6 +1189,9 @@
       },
       "analysis": {
         "name": "Bereit bei Abfahrt"
+      },
+      "what_if": {
+        "name": "What-if tägliches Laden"
       }
     },
     "binary_sensor": {

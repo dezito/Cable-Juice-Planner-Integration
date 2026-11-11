@@ -126,6 +126,36 @@ def test_own_prices_are_stored_and_used() -> None:
     assert month["lowest"] < 11.0 * 9.0
 
 
+def test_quarter_hour_prices_are_stored_as_hour_averages_and_estimates_are_not_kept() -> None:
+    """A stored hour is the average of its intervals (not the last quarter), only when fully
+    covered, and never a price that was filled from history or a forecast."""
+    engine, snap = _engine()
+    at = lambda hour, minute=0: datetime.datetime.combine(DAY, datetime.time(hour, minute))  # noqa: E731
+    prices: dict = {}
+    sources: dict = {}
+
+    def add(hour: int, values: tuple, source: str, minutes: tuple = (0, 15, 30, 45)) -> None:
+        for minute, price in zip(minutes, values):
+            prices[at(hour, minute)] = price
+            sources[at(hour, minute)] = source
+
+    add(7, (9.0,), "")  # no known source: never kept as a measured price
+    add(8, (1.0, 2.0, 3.0, 6.0), "p:real")  # kept as the average
+    add(9, (4.0, 4.0, 4.0), "p:real", minutes=(0, 15, 45))  # 09:30 is missing: not stretched over the hole
+    add(10, (5.0, 5.0, 5.0, 5.0), "database")  # filled from the price history
+    add(11, (7.0, 7.0, 7.0, 7.0), "p:forecast")  # a forecast
+    add(12, (2.0, 2.0, 2.0, 2.0), "p:real")  # the hour that is starting/ending when the job runs: kept
+    add(13, (1.0,), "p:real")  # not started yet
+    engine.get_grid_prices = lambda *args, **kwargs: prices  # type: ignore[method-assign]
+    engine.grid_price_cache = {"sources": sources}
+    assert engine.run_job(snap, engine.economy_store_prices).error is None
+    assert engine.economy_db["prices"] == {
+        _ts(DAY, 8): pytest.approx((1.0 + 2.0 + 3.0 + 6.0) / 4),
+        _ts(DAY, 12): pytest.approx(2.0),
+    }
+    assert "prices_averaged_since" in engine.economy_db
+
+
 def test_score_when_the_window_ends_at_the_departure() -> None:
     """Plugged in in the evening, unplugged at the departure: daily = lowest, the score still shows
     how close CJP came to the cheapest hours, measured from the average."""
@@ -215,3 +245,34 @@ def test_subscription_disabled_and_invalid_cost_is_incomplete() -> None:
     assert month["saving_daily"] is None
     assert month["score"] is None
     assert attrs["subscription_total"]["comparable_months"] == 0
+
+
+def test_an_hour_with_only_its_first_quarter_on_a_quarter_hour_day_is_not_stored() -> None:
+    engine, snap = _engine()
+    at = lambda hour, minute=0: datetime.datetime.combine(DAY, datetime.time(hour, minute))  # noqa: E731
+    prices = {at(8, m): 1.0 + m / 60 for m in (0, 15, 30, 45)}
+    prices[at(9)] = 7.0  # only :00 of hour 9, while the day is quarter-hourly
+    prices.update({at(10, m): 2.0 for m in (0, 15, 30, 45)})
+    sources = {moment: "p:real" for moment in prices}
+    engine.get_grid_prices = lambda *args, **kwargs: prices  # type: ignore[method-assign]
+    engine.grid_price_cache = {"sources": sources}
+    assert engine.run_job(snap, engine.economy_store_prices).error is None
+    assert set(engine.economy_db["prices"]) == {_ts(DAY, 8), _ts(DAY, 10)}
+
+
+def test_the_repeated_autumn_hour_is_stored_for_both_real_hours_and_marked_copied() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    change = datetime.date(2026, 10, 25)  # clocks go back at 03:00 CEST: 02:00-03:00 happens twice
+    snap = snapshot(datetime.datetime.combine(change + datetime.timedelta(days=1), datetime.time(12, 0)))
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    prices = {datetime.datetime.combine(change, datetime.time(h)): 1.0 + h for h in range(24)}  # one price for the repeated 02:00
+    engine.get_grid_prices = lambda *args, **kwargs: prices  # type: ignore[method-assign]
+    engine.grid_price_cache = {"sources": {moment: "p:real" for moment in prices}}
+    assert engine.run_job(snap, engine.economy_store_prices).error is None
+    first = datetime.datetime(2026, 10, 25, 0, tzinfo=datetime.UTC).timestamp()  # 02:00 CEST
+    second = first + 3600.0  # 02:00 CET
+    stored = engine.economy_db["prices"]
+    assert stored[first] == 3.0 and stored[first + 7200.0] == 4.0  # 03:00 CET follows the second 02:00
+    # the copy for the second 02:00 is kept apart: the monthly economy comparison never sees it
+    assert second not in stored
+    assert engine.economy_db["prices_dst_copy"] == {second: 3.0}
