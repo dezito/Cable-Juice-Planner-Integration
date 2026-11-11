@@ -3223,7 +3223,7 @@ views:
         | @@economy_month@@ | @@what_if_connections@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_difference@@ | @@what_if_row_targets@@ |
         |:---|---:|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        | **{{ m.month }}** | {{ m.windows }} | {{ m.smart_cost | round(2) }} @@valuta@@ | {{ m.asap_cost | round(2) }} @@valuta@@ | {{ (m.smart_cost - m.asap_cost) | round(2) }} @@valuta@@ | {{ m.targets_met }} / {{ m.windows }} |
+        | **{{ m.month }}** | {{ m.windows }} | {{ m.smart_cost | round(2) }} @@valuta@@ | {{ m.asap_cost | round(2) }} @@valuta@@ | {{ (((m.smart_cost - m.asap_cost) | round(2) ~ ' @@valuta@@') if r.comparable else '&ndash;') }} | {{ m.targets_met }} / {{ m.windows }} |
         {% endfor %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
@@ -3231,6 +3231,120 @@ views:
 
         @@what_if_recorded_reference@@: {{ r.recorded_reference.sessions }} @@what_if_sessions@@, {{ r.recorded_reference.kwh }} kWh{% if r.recorded_reference.cost is not none %}, {{ r.recorded_reference.cost }} @@valuta@@{% endif %}
         {%- endif %}
+        {% if r.warnings -%}
+
+        {% for w in r.warnings -%}
+        <ha-alert alert-type="warning">{{ warnings.get(w, w) }}</ha-alert>
+        {% endfor %}
+        {%- endif %}
+
+        <details><summary>@@what_if_assumptions@@</summary>
+
+        {% for n in r.notes -%}
+        - {{ notes.get(n, n) }}
+        {% endfor %}
+        </details>
+        {%- endif %}
+      grid_options: *id001
+  # Scenario B: the current settings against an alternative reserve and maximum level (engine/whatif/settings_part.py)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@what_if_b_title@@'
+      icon: mdi:battery-heart-variant
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_b_explain@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_what_if_days
+        name:
+          type: entity
+      - entity: number.cjp_what_if_start_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_what_if_min_daily_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_what_if_max_recommended_battery_level
+        name:
+          type: entity
+      - entity: button.cjp_run_what_if_settings
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      card_mod:
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+      content: |-
+        {% set a = states.sensor.cjp_what_if_settings.attributes %}
+        {% set r = a.result %}
+        {% set at = a.attempt %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'public_overfill': '@@what_if_reason_public_overfill@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@'} %}
+        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'modelled_policy': '@@what_if_note_modelled_policy@@', 'demand_from_recorded_drives': '@@what_if_note_demand_from_recorded_drives@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@', 'extra_top_ups_not_modelled': '@@what_if_note_extra_top_ups_not_modelled@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@'} %}
+        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% if at and at.status == 'running' -%}
+        <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
+        {%- elif at and at.status == 'unavailable' -%}
+        <ha-alert alert-type="warning">@@what_if_failed@@: {{ reasons.get(at.reason, at.reason) }}</ha-alert>
+        {%- endif %}
+        {% if not r -%}
+        <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
+        {%- else -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ r.baseline.start_soc }} % ({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+
+        {% if r.status == 'partial' -%}
+        <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
+        {%- endif %}
+        {% if not r.comparable -%}
+        <ha-alert alert-type="warning">@@what_if_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}</ha-alert>
+        {%- endif %}
+        {% set d = r.difference %}
+        {% set s = r.settings %}
+        | | @@what_if_b_col_current@@ | @@what_if_b_col_alternative@@ | @@what_if_col_difference@@ |
+        |:---|---:|---:|---:|
+        | @@what_if_b_reserve@@ | {{ s.baseline.reserve | round(0) }} % | {{ s.alternative.reserve | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.reserve == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
+        | @@what_if_b_maximum@@ | {{ s.baseline.maximum | round(0) }} % | {{ s.alternative.maximum | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.maximum == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
+        | @@what_if_row_cost@@ | {{ r.baseline.cost }} @@valuta@@ | {{ r.alternative.cost }} @@valuta@@ | {{ (d.cost ~ ' @@valuta@@') if d else '&ndash;' }} |
+        {% if d -%}
+        | @@what_if_row_terminal@@ | | | {{ d.terminal_adjustment }} @@valuta@@ ({{ d.terminal_energy_kwh }} kWh) |
+        | **@@what_if_row_adjusted@@** | | | **{{ d.adjusted_cost }} @@valuta@@** |
+        {% endif -%}
+        | @@what_if_row_grid@@ | {{ r.baseline.grid_kwh }} kWh | {{ r.alternative.grid_kwh }} kWh | {{ (d.grid_kwh ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_loss@@ | {{ r.baseline.loss_kwh }} kWh | {{ r.alternative.loss_kwh }} kWh | {{ (d.loss_kwh ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_unmet_driving@@ | {{ r.baseline.unmet_driving_kwh }} kWh | {{ r.alternative.unmet_driving_kwh }} kWh | |
+        | @@what_if_row_lowest@@ | {{ r.baseline.lowest_soc }} % | {{ r.alternative.lowest_soc }} % | |
+        | @@what_if_b_row_arrivals_below@@ | {{ r.baseline.arrivals_below_reserve }} / {{ r.baseline.arrivals }} | {{ r.alternative.arrivals_below_reserve }} / {{ r.alternative.arrivals }} | |
+        | @@what_if_b_row_lowest_arrival@@ | {{ r.baseline.lowest_arrival }} % | {{ r.alternative.lowest_arrival }} % | |
+        | @@what_if_row_final@@ | {{ r.baseline.final_soc }} % | {{ r.alternative.final_soc }} % | |
+
+        {% if r.months -%}
+        **@@what_if_months@@**
+
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_b_col_current@@ | @@what_if_b_col_alternative@@ | @@what_if_col_difference@@ |
+        |:---|---:|---:|---:|---:|
+        {% for m in r.months | reverse -%}
+        | **{{ m.month }}** | {{ m.windows }} | {{ m.baseline_cost | round(2) }} @@valuta@@ | {{ m.alternative_cost | round(2) }} @@valuta@@ | {{ (((m.alternative_cost - m.baseline_cost) | round(2) ~ ' @@valuta@@') if r.comparable else '&ndash;') }} |
+        {% endfor %}
+        {%- endif %}
+        **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
         {% if r.warnings -%}
 
         {% for w in r.warnings -%}

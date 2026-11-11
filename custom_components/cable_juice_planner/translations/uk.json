@@ -994,6 +994,12 @@
       },
       "what_if_start_battery_level": {
         "name": "Рівень батареї what-if при першому підключенні"
+      },
+      "what_if_min_daily_battery_level": {
+        "name": "What-if альтернативний щоденний резерв"
+      },
+      "what_if_max_recommended_battery_level": {
+        "name": "What-if альтернативний максимальний рівень батареї"
       }
     },
     "select": {
@@ -1084,6 +1090,9 @@
       },
       "run_what_if": {
         "name": "Запустити what-if"
+      },
+      "run_what_if_settings": {
+        "name": "Розрахувати what-if налаштувань"
       }
     },
     "sensor": {
@@ -1192,6 +1201,9 @@
       },
       "what_if": {
         "name": "What-if щоденне заряджання"
+      },
+      "what_if_settings": {
+        "name": "What-if налаштувань CJP"
       }
     },
     "binary_sensor": {

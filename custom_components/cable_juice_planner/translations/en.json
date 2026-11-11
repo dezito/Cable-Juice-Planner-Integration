@@ -994,6 +994,12 @@
       },
       "what_if_start_battery_level": {
         "name": "What-if battery level at first plug-in"
+      },
+      "what_if_min_daily_battery_level": {
+        "name": "What-if alternative daily reserve"
+      },
+      "what_if_max_recommended_battery_level": {
+        "name": "What-if alternative maximum battery level"
       }
     },
     "select": {
@@ -1084,6 +1090,9 @@
       },
       "run_what_if": {
         "name": "Run what-if"
+      },
+      "run_what_if_settings": {
+        "name": "Run what-if settings"
       }
     },
     "sensor": {
@@ -1192,6 +1201,9 @@
       },
       "what_if": {
         "name": "What-if daily charging"
+      },
+      "what_if_settings": {
+        "name": "What-if CJP settings"
       }
     },
     "binary_sensor": {

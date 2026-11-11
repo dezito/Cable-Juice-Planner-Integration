@@ -314,11 +314,11 @@ The settings from the dashboard are entities that are kept across restarts:
 | Type | Examples |
 |---|---|
 | `switch` | charging rules, workdays and preheating per day, the What-if smart charging days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
-| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, target and start level |
+| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, target, start level, alternative reserve and alternative maximum level |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
 | `select` | forecast type, What-if smart charging days |
-| `button` | force planning, reset trip, run what-if, recalculate charging loss, export data, reset dashboard |
+| `button` | force planning, reset trip, run what-if, run what-if settings, recalculate charging loss, export data, reset dashboard |
 | `binary_sensor` | public charging session done (waiting for the price; with location) |
 
 If you click a setting, a short explanation is shown under **Attributes** (`description`
@@ -328,7 +328,7 @@ affect the plan).
 The results include `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
 `_emoji_description`, `_kwh_cost_price`, `_drive_efficiency`, `_km_per_kwh`, `_estimated_range`,
 `_co2_emitted`, `_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
-full), `_charging_loss_model`, `_economy`, `_what_if` (the latest What-if result) and `_analysis`. Large attributes (markdown, plans, measurements)
+full), `_charging_loss_model`, `_economy`, `_what_if` and `_what_if_settings` (the latest What-if results) and `_analysis`. Large attributes (markdown, plans, measurements)
 are not stored in the recorder database.
 
 ---
@@ -346,8 +346,8 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choos
 - **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price
   forecast, battery capacity and charging loss
 - **What-if:** simulated comparisons that never change the plan: daily smart charging to the maximum
-  recommended level against immediate charging, and the cost recorded in the charging history against a
-  fixed monthly charging price
+  recommended level against immediate charging, the current daily reserve and maximum level against alternative
+  ones, and the cost recorded in the charging history against a fixed monthly charging price
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to

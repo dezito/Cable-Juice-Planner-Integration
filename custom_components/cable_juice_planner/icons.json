@@ -191,6 +191,12 @@
       },
       "what_if_start_battery_level": {
         "default": "mdi:battery-arrow-up"
+      },
+      "what_if_min_daily_battery_level": {
+        "default": "mdi:battery-low"
+      },
+      "what_if_max_recommended_battery_level": {
+        "default": "mdi:battery-high"
       }
     },
     "select": {
@@ -273,6 +279,9 @@
         "default": "mdi:database-refresh"
       },
       "run_what_if": {
+        "default": "mdi:flask-outline"
+      },
+      "run_what_if_settings": {
         "default": "mdi:flask-outline"
       }
     },
@@ -381,6 +390,9 @@
         "default": "mdi:car-clock"
       },
       "what_if": {
+        "default": "mdi:flask-outline"
+      },
+      "what_if_settings": {
         "default": "mdi:flask-outline"
       }
     },

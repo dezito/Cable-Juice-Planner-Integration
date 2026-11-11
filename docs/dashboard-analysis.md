@@ -273,8 +273,9 @@ solar charging over time.
 The What-if view collects simulated comparisons based on the history CJP has recorded. They never change the
 live plan, the settings, the car or the charger, and they are estimates, not guaranteed or actual savings.
 Each comparison states which data it uses and when it is unavailable; missing or invalid data is never
-replaced with a favourable value. The view holds the daily smart charging comparison and the comparison with a
-fixed monthly charging price; more are added as they are built.
+replaced with a favourable value. The view holds the daily smart charging comparison, the comparison of the
+daily reserve and maximum level, and the comparison with a fixed monthly charging price; more are added as
+they are built.
 
 ### Daily smart charging to the maximum recommended level
 
@@ -302,7 +303,7 @@ Settings on the What-if view (they never change the live plan or settings):
 | *Run what-if* (button) | calculates. It never changes the plan, the settings, the car or the charger |
 
 The latest successful result is kept across restarts and shown on the view, and on
-`sensor.cjp_<prefix>_what_if` (its state is the adjusted cost difference, the details are in the attributes).
+`sensor.<prefix>_what_if` (its state is the adjusted cost difference, the details are in the attributes).
 A calculation that gives no result (for example a missing starting level) leaves the previous result in place and says why; one that stopped early at a missing price is a result and replaces it, with its own state. A year of history takes
 about a tenth of a second. If a connection ends while the starting level is being read, the calculation is
 refused (the level would belong to another first connection) and can simply be run again. The sensor state
@@ -338,6 +339,48 @@ connection and the exact departure time), not a forecast and not a guaranteed or
 home battery, house and site limits, standby drain, a departure buffer and charging that CJP did not record.
 Charging at another charger cannot be seen. A temporary target above what the car can reach in a connection
 shows as *missing to the target* for both calculations.
+
+### Reserve and maximum level
+
+Compares your **current settings** with an **alternative daily reserve** (*min daily battery level*, the level the
+car should still have when it comes home) and/or an **alternative maximum recommended level** over a past
+period. Neither the live settings nor the plan are changed, and the current settings are replayed as they are
+now: earlier settings are not stored, so this is never the plan CJP actually made at the time.
+
+This is a deliberately simple, modelled policy, not CJP's planner (which reads live state, forecasts and solar
+and cannot be replayed). In every connection the car is charged, in the cheapest hours of the connection, to the
+level that the next recorded drive needs plus the reserve, never above the maximum level. A drive that needs
+more than the maximum is still covered, as CJP lifts the limit for a trip. The reserve can therefore have no
+effect when the maximum already decides the level (for example a drive plus the reserve above the maximum).
+The calculation above always charges to a fixed target and does not use the reserve at all.
+
+| Setting | Meaning |
+|---|---|
+| *What-if period* and *What-if battery level at first plug-in* | the same two settings as the calculation above |
+| *What-if alternative daily reserve* | the reserve to try. 0 uses the current setting and never changes it, so a reserve of exactly 0 % cannot be tried (use 1) |
+| *What-if alternative maximum battery level* | the maximum recommended level to try. 0 uses the current setting and never changes it |
+| *Run what-if settings* (button) | calculates. It never changes the plan, the settings, the car or the charger. Both values at 0 (or equal to the current settings) give nothing to compare |
+
+The latest successful result is kept across restarts and shown on `sensor.<prefix>_what_if_settings` (its
+state is the adjusted cost difference). It is saved separately from the calculation above and the two buttons
+never run at the same time. Because each connection's demand is the *next* recorded drive, the latest connection is left
+out (the drive after it is unknown), and at least two completed connections with a recorded drive are needed.
+
+**Reading the result.** *Difference* is the alternative minus the current settings, so a negative number means the
+alternative was cheaper. The two settings aim at different levels by design, so they are not compared on the
+target: they are compared on the driving they cover. If the two settings leave a different amount of driving uncovered, no
+difference is shown (also not in the monthly table). The *adjusted difference* values any battery level difference at the
+end (a lower reserve ends lower) at the price per kWh from the charger that the settings holding that energy actually
+paid. The period average price is not used here: the extra energy of a higher reserve is bought once, in the cheap
+hours, and valuing it at the average would turn that cheap purchase into a gain. The table also shows the energy from the charger, the charging loss, the
+driving that could not be covered, the lowest and final battery level and, with one common yardstick (the current
+reserve) for both settings, how many homecomings were below that reserve and the lowest homecoming level.
+
+**Data and limits.** The data, the stops (a missing price, an invalid entry, a failed energy balance) and the
+warnings are those of the calculation above. Not modelled, and stated on the card: cheap-hour top-ups above the
+maximum, forced charging when plugged in below the reserve, solar, house and site limits, standby drain and a
+departure buffer. The next drive is known in advance (hindsight), which flatters a low reserve: a real plan has to
+guess it. It is an estimate, not a guaranteed or actual saving.
 
 ### Fixed monthly charging price
 

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 REPLAY_MODEL_VERSION = 3
@@ -148,6 +148,7 @@ class PolicyResult:
     windows: list[WindowResult] = field(default_factory=list)
     start_soc: float = 0.0
     final_soc: float = 0.0
+    end_soc: float = 0.0
     lowest_soc: float = 0.0
     public_kwh: float = 0.0
     driven_percent: float = 0.0
@@ -384,11 +385,18 @@ def _apply_events(
     return soc, False
 
 
-def _run(data: ReplayInput, name: str, windows: list[Window]) -> tuple[PolicyResult, str | None, float | None, int]:
-    """Replay one policy. Returns (result, stop reason, stop time, windows replayed)."""
+def _run(
+    data: ReplayInput, name: str, windows: list[Window], targets: list[float] | None = None, next_start: float | None = None
+) -> tuple[PolicyResult, str | None, float | None, int]:
+    """Replay one policy. Returns (result, stop reason, stop time, windows replayed).
+
+    The policy named "asap" charges from plug-in; every other policy charges in the cheapest hours.
+    targets: the battery level to leave each window with (default: data.target_soc for all).
+    next_start: the start of the connection after the last one in `windows`; when given, the drives
+    in the gap before it are applied too (and policy.end_soc is the level the car comes back with).
+    """
     soc = float(data.start_soc)
     result = PolicyResult(name=name, start_soc=soc, lowest_soc=soc)
-    target = data.target_soc
     events = sorted(data.events, key=lambda e: e.ts)
     taken: set[int] = set()  # a drive belongs to one gap even when two gaps overlap (very short connections)
     replayed = 0
@@ -397,7 +405,8 @@ def _run(data: ReplayInput, name: str, windows: list[Window]) -> tuple[PolicyRes
         if not slots or any(slot.price is None for slot in slots):
             return _finish(result), "missing_prices", window.start, replayed
         row = WindowResult(window.start, window.end, soc, soc)
-        immediate = name != "smart" or (data.smart_weekdays is not None and window.weekday not in data.smart_weekdays)
+        target = targets[index] if targets is not None else data.target_soc
+        immediate = name == "asap" or (data.smart_weekdays is not None and window.weekday not in data.smart_weekdays)
         chosen = {i: slot.hours for i, slot in enumerate(slots)} if immediate else _plan_smart(data, slots, soc, target)
         for slot_index, battery, grid in _simulate(data, slots, chosen, soc, target):
             soc += battery / data.battery_kwh * 100.0
@@ -409,8 +418,8 @@ def _run(data: ReplayInput, name: str, windows: list[Window]) -> tuple[PolicyRes
         row.unmet_target_kwh = shortfall if shortfall > 1e-6 else 0.0
         result.windows.append(row)
         replayed += 1
-        if index + 1 < len(windows):
-            nxt = windows[index + 1].start
+        nxt = windows[index + 1].start if index + 1 < len(windows) else next_start
+        if nxt is not None:
             between = []
             for position, event in enumerate(events):
                 if position not in taken and _in_gap(event, window, nxt):
@@ -420,15 +429,17 @@ def _run(data: ReplayInput, name: str, windows: list[Window]) -> tuple[PolicyRes
             if overfill:
                 return _finish(result), "public_overfill", nxt, replayed
         result.lowest_soc = min(result.lowest_soc, soc)
-    return _finish(result), None, None, replayed
+    return _finish(result, soc), None, None, replayed
 
 
 def _in_gap(event: Event, window: Window, next_start: float) -> bool:
     return window.end - GAP_TOLERANCE <= event.ts < next_start
 
 
-def _finish(result: PolicyResult) -> PolicyResult:
+def _finish(result: PolicyResult, end_soc: float | None = None) -> PolicyResult:
+    """final_soc: the level at the last unplug. end_soc: the level after the drives that followed it (when applied)."""
     result.final_soc = result.windows[-1].soc_out if result.windows else result.start_soc
+    result.end_soc = end_soc if end_soc is not None else result.final_soc
     return result
 
 
@@ -445,8 +456,8 @@ def _conservation(data: ReplayInput, policy: PolicyResult) -> float:
     driven_kwh = policy.driven_percent / 100.0 * data.battery_kwh - policy.unmet_driving_kwh
     expected = policy.start_soc / 100.0 * data.battery_kwh + policy.charged_kwh + policy.public_kwh - driven_kwh
     if policy.windows:
-        # the SOC at the last compared unplug; drives after it are not part of the replay
-        actual = policy.windows[-1].soc_out / 100.0 * data.battery_kwh
+        # the SOC after the last applied drive (the last unplug when no drive after it was applied)
+        actual = policy.end_soc / 100.0 * data.battery_kwh
         worst = max(worst, abs(expected - actual))
     return worst
 
@@ -521,18 +532,238 @@ def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]
         result.comparable_reason = "no_prices"
     else:
         result.comparable = True
-        # the energy left in the battery at the end is valued explicitly at the period's
-        # time-weighted buy price and the loss actually seen when charging
-        grid, charged = smart.grid_kwh + asap.grid_kwh, smart.charged_kwh + asap.charged_kwh
-        ratio = grid / charged if charged > EPS else 1.0 + _loss(data, data.max_kw)
-        terminal_kwh = (smart.final_soc - asap.final_soc) / 100.0 * data.battery_kwh
-        adjustment = terminal_kwh * ratio * average
-        result.difference = {
-            "cost": smart.cost - asap.cost,
-            "terminal_energy_kwh": terminal_kwh,
-            "terminal_adjustment": adjustment,
-            "adjusted_cost": smart.cost - asap.cost - adjustment,
-            "grid_kwh": smart.grid_kwh - asap.grid_kwh,
-            "loss_kwh": smart.loss_kwh - asap.loss_kwh,
-        }
+        result.difference = _difference(data, smart, asap, average)
+    return result
+
+
+def _difference(
+    data: ReplayInput, first: PolicyResult, second: PolicyResult, average: float, price: float | None = None
+) -> dict[str, float]:
+    """first minus second. The energy left in the battery at the end is valued explicitly at `price`
+    (default: the period's time-weighted buy price) and the loss actually seen when charging."""
+    grid, charged = first.grid_kwh + second.grid_kwh, first.charged_kwh + second.charged_kwh
+    ratio = grid / charged if charged > EPS else 1.0 + _loss(data, data.max_kw)
+    terminal_kwh = (first.final_soc - second.final_soc) / 100.0 * data.battery_kwh
+    adjustment = terminal_kwh * ratio * (average if price is None else price)
+    return {
+        "cost": first.cost - second.cost,
+        "terminal_energy_kwh": terminal_kwh,
+        "terminal_adjustment": adjustment,
+        "adjusted_cost": first.cost - second.cost - adjustment,
+        "grid_kwh": first.grid_kwh - second.grid_kwh,
+        "loss_kwh": first.loss_kwh - second.loss_kwh,
+    }
+
+
+# ---------------------------------------------------------------------------- #
+# Scenario B: two sets of CJP settings replayed over the same history
+# ---------------------------------------------------------------------------- #
+#
+# A deliberately small, modelled policy (NOT CJP's planner, which reads live state, forecasts
+# and solar and cannot be replayed): at every plug-in the car is charged, in the cheapest hours
+# of the connection, to the level that covers the drive that follows plus the daily homecoming
+# reserve, but never above the maximum recommended level (a drive that needs more than that level
+# is still covered, as CJP lifts the limit for a trip). The next drive is the recorded one, so this
+# is a hindsight replay with perfect knowledge of the demand. It is what the two settings do in
+# CJP's planning rule "needed for work + minimum daily level, capped at the maximum"; the planner's
+# other rules (cheap-hour top-ups, solar, forced charging below the reserve) are not modelled.
+
+SETTINGS_MODEL_VERSION = 1
+
+SETTINGS_NOTES = (
+    "hindsight",
+    "modelled_policy",
+    "demand_from_recorded_drives",
+    "settings_history_not_stored",
+    "last_connection_left_out",
+    "extra_top_ups_not_modelled",
+    "forced_low_battery_charging_not_modelled",
+    "site_limits_not_replayed",
+    "solar_not_modelled",
+    "grid_buy_price_only",
+    "standby_not_modelled",
+)
+
+
+@dataclass(frozen=True)
+class CjpSettings:
+    """The two CJP settings that shape the daily charging level, in battery percent."""
+
+    reserve: float  # min_daily_battery_level: the level the car should still have when it comes home
+    maximum: float  # max_recommended_charge_limit_battery_level
+
+
+def settings_target(need: float, settings: CjpSettings) -> float:
+    """The level to leave a connection with: the next drive's need plus the reserve, capped at the maximum.
+
+    A need above the maximum is still covered (the cap never goes below the need).
+    """
+    return min(100.0, need + settings.reserve, max(settings.maximum, need))
+
+
+@dataclass
+class Readiness:
+    """The levels the car came home with, judged against one common reserve for both settings."""
+
+    arrivals: int = 0
+    arrivals_below_reserve: int = 0
+    lowest_arrival: float | None = None
+
+
+@dataclass
+class SettingsResult:
+    status: str  # ok | partial | unavailable
+    reason: str | None
+    model_version: int = SETTINGS_MODEL_VERSION
+    baseline: PolicyResult | None = None
+    alternative: PolicyResult | None = None
+    baseline_settings: CjpSettings | None = None
+    alternative_settings: CjpSettings | None = None
+    baseline_readiness: Readiness | None = None
+    alternative_readiness: Readiness | None = None
+    targets: dict[str, list[float]] = field(default_factory=dict)
+    windows_total: int = 0
+    windows_replayed: int = 0
+    stopped_at: float | None = None
+    average_price: float | None = None
+    max_conservation_error_kwh: float = 0.0
+    notes: tuple[str, ...] = SETTINGS_NOTES
+    warnings: tuple[str, ...] = ()
+    provenance: Mapping[str, str] = field(default_factory=dict)
+    ignored_events: int = 0
+    comparable: bool = False
+    comparable_reason: str | None = None
+    difference: dict[str, float] | None = None  # alternative minus baseline; negative cost is cheaper
+
+
+def _validate_settings(baseline: CjpSettings, alternative: CjpSettings) -> str | None:
+    for settings in (baseline, alternative):
+        if not (_finite(settings.reserve) and 0.0 <= settings.reserve <= 100.0):
+            return "invalid_settings"
+        if not (_finite(settings.maximum) and 0.0 < settings.maximum <= 100.0):
+            return "invalid_settings"
+    if baseline == alternative:
+        return "no_change"
+    return None
+
+
+def _gap_needs(data: ReplayInput, ordered: list[Window]) -> list[float]:
+    """The battery percent the recorded drives after each window (up to the next one) use; the last window has no next one."""
+    events = sorted(data.events, key=lambda e: e.ts)
+    taken: set[int] = set()  # the same assignment as _run: a drive belongs to one gap
+    needs = []
+    for index, window in enumerate(ordered[:-1]):
+        need = 0.0
+        for position, event in enumerate(events):
+            if position not in taken and _in_gap(event, window, ordered[index + 1].start):
+                taken.add(position)
+                if event.kind == "drive":
+                    need += event.soc_percent
+        needs.append(need)
+    return needs
+
+
+def _readiness(policy: PolicyResult, reserve: float) -> Readiness:
+    # the level when the car came back to each following plug-in (the last one after the last applied drive)
+    arrivals = [row.soc_in for row in policy.windows[1:]] + [policy.end_soc]
+    return Readiness(
+        arrivals=len(arrivals),
+        arrivals_below_reserve=sum(1 for level in arrivals if level < reserve - 1e-6),
+        lowest_arrival=min(arrivals) if arrivals else None,
+    )
+
+
+def replay_settings(data: ReplayInput, baseline: CjpSettings, alternative: CjpSettings) -> SettingsResult:
+    """Replay two settings over the same demand. Never raises for bad data: it reports why.
+
+    data.target_soc and data.smart_weekdays are not used (the targets come from the settings).
+    """
+    ordered = sorted(data.windows, key=lambda w: w.start)
+    provenance = dict(data.provenance)
+    usable_max = baseline.maximum if _finite(baseline.maximum) and baseline.maximum > 0 else 100.0
+    reason = _validate(replace(data, target_soc=usable_max, smart_weekdays=None))
+    if reason is None:
+        reason = _validate_settings(baseline, alternative)
+    if reason is None and len(ordered) < 2:
+        reason = "too_few_windows"  # the demand after the last connection is unknown
+    if reason is not None:
+        return SettingsResult(status="unavailable", reason=reason, windows_total=len(ordered), provenance=provenance)
+    try:
+        return _replay_settings(replace(data, smart_weekdays=None), ordered, baseline, alternative, provenance)
+    except _ModelError as err:
+        return SettingsResult(status="unavailable", reason=err.reason, windows_total=len(ordered), provenance=provenance)
+
+
+def _replay_settings(
+    data: ReplayInput, ordered: list[Window], baseline: CjpSettings, alternative: CjpSettings, provenance: dict[str, str]
+) -> SettingsResult:
+    needs = _gap_needs(data, ordered)
+    candidates = ordered[:-1]  # the last connection's following drive is unknown
+    base_targets = [settings_target(need, baseline) for need in needs]
+    alt_targets = [settings_target(need, alternative) for need in needs]
+    base, base_stop, base_at, base_n = _run(data, "baseline", candidates, base_targets, ordered[-1].start)
+    alt, alt_stop, alt_at, alt_n = _run(data, "alternative", candidates, alt_targets, ordered[-1].start)
+
+    if "public_overfill" in (base_stop, alt_stop):
+        # a fixed public charge that does not fit also hits the last gap, whose drives are applied for the readiness
+        return SettingsResult(status="unavailable", reason="public_overfill", windows_total=len(ordered), provenance=provenance)
+    count = min(base_n, alt_n)
+    stop, stopped = (base_stop, base_at) if base_n <= alt_n else (alt_stop, alt_at)
+    if count == 0:
+        return SettingsResult(status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance)
+    if count < len(candidates):
+        base, _, _, _ = _run(data, "baseline", candidates[:count], base_targets[:count], ordered[count].start)
+        alt, _, _, _ = _run(data, "alternative", candidates[:count], alt_targets[:count], ordered[count].start)
+
+    compared = ordered[:count]
+    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, data.prices) if slot.price is not None]
+    hours = sum(h for _, h in weighted)
+    average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
+
+    # the drives of every compared gap are used (the last one as the need only); the rest are not
+    used = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared)))
+    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
+    warnings = (*data.warnings, *(("events_inside_windows",) if inside else ()))
+
+    error = max(_conservation(data, base), _conservation(data, alt))
+    complete = count == len(candidates)
+    result = SettingsResult(
+        status="ok" if complete else "partial",
+        reason=None if complete else stop,
+        baseline=base,
+        alternative=alt,
+        baseline_settings=baseline,
+        alternative_settings=alternative,
+        baseline_readiness=_readiness(base, baseline.reserve),
+        alternative_readiness=_readiness(alt, baseline.reserve),
+        targets={"baseline": base_targets[:count], "alternative": alt_targets[:count]},
+        windows_total=len(ordered),
+        windows_replayed=count,
+        stopped_at=None if complete else stopped,
+        average_price=average,
+        max_conservation_error_kwh=error,
+        warnings=warnings,
+        provenance=provenance,
+        ignored_events=len(data.events) - used,
+    )
+    if not error <= CONSERVATION_TOLERANCE_KWH:
+        return SettingsResult(
+            status="unavailable", reason="energy_conservation", windows_total=len(ordered), provenance=provenance,
+            max_conservation_error_kwh=error,
+        )
+
+    # the settings aim at different levels by design, so only what must be delivered is compared:
+    # a setting that covers less of the driving must not look cheaper for it
+    if abs(base.unmet_driving_kwh - alt.unmet_driving_kwh) > COMPARE_TOLERANCE_KWH:
+        result.comparable_reason = "unmet_driving_differs"
+    elif average is None:
+        result.comparable_reason = "no_prices"
+    else:
+        result.comparable = True
+        # The settings differ mainly in the level the car ends with, which was bought once, in the cheap hours.
+        # Valuing that energy at the period average would turn the cheap purchase into a gain for the higher
+        # reserve, so it is valued at what the policy that holds it actually paid per kWh from the charger.
+        holder = alt if alt.final_soc >= base.final_soc else base
+        paid = holder.cost / holder.grid_kwh if holder.grid_kwh > EPS else average
+        result.difference = _difference(data, alt, base, average, paid)
     return result

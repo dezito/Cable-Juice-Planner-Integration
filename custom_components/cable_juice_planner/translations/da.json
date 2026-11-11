@@ -994,6 +994,12 @@
       },
       "what_if_start_battery_level": {
         "name": "What-if-batteriniveau ved første tilslutning"
+      },
+      "what_if_min_daily_battery_level": {
+        "name": "What-if alternativ daglig reserve"
+      },
+      "what_if_max_recommended_battery_level": {
+        "name": "What-if alternativt maksimalt batteriniveau"
       }
     },
     "select": {
@@ -1084,6 +1090,9 @@
       },
       "run_what_if": {
         "name": "Kør what-if"
+      },
+      "run_what_if_settings": {
+        "name": "Kør what-if-indstillinger"
       }
     },
     "sensor": {
@@ -1192,6 +1201,9 @@
       },
       "what_if": {
         "name": "What-if daglig opladning"
+      },
+      "what_if_settings": {
+        "name": "What-if CJP-indstillinger"
       }
     },
     "binary_sensor": {

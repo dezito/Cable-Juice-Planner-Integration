@@ -55,6 +55,7 @@ from .control.control import Control
 from .distance import Distance
 from .economy import Economy
 from .whatif.engine_part import WhatIf
+from .whatif.settings_part import WhatIfSettings
 from .energy.energy import Energy
 from .history.charging_history import ChargingHistory
 from .loss import Loss
@@ -86,7 +87,7 @@ _LOGGER = logging.getLogger(__name__)
 NOTIFY_SUPPRESS = datetime.timedelta(minutes=60)
 
 
-class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, WhatIf, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
+class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, WhatIf, WhatIfSettings, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
     """Holds the Cable Juice Planner state and implements the algorithm."""
 
     def __init__(self, config: dict, prefix: str, texts: dict[str, str], title: str | None = None) -> None:
