@@ -1093,6 +1093,9 @@
       },
       "run_what_if_settings": {
         "name": "Kør what-if-indstillinger"
+      },
+      "run_what_if_no_solar": {
+        "name": "Kør what-if uden sol"
       }
     },
     "sensor": {
@@ -1207,6 +1210,9 @@
       },
       "what_if_solar": {
         "name": "What-if bilens solfordel"
+      },
+      "what_if_no_solar": {
+        "name": "What-if uden sol"
       }
     },
     "binary_sensor": {

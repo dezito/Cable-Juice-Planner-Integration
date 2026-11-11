@@ -283,6 +283,9 @@
       },
       "run_what_if_settings": {
         "default": "mdi:flask-outline"
+      },
+      "run_what_if_no_solar": {
+        "default": "mdi:flask-outline"
       }
     },
     "sensor": {
@@ -397,6 +400,9 @@
       },
       "what_if_solar": {
         "default": "mdi:solar-power-variant-outline"
+      },
+      "what_if_no_solar": {
+        "default": "mdi:weather-sunny-off"
       }
     },
     "binary_sensor": {

@@ -65,7 +65,7 @@ def test_open_and_outside_windows_are_not_used_and_are_counted() -> None:
     assert coverage["windows_outside_period"] == 2 and coverage["windows_still_open"] == 1
 
 
-def test_missing_or_invalid_prices_are_not_filled() -> None:
+def test_missing_or_invalid_prices_are_left_out_of_the_replay_input_and_estimated_by_the_replay() -> None:
     prices = {hour(i): 1.0 for i in range(30)}
     del prices[hour(22)]
     prices[hour(23)] = math.nan
@@ -75,13 +75,16 @@ def test_missing_or_invalid_prices_are_not_filled() -> None:
     assert coverage["price_hours_missing"] == 2
     assert hour(24) + 900.0 not in data.prices and hour(22) not in data.prices and hour(23) not in data.prices
     result = replay(data)
-    assert result.status == "partial" and result.reason == "missing_prices" and result.windows_replayed == 1
+    # half of the connections are fully priced: the other one is estimated at the average and labelled
+    assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1
 
 
 def test_start_soc_is_never_defaulted() -> None:
     data, _ = build(start_soc=None, start_soc_source="unavailable")
+    assert data.start_soc is None  # not 0, not the target
     result = replay(data)
-    assert result.status == "unavailable" and result.reason == "no_start_soc"
+    assert result.status == "ok" and result.calibrated_start and result.method == "estimated"
+    assert result.smart.windows[0].calibrated and result.provenance["start_soc"] == "unavailable"
 
 
 def test_drives_and_public_charges_outside_the_replayed_span_are_left_out() -> None:
@@ -219,3 +222,16 @@ def test_the_window_selection_is_shared_and_reports_what_it_left_out() -> None:
     )
     assert [(w.start, w.end) for w in chosen] == [(hour(0), hour(2))]
     assert counts == {"outside": 0, "open": 1, "invalid": 2, "before_drive_history": 0}
+
+
+def test_the_refund_is_subtracted_from_every_price_like_cjp_prices_its_own_grid_energy() -> None:
+    data, _ = build(refund=0.3)
+    assert all(price == pytest.approx(0.7) for price in data.prices.values())
+    gross, _ = build()
+    assert replay(data).smart.cost == pytest.approx(replay(gross).smart.cost - 0.3 * replay(gross).smart.grid_kwh)
+
+
+def test_hours_from_the_price_sensor_history_are_counted_and_flagged() -> None:
+    data, coverage = build(history_hours=[hour(2), hour(3), hour(500)])
+    assert coverage["price_hours_from_history"] == 2 and "prices_from_price_history" in data.warnings
+    assert data.provenance["prices"] == "measured_partly_unverified"

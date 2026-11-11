@@ -1093,6 +1093,9 @@
       },
       "run_what_if_settings": {
         "name": "Розрахувати what-if налаштувань"
+      },
+      "run_what_if_no_solar": {
+        "name": "Розрахувати what-if без сонця"
       }
     },
     "sensor": {
@@ -1207,6 +1210,9 @@
       },
       "what_if_solar": {
         "name": "What-if перевага сонця для авто"
+      },
+      "what_if_no_solar": {
+        "name": "What-if без сонця"
       }
     },
     "binary_sensor": {

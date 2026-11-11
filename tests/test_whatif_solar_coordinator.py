@@ -33,3 +33,45 @@ async def test_the_economy_update_and_the_hourly_store_both_publish_the_solar_co
         assert result.error is None and calls == ["published"]
         result = await coordinator.async_run_job("economy_store_prices")
         assert result.error is None and calls == ["published", "published"]
+
+
+class _FakeRecorder:
+    async def async_add_executor_job(self, func, *args):
+        return func(*args)
+
+
+async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_charger_power_statistics(hass: HomeAssistant, loaded_entry) -> None:
+    from datetime import UTC, datetime
+
+    coordinator = loaded_entry.runtime_data
+    seen: dict = {}
+    start = datetime(2026, 10, 1, 10, tzinfo=UTC)
+
+    def statistics(hass_, begin, end, ids, period, units, kinds):
+        seen[tuple(sorted(ids))] = (period, units, kinds)
+        return {entity_id: [{"start": start, "mean": 1500.0 if "solar" in entity_id else 800.0}] for entity_id in ids}
+
+    provider = coordinator.price_provider
+    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.object(
+        coordinator.engine, "is_solar_configured", return_value=True
+    ), patch.dict(coordinator.config["solar"]["entity_ids"], {"production_entity_id": "sensor.solar"}), patch.dict(
+        coordinator.config["home"]["entity_ids"], {"power_consumption_entity_id": "sensor.house"}
+    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.charger"}), patch.object(
+        provider, "sell_price_entity_ids", return_value=["sensor.sell"]
+    ):
+        data: dict = {}
+        await coordinator._async_economy_solar_statistics(_FakeRecorder(), provider, data, datetime(2026, 10, 2, tzinfo=UTC), lambda row: row["start"].timestamp())
+    assert data["sell_history"] == {start.timestamp(): 800.0}
+    assert data["power_hours"] == {start.timestamp(): {"solar": 1500.0, "house": 800.0, "ev": 800.0}}
+    # the power is asked for in watts whatever unit the sensors have, hourly means
+    assert seen[("sensor.charger", "sensor.house", "sensor.solar")] == ("hour", {"power": "W"}, {"mean"})
+
+
+async def test_a_failing_statistics_read_never_stops_the_economy_refresh(hass: HomeAssistant, loaded_entry) -> None:
+    from datetime import UTC, datetime
+
+    coordinator = loaded_entry.runtime_data
+    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=RuntimeError("no statistics")):
+        data: dict = {}
+        await coordinator._async_economy_solar_statistics(_FakeRecorder(), coordinator.price_provider, data, datetime(2026, 10, 2, tzinfo=UTC), lambda row: 0.0)
+    assert data == {}

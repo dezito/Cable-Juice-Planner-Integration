@@ -24,6 +24,9 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
     def get_buy_price_entity_id(self) -> str:
         return self.buy_entity_id
 
+    def get_sell_price_entity_id(self) -> str:
+        return self.sell_entity_id
+
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_entity_id)
 

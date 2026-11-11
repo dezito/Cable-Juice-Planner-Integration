@@ -192,6 +192,8 @@ class CoordinatorEvents:
             self._background(self.async_run_what_if(), "what_if")
         elif key == "run_what_if_settings":
             self._background(self.async_run_what_if_settings(), "what_if_settings")
+        elif key == "run_what_if_no_solar":
+            self._background(self.async_run_what_if_no_solar(), "what_if_no_solar")
 
     async def _async_public_cost_flow(self, value) -> None:
         result = await self.async_run_job("public_charging_cost_changed", float_or_none(value))

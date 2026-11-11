@@ -82,15 +82,15 @@ def test_scenario_a_changes_nothing_live() -> None:
     assert repr(getattr(engine, "charging_plan", None)) == plan_before
 
 
-def test_scenario_a_needs_a_start_battery_level() -> None:
+def test_scenario_a_without_a_start_battery_level_calibrates_and_says_so() -> None:
     engine, snap = _engine()
     _seed(engine)
     _, result = _run(engine, snap, {"soc": None, "source": "unavailable"})
     r = result.value
-    assert r["status"] == "unavailable" and r["reason"] == "no_start_soc" and r["smart"] is None
-    # never defaulted, and nothing was saved
-    assert "what_if" not in engine.economy_db
-    assert result.states["what_if"] is None and result.attributes["what_if"]["attempt"]["reason"] == "no_start_soc"
+    assert r["status"] == "ok" and r["method"] == "estimated" and r["calibrated_start"] is True
+    assert "start_level_unknown_calibrated" in r["warnings"] and r["provenance"]["start_soc"] == "unavailable"
+    assert r["smart"]["start_soc"] == r["target"]["battery_level"]  # the common level, not a default for a real start
+    assert result.states["what_if"] == r["difference"]["adjusted_cost"]
 
 
 def test_a_failed_calculation_keeps_the_previous_saved_result() -> None:
@@ -98,22 +98,46 @@ def test_a_failed_calculation_keeps_the_previous_saved_result() -> None:
     _seed(engine)
     _, first = _run(engine, snap)
     saved = engine.economy_db["what_if"]
-    _, failed = _run(engine, snap, {"soc": None, "source": "unavailable"})
-    assert failed.value["status"] == "unavailable"
+    _, failed = _run(engine, snap, {"soc": 50.0, "source": "entered", "first_window_start": 1.0})  # a connection ended meanwhile
+    assert failed.value["status"] == "unavailable" and failed.value["reason"] == "start_level_stale"
     assert engine.economy_db["what_if"] is saved
     assert failed.states["what_if"] == first.value["difference"]["adjusted_cost"]  # the saved result is still shown
     assert failed.attributes["what_if"]["result"]["computed_at"] == first.value["computed_at"]
     assert failed.attributes["what_if"]["attempt"]["status"] == "unavailable"
 
 
-def test_a_missing_price_stops_the_replay_and_is_reported() -> None:
+def test_a_connection_without_prices_is_estimated_and_reported() -> None:
     engine, snap = _engine()
     _seed(engine, skip_price_day=3)
     _, result = _run(engine, snap)
     r = result.value
-    assert r["status"] == "partial" and r["reason"] == "missing_prices"
-    assert 0 < r["windows"]["replayed"] < r["windows"]["total"] and r["windows"]["stopped_at"] is not None
-    assert r["coverage"]["price_hours_missing"] > 0
+    assert r["status"] == "ok" and r["method"] == "estimated" and r["estimated_windows"] == 1
+    assert r["windows"]["replayed"] == r["windows"]["total"] == 5 and r["price_estimate"] is not None
+    assert "prices_estimated_windows" in r["warnings"] and r["coverage"]["price_hours_missing"] > 0
+
+
+def test_without_any_stored_price_there_is_nothing_to_estimate_from() -> None:
+    engine, snap = _engine()
+    _seed(engine)
+    engine.economy_db["prices"].clear()
+    _, result = _run(engine, snap)
+    assert result.value["status"] == "unavailable" and result.value["reason"] == "missing_prices"
+
+
+def test_prices_from_the_price_sensor_history_fill_hours_cjp_did_not_store() -> None:
+    engine, snap = _engine()
+    _seed(engine)
+    engine.economy_db["prices_history"] = {ts: 1.0 for ts in engine.economy_db["prices"]}
+    for ts in [ts for ts in list(engine.economy_db["prices"]) if ts % 7200 == 0]:
+        del engine.economy_db["prices"][ts]  # every other hour was never stored by CJP
+    _, result = _run(engine, snap)
+    r = result.value
+    assert r["status"] == "ok" and r["method"] == "strict" and r["estimated_windows"] == 0
+    assert r["coverage"]["price_hours_from_history"] > 0 and "prices_from_price_history" in r["warnings"]
+    assert r["provenance"]["prices"] == "measured_partly_unverified"
+    # a price CJP stored itself always wins over the history
+    engine.economy_db["prices_history"] = {ts: 99.0 for ts in engine.economy_db["prices"]}
+    assert _run(engine, snap)[1].value["coverage"]["price_hours_from_history"] == 0
 
 
 def test_a_temporary_target_never_changes_the_live_setting() -> None:
@@ -216,13 +240,14 @@ def test_a_start_level_read_for_another_first_connection_is_not_used() -> None:
     assert ok["period"]["start"] == prepared["period"][0] and ok["period"]["end"] == prepared["period"][1]
 
 
-def test_a_stopped_replay_publishes_its_figures_but_no_period_state() -> None:
+def test_an_estimated_replay_is_published_with_its_label_and_its_period_figure() -> None:
     engine, snap = _engine()
     _seed(engine, skip_price_day=3)
     _, result = _run(engine, snap)
-    assert result.value["status"] == "partial" and result.value["difference"] is not None
-    assert result.states["what_if"] is None  # a whole-period number would be misleading
-    assert result.attributes["what_if"]["result"]["status"] == "partial"
+    assert result.value["status"] == "ok" and result.value["difference"] is not None
+    assert result.value["difference"]["measured_cost"] is not None
+    assert result.states["what_if"] == result.value["difference"]["adjusted_cost"]
+    assert result.attributes["what_if"]["result"]["method"] == "estimated"
 
 
 def test_a_missing_battery_capacity_is_unavailable() -> None:

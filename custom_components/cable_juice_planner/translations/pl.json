@@ -1093,6 +1093,9 @@
       },
       "run_what_if_settings": {
         "name": "Oblicz what-if ustawień"
+      },
+      "run_what_if_no_solar": {
+        "name": "Oblicz what-if bez słońca"
       }
     },
     "sensor": {
@@ -1207,6 +1210,9 @@
       },
       "what_if_solar": {
         "name": "What-if korzyść ze słońca dla samochodu"
+      },
+      "what_if_no_solar": {
+        "name": "What-if bez słońca"
       }
     },
     "binary_sensor": {

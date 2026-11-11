@@ -194,6 +194,7 @@ class CoordinatorRefresh:
                         hourly = {row[0]: row[1] for row in resample_steps(series, start.timestamp(), end.timestamp(), 3600.0)}
                     recorded[price_id] = hourly
                 data["prices"] = provider.combine_history(recorded)
+            await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts)
             if odometer_id:
                 months = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, end - datetime.timedelta(days=400), end, {odometer_id}, "month", None, {"change"}
@@ -225,6 +226,41 @@ class CoordinatorRefresh:
         await self.async_run_job("economy_update", data)
         if backfill:
             await self.async_run_job("economy_mark_backfilled")
+
+    async def _async_economy_solar_statistics(self, instance, provider, data: dict[str, Any], end: datetime.datetime, stat_ts) -> None:
+        """The What-if solar comparison: the hourly sell price and the hourly solar production, house consumption and
+        charger power (W) from the long-term statistics, so it does not have to wait for CJP's own records.
+        Missing entities or statistics just leave the keys out (a failure here must never stop the rest of the update)."""
+        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+
+        start = end - datetime.timedelta(days=400)
+        try:
+            sell_ids = provider.sell_price_entity_ids() if provider else []
+            if sell_ids:
+                stats = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, start, end, set(sell_ids), "hour", None, {"mean"}
+                )
+                for sell_id in sell_ids:
+                    hourly = {stat_ts(row): row["mean"] for row in stats.get(sell_id, []) if row.get("mean") is not None}
+                    if hourly:
+                        data["sell_history"] = hourly  # the first provider that has a history
+                        break
+            solar_id = self.config["solar"]["entity_ids"].get("production_entity_id") if self.engine.is_solar_configured() else ""
+            house_id = self.config["home"]["entity_ids"].get("power_consumption_entity_id")
+            ev_id = self.config["charger"]["entity_ids"].get("power_consumtion_entity_id")
+            if solar_id and house_id and ev_id:
+                stats = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, start, end, {solar_id, house_id, ev_id}, "hour", {"power": "W"}, {"mean"}
+                )
+                hours: dict[float, dict[str, float]] = {}
+                for key, entity_id in (("solar", solar_id), ("house", house_id), ("ev", ev_id)):
+                    for row in stats.get(entity_id, []):
+                        if row.get("mean") is not None:
+                            hours.setdefault(stat_ts(row), {})[key] = abs(float(row["mean"]))
+                if hours:
+                    data["power_hours"] = hours
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Economy: could not load the solar statistics: %s", err)
 
     @callback
     def _analysis_daily(self, _now) -> None:

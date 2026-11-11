@@ -1,4 +1,4 @@
-"""What-if Scenarios A and B: the buttons (read the starting battery level, then run the job)."""
+"""What-if Scenarios A, B and D: the buttons (read the starting battery level, then run the job)."""
 from __future__ import annotations
 
 import datetime
@@ -28,6 +28,10 @@ class CoordinatorWhatIf:
         """button run_what_if_settings (Scenario B). Shares the one-at-a-time guard with Scenario A."""
         await self._async_run_what_if_jobs("what_if_settings")
 
+    async def async_run_what_if_no_solar(self) -> None:
+        """button run_what_if_no_solar (Scenario D). Shares the one-at-a-time guard with the other scenarios."""
+        await self._async_run_what_if_jobs("what_if_no_solar")
+
     async def _async_run_what_if_jobs(self, name: str) -> None:
         """prepare -> read the starting level -> run, for the jobs "<name>_prepare", "<name>_run" and "<name>_fail"."""
         if self._what_if_running:
@@ -55,7 +59,7 @@ class CoordinatorWhatIf:
     async def _async_what_if_start_soc(self, prepared: dict[str, Any]) -> dict[str, Any]:
         """The battery level at the first replayed plug-in: entered by the user, else from the recorder.
 
-        Never defaulted: without a value the engine reports "no_start_soc".
+        Never defaulted: without a value the replay calibrates its first connection and labels the result an estimate.
         """
         manual = prepared.get("manual_start_soc")
         if manual is not None:
