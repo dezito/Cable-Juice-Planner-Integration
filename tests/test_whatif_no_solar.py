@@ -174,7 +174,7 @@ def _attributes() -> dict:
 async def _render(hass: HomeAssistant, language: str, attributes: dict) -> str:
     content = _content(language)
     hass.states.async_set(re.search(r"states\.(sensor\.\w+)\.attributes", content).group(1), "0", attributes)
-    return Template(content, hass).async_render(parse_result=False)
+    return Template(content, hass).async_render(parse_result=False, strict=True)  # like the frontend: an undefined attribute is an error
 
 
 async def test_the_card_shows_the_plan_the_recorded_charging_the_estimate_and_the_warnings(hass: HomeAssistant) -> None:
@@ -189,6 +189,14 @@ async def test_the_card_shows_the_plan_the_recorded_charging_the_estimate_and_th
     assert "None" not in out and "Undefined" not in out and "@@" not in out
     r = attributes["result"]
     assert str(r["plan"]["cost"]) in out and str(r["estimate"]["solar_advantage"]) in out and str(r["recorded"]["cost"]) in out
+
+
+async def test_a_result_saved_before_the_difference_and_measured_span_fields_still_renders(hass: HomeAssistant) -> None:
+    attributes = _attributes()
+    old = {**attributes, "result": {k: v for k, v in attributes["result"].items() if k != "plan_measured"}}
+    for language in ("da", "en"):
+        out = await _render(hass, language, old)
+        assert "None" not in out and "Undefined" not in out and str(old["result"]["plan"]["cost"]) in out, language
 
 
 async def test_every_language_renders_without_missing_texts_and_every_warning_and_reason_is_translated(hass: HomeAssistant) -> None:

@@ -377,8 +377,8 @@ The calculation above always charges to a fixed target and does not use the rese
 | Setting | Meaning |
 |---|---|
 | *What-if period* and *What-if battery level at first plug-in* | the same two settings as the calculation above |
-| *What-if alternative daily reserve* | the reserve to try. 0 uses the current setting and never changes it, so a reserve of exactly 0 % cannot be tried (use 1) |
-| *What-if alternative maximum battery level* | the maximum recommended level to try. 0 uses the current setting and never changes it |
+| *What-if alternative daily arrival battery level* | the reserve to try. 0 uses the current setting and never changes it, so a reserve of exactly 0 % cannot be tried (use 1) |
+| *What-if alternative EV max recommended charging limit* | the maximum recommended level to try. 0 uses the current setting and never changes it |
 | *Run what-if settings* (button) | calculates. It never changes the plan, the settings, the car or the charger. Both values at 0 (or equal to the current settings) give nothing to compare |
 
 The latest successful result is kept across restarts and shown on `sensor.<prefix>_what_if_settings` (its
@@ -467,7 +467,11 @@ same connections are used by the reserve and maximum level comparison and by the
 the recorded energy is valued at the price per kWh of the measured connections only, because CJP's recorded
 sessions only exist from when it began recording. A smart charger that was used in the past already charged in
 cheap hours, so the estimate of the connection length matters: an estimate that is too short understates the
-difference, one that is too long overstates it. The check does not prove the estimate: it shows that the method
+difference, one that is too long overstates it. An estimated connection (from the statistics or the plan) is itself an estimate, so its prices are not estimated on
+top of that: only the estimated connections after the last one with an hour without a price are used, and the
+earlier ones are left out with a warning. Otherwise a stretch of the past that no price reaches back to would pull the
+share of connections with a price under the limit of the replay (half) and cost the whole result, also for the
+measured connections. The check does not prove the estimate: it shows that the method
 reproduces the connections that are known.
 
 **The work plan.** The plan (per weekday: workday or not, departure, homecoming and the distance needed, as it is

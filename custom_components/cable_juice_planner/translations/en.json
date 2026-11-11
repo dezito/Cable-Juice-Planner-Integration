@@ -996,10 +996,10 @@
         "name": "What-if battery level at first plug-in"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternative daily reserve"
+        "name": "What-if alternative daily arrival battery level"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternative maximum battery level"
+        "name": "What-if alternative EV max recommended charging limit"
       }
     },
     "select": {

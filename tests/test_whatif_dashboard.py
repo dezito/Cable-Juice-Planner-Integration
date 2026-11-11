@@ -37,7 +37,7 @@ def _result() -> dict:
 async def _render(hass: HomeAssistant, language: str, attributes: dict) -> str:
     content, sensor = _card(language)
     hass.states.async_set(sensor, "0", attributes)
-    return Template(content, hass).async_render(parse_result=False)
+    return Template(content, hass).async_render(parse_result=False, strict=True)  # like the frontend: an undefined attribute is an error
 
 
 async def test_a_result_is_shown_with_both_columns_months_and_assumptions(hass: HomeAssistant) -> None:
@@ -70,7 +70,7 @@ async def test_the_table_has_a_current_settings_column_and_the_settings_rows(has
     month = r["months"][0]
     assert month["current_cost"] is not None and str(r["difference"]["adjusted_cost"]) in out
     assert f"{round(month['same_smart_cost'] - month['current_cost'], 2)} " in out
-    assert "Target battery level" in out and "Smart charging days" in out and "Daily reserve at homecoming" in out
+    assert "Target battery level" in out and "Smart charging days" in out and "Daily arrival battery level" in out
     assert f"{round(r['settings']['reserve'])} %" in out and "one connection less" in out
     # a saved result from before the column existed (or a replay that could not be made) shows dashes, never "None"
     old = copy.deepcopy(attributes)
@@ -78,6 +78,22 @@ async def test_the_table_has_a_current_settings_column_and_the_settings_rows(has
     old["result"]["settings"] = None
     out = await _render(hass, "en", old)
     assert "None" not in out and "Undefined" not in out and "one connection less" not in out and "&ndash;" in out.replace("–", "&ndash;")
+
+
+async def test_a_result_saved_before_the_current_settings_column_still_renders(hass: HomeAssistant) -> None:
+    """The result is saved: after an update the card first shows the one from the earlier version, without the new fields
+    (current, settings, derived, the month fields of the current settings). The frontend renders strictly."""
+    attributes = _result()
+    old = copy.deepcopy(attributes)
+    for key in ("current", "current_reason", "settings", "derived"):
+        del old["result"][key]
+    for month in old["result"]["months"]:
+        for key in ("current_cost", "same_windows", "same_smart_cost", "same_asap_cost", "derived_windows"):
+            month.pop(key, None)
+    for language in ("da", "en"):
+        out = await _render(hass, language, old)
+        assert "None" not in out and "Undefined" not in out and str(old["result"]["smart"]["cost"]) in out, language
+        assert "&ndash;" in out.replace("–", "&ndash;")  # the current settings column is shown with dashes
 
 
 async def test_the_month_rows_form_one_markdown_table_without_blank_lines_between_them(hass: HomeAssistant) -> None:

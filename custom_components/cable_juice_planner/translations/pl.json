@@ -996,10 +996,10 @@
         "name": "Poziom baterii what-if przy pierwszym podłączeniu"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternatywna dzienna rezerwa"
+        "name": "What-if alternatywne dzienne minimum baterii"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternatywny maksymalny poziom baterii"
+        "name": "What-if alternatywny maksymalny zalecany limit ładowania EV"
       }
     },
     "select": {

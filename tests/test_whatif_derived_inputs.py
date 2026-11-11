@@ -65,6 +65,24 @@ def test_older_connections_come_first_with_the_level_and_the_net_use_between_the
     assert result.smart.windows[1].soc_in == pytest.approx(result.smart.windows[0].soc_out - 15.0)
 
 
+def test_estimated_connections_without_a_price_are_left_out_so_they_cannot_cost_the_whole_result() -> None:
+    # no price reaches back to the first two estimated connections (hours 0-8 and 24-32): only the last one is kept
+    prices = {hour(i): 1.0 + (i % 24) / 24 for i in range(140) if not (i < 33)}
+    data, coverage = build(prices=prices)
+    assert [(w.start, w.derived) for w in data.windows] == [(hour(48), True), (hour(100), False), (hour(120), False)]
+    assert coverage["estimated_unpriced_left_out"] == 2 and coverage["windows_derived"] == 1
+    assert "estimated_connections_without_prices_left_out" in data.warnings and "connections_estimated_from_battery_statistics" in data.warnings
+    # the level and the use come from the kept ones only: the start is the level at the first kept one, the use before the first measured one stays
+    assert data.start_soc == 60.0 and [(e.ts, e.soc_percent) for e in data.events if e.ts < hour(100)] == [(hour(78), 15.0)]
+    result = replay(data)
+    assert result.status == "ok", result.reason
+    # a share of connections without prices that would have failed the replay (fewer than half priced) with them in
+    unpriced_all = {hour(i): 1.0 for i in range(96, 140)}  # only the measured connections have prices
+    kept, _ = build(prices=unpriced_all)
+    assert [w.derived for w in kept.windows] == [False, False] and kept.start_soc == 40.0 and kept.provenance["start_soc"] == "entered"
+    assert not [e for e in kept.events if e.ts < hour(100)] and replay(kept).status == "ok"
+
+
 def test_a_recorded_drive_replaces_the_net_use_in_the_gap_before_the_first_measured_connection() -> None:
     data, coverage = build(drives=[{"start": hour(110), "end": hour(112), "km": 40.0, "used": 20.0}, {"start": hour(70), "end": hour(72), "km": 30.0, "used": 18.0}])
     drives = sorted((e.ts, e.soc_percent) for e in data.events)
