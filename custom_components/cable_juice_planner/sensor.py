@@ -22,7 +22,7 @@ PARALLEL_UPDATES = 0
 
 MAX_STATE_LENGTH = 255
 # markdown / plan attributes are large; keep them out of the recorder database
-UNRECORDED = ("analysis", "charging_loss_model", "soc_charging_power_model", "economy", "what_if", "what_if_settings", "current_charging_rule", "overview", "charging_history", "emoji_description", "drive_efficiency", "km_per_kwh", "kwh_cost_price")
+UNRECORDED = ("analysis", "charging_loss_model", "soc_charging_power_model", "economy", "what_if", "what_if_settings", "what_if_solar", "current_charging_rule", "overview", "charging_history", "emoji_description", "drive_efficiency", "km_per_kwh", "kwh_cost_price")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:

@@ -147,6 +147,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "what_if": ("{valuta}", None, None, None),
     # the adjusted cost difference of the latest What-if Scenario B (alternative settings minus current settings)
     "what_if_settings": ("{valuta}", None, None, None),
+    # the solar advantage of the completed months in What-if Scenario D (grid cost of the EV's solar energy minus its sell value)
+    "what_if_solar": ("{valuta}", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)

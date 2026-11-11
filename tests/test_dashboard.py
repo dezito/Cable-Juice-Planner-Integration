@@ -659,7 +659,7 @@ def test_what_if_view_holds_the_subscription_comparison() -> None:
     view = yaml.safe_load(text)["views"][3]
     assert view["path"] == "what-if" and view["title"] == "What-if" and view["icon"] == "mdi:flask-outline"
     headings = [c["heading"] for c in _cards(view) if c.get("type") == "heading"]
-    assert headings == ["Daglig smart opladning til det maksimalt anbefalede niveau", "Reserve og maksimalt niveau", "Fast månedlig ladepris"]
+    assert headings == ["Daglig smart opladning til det maksimalt anbefalede niveau", "Reserve og maksimalt niveau", "Bilens solenergi erstattet af nettet", "Fast månedlig ladepris"]
     entities = [row["entity"] for c in _cards(view) if c.get("type") == "entities" for row in c["entities"]]
     assert entities == [
         "number.cjp_tesla_what_if_days", "number.cjp_tesla_what_if_target_battery_level",

@@ -119,6 +119,9 @@ class Economy:
                 for key in ("kwh", "achieved", "average", "daily", "lowest"):
                     window.pop(key, None)
             self.economy_db["version"] = ECONOMY_DB_VERSION
+        # Sessions that started before this did not record their solar energy as energy (see
+        # engine/energy/solar.py calc_local_energy_kwh), so the What-if solar comparison does not use them
+        self.economy_db.setdefault("solar_energy_since", self._economy_ts(self.now()))
 
     # connection windows ------------------------------------------------ #
 
@@ -204,6 +207,52 @@ class Economy:
         for ts in [ts for ts in copies if ts < oldest]:
             del copies[ts]
         self.mark_dirty("economy")
+        try:
+            # the What-if solar comparison must never stop the storing of the buy prices above
+            self._economy_store_sell_prices(now)
+            self.update_solar_ledger()
+            self.publish_what_if_solar()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("The What-if solar data could not be stored: %s %s", err, type(err))
+
+    def _economy_store_sell_prices(self, now: datetime.datetime) -> None:
+        """The raw hourly sell prices (and the fixed production price in effect) of the hours that have passed.
+
+        Kept for the What-if solar comparison, which needs the value of the solar energy at the time. Only
+        measured prices of complete hours, like the buy prices. The raw price is stored: sell_value() is
+        applied once, when the comparison is calculated, so a later change of the production price can not
+        be applied to an earlier hour.
+        """
+        if not self.is_solar_configured():
+            return
+        try:
+            production = float(self.config["solar"]["production_price"])
+        except (KeyError, TypeError, ValueError):
+            return
+        if not _finite(production):
+            return
+        sell_prices = self.get_sell_prices() or {}
+        sources = getattr(self, "sell_price_cache", {}).get("sources") or {}
+        real = {
+            moment: float(price) for moment, price in sell_prices.items()
+            if isinstance(moment, datetime.datetime) and _finite(price) and _is_measured_price(sources.get(moment))
+        }
+        complete = _complete_hours(real)
+        stored = self.economy_db.setdefault("sell_prices", {})
+        fixed = self.economy_db.setdefault("sell_production_price", {})
+        for hour, price in hourly_price_averages(real, full_hours_only=True).items():
+            if hour in complete and hour <= now:
+                ts = self._economy_ts(hour)
+                if ts not in stored:
+                    # an hour is stored once, with the production price in effect then: a later change of the
+                    # production price (or a refreshed price vector that still holds this hour) never rewrites it
+                    stored[ts] = round(price, 4)
+                    fixed[ts] = production
+        self.economy_db.setdefault("sell_prices_since", self._economy_ts(now))
+        oldest = self._economy_ts(now) - ECONOMY_PRICE_DAYS * 86400
+        for table in (stored, fixed):
+            for ts in [ts for ts in table if ts < oldest]:
+                del table[ts]
 
     # calculation ------------------------------------------------------- #
 
@@ -259,6 +308,7 @@ class Economy:
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
         self.mark_dirty("economy")
         self.publish_economy(data.get("odometer_months") or {})
+        self.publish_what_if_solar()
 
     def _economy_sessions(self) -> list[dict]:
         sessions = []

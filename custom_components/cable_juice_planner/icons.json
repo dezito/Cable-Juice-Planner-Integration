@@ -394,6 +394,9 @@
       },
       "what_if_settings": {
         "default": "mdi:flask-outline"
+      },
+      "what_if_solar": {
+        "default": "mdi:solar-power-variant-outline"
       }
     },
     "binary_sensor": {

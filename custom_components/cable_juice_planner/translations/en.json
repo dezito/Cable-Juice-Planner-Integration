@@ -1204,6 +1204,9 @@
       },
       "what_if_settings": {
         "name": "What-if CJP settings"
+      },
+      "what_if_solar": {
+        "name": "What-if EV solar advantage"
       }
     },
     "binary_sensor": {

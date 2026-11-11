@@ -274,8 +274,8 @@ The What-if view collects simulated comparisons based on the history CJP has rec
 live plan, the settings, the car or the charger, and they are estimates, not guaranteed or actual savings.
 Each comparison states which data it uses and when it is unavailable; missing or invalid data is never
 replaced with a favourable value. The view holds the daily smart charging comparison, the comparison of the
-daily reserve and maximum level, and the comparison with a fixed monthly charging price; more are added as
-they are built.
+daily reserve and maximum level, the EV's solar energy replaced by grid energy, and the comparison with a fixed
+monthly charging price; more are added as they are built.
 
 ### Daily smart charging to the maximum recommended level
 
@@ -381,6 +381,48 @@ warnings are those of the calculation above. Not modelled, and stated on the car
 maximum, forced charging when plugged in below the reserve, solar, house and site limits, standby drain and a
 departure buffer. The next drive is known in advance (hindsight), which flatters a low reserve: a real plan has to
 guess it. It is an estimate, not a guaranteed or actual saving.
+
+### EV solar energy replaced by grid energy
+
+Shows what the energy your EV took from solar would have cost if the EV had charged **at the same times from
+the grid** instead, and the solar had been exported. It is calculated continuously from the sessions CJP
+recorded (no button, no starting level) and shown on `sensor.<prefix>_what_if_solar` (its state is the solar
+advantage of the completed months). Each session is priced once, in the hour after it ended, and kept (see the
+table below).
+
+For every finished private charging session with solar energy *S* (kWh) the same kWh are priced twice:
+
+- **at the grid:** the hourly buy price minus the refund (the basis CJP prices its own grid energy at);
+- **at the sale it replaced:** the opportunity cost of the solar energy, valued exactly the way CJP values it
+  (the hourly sell price, or the difference to a fixed production price). Solar is never treated as free.
+
+The *solar advantage* is the first minus the second, so a positive number means solar was cheaper than the
+grid. The grid part of a session is the same in both cases and cancels, and the recorded cost of a session is
+not used (it is one snapshot price times the whole session). Both prices are the time-weighted average over
+the session, which assumes the solar energy was spread evenly over it. Per month the card shows the number of
+sessions, the solar energy, the two values and the advantage; the total adds only completed months and the
+current month is shown but not added.
+
+**Only the first no-solar mode.** This is "no EV use of solar, the surplus exported". It is not "physically no
+solar production" and not a charging replanned without solar: both need the hourly solar availability, which is
+not stored, so they are not offered. The home battery is kept as recorded (its energy is shown, neither
+replaced nor valued) and no whole-house result is claimed.
+
+**What it needs, and why it starts empty.**
+
+| Data | Source | Limit |
+|---|---|---|
+| Solar energy of a session | CJP's charging history | the average power from local energy over the session times the session length, capped at the energy the EV charged (the sources are scaled down together when they would exceed it). Entries written by earlier versions stored the power as if it were kWh, which is only right for exactly 60 minutes, and cannot be told apart from correct ones: only sessions that started after the marker (stored when the integration first ran this calculation) are used |
+| Ledger | `economy_db["solar_ledger"]`, 400 days | a session is priced once while it ended less than 5 days ago, because CJP merges its charging history per day after a week (a session would become a day-long span with pauses) and a price or the refund can change later. A session whose stored price is still missing 48 hours after it ended is left out. One that was never priced in time (for example after a long outage) is counted as *not priced in time* |
+| Buy prices | the hourly prices CJP stores (see above) | an hour needs a stored price; the refund is subtracted |
+| Sell prices | the raw hourly sell price, stored from the first run of this calculation (own marker), together with the fixed production price in effect | the raw price and the production price are stored once per hour and the sell value (CJP's `sell_value()` rule) is applied when a session is priced, so a later change of the production price never rewrites an earlier hour. Only measured prices of complete hours are stored, like the buy prices. CJP has no sell price history to read back, so existing sessions cannot be priced |
+
+A session whose span lacks a stored buy or sell price for any hour is left out and counted; no price is ever
+filled in. The card shows how many sessions were left out and why (public charging, still charging, an
+unreadable data such as an end time, no solar energy, recorded before the solar energy was stored as energy, not
+priced in time, a missing buy or sell price) and since when the solar energy and the sell prices are stored. Because of the two markers an
+existing installation shows no result at first: it fills as new solar sessions are recorded. It is an estimate,
+not a guaranteed or actual saving.
 
 ### Fixed monthly charging price
 

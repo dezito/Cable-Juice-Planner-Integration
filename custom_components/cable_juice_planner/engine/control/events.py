@@ -115,6 +115,7 @@ class ControlEvents:
         self.publish_economy()
         self.load_what_if()
         self.load_what_if_settings()
+        self.publish_what_if_solar()
         self.load_analysis_db(databases.get("analysis"))
         self.publish_analysis()
         self.publish_charging_loss_model()

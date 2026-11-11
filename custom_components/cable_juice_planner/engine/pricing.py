@@ -129,14 +129,14 @@ class Pricing:
             timestamp += datetime.timedelta(hours=1)
         return missing
 
-    def sell_value(self, price: float) -> float:
+    def sell_value(self, price: float, production_price: float | None = None) -> float:
         """What a sold kWh is worth at this hourly sell price.
 
         With a fixed solar sell price (a production agreement that settles the difference to the
         spot price) it is the fixed price minus the hourly price - negative when the hourly price
         is above the fixed price. Without one (-1) it is the hourly price itself.
         """
-        fixed = float(self.config["solar"]["production_price"])
+        fixed = float(self.config["solar"]["production_price"]) if production_price is None else float(production_price)
         return price if fixed == -1.0 else fixed - price
 
     def get_grid_prices(self, update_prices=False) -> dict:

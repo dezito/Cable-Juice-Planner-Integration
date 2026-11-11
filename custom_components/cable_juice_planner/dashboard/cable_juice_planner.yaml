@@ -3360,6 +3360,83 @@ views:
         </details>
         {%- endif %}
       grid_options: *id001
+  # Scenario D: the EV's solar energy replaced by grid energy at the same charging times (engine/whatif/solar.py)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@what_if_d_title@@'
+      icon: mdi:solar-power-variant-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_d_explain@@\n\n</details>"
+      grid_options: *id001
+    - type: markdown
+      card_mod:
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+      content: |-
+        {% set a = states.sensor.cjp_what_if_solar.attributes %}
+        {% set r = a.result %}
+        {% set reasons = {'no_solar_configured': '@@what_if_d_reason_no_solar_configured@@', 'no_price_provider': '@@what_if_d_reason_no_price_provider@@', 'waiting_for_new_sessions': '@@what_if_d_reason_waiting_for_new_sessions@@', 'no_sell_prices': '@@what_if_d_reason_no_sell_prices@@', 'no_buy_prices': '@@what_if_d_reason_no_buy_prices@@', 'no_solar_sessions': '@@what_if_d_reason_no_solar_sessions@@', 'internal_error': '@@what_if_reason_internal_error@@'} %}
+        {% set left = {'public': '@@what_if_d_left_public@@', 'still_charging': '@@what_if_d_left_still_charging@@', 'invalid': '@@what_if_d_left_invalid@@', 'without_solar': '@@what_if_d_left_without_solar@@', 'before_energy_fix': '@@what_if_d_left_before_energy_fix@@', 'missing_buy_price': '@@what_if_d_left_missing_buy_price@@', 'missing_sell_price': '@@what_if_d_left_missing_sell_price@@', 'not_captured': '@@what_if_d_left_not_captured@@'} %}
+        {% set notes = {'ev_solar_exported_instead': '@@what_if_d_note_ev_solar_exported_instead@@', 'solar_spread_evenly_over_session': '@@what_if_d_note_solar_spread_evenly_over_session@@', 'home_battery_kept_as_recorded': '@@what_if_d_note_home_battery_kept_as_recorded@@', 'no_whole_house_result': '@@what_if_d_note_no_whole_house_result@@', 'replanned_without_solar_not_modelled': '@@what_if_d_note_replanned_without_solar_not_modelled@@', 'no_solar_production_not_modelled': '@@what_if_d_note_no_solar_production_not_modelled@@', 'recorded_sessions_only': '@@what_if_d_note_recorded_sessions_only@@'} %}
+        {% if not r -%}
+        <ha-alert alert-type="info">@@what_if_d_reason_no_solar_sessions@@</ha-alert>
+        {%- else -%}
+        {% if r.status != 'ok' -%}
+        <ha-alert alert-type="info">{{ reasons.get(r.reason, r.reason) }}</ha-alert>
+        {%- endif %}
+        {% if r.months -%}
+        | @@economy_month@@ | @@what_if_d_col_sessions@@ | @@what_if_d_col_solar@@ | @@what_if_d_col_grid@@ | @@what_if_d_col_sell@@ | @@what_if_d_col_advantage@@ |
+        |:---|---:|---:|---:|---:|---:|
+        {% for m in r.months | reverse -%}
+        {% if m.status == 'completed' -%}
+        | **{{ m.month }}** | {{ m.sessions }} | {{ m.solar_kwh }} kWh | {{ m.grid_cost }} @@valuta@@ | {{ m.sell_value }} @@valuta@@ | {{ m.advantage }} @@valuta@@ |
+        {% else -%}
+        | **{{ m.month }}** | {{ m.sessions }} | {{ m.solar_kwh }} kWh | {{ m.grid_cost }} @@valuta@@ | {{ m.sell_value }} @@valuta@@ | *@@economy_subscription_current@@* |
+        {% endif -%}
+        {% endfor %}
+        {% if r.total.months -%}
+        **@@what_if_d_total@@ ({{ r.total.months }}):** {{ r.total.solar_kwh }} kWh &middot; {{ r.total.grid_cost }} @@valuta@@ &rarr; {{ r.total.sell_value }} @@valuta@@ &middot; @@what_if_d_col_advantage@@ **{{ r.total.advantage }} @@valuta@@**
+        {% endif -%}
+        {%- endif %}
+        {% set items = (r.left_out or {}).items() | selectattr('1', 'gt', 0) | list %}
+        {% if items -%}
+
+        **@@what_if_d_left_out@@:** {% for item in items %}{{ left.get(item[0], item[0]) }} ({{ item[1] }}){{ ' &middot; ' if not loop.last }}{% endfor %}
+        {%- endif %}
+        {% if r.powerwall_kwh -%}
+
+        @@what_if_d_powerwall@@: {{ r.powerwall_kwh }} kWh
+        {%- endif %}
+        {% if r.solar_energy_since or r.sell_prices_since -%}
+
+        {% if r.solar_energy_since %}@@what_if_d_since@@ {{ r.solar_energy_since | timestamp_custom('%Y-%m-%d', true) }}{% endif %}{% if r.solar_energy_since and r.sell_prices_since %} &middot; {% endif %}{% if r.sell_prices_since %}@@what_if_d_sell_since@@ {{ r.sell_prices_since | timestamp_custom('%Y-%m-%d', true) }}{% endif %}
+        {%- endif %}
+        {% if r.notes -%}
+
+        <details><summary>@@what_if_assumptions@@</summary>
+
+        {% for n in r.notes -%}
+        - {{ notes.get(n, n) }}
+        {% endfor %}
+        </details>
+        {%- endif %}
+        {%- endif %}
+      grid_options: *id001
   # simulated comparisons that never change the plan, the settings, the car or the charger
   - type: grid
     column_span: 2

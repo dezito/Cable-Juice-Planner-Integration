@@ -1204,6 +1204,9 @@
       },
       "what_if_settings": {
         "name": "What-if CJP-Einstellungen"
+      },
+      "what_if_solar": {
+        "name": "What-if Solarvorteil des Autos"
       }
     },
     "binary_sensor": {
