@@ -105,7 +105,8 @@ DATETIME_SETTINGS: dict[str, dict[str, Any]] = {
 
 # run_what_if: the What-if view's Scenario A (daily smart charging to the maximum recommended level)
 # run_what_if_settings: its Scenario B (the daily homecoming reserve and maximum recommended level)
-BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if", "run_what_if_settings")
+# run_what_if_no_solar: its Scenario D (the planned charging from the grid only, no solar)
+BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if", "run_what_if_settings", "run_what_if_no_solar")
 # only with a car integration (the charging loss is measured with its battery level)
 EV_BUTTON_KEYS = ("recalculate_charging_loss",)
 
@@ -149,6 +150,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "what_if_settings": ("{valuta}", None, None, None),
     # the solar advantage of the completed months in What-if Scenario D (grid cost of the EV's solar energy minus its sell value)
     "what_if_solar": ("{valuta}", None, None, None),
+    # the estimated solar advantage of the latest What-if Scenario D (the recorded energy at the planned grid price minus the recorded cost)
+    "what_if_no_solar": ("{valuta}", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)

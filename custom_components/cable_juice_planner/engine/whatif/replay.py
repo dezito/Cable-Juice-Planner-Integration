@@ -40,12 +40,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-REPLAY_MODEL_VERSION = 3
+REPLAY_MODEL_VERSION = 4
 EPS = 1e-9
 HOUR = 3600.0
 SOC_STEP = 10.0  # % : the SOC power model is learned in bands this wide (engine/soc_power.py)
 CONSERVATION_TOLERANCE_KWH = 1e-6
 COMPARE_TOLERANCE_KWH = 0.01  # unmet energy that may differ before two policies are "not comparable"
+MIN_PRICED_SHARE = 0.5  # the share of the connections that must have every price for an estimate (like BattMind's what-if)
 GAP_TOLERANCE = 15 * 60.0  # s : a drive recorded this long before the unplug still belongs after the window
 
 NOTES = (
@@ -119,6 +120,7 @@ class ReplayInput:
     power_cap: PowerCap = _no_cap
     provenance: Mapping[str, str] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()  # data the adapter had to leave out or could not verify
+    estimated_hours: frozenset[float] = frozenset()  # (internal) hours whose price was estimated, see _with_estimated_prices
     smart_weekdays: frozenset[int] | None = None
     """None: smart on every window. Otherwise only on windows whose departure weekday is in
     the set; the other windows are charged immediately by both policies, so the result differs
@@ -136,6 +138,8 @@ class WindowResult:
     cost: float = 0.0
     unmet_target_kwh: float = 0.0  # battery kWh missing to the target at unplug
     drive_shortfall_kwh: float = 0.0  # driving after this window that the battery could not cover
+    estimated: bool = False  # a price in this connection was estimated (see _with_estimated_prices)
+    calibrated: bool = False  # the level before this connection was unknown: it only brings the car to a common level
 
     @property
     def loss_kwh(self) -> float:
@@ -152,6 +156,15 @@ class PolicyResult:
     lowest_soc: float = 0.0
     public_kwh: float = 0.0
     driven_percent: float = 0.0
+    calibrated: bool = False  # the starting level was unknown (see _run)
+
+    @property
+    def estimated_cost(self) -> float:
+        return sum(w.cost for w in self.windows if w.estimated)
+
+    @property
+    def estimated_windows(self) -> int:
+        return sum(1 for w in self.windows if w.estimated)
 
     @property
     def charged_kwh(self) -> float:
@@ -201,6 +214,10 @@ class ReplayResult:
     comparable: bool = False
     comparable_reason: str | None = None
     difference: dict[str, float] | None = None  # smart minus asap; negative cost is better
+    method: str = "strict"  # "strict": measured data only; "estimated": some prices or the starting level were estimated
+    estimated_windows: int = 0
+    price_estimate: float | None = None  # the price used for the hours without one (the average of the priced hours)
+    calibrated_start: bool = False
 
 
 @dataclass
@@ -234,7 +251,7 @@ def _validate(data: ReplayInput) -> str | None:
         return "no_charging_power"
     if not data.windows:
         return "no_windows"  # before the start level: nothing to start a level for
-    if not _finite(data.start_soc) or not 0.0 <= data.start_soc <= 100.0:
+    if data.start_soc is not None and (not _finite(data.start_soc) or not 0.0 <= data.start_soc <= 100.0):
         return "no_start_soc"
     if not _finite(data.target_soc) or not 0.0 < data.target_soc <= 100.0:
         return "invalid_target"
@@ -259,6 +276,43 @@ def _validate(data: ReplayInput) -> str | None:
         if event.kind == "public" and not (_finite(event.battery_kwh) and event.battery_kwh >= 0):
             return "invalid_event"
     return None
+
+
+def _with_estimated_prices(data: ReplayInput, windows: list[Window]) -> tuple[ReplayInput, float | None, bool]:
+    """Give the hours without a finite price the time-weighted average of the priced hours (the same flat price for
+    every policy, so no policy gets energy for free and no hour is cheaper than another). Returns
+    (data with the prices filled, that price, whether every connection was fully priced to start with).
+
+    The replay then runs on all connections; the ones that needed an estimate are flagged and counted. The caller
+    decides if enough connections had measured prices (MIN_PRICED_SHARE) for the result to be given at all."""
+    total = weight = 0.0
+    missing: set[float] = set()
+    fully_priced = 0
+    for window in windows:
+        slots = _slots(window, data.prices)
+        if slots and all(slot.price is not None for slot in slots):
+            fully_priced += 1
+        else:
+            # a connection with even one hour missing is estimated as a whole: at one flat price smart has nothing
+            # to choose between, so the estimate can not make smart look cheaper than immediate charging
+            missing.update(slot.hour for slot in slots)
+        for slot in slots:
+            if slot.price is not None:
+                total += slot.price * slot.hours
+                weight += slot.hours
+    if not missing:
+        return data, None, True
+    if weight <= 0.0:
+        return data, None, False
+    fill = total / weight
+    filled = {**data.prices, **dict.fromkeys(missing, fill)}
+    return replace(data, prices=filled, estimated_hours=frozenset(missing)), fill, fully_priced == len(windows)
+
+
+def _enough_priced(data: ReplayInput, windows: list[Window]) -> bool:
+    """At least MIN_PRICED_SHARE of the connections have every price (measured)."""
+    full = sum(1 for w in windows if (s := _slots(w, data.prices)) and all(x.price is not None for x in s))
+    return bool(windows) and full / len(windows) >= MIN_PRICED_SHARE
 
 
 def _loss(data: ReplayInput, kw: float) -> float:
@@ -386,7 +440,8 @@ def _apply_events(
 
 
 def _run(
-    data: ReplayInput, name: str, windows: list[Window], targets: list[float] | None = None, next_start: float | None = None
+    data: ReplayInput, name: str, windows: list[Window], targets: list[float] | None = None, next_start: float | None = None,
+    calibrate_to: float | None = None,
 ) -> tuple[PolicyResult, str | None, float | None, int]:
     """Replay one policy. Returns (result, stop reason, stop time, windows replayed).
 
@@ -394,9 +449,12 @@ def _run(
     targets: the battery level to leave each window with (default: data.target_soc for all).
     next_start: the start of the connection after the last one in `windows`; when given, the drives
     in the gap before it are applied too (and policy.end_soc is the level the car comes back with).
+    calibrate_to: used when the starting level is unknown. The first connection then only brings the car to this
+    level (nothing is charged or counted in it) and the replay runs normally from the drives after it.
     """
-    soc = float(data.start_soc)
-    result = PolicyResult(name=name, start_soc=soc, lowest_soc=soc)
+    calibrating = data.start_soc is None
+    soc = float(calibrate_to if calibrating else data.start_soc)
+    result = PolicyResult(name=name, start_soc=soc, lowest_soc=soc, calibrated=calibrating)
     events = sorted(data.events, key=lambda e: e.ts)
     taken: set[int] = set()  # a drive belongs to one gap even when two gaps overlap (very short connections)
     replayed = 0
@@ -404,18 +462,23 @@ def _run(
         slots = _slots(window, data.prices)
         if not slots or any(slot.price is None for slot in slots):
             return _finish(result), "missing_prices", window.start, replayed
-        row = WindowResult(window.start, window.end, soc, soc)
+        row = WindowResult(
+            window.start, window.end, soc, soc,
+            estimated=not (calibrating and index == 0) and any(slot.hour in data.estimated_hours for slot in slots),
+            calibrated=calibrating and index == 0,
+        )
         target = targets[index] if targets is not None else data.target_soc
-        immediate = name == "asap" or (data.smart_weekdays is not None and window.weekday not in data.smart_weekdays)
-        chosen = {i: slot.hours for i, slot in enumerate(slots)} if immediate else _plan_smart(data, slots, soc, target)
-        for slot_index, battery, grid in _simulate(data, slots, chosen, soc, target):
-            soc += battery / data.battery_kwh * 100.0
-            row.charged_kwh += battery
-            row.grid_kwh += grid
-            row.cost += grid * slots[slot_index].price  # type: ignore[operator]
-        row.soc_out = soc
-        shortfall = max(target - soc, 0.0) / 100.0 * data.battery_kwh
-        row.unmet_target_kwh = shortfall if shortfall > 1e-6 else 0.0
+        if not row.calibrated:
+            immediate = name == "asap" or (data.smart_weekdays is not None and window.weekday not in data.smart_weekdays)
+            chosen = {i: slot.hours for i, slot in enumerate(slots)} if immediate else _plan_smart(data, slots, soc, target)
+            for slot_index, battery, grid in _simulate(data, slots, chosen, soc, target):
+                soc += battery / data.battery_kwh * 100.0
+                row.charged_kwh += battery
+                row.grid_kwh += grid
+                row.cost += grid * slots[slot_index].price  # type: ignore[operator]
+            row.soc_out = soc
+            shortfall = max(target - soc, 0.0) / 100.0 * data.battery_kwh
+            row.unmet_target_kwh = shortfall if shortfall > 1e-6 else 0.0
         result.windows.append(row)
         replayed += 1
         nxt = windows[index + 1].start if index + 1 < len(windows) else next_start
@@ -467,6 +530,8 @@ def replay(data: ReplayInput) -> ReplayResult:
     reason = _validate(data)
     ordered = sorted(data.windows, key=lambda w: w.start)
     provenance = dict(data.provenance)
+    if reason is None and data.start_soc is None and len(ordered) < 2:
+        reason = "too_few_windows"  # the only connection would be the one that calibrates: nothing is replayed
     if reason is not None:
         return ReplayResult(status="unavailable", reason=reason, windows_total=len(ordered), provenance=provenance)
     try:
@@ -476,8 +541,16 @@ def replay(data: ReplayInput) -> ReplayResult:
 
 
 def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]) -> ReplayResult:
-    smart, smart_stop, smart_at, smart_n = _run(data, "smart", ordered)
-    asap, asap_stop, asap_at, asap_n = _run(data, "asap", ordered)
+    measured = data  # the average price and the "enough measured prices" rule use only what was really priced
+    data, price_fill, fully_priced = _with_estimated_prices(data, ordered)
+    if not fully_priced and (price_fill is None or not _enough_priced(measured, ordered)):
+        return ReplayResult(
+            status="unavailable", reason="missing_prices", windows_total=len(ordered), provenance=provenance,
+            warnings=measured.warnings,
+        )
+    calibrate_to = measured.target_soc
+    smart, smart_stop, smart_at, smart_n = _run(data, "smart", ordered, calibrate_to=calibrate_to)
+    asap, asap_stop, asap_at, asap_n = _run(data, "asap", ordered, calibrate_to=calibrate_to)
 
     # both policies must cover the same windows or the comparison would not be like for like
     count = min(smart_n, asap_n)
@@ -489,17 +562,22 @@ def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]
     if count < len(ordered):
         # run again over exactly the compared windows: no drive or public charge after the
         # last one counts towards the lowest SOC, the energy balance or the unmet demand
-        smart, _, _, _ = _run(data, "smart", ordered[:count])
-        asap, _, _, _ = _run(data, "asap", ordered[:count])
+        smart, _, _, _ = _run(data, "smart", ordered[:count], calibrate_to=calibrate_to)
+        asap, _, _, _ = _run(data, "asap", ordered[:count], calibrate_to=calibrate_to)
 
     compared = ordered[:count]
-    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, data.prices) if slot.price is not None]
+    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, measured.prices) if slot.price is not None]
     hours = sum(h for _, h in weighted)
     average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
 
     applied = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared[:-1])))
     inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
-    warnings = (*data.warnings, *(("events_inside_windows",) if inside else ()))
+    estimated_windows = smart.estimated_windows
+    calibrated = smart.calibrated
+    warnings = (
+        *data.warnings, *(("events_inside_windows",) if inside else ()),
+        *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
+    )
 
     error = max(_conservation(data, smart), _conservation(data, asap))
     complete = count == len(ordered)
@@ -516,6 +594,10 @@ def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]
         warnings=warnings,
         provenance=provenance,
         ignored_events=len(data.events) - applied,
+        method="estimated" if estimated_windows or calibrated else "strict",
+        estimated_windows=estimated_windows,
+        price_estimate=price_fill,
+        calibrated_start=calibrated,
     )
     if not error <= CONSERVATION_TOLERANCE_KWH:
         return ReplayResult(
@@ -547,6 +629,7 @@ def _difference(
     adjustment = terminal_kwh * ratio * (average if price is None else price)
     return {
         "cost": first.cost - second.cost,
+        "measured_cost": (first.cost - first.estimated_cost) - (second.cost - second.estimated_cost),
         "terminal_energy_kwh": terminal_kwh,
         "terminal_adjustment": adjustment,
         "adjusted_cost": first.cost - second.cost - adjustment,
@@ -568,7 +651,7 @@ def _difference(
 # CJP's planning rule "needed for work + minimum daily level, capped at the maximum"; the planner's
 # other rules (cheap-hour top-ups, solar, forced charging below the reserve) are not modelled.
 
-SETTINGS_MODEL_VERSION = 1
+SETTINGS_MODEL_VERSION = 2
 
 SETTINGS_NOTES = (
     "hindsight",
@@ -634,6 +717,10 @@ class SettingsResult:
     comparable: bool = False
     comparable_reason: str | None = None
     difference: dict[str, float] | None = None  # alternative minus baseline; negative cost is cheaper
+    method: str = "strict"
+    estimated_windows: int = 0
+    price_estimate: float | None = None
+    calibrated_start: bool = False
 
 
 def _validate_settings(baseline: CjpSettings, alternative: CjpSettings) -> str | None:
@@ -684,8 +771,8 @@ def replay_settings(data: ReplayInput, baseline: CjpSettings, alternative: CjpSe
     reason = _validate(replace(data, target_soc=usable_max, smart_weekdays=None))
     if reason is None:
         reason = _validate_settings(baseline, alternative)
-    if reason is None and len(ordered) < 2:
-        reason = "too_few_windows"  # the demand after the last connection is unknown
+    if reason is None and len(ordered) < (3 if data.start_soc is None else 2):
+        reason = "too_few_windows"  # the demand after the last connection is unknown (and the first one may only calibrate)
     if reason is not None:
         return SettingsResult(status="unavailable", reason=reason, windows_total=len(ordered), provenance=provenance)
     try:
@@ -699,10 +786,19 @@ def _replay_settings(
 ) -> SettingsResult:
     needs = _gap_needs(data, ordered)
     candidates = ordered[:-1]  # the last connection's following drive is unknown
+    measured = data
+    data, price_fill, fully_priced = _with_estimated_prices(data, candidates)
+    if not fully_priced and (price_fill is None or not _enough_priced(measured, candidates)):
+        return SettingsResult(
+            status="unavailable", reason="missing_prices", windows_total=len(ordered), provenance=provenance,
+            warnings=measured.warnings,
+        )
     base_targets = [settings_target(need, baseline) for need in needs]
     alt_targets = [settings_target(need, alternative) for need in needs]
-    base, base_stop, base_at, base_n = _run(data, "baseline", candidates, base_targets, ordered[-1].start)
-    alt, alt_stop, alt_at, alt_n = _run(data, "alternative", candidates, alt_targets, ordered[-1].start)
+    # an unknown starting level: the first connection brings both settings to the same level (the current setting's)
+    calibrate_to = base_targets[0]
+    base, base_stop, base_at, base_n = _run(data, "baseline", candidates, base_targets, ordered[-1].start, calibrate_to)
+    alt, alt_stop, alt_at, alt_n = _run(data, "alternative", candidates, alt_targets, ordered[-1].start, calibrate_to)
 
     if "public_overfill" in (base_stop, alt_stop):
         # a fixed public charge that does not fit also hits the last gap, whose drives are applied for the readiness
@@ -712,18 +808,23 @@ def _replay_settings(
     if count == 0:
         return SettingsResult(status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance)
     if count < len(candidates):
-        base, _, _, _ = _run(data, "baseline", candidates[:count], base_targets[:count], ordered[count].start)
-        alt, _, _, _ = _run(data, "alternative", candidates[:count], alt_targets[:count], ordered[count].start)
+        base, _, _, _ = _run(data, "baseline", candidates[:count], base_targets[:count], ordered[count].start, calibrate_to)
+        alt, _, _, _ = _run(data, "alternative", candidates[:count], alt_targets[:count], ordered[count].start, calibrate_to)
 
     compared = ordered[:count]
-    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, data.prices) if slot.price is not None]
+    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, measured.prices) if slot.price is not None]
     hours = sum(h for _, h in weighted)
     average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
 
     # the drives of every compared gap are used (the last one as the need only); the rest are not
     used = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared)))
     inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
-    warnings = (*data.warnings, *(("events_inside_windows",) if inside else ()))
+    estimated_windows = base.estimated_windows
+    calibrated = base.calibrated
+    warnings = (
+        *data.warnings, *(("events_inside_windows",) if inside else ()),
+        *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
+    )
 
     error = max(_conservation(data, base), _conservation(data, alt))
     complete = count == len(candidates)
@@ -745,6 +846,10 @@ def _replay_settings(
         warnings=warnings,
         provenance=provenance,
         ignored_events=len(data.events) - used,
+        method="estimated" if estimated_windows or calibrated else "strict",
+        estimated_windows=estimated_windows,
+        price_estimate=price_fill,
+        calibrated_start=calibrated,
     )
     if not error <= CONSERVATION_TOLERANCE_KWH:
         return SettingsResult(
@@ -767,3 +872,113 @@ def _replay_settings(
         paid = holder.cost / holder.grid_kwh if holder.grid_kwh > EPS else average
         result.difference = _difference(data, alt, base, average, paid)
     return result
+
+
+# ---------------------------------------------------------------------------- #
+# Scenario D: the planned charging with the grid only (no solar), for the period
+# ---------------------------------------------------------------------------- #
+#
+# The same modelled policy as Scenario B for ONE set of settings (the current ones): every connection
+# is charged, in the cheapest hours, from the grid to the level the next recorded drive needs plus the
+# reserve, capped at the maximum. Solar is not used at all, which is what "no solar" means here: all
+# energy is bought at the grid price. Missing prices and an unknown starting level are handled like in
+# the other replays (an estimated price, a calibrating first connection).
+
+PLAN_NOTES = (
+    "grid_only_no_solar",
+    "hindsight",
+    "modelled_policy",
+    "demand_from_recorded_drives",
+    "last_connection_left_out",
+    "extra_top_ups_not_modelled",
+    "forced_low_battery_charging_not_modelled",
+    "site_limits_not_replayed",
+    "standby_not_modelled",
+)
+
+
+@dataclass
+class PlanResult:
+    status: str  # ok | unavailable
+    reason: str | None
+    model_version: int = SETTINGS_MODEL_VERSION
+    plan: PolicyResult | None = None
+    settings: CjpSettings | None = None
+    readiness: Readiness | None = None
+    targets: list[float] = field(default_factory=list)
+    windows_total: int = 0
+    windows_replayed: int = 0
+    average_price: float | None = None
+    max_conservation_error_kwh: float = 0.0
+    notes: tuple[str, ...] = PLAN_NOTES
+    warnings: tuple[str, ...] = ()
+    provenance: Mapping[str, str] = field(default_factory=dict)
+    method: str = "strict"
+    estimated_windows: int = 0
+    price_estimate: float | None = None
+    calibrated_start: bool = False
+
+
+def replay_plan(data: ReplayInput, settings: CjpSettings) -> PlanResult:
+    """Replay the planned grid-only charging of one set of settings. Never raises for bad data: it reports why."""
+    ordered = sorted(data.windows, key=lambda w: w.start)
+    provenance = dict(data.provenance)
+    usable_max = settings.maximum if _finite(settings.maximum) and settings.maximum > 0 else 100.0
+    reason = _validate(replace(data, target_soc=usable_max, smart_weekdays=None))
+    if reason is None and not (_finite(settings.reserve) and 0.0 <= settings.reserve <= 100.0 and _finite(settings.maximum) and 0.0 < settings.maximum <= 100.0):
+        reason = "invalid_settings"
+    if reason is None and len(ordered) < (3 if data.start_soc is None else 2):
+        reason = "too_few_windows"
+    if reason is not None:
+        return PlanResult(status="unavailable", reason=reason, windows_total=len(ordered), provenance=provenance)
+    try:
+        return _replay_plan(replace(data, smart_weekdays=None), ordered, settings, provenance)
+    except _ModelError as err:
+        return PlanResult(status="unavailable", reason=err.reason, windows_total=len(ordered), provenance=provenance)
+
+
+def _replay_plan(data: ReplayInput, ordered: list[Window], settings: CjpSettings, provenance: dict[str, str]) -> PlanResult:
+    needs = _gap_needs(data, ordered)
+    candidates = ordered[:-1]
+    measured = data
+    data, price_fill, fully_priced = _with_estimated_prices(data, candidates)
+    if not fully_priced and (price_fill is None or not _enough_priced(measured, candidates)):
+        return PlanResult(status="unavailable", reason="missing_prices", windows_total=len(ordered), provenance=provenance, warnings=measured.warnings)
+    targets = [settings_target(need, settings) for need in needs]
+    plan, stop, _, count = _run(data, "planned", candidates, targets, ordered[-1].start, targets[0])
+    if stop == "public_overfill":
+        return PlanResult(status="unavailable", reason="public_overfill", windows_total=len(ordered), provenance=provenance)
+    if count == 0:
+        return PlanResult(status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance)
+    compared = ordered[:count]
+    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, measured.prices) if slot.price is not None]
+    hours = sum(h for _, h in weighted)
+    average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
+    error = _conservation(data, plan)
+    if not error <= CONSERVATION_TOLERANCE_KWH:
+        return PlanResult(
+            status="unavailable", reason="energy_conservation", windows_total=len(ordered), provenance=provenance, max_conservation_error_kwh=error,
+        )
+    estimated_windows, calibrated = plan.estimated_windows, plan.calibrated
+    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
+    return PlanResult(
+        status="ok",
+        reason=None,
+        plan=plan,
+        settings=settings,
+        readiness=_readiness(plan, settings.reserve),
+        targets=targets[:count],
+        windows_total=len(ordered),
+        windows_replayed=count,
+        average_price=average,
+        max_conservation_error_kwh=error,
+        warnings=(
+            *data.warnings, *(("events_inside_windows",) if inside else ()),
+            *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
+        ),
+        provenance=provenance,
+        method="estimated" if estimated_windows or calibrated else "strict",
+        estimated_windows=estimated_windows,
+        price_estimate=price_fill,
+        calibrated_start=calibrated,
+    )

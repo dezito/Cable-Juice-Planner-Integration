@@ -154,9 +154,14 @@ def test_settings_out_of_range_are_not_replayed(baseline, alternative) -> None:
     assert result.status == "unavailable" and result.reason == "invalid_settings"
 
 
-def test_a_missing_start_level_is_never_defaulted() -> None:
+def test_an_unknown_start_level_brings_both_settings_to_the_same_level() -> None:
     result = replay_settings(replace(three_days(), start_soc=None), LIVE, CjpSettings(50.0, 90.0))
-    assert result.status == "unavailable" and result.reason == "no_start_soc"
+    assert result.status == "ok" and result.calibrated_start and "start_level_unknown_calibrated" in result.warnings
+    first_base, first_alt = result.baseline.windows[0], result.alternative.windows[0]
+    # the first connection is only used to bring the car to one common level: nothing is charged or counted in it
+    assert first_base.calibrated and first_alt.calibrated and first_base.cost == first_alt.cost == 0.0
+    assert first_base.soc_out == first_alt.soc_out == pytest.approx(result.targets["baseline"][0])
+    assert result.comparable and result.max_conservation_error_kwh < 1e-6
 
 
 def test_no_connections_is_reported_before_the_settings() -> None:
@@ -164,13 +169,27 @@ def test_no_connections_is_reported_before_the_settings() -> None:
     assert result.status == "unavailable" and result.reason == "no_windows"
 
 
-def test_a_missing_price_stops_both_settings_at_the_same_window() -> None:
-    prices = {i: 1.0 for i in range(60)}
-    del prices[24]  # inside connection 2
-    result = replay_settings(three_days(prices), LIVE, CjpSettings(50.0, 90.0))
-    assert result.status == "partial" and result.reason == "missing_prices"
-    assert result.windows_replayed == 1 and len(result.alternative.windows) == 1
-    assert result.stopped_at == pytest.approx(hour(20))
+def test_a_connection_without_prices_is_priced_at_one_flat_price_for_both_settings() -> None:
+    prices = {i: 1.0 + (i % 5) * 0.2 for i in range(60)}
+    for i in range(20, 32):
+        del prices[i]  # connection 2 has no price
+    result = replay_settings(three_days(prices), LIVE, CjpSettings(reserve=50.0, maximum=90.0))
+    assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1
+    assert result.windows_replayed == 2 and "prices_estimated_windows" in result.warnings
+    base, alt = result.baseline.windows[1], result.alternative.windows[1]
+    assert base.estimated and alt.estimated
+    # both settings pay the same estimated price per kWh: the one that charges more does not get its energy for free
+    assert base.cost == pytest.approx(base.grid_kwh * result.price_estimate)
+    assert alt.cost == pytest.approx(alt.grid_kwh * result.price_estimate)
+    assert base.cost / base.grid_kwh == pytest.approx(alt.cost / alt.grid_kwh)  # one price per kWh for both settings
+    assert "measured_cost" in result.difference
+
+
+def test_fewer_than_half_priced_connections_give_no_settings_result() -> None:
+    prices = {i: 1.0 for i in range(8)}  # only connection 1 of the two compared ones
+    prices_none = {}
+    assert replay_settings(three_days(prices_none or {99: 1.0}), LIVE, CjpSettings(50.0, 90.0)).reason == "missing_prices"
+    assert replay_settings(three_days(prices), LIVE, CjpSettings(50.0, 90.0)).status == "ok"  # one of two is enough
 
 
 def test_a_model_that_returns_nothing_usable_is_unavailable() -> None:

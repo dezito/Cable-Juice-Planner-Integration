@@ -239,3 +239,60 @@ def solar_comparison(
         entries.append({**result, "month": month_of(float(session["start"])) if _finite(session.get("start")) else ""})
     summary = summarize(entries, current_month, {"still_charging": still_charging})
     return {**summary, "solar_energy_since": solar_energy_since}
+
+
+MIN_EV_KWH = 0.05  # an hour in which the EV charged less than this is not a charging hour
+
+POWER_HISTORY_NOTES = (*NOTES, "solar_from_power_history")
+
+
+def solar_from_power_hours(
+    power_hours: Mapping[float, Any],
+    buy: Mapping[float, float],
+    sell: Mapping[float, float],
+    production: Mapping[float, float],
+    assumed_production: float,
+    refund: float,
+    last_hour: float,
+    current_month: str,
+    month_of: Callable[[float], str],
+) -> dict[str, Any]:
+    """The same comparison from the recorder's hourly statistics instead of CJP's own session records.
+
+    power_hours: UTC hour -> [solar production W, house consumption W (the EV included), charger power W], the
+    hourly means. Like CJP's own formula (local_energy_available) the solar the EV can use in an hour is what the
+    production leaves after the rest of the house: max(solar - (house - EV), 0), never more than the EV charged. The
+    home battery is not modelled (its energy is not separated). Hours without a buy or sell price are left out and counted
+    (as hours); the production price of an hour that has none stored is the one set now (counted as assumed).
+    """
+    left_out = {"missing_buy_price": 0, "missing_sell_price": 0}
+    entries: list[dict[str, Any]] = []
+    assumed = 0
+    for ts in sorted(power_hours):
+        values = power_hours[ts]
+        if ts > last_hour or not isinstance(values, (list, tuple)) or len(values) != 3 or not all(_finite(v) for v in values):
+            continue
+        solar_w, house_w, ev_w = (float(v) for v in values)
+        ev_kwh = ev_w / 1000.0
+        if ev_kwh < MIN_EV_KWH:
+            continue
+        energy = min(ev_kwh, max(solar_w - max(house_w - ev_w, 0.0), 0.0) / 1000.0)
+        if energy <= 1e-9:
+            continue  # no solar in this charging hour: nothing to replace
+        if not _finite(buy.get(ts)):
+            left_out["missing_buy_price"] += 1
+            continue
+        if not _finite(sell.get(ts)):
+            left_out["missing_sell_price"] += 1
+            continue
+        fixed = production.get(ts)
+        if not _finite(fixed):
+            fixed, assumed = assumed_production, assumed + 1
+        entries.append({
+            "month": month_of(ts), "outcome": "counted", "solar_kwh": energy, "grid_cost": energy * (float(buy[ts]) - refund),
+            "sell_value": energy * sell_value(float(sell[ts]), float(fixed)), "powerwall_kwh": 0.0,
+        })
+    summary = summarize(entries, current_month, left_out)
+    summary["notes"] = list(POWER_HISTORY_NOTES)
+    summary["assumed_production_hours"] = assumed
+    return summary

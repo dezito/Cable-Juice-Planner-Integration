@@ -134,6 +134,10 @@ class BasePriceProvider:
     def get_buy_price_entity_id(self) -> str:
         return ""
 
+    def get_sell_price_entity_id(self) -> str:
+        """The entity whose recorded history is the provider's sell price (empty when there is no single one)."""
+        return ""
+
     def _load_buy_real_prices(self):
         raise NotImplementedError
 
@@ -246,6 +250,10 @@ class CombinedPriceProvider(BasePriceProvider):
                 value = float_or_none(state.state)
                 values[entity_id] = value if value is not None else 0.0
         return {"attributes": attributes, "values": values}
+
+    def sell_price_entity_ids(self) -> list[str]:
+        """The sell price entities of the providers that have one, in priority order."""
+        return list(dict.fromkeys(entity_id for entity_id in (p.get_sell_price_entity_id() for p in self.providers) if entity_id))
 
     def combine_history(self, history: Mapping[str, Mapping]) -> dict:
         """Recorded buy prices {entity_id: {timestamp: price}} -> {timestamp: price}: per

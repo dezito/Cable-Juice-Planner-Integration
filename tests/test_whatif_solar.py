@@ -531,3 +531,96 @@ def test_a_period_of_zero_minutes_is_safe_and_never_more_than_the_ev_charged() -
     engine.local_energy_available = lambda **kwargs: (0.0, 4000.0, 3000.0, 1000.0)  # type: ignore[method-assign]
     value = engine.run_job(snap, engine.calc_local_energy_kwh, 60, 3.0, True).value
     assert all(0.0 <= part <= 3.0 for part in value) and value[0] <= 3.0
+
+
+def test_a_buy_price_missing_from_the_stored_prices_comes_from_the_price_sensor_history() -> None:
+    engine, snap = _solar_engine()
+    _prices(engine, RECENT)
+    engine.economy_db["prices_history"] = {ts: 2.0 for ts in engine.economy_db["prices"]}
+    for ts in list(engine.economy_db["prices"]):
+        if ts == _ts(RECENT, 11):
+            del engine.economy_db["prices"][ts]  # CJP did not store this hour itself
+    _history(engine, RECENT, 11, "11:55")
+    entry = next(iter(_ledger(engine, snap).values()))
+    assert entry["outcome"] == "counted" and entry["grid_cost"] == pytest.approx(4.0 * (2.0 - 0.2))  # the history price of that hour
+
+
+# --------------------------------------------------------------------------- from the recorder statistics
+
+from custom_components.cable_juice_planner.engine.whatif.solar import solar_from_power_hours  # noqa: E402
+
+
+def hourly(power_hours, buy=1.0, sell=0.4, production=None, assumed=-1.0, refund=0.0, last=None):
+    stamps = list(power_hours)
+    return solar_from_power_hours(
+        power_hours, dict.fromkeys(stamps, buy) if not isinstance(buy, dict) else buy,
+        dict.fromkeys(stamps, sell) if not isinstance(sell, dict) else sell, production or {}, assumed, refund,
+        last if last is not None else hour(100), "2026-02", lambda ts: "2026-01",
+    )
+
+
+def test_the_solar_the_ev_can_use_is_what_the_production_leaves_after_the_rest_of_the_house() -> None:
+    # solar 6 kW, house 3 kW of which the EV 2 kW: 5 kW are left for the EV, which only took 2 kW -> 2 kWh
+    assert hourly({hour(10): [6000.0, 3000.0, 2000.0]})["months"][0]["solar_kwh"] == 2.0
+    # solar 3 kW, house 3.5 kW of which the EV 2 kW: the rest of the house takes 1.5 kW, 1.5 kW are left -> 1.5 kWh
+    assert hourly({hour(10): [3000.0, 3500.0, 2000.0]})["months"][0]["solar_kwh"] == 1.5
+    # the house alone uses more than the production: no solar for the EV
+    assert hourly({hour(10): [1000.0, 4000.0, 2000.0]})["status"] == "unavailable"
+
+
+def test_hours_without_charging_or_without_a_price_are_left_out_and_counted() -> None:
+    hours = {hour(10): [6000.0, 3000.0, 2000.0], hour(11): [6000.0, 1000.0, 10.0], hour(12): [6000.0, 3000.0, 2000.0], hour(13): [6000.0, 3000.0, 2000.0]}
+    result = hourly(hours, buy={hour(10): 1.0, hour(11): 1.0, hour(13): 1.0}, sell={hour(10): 0.4, hour(11): 0.4, hour(12): 0.4})
+    assert result["sessions_counted"] == 1  # hour 11 is no charging hour (10 W), hour 12 has no buy price, hour 13 no sell price
+    assert result["left_out"]["missing_buy_price"] == 1 and result["left_out"]["missing_sell_price"] == 1
+
+
+def test_the_sell_value_rule_the_refund_and_the_assumed_production_price_are_applied_per_hour() -> None:
+    hours = {hour(10): [6000.0, 3000.0, 2000.0], hour(11): [6000.0, 3000.0, 2000.0]}
+    result = hourly(hours, buy=2.0, sell=0.5, production={hour(10): 0.8}, assumed=-1.0, refund=0.25)
+    month = result["months"][0]
+    # hour 10: fixed 0.8 - 0.5 = 0.3; hour 11 has no stored production price: the assumed -1 (none) gives the hourly 0.5
+    assert month["sell_value"] == pytest.approx(2.0 * 0.3 + 2.0 * 0.5)
+    assert month["grid_cost"] == pytest.approx(2 * 2.0 * (2.0 - 0.25)) and result["assumed_production_hours"] == 1
+    assert "solar_from_power_history" in result["notes"]
+
+
+def test_the_latest_hour_and_invalid_rows_are_not_used() -> None:
+    hours = {hour(10): [6000.0, 3000.0, 2000.0], hour(50): [6000.0, 3000.0, 2000.0], hour(11): [float("nan"), 3000.0, 2000.0], hour(12): [1.0, 2.0]}
+    assert hourly(hours, last=hour(20))["sessions_counted"] == 1
+
+
+def test_the_statistics_are_stored_and_the_sell_sensor_is_converted_by_the_provider_without_side_effects() -> None:
+    engine, snap = _solar_engine()
+    provider = engine.price_provider.providers[0]
+    provider.get_sell_price_entity_id = lambda: "sensor.sell"
+    provider.sell_price_details = {"kept": 1}
+    provider.calculate_sell_price = lambda moment, price: (provider.sell_price_details.update({moment: 1}), round(price * 0.5, 4))[1]  # type: ignore[method-assign]
+    recent = _ts(RECENT, 11)
+    data = {
+        "power_hours": {recent: {"solar": 6000.0, "house": 3000.0, "ev": 2000.0}, 5.0: {"solar": 1.0, "house": 1.0, "ev": 1.0}, recent + 3600: {"solar": 1.0}},
+        "sell_history": {recent: 0.8, 6.0: 9.0},
+    }
+    result = engine.run_job(snap, engine.economy_update, {"prices": {}, "windows": [], "odometer_months": {}, **data})
+    assert result.error is None, result.error
+    assert engine.economy_db["power_hours"] == {recent: [6000.0, 3000.0, 2000.0]}  # old and incomplete hours are not kept
+    assert engine.economy_db["sell_prices_history"] == {recent: 0.4}
+    assert provider.sell_price_details == {"kept": 1}  # the notes of the provider are exactly as they were
+
+
+def test_the_comparison_uses_the_recorder_statistics_when_there_are_some_and_the_sessions_otherwise() -> None:
+    engine, snap = _solar_engine()
+    engine.config["solar"]["production_price"] = -1.0
+    prior = _ts(DAY - datetime.timedelta(days=70), 11)
+    engine.economy_db["prices"] = {prior: 1.5}
+    engine.economy_db["sell_prices_history"] = {prior: 0.5}
+    engine.economy_db["power_hours"] = {prior: [6000.0, 3000.0, 2000.0]}
+    data = _data(engine, snap)
+    assert data["source"] == "power_history" and data["status"] == "ok"
+    month = data["months"][0]
+    assert month["solar_kwh"] == 2.0 and month["grid_cost"] == pytest.approx(2.0 * (1.5 - 0.2)) and month["sell_value"] == pytest.approx(1.0)
+    assert data["total"]["months"] == 1 and "production_price_assumed_current" in data["notes"]
+    # without a price for the hour it falls back to the sessions, which are empty here
+    del engine.economy_db["sell_prices_history"][prior]
+    fallback = _data(engine, snap)
+    assert fallback["source"] == "sessions" and fallback["status"] == "unavailable"

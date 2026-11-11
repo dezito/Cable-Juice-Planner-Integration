@@ -111,6 +111,8 @@ def build_replay_input(
     smart_weekdays: frozenset[int] | None = None,
     drive_history_limit: int | None = None,
     dst_copied_hours: Iterable[float] = (),
+    history_hours: Iterable[float] = (),
+    refund: float = 0.0,
 ) -> tuple[ReplayInput, dict[str, Any]]:
     """The replay input for [period_start, period_end) and what the data covered."""
     drives = list(drives)
@@ -129,7 +131,7 @@ def build_replay_input(
             invalid_prices += 1
             continue
         if _finite(ts) and ts % HOUR == 0 and _finite(price):
-            hourly[ts] = float(price)
+            hourly[ts] = float(price) - refund  # the basis CJP prices its own grid energy at (the stored prices are gross)
         else:
             invalid_prices += 1
 
@@ -162,11 +164,13 @@ def build_replay_input(
 
     needed = {h for w in chosen for h in _hours(w)}
     covered = sum(1 for h in needed if h in hourly)
+    from_history_hours = {h for h in history_hours if h in needed and h in hourly}
     legacy = (
-        sum(1 for h in needed if h in hourly and (prices_averaged_since is None or h < prices_averaged_since))
+        sum(1 for h in needed if h in hourly and h not in from_history_hours and (prices_averaged_since is None or h < prices_averaged_since))
         if needed else 0
     )
     copied = sum(1 for h in dst_copied_hours if h in needed)
+    from_history = len(from_history_hours)
     coverage = {
         "windows": len(chosen),
         "windows_outside_period": left_out["outside"],
@@ -178,6 +182,7 @@ def build_replay_input(
         "price_hours_missing": len(needed) - covered,
         "price_hours_legacy_unverified": legacy,
         "price_hours_dst_copied": copied,
+        "price_hours_from_history": from_history,
         "price_entries_invalid": invalid_prices,
         "drives": drive_count,
         "drives_in_gaps": drives_in_gaps,
@@ -193,7 +198,7 @@ def build_replay_input(
     }
     provenance = {
         "windows": "measured",
-        "prices": "measured" if not legacy and not copied else "measured_partly_unverified",
+        "prices": "measured" if not legacy and not copied and not from_history else "measured_partly_unverified",
         "drives": "measured_accepted_drives_only_net_of_public_charging",
         "public_charges": "recorded_only_counted",
         "start_soc": start_soc_source,
@@ -202,6 +207,8 @@ def build_replay_input(
     warnings = []
     if legacy:
         warnings.append("prices_legacy_unverified")  # may be the last quarter of an hour
+    if from_history:
+        warnings.append("prices_from_price_history")  # the price sensor's recorded hourly statistics, not CJP's own stored hour
     if copied:
         warnings.append("prices_dst_hour_copied")  # the repeated autumn hour has the first hour's price
     if invalid_prices or invalid_drives or invalid_public or left_out["invalid"]:

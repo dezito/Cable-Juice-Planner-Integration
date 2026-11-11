@@ -44,14 +44,14 @@ async def test_the_button_replays_the_alternative_and_publishes_it(hass: HomeAss
     assert (coordinator.settings.get("min_daily_battery_level"), coordinator.settings.get("max_recommended_charge_limit_battery_level")) == live
 
 
-async def test_without_a_start_level_it_is_unavailable_and_never_defaults(hass: HomeAssistant, loaded_entry) -> None:
+async def test_without_a_start_level_both_settings_are_calibrated_to_one_level(hass: HomeAssistant, loaded_entry) -> None:
     coordinator = loaded_entry.runtime_data
     _seed(coordinator)
     await hass.services.async_call("number", "set_value", {"entity_id": MAXIMUM, "value": 60}, blocking=True)
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value={"soc": None, "source": "unavailable"}):
         await _press(hass)
     attributes = hass.states.get(SENSOR).attributes
-    assert attributes["attempt"]["reason"] == "no_start_soc" and attributes["result"] is None
+    assert attributes["attempt"]["status"] == "ok" and attributes["result"]["calibrated_start"] is True
 
 
 async def test_both_overrides_at_zero_compare_nothing(hass: HomeAssistant, loaded_entry) -> None:

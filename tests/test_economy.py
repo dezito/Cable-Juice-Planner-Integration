@@ -276,3 +276,19 @@ def test_the_repeated_autumn_hour_is_stored_for_both_real_hours_and_marked_copie
     # the copy for the second 02:00 is kept apart: the monthly economy comparison never sees it
     assert second not in stored
     assert engine.economy_db["prices_dst_copy"] == {second: 3.0}
+
+
+def test_the_daily_economy_update_keeps_the_price_sensor_statistics_for_the_what_if_replays() -> None:
+    engine, snap = _engine()
+    stored_hour, new_hour, old_hour = _ts(DAY, 10), _ts(DAY, 11), _ts(DAY - datetime.timedelta(days=500), 11)
+    engine.economy_db["prices"] = {stored_hour: 1.5}
+    result = engine.run_job(snap, engine.economy_update, {"prices": {stored_hour: 9.0, new_hour: 2.0, old_hour: 3.0}, "windows": [], "odometer_months": {}})
+    assert result.error is None, result.error
+    history = engine.economy_db["prices_history"]
+    assert history[new_hour] == 2.0  # a price CJP did not store itself is kept
+    assert stored_hour not in history  # a stored price always wins and is not duplicated
+    assert old_hour not in history  # trimmed after 400 days
+    # once CJP stores the hour itself, the history copy goes
+    engine.economy_db["prices"][new_hour] = 2.5
+    assert engine.run_job(snap, engine.economy_update, {"prices": {new_hour: 2.0}, "windows": [], "odometer_months": {}}).error is None
+    assert new_hour not in engine.economy_db["prices_history"]

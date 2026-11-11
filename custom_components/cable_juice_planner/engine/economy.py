@@ -266,7 +266,16 @@ class Economy:
         windows.sort(key=lambda w: w["start"])
         # the price sensor's history (statistics or raw), the plan's own prices win
         prices = {float(ts): float(price) for ts, price in (data.get("prices") or {}).items()}
-        prices.update({float(ts): float(price) for ts, price in self.economy_db.get("prices", {}).items()})
+        # keep the statistics prices CJP did not store itself: the What-if replays use them for hours without a stored price
+        history = self.economy_db.setdefault("prices_history", {})
+        stored_prices = self.economy_db.get("prices", {})
+        for ts, price in prices.items():
+            if ts not in stored_prices and _finite(price):
+                history[ts] = round(price, 4)
+        prices.update({float(ts): float(price) for ts, price in stored_prices.items()})
+        oldest_price = self._economy_ts(self.now()) - ECONOMY_PRICE_DAYS * 86400
+        for ts in [ts for ts in history if float(ts) < oldest_price or ts in stored_prices]:
+            del history[ts]
         kw = int(self.config["charger"]["charging_phases"]) * float(self.config["charger"]["charging_max_amp"]) * float(self.config["charger"]["power_voltage"]) / 1000
         now = self._economy_ts(self.now())
         sessions = self._economy_sessions()
@@ -308,6 +317,10 @@ class Economy:
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
         self.mark_dirty("economy")
         self.publish_economy(data.get("odometer_months") or {})
+        try:
+            self.store_solar_statistics(data)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("The What-if solar statistics could not be stored: %s %s", err, type(err))
         self.publish_what_if_solar()
 
     def _economy_sessions(self) -> list[dict]:

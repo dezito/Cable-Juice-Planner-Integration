@@ -1093,6 +1093,9 @@
       },
       "run_what_if_settings": {
         "name": "Run what-if settings"
+      },
+      "run_what_if_no_solar": {
+        "name": "Run what-if without solar"
       }
     },
     "sensor": {
@@ -1207,6 +1210,9 @@
       },
       "what_if_solar": {
         "name": "What-if EV solar advantage"
+      },
+      "what_if_no_solar": {
+        "name": "What-if without solar"
       }
     },
     "binary_sensor": {

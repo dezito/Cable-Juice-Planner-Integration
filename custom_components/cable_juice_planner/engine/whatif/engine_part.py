@@ -100,9 +100,17 @@ class WhatIf:
         stored = self.economy_db.get("prices", {})
         # the repeated autumn hour is kept apart (not in the monthly economy): a real price always wins over its copy
         copies = {ts: price for ts, price in self.economy_db.get("prices_dst_copy", {}).items() if ts not in stored}
+        # hours CJP did not store itself: the price sensor's recorded hourly statistics (kept by the daily economy
+        # update), the last choice. A stored price or a copy always wins; the hours are counted and flagged.
+        history = {
+            float(ts): price for ts, price in self.economy_db.get("prices_history", {}).items()
+            if ts not in stored and ts not in copies and isinstance(price, (int, float)) and math.isfinite(price)
+        }
         data, coverage = build_replay_input(
             windows=self.economy_db["windows"],
-            prices={**copies, **stored},
+            prices={**history, **copies, **stored},
+            history_hours=list(history),
+            refund=self._solar_refund() or 0.0,
             drives=self.analysis_db.get("drives", []),
             public_sessions=public,
             period_start=period_start,
@@ -204,6 +212,10 @@ class WhatIf:
             "windows": {"total": result.windows_total, "replayed": result.windows_replayed, "stopped_at": result.stopped_at},
             "comparable": result.comparable,
             "comparable_reason": result.comparable_reason,
+            "method": result.method,
+            "estimated_windows": result.estimated_windows,
+            "price_estimate": _round(result.price_estimate, 4),
+            "calibrated_start": result.calibrated_start,
             "warnings": list(result.warnings),
             "notes": list(result.notes),
             "provenance": dict(result.provenance),

@@ -110,14 +110,48 @@ def test_driving_shortfall_is_unmet_demand_and_the_soc_stops_at_zero() -> None:
     assert result.max_conservation_error_kwh < 1e-6
 
 
-def test_missing_price_stops_the_replay_instead_of_filling_it() -> None:
+def test_a_connection_without_prices_is_estimated_at_the_average_of_the_priced_hours() -> None:
+    prices = {**{i: 1.0 for i in range(6)}, **{i: 3.0 for i in range(40, 46)}}  # the middle connection (20-26) has no price at all
+    result = replay(make([(0, 6), (20, 26), (40, 46)], prices))
+    assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1
+    assert result.price_estimate == pytest.approx(2.0)  # the time-weighted average of the priced hours, never a favourable value
+    assert result.windows_replayed == 3 and "prices_estimated_windows" in result.warnings
+    smart_row, asap_row = result.smart.windows[1], result.asap.windows[1]
+    assert smart_row.estimated and asap_row.estimated and not result.smart.windows[0].estimated
+    # at one flat price smart has nothing to choose between: no policy gets cheaper energy from an estimate
+    assert smart_row.cost == pytest.approx(asap_row.cost)
+    assert smart_row.cost == pytest.approx(smart_row.grid_kwh * 2.0)
+    # the measured part is shown next to the total
+    assert result.difference["measured_cost"] == pytest.approx(result.difference["cost"])
+    assert result.average_price == pytest.approx(2.0)
+
+
+def test_a_single_missing_hour_is_estimated_and_the_rest_of_the_connection_is_measured() -> None:
     prices = flat(30)
     del prices[22]
     result = replay(make([(0, 6), (20, 26), (40, 46)], {**prices, **{i: 1.0 for i in range(40, 46)}}))
-    assert result.status == "partial" and result.reason == "missing_prices"
-    assert result.windows_replayed == 1 and result.windows_total == 3
-    assert result.stopped_at == hour(20)
-    assert len(result.smart.windows) == len(result.asap.windows) == 1
+    assert result.status == "ok" and result.estimated_windows == 1 and result.windows_replayed == 3
+
+
+def test_fewer_than_half_of_the_connections_with_prices_gives_no_result() -> None:
+    prices = {i: 1.0 for i in range(6)}  # only the first of three connections is priced
+    result = replay(make([(0, 6), (20, 26), (40, 46)], prices))
+    assert result.status == "unavailable" and result.reason == "missing_prices"
+    assert replay(make([(0, 6)], {})).reason == "missing_prices"  # nothing priced at all: nothing to estimate from
+    half = replay(make([(0, 6), (20, 26)], prices))  # exactly half is enough
+    assert half.status == "ok" and half.method == "estimated"
+
+
+def test_an_unknown_start_level_makes_the_first_connection_bring_the_car_to_the_target() -> None:
+    drive = Event(ts=hour(10), kind="drive", soc_percent=30.0)
+    result = replay(make([(0, 6), (20, 26)], flat(30), events=[drive], start=None, target=80.0))
+    assert result.status == "ok" and result.method == "estimated" and result.calibrated_start
+    assert "start_level_unknown_calibrated" in result.warnings
+    first = result.smart.windows[0]
+    assert first.calibrated and first.cost == 0.0 and first.charged_kwh == 0.0 and first.soc_out == pytest.approx(80.0)
+    assert result.smart.windows[1].soc_in == pytest.approx(50.0)  # the drive is applied from the common level
+    assert result.smart.windows[1].soc_out == pytest.approx(80.0) and result.max_conservation_error_kwh < 1e-6
+    assert result.comparable and result.difference is not None
 
 
 def test_non_finite_price_counts_as_missing() -> None:
@@ -189,7 +223,6 @@ def test_terminal_adjustment_is_explicit_and_consistent() -> None:
 @pytest.mark.parametrize(
     ("kwargs", "reason"),
     [
-        ({"start": None}, "no_start_soc"),
         ({"start": math.nan}, "no_start_soc"),
         ({"start": 120.0}, "no_start_soc"),
         ({"target": 0.0}, "invalid_target"),
@@ -361,4 +394,23 @@ def test_a_drive_between_two_overlapping_gaps_is_applied_once() -> None:
 
 def test_no_connections_is_reported_before_a_missing_start_level() -> None:
     assert replay(make([], flat(2), start=None)).reason == "no_windows"
-    assert replay(make([(0, 2)], flat(2), start=None)).reason == "no_start_soc"
+    # an unknown level is calibrated, not defaulted: a single connection would only calibrate and replay nothing
+    assert replay(make([(0, 2)], flat(2), start=None)).reason == "too_few_windows"
+    assert replay(make([(0, 2), (10, 12)], flat(14), start=None)).calibrated_start
+
+
+def test_one_missing_hour_makes_the_whole_connection_estimated_so_smart_gets_no_cheap_hour_from_it() -> None:
+    # the connection 0-8 has a cheap hour 2 and an expensive hour 5, hour 6 has no price: smart must not use an estimate to look cheaper
+    prices = {0: 2.0, 1: 2.0, 2: 0.1, 3: 2.0, 4: 2.0, 5: 5.0, 7: 2.0}
+    result = replay(make([(0, 8), (20, 22)], {**prices, 20: 1.0, 21: 1.0}))
+    assert result.status == "ok" and result.estimated_windows == 1
+    first_smart, first_asap = result.smart.windows[0], result.asap.windows[0]
+    assert first_smart.estimated and first_smart.cost == pytest.approx(first_asap.cost)  # one flat price: nothing to choose between
+    assert result.difference["measured_cost"] == pytest.approx(result.difference["cost"])
+
+
+def test_the_calibrating_connection_is_not_counted_as_estimated_even_without_prices() -> None:
+    drive = Event(ts=hour(10), kind="drive", soc_percent=30.0)
+    prices = {i: 1.0 for i in range(20, 26)}  # the first connection (0-6) has no price, the second does
+    result = replay(make([(0, 6), (20, 26)], prices, events=[drive], start=None))
+    assert result.status == "ok" and result.calibrated_start and result.estimated_windows == 0 and result.method == "estimated"

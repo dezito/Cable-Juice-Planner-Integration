@@ -73,13 +73,13 @@ async def test_not_comparable_shows_no_difference_and_why(hass: HomeAssistant) -
     assert str(result["smart"]["cost"]) in out
 
 
-async def test_a_stopped_replay_says_where_and_why(hass: HomeAssistant) -> None:
+async def test_a_replay_stopped_by_a_public_charge_says_where_and_why(hass: HomeAssistant) -> None:
     attributes = _result()
     result = copy.deepcopy(attributes["result"])
-    result.update(status="partial", reason="missing_prices")
+    result.update(status="partial", reason="public_overfill")
     result["windows"] = {"total": 9, "replayed": 5, "stopped_at": result["period"]["end"] - 86400}
     out = await _render(hass, "en", {**attributes, "result": result})
-    assert "The replay stopped early at" in out and "An hour has no stored price" in out and "5 / 9" in out
+    assert "The replay stopped early at" in out and "would take the battery above 100 %" in out and "5 / 9" in out
 
 
 async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
@@ -89,7 +89,7 @@ async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
     failed = await _render(
         hass, "en", {**attributes, "attempt": {"status": "unavailable", "reason": "no_start_soc", "at": 1.0}}
     )
-    assert "could not be completed" in failed and "enter it in the field above" in failed
+    assert "could not be completed" in failed and "must be between 0 and 100 %" in failed
     assert "Latest result" in failed  # the previous successful result stays visible
     empty = await _render(hass, "en", {"result": None, "attempt": None})
     assert "No calculation yet" in empty and "Latest result" not in empty

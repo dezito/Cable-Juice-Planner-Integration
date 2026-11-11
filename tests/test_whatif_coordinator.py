@@ -46,14 +46,15 @@ async def test_the_what_if_entities_exist(hass: HomeAssistant, loaded_entry) -> 
     assert hass.states.get(f"select.{OBJECT_PREFIX}_what_if_day_selection").state == "all"
 
 
-async def test_the_button_without_a_start_level_is_unavailable_and_never_defaults(hass: HomeAssistant, loaded_entry) -> None:
+async def test_the_button_without_a_start_level_calibrates_the_first_connection_and_says_so(hass: HomeAssistant, loaded_entry) -> None:
     coordinator = loaded_entry.runtime_data
     _seed(coordinator)
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value={"soc": None, "source": "unavailable"}):
         await _press(hass)
     attributes = hass.states.get(SENSOR).attributes
-    assert attributes["attempt"]["status"] == "unavailable" and attributes["attempt"]["reason"] == "no_start_soc"
-    assert attributes["result"] is None and hass.states.get(SENSOR).state == "unknown"
+    assert attributes["attempt"]["status"] == "ok"
+    result = attributes["result"]
+    assert result["method"] == "estimated" and result["calibrated_start"] is True and "start_level_unknown_calibrated" in result["warnings"]
 
 
 async def test_the_button_reads_the_level_replays_and_publishes(hass: HomeAssistant, loaded_entry) -> None:
@@ -91,11 +92,12 @@ async def test_the_result_survives_a_failed_second_calculation(hass: HomeAssista
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value={"soc": 55.0, "source": "recorded_state"}):
         await _press(hass)
     first = hass.states.get(SENSOR).attributes["result"]["computed_at"]
-    with patch.object(type(coordinator), "_async_what_if_start_soc", return_value={"soc": None, "source": "unavailable"}):
+    coordinator.engine.analysis_db["drives"].clear()  # the demand is now unknown: the second calculation has no result
+    with patch.object(type(coordinator), "_async_what_if_start_soc", return_value={"soc": 55.0, "source": "recorded_state"}):
         await _press(hass)
     attributes = hass.states.get(SENSOR).attributes
     assert attributes["result"]["computed_at"] == first
-    assert attributes["attempt"]["status"] == "unavailable"
+    assert attributes["attempt"]["status"] == "unavailable" and attributes["attempt"]["reason"] == "no_drives"
 
 
 async def test_the_start_level_comes_from_the_user_first_and_is_never_invented(hass: HomeAssistant, loaded_entry) -> None:

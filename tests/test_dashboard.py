@@ -659,7 +659,7 @@ def test_what_if_view_holds_the_subscription_comparison() -> None:
     view = yaml.safe_load(text)["views"][3]
     assert view["path"] == "what-if" and view["title"] == "What-if" and view["icon"] == "mdi:flask-outline"
     headings = [c["heading"] for c in _cards(view) if c.get("type") == "heading"]
-    assert headings == ["Daglig smart opladning til det maksimalt anbefalede niveau", "Reserve og maksimalt niveau", "Bilens solenergi erstattet af nettet", "Fast månedlig ladepris"]
+    assert headings == ["Daglig smart opladning til det maksimalt anbefalede niveau", "Reserve og maksimalt niveau", "Uden sol: planlagt fra nettet", "Bilens solenergi erstattet af nettet", "Fast månedlig ladepris"]
     entities = [row["entity"] for c in _cards(view) if c.get("type") == "entities" for row in c["entities"]]
     assert entities == [
         "number.cjp_tesla_what_if_days", "number.cjp_tesla_what_if_target_battery_level",
@@ -668,7 +668,9 @@ def test_what_if_view_holds_the_subscription_comparison() -> None:
         "button.cjp_tesla_run_what_if",
         "number.cjp_tesla_what_if_days", "number.cjp_tesla_what_if_start_battery_level",
         "number.cjp_tesla_what_if_min_daily_battery_level", "number.cjp_tesla_what_if_max_recommended_battery_level",
-        "button.cjp_tesla_run_what_if_settings", "number.cjp_tesla_subscription_monthly_price",
+        "button.cjp_tesla_run_what_if_settings",
+        "number.cjp_tesla_what_if_days", "number.cjp_tesla_what_if_start_battery_level", "button.cjp_tesla_run_what_if_no_solar",
+        "number.cjp_tesla_subscription_monthly_price",
     ]
     markdown = "\n".join(c.get("content", "") for c in _cards(view) if c.get("type") == "markdown")
     # Read more covers the simulated nature, the price field, completed months and the recorded-history limit

@@ -67,17 +67,20 @@ def test_the_same_settings_are_not_a_comparison() -> None:
     assert equal.value["reason"] == "no_change"
 
 
-def test_a_missing_start_level_is_never_defaulted_and_keeps_the_saved_result() -> None:
+def test_a_missing_start_level_calibrates_both_settings_and_a_failed_run_keeps_the_saved_result() -> None:
     engine, snap = _engine()
     _seed(engine)
     snap = snapshot_with(snap, {"what_if_min_daily_battery_level": 50.0})
     _, first = _run(engine, snap)
     saved = engine.economy_db["what_if_settings"]
-    _, failed = _run(engine, snap, {"soc": None, "source": "unavailable"})
-    assert failed.value["status"] == "unavailable" and failed.value["reason"] == "no_start_soc"
-    assert engine.economy_db["what_if_settings"] is saved
-    assert failed.states["what_if_settings"] == first.value["difference"]["adjusted_cost"]
-    assert failed.attributes["what_if_settings"]["attempt"]["reason"] == "no_start_soc"
+    _, estimated = _run(engine, snap, {"soc": None, "source": "unavailable"})
+    assert estimated.value["status"] == "ok" and estimated.value["calibrated_start"] is True and estimated.value["method"] == "estimated"
+    _, failed = _run(engine, snap, {"soc": 50.0, "source": "entered", "first_window_start": 1.0})
+    assert failed.value["status"] == "unavailable" and failed.value["reason"] == "start_level_stale"
+    assert engine.economy_db["what_if_settings"] is not saved  # the estimated run replaced it, the failed one did not
+    assert failed.states["what_if_settings"] == estimated.value["difference"]["adjusted_cost"]
+    assert failed.attributes["what_if_settings"]["attempt"]["reason"] == "start_level_stale"
+    assert first.value["method"] == "strict"
 
 
 def test_no_recorded_drive_that_can_be_applied_means_unknown_demand() -> None:
@@ -88,14 +91,13 @@ def test_no_recorded_drive_that_can_be_applied_means_unknown_demand() -> None:
     assert result.value["status"] == "unavailable" and result.value["reason"] == "no_drives"
 
 
-def test_a_missing_price_stops_the_replay_and_is_reported() -> None:
+def test_a_connection_without_prices_is_estimated_and_labelled() -> None:
     engine, snap = _engine()
     _seed(engine, skip_price_day=3)
     _, result = _run(engine, snapshot_with(snap, {"what_if_min_daily_battery_level": 50.0}))
     r = result.value
-    assert r["status"] == "partial" and r["reason"] == "missing_prices"
-    assert 0 < r["windows"]["replayed"] < 4 and r["windows"]["stopped_at"] is not None
-    assert result.states["what_if_settings"] is None  # no whole-period figure from a partial replay
+    assert r["status"] == "ok" and r["method"] == "estimated" and r["estimated_windows"] == 1 and r["price_estimate"] is not None
+    assert result.states["what_if_settings"] == r["difference"]["adjusted_cost"]
 
 
 def test_scenario_a_and_b_keep_their_own_results() -> None:

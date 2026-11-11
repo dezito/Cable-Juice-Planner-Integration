@@ -3182,7 +3182,7 @@ views:
         {% set r = a.result %}
         {% set at = a.attempt %}
         {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'public_overfill': '@@what_if_reason_public_overfill@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@'} %}
         {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@', 'departure_buffer_not_modelled': '@@what_if_note_departure_buffer_not_modelled@@'} %}
         {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
         {% if at and at.status == 'running' -%}
@@ -3193,7 +3193,7 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ r.smart.start_soc }} % ({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3297,7 +3297,7 @@ views:
         {% set r = a.result %}
         {% set at = a.attempt %}
         {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'public_overfill': '@@what_if_reason_public_overfill@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@'} %}
         {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'modelled_policy': '@@what_if_note_modelled_policy@@', 'demand_from_recorded_drives': '@@what_if_note_demand_from_recorded_drives@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@', 'extra_top_ups_not_modelled': '@@what_if_note_extra_top_ups_not_modelled@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@'} %}
         {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
         {% if at and at.status == 'running' -%}
@@ -3308,7 +3308,7 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ r.baseline.start_soc }} % ({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3360,6 +3360,121 @@ views:
         </details>
         {%- endif %}
       grid_options: *id001
+  # Scenario D: the planned charging with the grid only, no solar, over the selected period (engine/whatif/plan_part.py)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@what_if_ns_title@@'
+      icon: mdi:weather-sunny-off
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@what_if_ns_explain@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_what_if_days
+        name:
+          type: entity
+      - entity: number.cjp_what_if_start_battery_level
+        name:
+          type: entity
+      - entity: button.cjp_run_what_if_no_solar
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      card_mod:
+        style:
+          .: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+          ha-markdown$: |
+            table, th, td {
+              border: none !important;
+            }
+            table {
+              border-collapse: collapse;
+            }
+            table tbody tr:not(:only-child):nth-child(odd) td {
+              background: rgba(127, 127, 127, 0.08);
+            }
+      content: |-
+        {% set a = states.sensor.cjp_what_if_no_solar.attributes %}
+        {% set r = a.result %}
+        {% set at = a.attempt %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'public_overfill': '@@what_if_reason_public_overfill@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@'} %}
+        {% set notes = {'grid_only_no_solar': '@@what_if_ns_note_grid_only@@', 'hindsight': '@@what_if_note_hindsight@@', 'modelled_policy': '@@what_if_note_modelled_policy@@', 'demand_from_recorded_drives': '@@what_if_note_demand_from_recorded_drives@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@', 'extra_top_ups_not_modelled': '@@what_if_note_extra_top_ups_not_modelled@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@'} %}
+        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% if at and at.status == 'running' -%}
+        <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
+        {%- elif at and at.status == 'unavailable' -%}
+        <ha-alert alert-type="warning">@@what_if_failed@@: {{ reasons.get(at.reason, at.reason) }}</ha-alert>
+        {%- endif %}
+        {% if not r -%}
+        <ha-alert alert-type="info">@@what_if_ns_no_result@@</ha-alert>
+        {%- else -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }}) &middot; @@what_if_b_reserve@@ {{ r.settings.reserve | round(0) }} % &middot; @@what_if_b_maximum@@ {{ r.settings.maximum | round(0) }} %
+
+        {% if r.method == 'estimated' -%}
+        <ha-alert alert-type="info">@@what_if_ns_method_estimated@@</ha-alert>
+        {%- endif %}
+        {% set p = r.plan %}
+        {% set rec = r.recorded %}
+        | | @@what_if_ns_col_planned@@ | @@what_if_ns_col_recorded@@ |
+        |:---|---:|---:|
+        | @@what_if_row_cost@@ | {{ p.cost }} @@valuta@@ | {{ (rec.cost ~ ' @@valuta@@') if rec and rec.cost is not none else '&ndash;' }} |
+        | @@what_if_row_grid@@ | {{ p.grid_kwh }} kWh | {{ (rec.kwh ~ ' kWh') if rec and rec.sessions else '&ndash;' }} |
+        | @@what_if_ns_row_unit@@ | {{ (p.unit ~ ' @@valuta@@') if p.unit is not none else '&ndash;' }} | {{ (rec.unit ~ ' @@valuta@@') if rec and rec.unit is not none else '&ndash;' }} |
+        | @@what_if_ns_row_solar@@ | 0 kWh | {{ (rec.solar_kwh ~ ' kWh') if rec and rec.sessions else '&ndash;' }} |
+        | @@what_if_row_loss@@ | {{ p.loss_kwh }} kWh | |
+        | @@what_if_row_unmet_driving@@ | {{ p.unmet_driving_kwh }} kWh | |
+        | @@what_if_row_lowest@@ | {{ p.lowest_soc }} % | |
+        | @@what_if_b_row_arrivals_below@@ | {{ p.arrivals_below_reserve }} / {{ p.arrivals }} | |
+        | @@what_if_b_row_lowest_arrival@@ | {{ p.lowest_arrival }} % | |
+        | @@what_if_row_final@@ | {{ p.final_soc }} % | |
+
+        {% if r.estimate -%}
+        **@@what_if_ns_estimate@@:** @@what_if_ns_without_solar@@ {{ r.estimate.cost_without_solar }} @@valuta@@ ({{ r.estimate.kwh }} kWh &times; {{ r.estimate.unit }}) &middot; @@what_if_ns_col_recorded@@ {{ r.estimate.recorded_cost }} @@valuta@@ &middot; **@@what_if_ns_advantage@@ {{ r.estimate.solar_advantage }} @@valuta@@**
+        {%- elif not rec or not rec.sessions -%}
+        <ha-alert alert-type="info">@@what_if_ns_no_recorded@@</ha-alert>
+        {%- endif %}
+        {% if rec and rec.powerwall_kwh -%}
+
+        @@what_if_d_powerwall@@: {{ rec.powerwall_kwh }} kWh
+        {%- endif %}
+        {% if r.estimated_windows and r.price_estimate is not none -%}
+
+        @@what_if_price_estimate@@: {{ r.price_estimate }} @@valuta@@
+        {%- endif %}
+        {% if r.months -%}
+
+        **@@what_if_months@@**
+
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_ns_col_planned@@ | @@what_if_ns_col_recorded@@ |
+        |:---|---:|---:|---:|
+        {% for m in r.months | reverse -%}
+        | **{{ m.month }}** | {{ m.windows }} | {{ m.planned_kwh }} kWh / {{ m.planned_cost }} @@valuta@@ | {{ m.recorded_kwh }} kWh / {{ (m.recorded_cost ~ ' @@valuta@@') if m.recorded_cost is not none else '&ndash;' }} |
+        {% endfor %}
+        {%- endif %}
+        **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
+        {% if r.warnings -%}
+
+        {% for w in r.warnings -%}
+        <ha-alert alert-type="warning">{{ warnings.get(w, w) }}</ha-alert>
+        {% endfor %}
+        {%- endif %}
+
+        <details><summary>@@what_if_assumptions@@</summary>
+
+        {% for n in r.notes -%}
+        - {{ notes.get(n, n) }}
+        {% endfor %}
+        </details>
+        {%- endif %}
+      grid_options: *id001
   # Scenario D: the EV's solar energy replaced by grid energy at the same charging times (engine/whatif/solar.py)
   - type: grid
     column_span: 2
@@ -3392,7 +3507,7 @@ views:
         {% set r = a.result %}
         {% set reasons = {'no_solar_configured': '@@what_if_d_reason_no_solar_configured@@', 'no_price_provider': '@@what_if_d_reason_no_price_provider@@', 'waiting_for_new_sessions': '@@what_if_d_reason_waiting_for_new_sessions@@', 'no_sell_prices': '@@what_if_d_reason_no_sell_prices@@', 'no_buy_prices': '@@what_if_d_reason_no_buy_prices@@', 'no_solar_sessions': '@@what_if_d_reason_no_solar_sessions@@', 'internal_error': '@@what_if_reason_internal_error@@'} %}
         {% set left = {'public': '@@what_if_d_left_public@@', 'still_charging': '@@what_if_d_left_still_charging@@', 'invalid': '@@what_if_d_left_invalid@@', 'without_solar': '@@what_if_d_left_without_solar@@', 'before_energy_fix': '@@what_if_d_left_before_energy_fix@@', 'missing_buy_price': '@@what_if_d_left_missing_buy_price@@', 'missing_sell_price': '@@what_if_d_left_missing_sell_price@@', 'not_captured': '@@what_if_d_left_not_captured@@'} %}
-        {% set notes = {'ev_solar_exported_instead': '@@what_if_d_note_ev_solar_exported_instead@@', 'solar_spread_evenly_over_session': '@@what_if_d_note_solar_spread_evenly_over_session@@', 'home_battery_kept_as_recorded': '@@what_if_d_note_home_battery_kept_as_recorded@@', 'no_whole_house_result': '@@what_if_d_note_no_whole_house_result@@', 'replanned_without_solar_not_modelled': '@@what_if_d_note_replanned_without_solar_not_modelled@@', 'no_solar_production_not_modelled': '@@what_if_d_note_no_solar_production_not_modelled@@', 'recorded_sessions_only': '@@what_if_d_note_recorded_sessions_only@@'} %}
+        {% set notes = {'ev_solar_exported_instead': '@@what_if_d_note_ev_solar_exported_instead@@', 'solar_spread_evenly_over_session': '@@what_if_d_note_solar_spread_evenly_over_session@@', 'home_battery_kept_as_recorded': '@@what_if_d_note_home_battery_kept_as_recorded@@', 'no_whole_house_result': '@@what_if_d_note_no_whole_house_result@@', 'replanned_without_solar_not_modelled': '@@what_if_d_note_replanned_without_solar_not_modelled@@', 'no_solar_production_not_modelled': '@@what_if_d_note_no_solar_production_not_modelled@@', 'recorded_sessions_only': '@@what_if_d_note_recorded_sessions_only@@', 'solar_from_power_history': '@@what_if_d_note_solar_from_power_history@@', 'production_price_assumed_current': '@@what_if_d_note_production_price_assumed_current@@'} %}
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_d_reason_no_solar_sessions@@</ha-alert>
         {%- else -%}
@@ -3400,7 +3515,7 @@ views:
         <ha-alert alert-type="info">{{ reasons.get(r.reason, r.reason) }}</ha-alert>
         {%- endif %}
         {% if r.months -%}
-        | @@economy_month@@ | @@what_if_d_col_sessions@@ | @@what_if_d_col_solar@@ | @@what_if_d_col_grid@@ | @@what_if_d_col_sell@@ | @@what_if_d_col_advantage@@ |
+        | @@economy_month@@ | {{ '@@what_if_d_col_hours@@' if r.source == 'power_history' else '@@what_if_d_col_sessions@@' }} | @@what_if_d_col_solar@@ | @@what_if_d_col_grid@@ | @@what_if_d_col_sell@@ | @@what_if_d_col_advantage@@ |
         |:---|---:|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
         {% if m.status == 'completed' -%}
