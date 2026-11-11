@@ -56,6 +56,79 @@ async def test_a_result_is_shown_with_both_columns_months_and_assumptions(hass: 
     assert "Kun til reference" in out and "1 sessioner" in out  # CJP's own recorded cost: a labelled reference only
 
 
+async def test_the_table_has_a_current_settings_column_and_the_settings_rows(hass: HomeAssistant) -> None:
+    attributes = _result()
+    r = attributes["result"]
+    out = await _render(hass, "en", attributes)
+    # the third column replays the current reserve and maximum; the rows show what was used and what is set now
+    # the current settings come first, as the reference; smart and immediate charging each have a difference against it
+    assert "| Current settings | Smart | Immediate charging | Smart vs current settings | Immediate vs current settings |" in out
+    assert str(r["current"]["cost"]) in out and str(r["current"]["lowest_soc"]) in out
+    same = r["current"]["same"]
+    assert f"{round(same['smart_cost'] - same['current_cost'], 2)} " in out and f"{round(same['asap_cost'] - same['current_cost'], 2)} " in out
+    # the same per month, and the smart - immediate difference (with the battery level adjustment) below the table
+    month = r["months"][0]
+    assert month["current_cost"] is not None and str(r["difference"]["adjusted_cost"]) in out
+    assert f"{round(month['same_smart_cost'] - month['current_cost'], 2)} " in out
+    assert "Target battery level" in out and "Smart charging days" in out and "Daily reserve at homecoming" in out
+    assert f"{round(r['settings']['reserve'])} %" in out and "one connection less" in out
+    # a saved result from before the column existed (or a replay that could not be made) shows dashes, never "None"
+    old = copy.deepcopy(attributes)
+    old["result"]["current"] = None
+    old["result"]["settings"] = None
+    out = await _render(hass, "en", old)
+    assert "None" not in out and "Undefined" not in out and "one connection less" not in out and "&ndash;" in out.replace("–", "&ndash;")
+
+
+async def test_the_month_rows_form_one_markdown_table_without_blank_lines_between_them(hass: HomeAssistant) -> None:
+    attributes = _result()
+    out = await _render(hass, "en", attributes)
+    rows = [line for line in out.splitlines() if re.match(r"\| \*\*\d{4}-\d{2}\*\*", line)]
+    assert rows and len(rows) == len(attributes["result"]["months"])
+    start = out.index(rows[0])
+    block = out[out.rindex("\n\n", 0, start) + 2: out.index(rows[-1]) + len(rows[-1])]
+    # header, separator and every row follow each other directly (a blank line would end the table)
+    assert "\n\n" not in block and block.count("\n") == len(rows) + 1
+    assert all(line.count("|") == block.splitlines()[0].count("|") for line in block.splitlines())
+    # the month that holds the last connection has one connection less for the current settings: marked with an asterisk
+    last = next(m for m in attributes["result"]["months"] if m["same_windows"] != m["windows"])
+    assert any(line.startswith(f"| **{last['month']}**") and "*" in line.split("**", 2)[2] for line in rows)
+
+
+def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    text = render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing)
+    assert "@@" not in text
+    view = yaml.safe_load(text)["views"][3]
+    charts = [c for c in _cards(view) if c.get("type") == "custom:apexcharts-card"]
+    what_if, settings, no_solar, solar = (f"sensor.cjp_tesla_what_if{suffix}" for suffix in ("", "_settings", "_no_solar", "_solar"))
+    # (title, type, series entities, series names) in the order of the view: the scenarios in turn
+    assert [(c["header"]["title"], c["all_series_config"]["type"], {s["entity"] for s in c["series"]}, [s["name"] for s in c["series"]]) for c in charts] == [
+        ("Cost per month", "column", {what_if}, ["Current settings", "Smart", "Immediate charging"]),
+        ("Difference against the current settings per month", "column", {what_if}, ["Smart vs current settings", "Immediate vs current settings"]),
+        ("Cumulative saving of smart against immediate charging per month", "line", {what_if}, ["Saving"]),
+        ("Current and alternative settings: cost per month", "column", {settings}, ["Current settings", "Alternative"]),
+        ("Cumulative difference per month (alternative - current)", "line", {settings}, ["Difference"]),
+        ("Without solar and recorded: cost per month", "column", {no_solar}, ["Current settings, from the grid (no solar)", "Recorded (with solar)"]),
+        ("Price per kWh per month", "line", {no_solar}, ["Current settings, from the grid (no solar)", "Recorded (with solar)"]),
+        ("Energy per month", "column", {no_solar}, ["Current settings, from the grid (no solar)", "Recorded (with solar)"]),
+        ("Solar energy: grid cost against sale value per month", "column", {solar}, ["At the grid price", "Sale it replaced"]),
+        ("Cumulative solar advantage (completed months)", "line", {solar}, ["Solar advantage"]),
+        ("Recorded cost against the fixed price per month", "line", {"sensor.cjp_tesla_economy"}, ["Recorded cost", "Subscription"]),
+    ]
+    for chart in charts:
+        # a chart reads the saved result of its sensor and shows nothing without one; never a point without a value
+        assert chart["graph_span"] in ("400d", "365d") and chart["now"] == {"show": False}
+        for series in chart["series"]:
+            code = series["data_generator"]
+            assert "entity.attributes" in code and ("getTime()" in code or "* 1000" in code)
+            assert ".filter(" in code and "Number.isFinite" in code
+            assert code.count("{") == code.count("}") and code.count("(") == code.count(")") and code.count("[") == code.count("]")
+    # a chart for each month field the result sensors publish
+    fields = {name for c in charts for s in c["series"] for name in re.findall(r"m\.(\w+_cost)", s["data_generator"])}
+    assert {"current_cost", "smart_cost", "asap_cost", "same_smart_cost", "same_asap_cost", "baseline_cost", "alternative_cost", "planned_cost", "recorded_cost"} <= fields
+
+
 async def test_every_language_renders_the_card_without_missing_texts(hass: HomeAssistant) -> None:
     attributes = _result()
     for language in ("da", "de", "en", "en-GB", "pl", "uk"):

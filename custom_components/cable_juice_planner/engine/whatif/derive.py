@@ -272,7 +272,8 @@ def derive_windows(
     if plan is not None and tz is not None:
         planned = derive_all(hours, lengths, plan, tz)
         planned_check = validate(planned, measured, hours)
-        if planned_check["passed"]:
+        # both versions must pass: today's plan never rescues an estimate that did not hold up without it
+        if planned_check["passed"] and validation["passed"]:
             everything, validation, bounds = planned, planned_check, True
     if not validation["passed"]:
         return result("unavailable", "not_validated", validation=validation)

@@ -74,10 +74,14 @@ def test_the_model_is_checked_against_the_measured_connections_before_it_is_used
     measured, drives = week(MONDAY + datetime.timedelta(days=28), 6)
     before = local(MONDAY, 0)
     ok = model_connections(plan(), TZ, measured, drives, before, measured[0][0], measured[0][0])
-    assert ok["status"] == "ok" and ok["validation"]["passed"] and ok["validation"]["use_ratio"] == pytest.approx(1.0, abs=0.1)
+    assert ok["status"] == "ok" and ok["validation"]["passed"]
     assert len(ok["windows"]) >= 18  # four weeks of workday evenings (the Friday one is the weekend)
     assert all(window[1] <= measured[0][0] for window in ok["windows"])
-    assert {round(u, 1) for _, u in ok["drives"]} <= {9.0, 15.0}
+    # the weekend the model cuts to the long length has its days off in the gap; the check counts them (51 % a week, not 45 %)
+    # and the percent per km is brought to the recorded use, so the modelled use over the measured period equals the recorded one
+    assert ok["validation"]["use_ratio"] == pytest.approx(51 / 45, abs=0.05)
+    assert ok["percent_per_km"] == pytest.approx(0.3 / (51 / 45), abs=0.01)
+    assert all(min(abs(u - 9 * 45 / 51), abs(u - 15 * 45 / 51)) < 0.5 for _, u in ok["drives"])
     # a plan that says something else than what was measured is not used (the car leaves at noon, not at 07:00)
     wrong = model_connections(plan(departure=12.0), TZ, measured, drives, before, measured[0][0], measured[0][0])
     assert wrong["status"] == "unavailable" and wrong["reason"] == "not_validated" and wrong["windows"] == []
@@ -125,6 +129,13 @@ def test_the_time_before_the_first_record_is_modelled_from_the_plan_and_labelled
     assert data.provenance["windows"] == "measured_and_modelled_from_work_plan"
     # the level at the first modelled connection is unknown: the entered one (here none) is what the replay gets, never one made up
     assert data.start_soc is None and data.provenance["start_soc"] == "unavailable"
+    # an entered level belongs to the first measured connection: it is not applied to a modelled one
+    entered, _ = build(windows, drives, start_soc=50.0, start_soc_source="entered")
+    assert entered.start_soc is None and entered.provenance["start_soc"] == "unavailable"
+    # a measured connection that is left out of the replay (before the period) is a time that is recorded: no model over it
+    early = [(windows[0][0] - 60 * 86400.0, windows[0][0] - 60 * 86400.0 + 14 * HOUR), *windows]
+    _, covered = build(early, drives, period_start=windows[0][0] - 21 * 86400.0)
+    assert covered["windows_modelled"] == 0 and covered["windows_outside_period"] == 1
     result = replay(data)
     assert result.status == "ok", result.reason
     assert result.calibrated_start
@@ -154,6 +165,6 @@ def test_the_plan_cuts_the_estimated_connections_to_the_planned_homecoming_and_d
     assert (bounded["windows"][0]["start"], bounded["windows"][0]["end"]) == (at(0, 17.5), at(1, 6.5))
     # levels still come from the hours of the statistics, and the first hour of the statistics is reported
     assert bounded["windows"][0]["soc_in"] == 60.0 and bounded["statistics_from"] == min(rows)
-    # a plan that would cut off the observed charging (home at 02:00) does not: the connection is left as observed
-    late = derive_windows(rows, measured_days(20, 40), plan(departure=6.5, homecoming=2.0, workdays=range(7)), utc)
-    assert late["windows"][0]["start"] == at(0, 17)
+    # a plan that would cut off the observed charging (gone at 02:00, the charging is 01-04) does not: the connection is left as observed
+    early = derive_windows(rows, measured_days(20, 40), plan(departure=2.0, homecoming=17.5, workdays=range(7)), utc)
+    assert (early["windows"][0]["start"], early["windows"][0]["end"]) == (at(0, 17), at(1, 7))

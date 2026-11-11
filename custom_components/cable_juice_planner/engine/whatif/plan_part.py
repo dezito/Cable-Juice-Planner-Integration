@@ -108,6 +108,7 @@ class WhatIfNoSolar:
             "provenance": dict(result.provenance),
             "conservation_error_kwh": _round(result.max_conservation_error_kwh, 9),
             "plan": self._plan_policy(result),
+            "plan_measured": None,
             "average_price": _round(result.average_price, 4),
             "recorded": None,
             "estimate": None,
@@ -121,10 +122,15 @@ class WhatIfNoSolar:
         # estimated from the battery level statistics (a different, possibly much longer and differently priced, span)
         measured_rows = [w for w in result.plan.windows if not w.derived] or result.plan.windows
         # the calibrating first connection charges nothing in the plan: the recorded span starts after it
-        first = measured_rows[1].start if result.plan.calibrated and len(measured_rows) > 1 else measured_rows[0].start
+        # (the calibrating first connection is a measured one only when no estimated or modelled connection comes before it)
+        skip_first = result.plan.calibrated and not result.plan.windows[0].derived and len(measured_rows) > 1
+        first = measured_rows[1].start if skip_first else measured_rows[0].start
         last = result.plan.windows[-1].end
         measured_grid = sum(w.grid_kwh for w in measured_rows)
-        measured_unit = _round(sum(w.cost for w in measured_rows) / measured_grid, 3) if measured_grid > 1e-9 else None
+        measured_cost = sum(w.cost for w in measured_rows)
+        measured_unit = _round(measured_cost / measured_grid, 3) if measured_grid > 1e-9 else None
+        # the same span as the recorded charging it is compared with (the plan over the whole period is in "plan")
+        published["plan_measured"] = {"cost": _round(measured_cost, 2), "grid_kwh": _round(measured_grid, 3), "unit": measured_unit}
         published["windows"]["derived"] = sum(1 for w in result.plan.windows if w.derived)
         inside = [s for s in sessions if first <= s["ts"] < last and not s["public"]]
         kwh = sum(s["kwh"] for s in inside)

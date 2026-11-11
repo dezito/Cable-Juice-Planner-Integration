@@ -292,6 +292,24 @@ the recorded history lacks small drives, standby drain, house limits and the sol
 against it would reward buying less energy. CJP's recorded cost and energy in the same span are shown only as
 a labelled reference.
 
+Charts under the results (they need the apexcharts-card, like the other charts) show the cost per month of the
+current settings, smart and immediate charging, and the difference of smart and immediate charging against the
+current settings per month (over the connections all three cover). A line chart shows the cumulative saving of smart
+charging per month. The settings comparison
+has a monthly cost chart and a cumulative difference line, the comparison without solar monthly cost, price per kWh
+and energy charts (planned and recorded), the solar comparison monthly grid cost against sale value and the
+cumulative solar advantage, and the fixed monthly price a chart of the recorded cost against the price per month.
+A chart without a result, or without a value in a month, shows nothing for it; the cumulative lines of the
+comparisons that need equal energy are empty when the result is not comparable.
+
+The table lists the *Current settings* column first, as the reference, then smart and immediate charging, each with
+its difference against the current settings. It replays your current daily reserve and maximum recommended level (each
+connection charged in the cheapest hours to what the next recorded drive needs plus the reserve, capped at the
+maximum, the same model as the settings comparison below) over the same period, so the table shows the two
+what-if ways next to what the settings you run now would have done. It leaves out the last connection (what the
+next drive needs is not known yet), so it covers one connection less; the card says so. If that replay cannot be
+made the column shows dashes.
+
 Settings on the What-if view (they never change the live plan or settings):
 
 | Setting | Meaning |
@@ -457,19 +475,27 @@ set now, not as it was in the past) is used in two ways:
 
 - *as a bound* on the estimated connections: a connection is not allowed to begin before the planned homecoming of
   its first day or end after the planned departure of its last one, as long as it keeps the observed charging. The
-  plan can only shorten a connection. It is used when that version also passes the check against the measured
-  connections, otherwise the connections are used as the statistics show them (the coverage says which);
+  plan can only shorten a connection. It is used only when the connections with and without the plan both pass the
+  check against the measured connections (today's plan never rescues an estimate that did not hold up without it),
+  otherwise the connections are used as the statistics show them (the coverage says which). A later start set by the
+  plan also moves where immediate charging begins, which can change the comparison: the check looks at the departure
+  time, not at the start;
 - *as a model* for the time before any record: before the first estimated or measured connection, and before the
   battery level statistics begin, the car is home from the homecoming time until the next workday's departure (a
   weekend in one stay, kept within the length of the longer measured connections), and the battery use between two
   connections is the distance of the days in the gap (a workday's when it leaves in the gap, a day off's when its
   noon is in it) times the battery percent per km of the recorded drives (the median, at least 10 drives; never a
-  default). The battery level at the first modelled connection is not known, so the level entered or read for the
-  period is used, else the first connection only brings the car to a common level, like any unknown start. The model
-  is only used when, run over the period CJP measured, it passes the same check as the statistics (it finds the
-  measured connections, does not claim time the car was away, ends them at about the right time) and its battery use
-  is between 0.6 and 1.6 times the recorded drives'. It is a model of what the plan says today, not a record: the
-  warning says so, and the card shows how many of the estimated connections were modelled.
+  default). Nothing records the battery level at a modelled connection, and a level entered or read for the period
+  belongs to the first measured connection, so with modelled connections the first one only brings the car to a
+  common level (nothing in it is counted), like any unknown start, and the card says so. The model never covers a
+  time in which a measured connection exists, also one that is left out of the replay. It is only used when, run over
+  the period CJP measured, it passes the same check as the statistics (it finds the measured connections, does not
+  claim time the car was away, ends them at about the right time) and its battery use, counted in the gaps between
+  the modelled connections, is between 0.6 and 1.6 times the recorded drives' in those same gaps. It is a model of
+  what the plan says today, not a record: the warning says so, and the card shows how many of the estimated
+  connections were modelled. The comparison without solar compares the recorded charging with the plan over the
+  measured connections only (the cost, energy and price per kWh rows); the monthly table and the other rows cover the
+  whole period.
 
 Every result table also shows the settings it used: the target battery level (and whether it is the live setting
 or the temporary target) and the days with smart charging for the daily smart charging comparison, the current and

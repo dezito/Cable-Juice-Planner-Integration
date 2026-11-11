@@ -19,7 +19,7 @@ from ..soc_power import planning_power_cap
 from ..analysis.helpers import ANALYSIS_DRIVES
 from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
-from .replay import PolicyResult, ReplayResult, replay
+from .replay import PolicyResult, ReplayResult, replay, replay_plan
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -208,6 +208,7 @@ class WhatIf:
         else:
             result = replay(data)
         published = self._what_if_result(result, coverage, now, period_start, period_end, target, target_source, sessions)
+        self._what_if_add_current(published, data, result)
         self._what_if_attempt(result.status, result.reason)
         if result.status in ("ok", "partial"):
             # only a successful calculation replaces the saved one
@@ -219,6 +220,64 @@ class WhatIf:
     # ------------------------------------------------------------------ #
     # result
     # ------------------------------------------------------------------ #
+
+    def _what_if_add_current(self, published: dict[str, Any], data: Any, result: ReplayResult) -> None:
+        """The third column of the table: your current daily reserve and maximum recommended level replayed over the same
+        period (the planned grid-only charging of Scenario B/D, shared replay). It leaves out the last connection (the next
+        drive's need is not known), so it covers one connection less. Never changes anything live; a failure only leaves
+        the column out, and the reason is kept."""
+        published["settings"] = None
+        published["current"] = None
+        published["current_reason"] = None
+        if result.status not in ("ok", "partial"):
+            return
+        try:
+            live, _, _ = self.what_if_settings_values()
+            published["settings"] = {"reserve": live.reserve, "maximum": live.maximum}
+            plan = replay_plan(data, live)
+            if plan.status == "ok":
+                published["current"] = {
+                    **self._plan_policy(plan), "windows_replayed": plan.windows_replayed, "estimated_windows": plan.estimated_windows,
+                }
+                self._what_if_same_span(published, plan.plan, result)
+            else:
+                published["current_reason"] = plan.reason
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("What-if: the current settings column could not be calculated: %s", err)
+            published["current_reason"] = "internal_error"
+
+    def _what_if_same_span(self, published: dict[str, Any], current: PolicyResult | None, result: ReplayResult) -> None:
+        """The differences against the current settings over the connections all three cover: the current settings leave out
+        the last connection, so a difference of the plain totals would hold one connection more for smart and immediate
+        charging. Totals and per month; the month rows keep their plain numbers too."""
+        if current is None or result.smart is None or result.asap is None:
+            return
+        count = min(len(current.windows), len(result.smart.windows), len(result.asap.windows))
+        if count == 0:
+            return
+        pairs = list(zip(current.windows[:count], result.smart.windows[:count], result.asap.windows[:count]))
+        total = {"windows": count}
+        for name, index in (("current", 0), ("smart", 1), ("asap", 2)):
+            rows = [p[index] for p in pairs]
+            total[f"{name}_cost"] = _round(sum(w.cost for w in rows), 3)
+            total[f"{name}_grid_kwh"] = _round(sum(w.grid_kwh for w in rows), 3)
+            total[f"{name}_loss_kwh"] = _round(sum(w.loss_kwh for w in rows), 3)
+        published["current"]["same"] = total
+        months: dict[str, dict[str, float]] = {}
+        for cur, smart, asap in pairs:
+            month = months.setdefault(
+                self._economy_local(smart.end).strftime("%Y-%m"), {"windows": 0, "current": 0.0, "smart": 0.0, "asap": 0.0}
+            )
+            month["windows"] += 1
+            month["current"] += cur.cost
+            month["smart"] += smart.cost
+            month["asap"] += asap.cost
+        for row in published.get("months") or []:
+            same = months.get(row["month"])
+            row["current_cost"] = _round(same["current"], 3) if same else None
+            row["same_windows"] = int(same["windows"]) if same else 0
+            row["same_smart_cost"] = _round(same["smart"], 3) if same else None
+            row["same_asap_cost"] = _round(same["asap"], 3) if same else None
 
     def _policy(self, policy: PolicyResult | None) -> dict[str, Any] | None:
         if policy is None:
@@ -266,6 +325,9 @@ class WhatIf:
             "rows": [],
             "recorded_reference": None,
             "derived": None,
+            "settings": None,
+            "current": None,
+            "current_reason": None,
         }
         if result.smart is None or result.asap is None:
             return published
