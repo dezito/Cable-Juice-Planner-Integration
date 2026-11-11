@@ -113,6 +113,7 @@ class ControlEvents:
         self.load_charging_loss_db(databases.get("charging_loss"))
         self.load_economy_db(databases.get("economy"))
         self.publish_economy()
+        self.load_what_if()
         self.load_analysis_db(databases.get("analysis"))
         self.publish_analysis()
         self.publish_charging_loss_model()

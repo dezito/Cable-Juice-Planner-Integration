@@ -273,8 +273,71 @@ solar charging over time.
 The What-if view collects simulated comparisons based on the history CJP has recorded. They never change the
 live plan, the settings, the car or the charger, and they are estimates, not guaranteed or actual savings.
 Each comparison states which data it uses and when it is unavailable; missing or invalid data is never
-replaced with a favourable value. The view currently holds the comparison with a fixed monthly charging
-price. More comparisons are added to this view as they are built.
+replaced with a favourable value. The view holds the daily smart charging comparison and the comparison with a
+fixed monthly charging price; more are added as they are built.
+
+### Daily smart charging to the maximum recommended level
+
+Compares two ways of charging at home over a past period, with your own recorded history:
+
+- **Smart:** in every connection (plug-in to unplug), charge in the cheapest hours until the target battery
+  level before departure, like CJP's daily charging to the maximum recommended level.
+- **Immediate charging (the reference):** charge from plug-in until the same target.
+
+Both calculations use exactly the same connections, drives, public charges, charging loss, learned charging
+power by battery level and hourly grid prices, and the battery level is carried from one connection to the
+next (it is never reset at a plug-in). The reference is immediate charging, not CJP's recorded cost, because
+the recorded history lacks small drives, standby drain, house limits and the solar valuation: a difference
+against it would reward buying less energy. CJP's recorded cost and energy in the same span are shown only as
+a labelled reference.
+
+Settings on the What-if view (they never change the live plan or settings):
+
+| Setting | Meaning |
+|---|---|
+| *What-if period* | how many days back to replay (7-365). Only completed connections inside it are used |
+| *What-if target battery level* | a temporary target. 0 uses the live *max recommended charge limit* and never changes it |
+| *What-if battery level at first plug-in* | the battery level when the period's first connection began. 0 reads it from Home Assistant's history; enter a value if that is missing |
+| *What-if smart charging days* | all days, the work plan's days, Monday to Friday, the weekend, or *Selected days* (then switch on the *What-if Monday ... Sunday* switches you want). Days count by the day the car leaves (the end of the connection). The work plan's days are the days as they are set now, not as they were in the past. On the other days both calculations charge immediately, so only the selected days differ. A selection with no days gives no result |
+| *Run what-if* (button) | calculates. It never changes the plan, the settings, the car or the charger |
+
+The latest successful result is kept across restarts and shown on the view, and on
+`sensor.cjp_<prefix>_what_if` (its state is the adjusted cost difference, the details are in the attributes).
+A calculation that gives no result (for example a missing starting level) leaves the previous result in place and says why; one that stopped early at a missing price is a result and replaces it, with its own state. A year of history takes
+about a tenth of a second. If a connection ends while the starting level is being read, the calculation is
+refused (the level would belong to another first connection) and can simply be run again. The sensor state
+is only set for a result that covers the whole period; a result that stopped early has no such number.
+
+**Reading the result.** *Difference* is smart minus immediate charging, so a negative number means smart
+charging was cheaper. The *adjusted difference* also values any battery level difference at the end of the
+period at the period's time-weighted average buy price, so one calculation cannot look cheaper by ending with
+less energy. If the two calculations do not deliver the same (the target is missed by a different amount, or a
+different amount of driving cannot be covered) no difference is shown at all. The table also shows the energy
+from the charger, the charging loss, how many connections reached the target, what is missing to the target,
+the driving the battery could not cover, and the lowest and final battery level, per month and in total.
+
+**Where the data comes from.**
+
+| Data | Source | Limit |
+|---|---|---|
+| Connections | CJP's recorded plug-in and unplug times at home | only completed connections; a connection that is still open is left out |
+| Prices | the hourly buy prices CJP stored itself (incl. fees), 400 days | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this replay and flagged, and never replaces a real price in the monthly economy comparison |
+| Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded, so the demand is understated for both calculations. Without any recorded drive the demand is unknown and there is no result. CJP keeps the newest 400 drives: connections older than the oldest kept drive are left out |
+| Public charges | CJP's charging history | counted and shown, but not added to the battery level again, because the drive they belong to is already net of them. A public charge in a gap with no recorded drive changes the level by an unknown amount and is flagged |
+| Starting level | entered, or the recorder state at the first plug-in, or the hourly mean from the long-term statistics (marked as approximate) | never defaulted: without it the result is unavailable |
+| Loss and charging power | the configured or measured charging loss, and the learned power by battery level when learning of charging power is switched on | |
+
+**What stops or limits a result.** A missing, invalid or non-finite price stops the replay at that connection;
+the result then covers only the connections before it and says so, because the battery level would no longer
+be the same for both. A fixed public charge that would take the battery above 100 % stops it too. Entries that
+had to be left out (an invalid drive, a drive dated inside a connection) are counted and shown as warnings.
+If the energy balance does not add up the result is withheld.
+
+**Not included, and stated on the card:** it is a hindsight estimate (smart knows every price of the
+connection and the exact departure time), not a forecast and not a guaranteed or actual saving; solar and the
+home battery, house and site limits, standby drain, a departure buffer and charging that CJP did not record.
+Charging at another charger cannot be seen. A temporary target above what the car can reach in a connection
+shows as *missing to the target* for both calculations.
 
 ### Fixed monthly charging price
 

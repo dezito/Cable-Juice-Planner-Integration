@@ -887,6 +887,27 @@
       },
       "auto_forecast_type": {
         "name": "Choose the forecast type automatically"
+      },
+      "what_if_day_monday": {
+        "name": "What-if Monday"
+      },
+      "what_if_day_tuesday": {
+        "name": "What-if Tuesday"
+      },
+      "what_if_day_wednesday": {
+        "name": "What-if Wednesday"
+      },
+      "what_if_day_thursday": {
+        "name": "What-if Thursday"
+      },
+      "what_if_day_friday": {
+        "name": "What-if Friday"
+      },
+      "what_if_day_saturday": {
+        "name": "What-if Saturday"
+      },
+      "what_if_day_sunday": {
+        "name": "What-if Sunday"
       }
     },
     "number": {
@@ -964,11 +985,30 @@
       },
       "subscription_monthly_price": {
         "name": "Fixed monthly charging price"
+      },
+      "what_if_days": {
+        "name": "What-if period"
+      },
+      "what_if_target_battery_level": {
+        "name": "What-if target battery level"
+      },
+      "what_if_start_battery_level": {
+        "name": "What-if battery level at first plug-in"
       }
     },
     "select": {
       "forecast_type": {
         "name": "Select forecast type"
+      },
+      "what_if_day_selection": {
+        "name": "What-if smart charging days",
+        "state": {
+          "all": "All days",
+          "work_plan": "Work plan days",
+          "monday_friday": "Monday to Friday",
+          "weekend": "Weekend",
+          "selected": "Selected days"
+        }
       }
     },
     "time": {
@@ -1041,6 +1081,9 @@
       },
       "recalculate_charging_loss": {
         "name": "Recalculate charging loss"
+      },
+      "run_what_if": {
+        "name": "Run what-if"
       }
     },
     "sensor": {
@@ -1146,6 +1189,9 @@
       },
       "analysis": {
         "name": "Ready at departure"
+      },
+      "what_if": {
+        "name": "What-if daily charging"
       }
     },
     "binary_sensor": {

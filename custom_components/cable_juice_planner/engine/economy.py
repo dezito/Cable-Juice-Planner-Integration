@@ -23,9 +23,11 @@ from __future__ import annotations
 import datetime
 import logging
 import math
+from collections.abc import Iterable
 from typing import Any
 
 from ..const import WEEKDAYS
+from ..prices.intervals import hourly_price_averages
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +39,37 @@ ECONOMY_WINDOW_SETTLE = 2 * 3600  # s after unplugging before a window is calcul
 
 def _finite(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _is_measured_price(source: Any) -> bool:
+    """Only a price the provider published as real counts: not an estimate from the price
+    history ("database"/"offline"), not a forecast and not one without a known source."""
+    return str(source or "").endswith(":real")
+
+
+def _complete_hours(moments: Iterable[datetime.datetime]) -> set[datetime.datetime]:
+    """Hours whose prices are all there: one price per equal step from :00 (1 x 60, 2 x 30, 4 x 15 minutes).
+
+    The step of a day is the shortest spacing of that day's prices (60 minutes when it has no two prices
+    in the same hour), so an hour with only its first quarter on a quarter-hour day is incomplete. An
+    interval never stretches over a missing price: a missing quarter is a missing hour.
+    """
+    ordered = sorted(set(moments))
+    steps: dict[datetime.date, int] = {}
+    for earlier, later in zip(ordered, ordered[1:]):
+        gap = int((later - earlier).total_seconds())
+        if 0 < gap <= 3600:
+            steps[earlier.date()] = min(steps.get(earlier.date(), 3600), gap)
+    offsets: dict[datetime.datetime, list[int]] = {}
+    for moment in ordered:
+        hour = moment.replace(minute=0, second=0, microsecond=0)
+        offsets.setdefault(hour, []).append(int((moment - hour).total_seconds()))
+    complete = set()
+    for hour, found in offsets.items():
+        step = steps.get(hour.date(), 3600)
+        if 3600 % step == 0 and found == list(range(0, 3600, step)):
+            complete.add(hour)
+    return complete
 
 
 def fill_cheapest(prices: dict[float, float], start: float, end: float, kwh: float, kw: float) -> float | None:
@@ -136,12 +169,40 @@ class Economy:
         recorder's history of the price sensor."""
         stored = self.economy_db.setdefault("prices", {})
         now = self.now()
-        for moment, price in (self.get_grid_prices() or {}).items():
-            if isinstance(moment, datetime.datetime) and moment <= now and isinstance(price, (int, float)):
-                stored[self._economy_ts(moment.replace(minute=0, second=0, microsecond=0))] = round(float(price), 4)
+        grid_prices = self.get_grid_prices() or {}
+        # (read after the prices: fetching them may have replaced the sources)
+        sources = getattr(self, "grid_price_cache", {}).get("sources") or {}
+        # only measured prices: an hour filled from the price history ("database"/"offline") or a
+        # forecast is an estimate and must never be kept as if it were the price paid
+        real = {
+            moment: float(price) for moment, price in grid_prices.items()
+            if isinstance(moment, datetime.datetime) and _finite(price) and _is_measured_price(sources.get(moment))
+        }
+        # an hour is the duration-weighted average of its intervals (quarter-hour prices are
+        # not "the last quarter"). Only an hour with every price published and already started:
+        # a published price is final, and this runs at minute 59, so the hour that is ending counts
+        complete = _complete_hours(real)
+        copies = self.economy_db.setdefault("prices_dst_copy", {})
+        for hour, price in hourly_price_averages(real, full_hours_only=True).items():
+            if hour in complete and hour <= now:
+                stored[self._economy_ts(hour)] = round(price, 4)
+                # the autumn clock change repeats a local hour, but the price vector has one price for
+                # it. The second real hour is kept apart as a copy (only the What-if replay reads it, and
+                # flags it): it must never replace a real price of the monthly economy comparison
+                repeated = hour.replace(tzinfo=self._snap.tz, fold=1).timestamp()
+                if repeated != self._economy_ts(hour):
+                    copies[repeated] = round(price, 4)
+        # hours stored before the copy existed (the autumn change inside the kept 400 days)
+        for ts in [ts for ts in stored if (ts + 3600.0) not in stored and (ts + 3600.0) not in copies]:
+            first = datetime.datetime.fromtimestamp(ts, self._snap.tz)
+            if first.fold == 0 and first.replace(fold=1).utcoffset() != first.utcoffset():
+                copies[ts + 3600.0] = stored[ts]
+        self.economy_db.setdefault("prices_averaged_since", self._economy_ts(now))
         oldest = self._economy_ts(now) - ECONOMY_PRICE_DAYS * 86400
         for ts in [ts for ts in stored if ts < oldest]:
             del stored[ts]
+        for ts in [ts for ts in copies if ts < oldest]:
+            del copies[ts]
         self.mark_dirty("economy")
 
     # calculation ------------------------------------------------------- #

@@ -47,8 +47,11 @@ def price_interval_at(
     return None
 
 
-def hourly_price_averages(prices: dict[datetime.datetime, float]) -> dict[datetime.datetime, float]:
-    """Aggregate interval prices into duration-weighted averages for covered hours."""
+def hourly_price_averages(prices: dict[datetime.datetime, float], full_hours_only: bool = False) -> dict[datetime.datetime, float]:
+    """Aggregate interval prices into duration-weighted averages for covered hours.
+
+    full_hours_only: leave out an hour whose intervals do not cover all of it.
+    """
     totals: dict[datetime.datetime, float] = {}
     durations: dict[datetime.datetime, float] = {}
     for start, end, price in price_intervals(prices):
@@ -61,4 +64,4 @@ def hourly_price_averages(prices: dict[datetime.datetime, float]) -> dict[dateti
             totals[hour] = totals.get(hour, 0.0) + price * duration
             durations[hour] = durations.get(hour, 0.0) + duration
             cursor = covered_until
-    return {hour: totals[hour] / durations[hour] for hour in totals}
+    return {hour: totals[hour] / durations[hour] for hour in totals if not full_hours_only or durations[hour] >= 3600.0 - 1e-6}

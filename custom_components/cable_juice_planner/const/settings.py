@@ -33,6 +33,8 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     "price_forecast_correction": {"default": True},
     # the house consumption and km/kWh use the forecast type that hit best lately (engine/analysis)
     "auto_forecast_type": {"default": False},
+    # What-if smart charging days when what_if_day_selection is "selected": the day the car leaves
+    **{f"what_if_day_{day}": {"default": False} for day in WEEKDAYS},
 }
 
 
@@ -66,11 +68,24 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "public_charging"},
     # 0 disables the Economy comparison with an ideal all-inclusive monthly charging fee
     "subscription_monthly_price": {"min": 0, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0},
+    # What-if Scenario A: the period, a temporary target (0 = the live maximum recommended level)
+    # and the battery level at the first plug-in (0 = read it from Home Assistant's history)
+    "what_if_days": {"min": 7, "max": 365, "step": 1, "mode": "box", "unit": "d", "default": 30.0},
+    "what_if_target_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
+    "what_if_start_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0},
 }
+
+# the What-if settings only feed a simulation: changing one must not recalculate the live plan
+WHAT_IF_SETTING_KEYS = (
+    "what_if_days", "what_if_target_battery_level", "what_if_start_battery_level", "what_if_day_selection",
+    *(f"what_if_day_{day}" for day in WEEKDAYS),
+)
 
 FORECAST_TYPE_OPTIONS = ["Average", "EMA (Exponential Moving Average)", "Trend"]
 SELECT_SETTINGS: dict[str, dict[str, Any]] = {
     "forecast_type": {"options": FORECAST_TYPE_OPTIONS, "default": "EMA (Exponential Moving Average)"},
+    # the days Scenario A charges "smart" on; the others are charged immediately in both calculations
+    "what_if_day_selection": {"options": ["all", "work_plan", "monday_friday", "weekend", "selected"], "default": "all"},
 }
 
 TIME_SETTINGS: dict[str, dict[str, Any]] = {
@@ -84,7 +99,8 @@ DATETIME_SETTINGS: dict[str, dict[str, Any]] = {
     "trip_homecoming_date_time": {},
 }
 
-BUTTON_KEYS = ("enforce_planning", "trip_reset")
+# run_what_if: the What-if view's Scenario A (daily smart charging to the maximum recommended level)
+BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if")
 # only with a car integration (the charging loss is measured with its battery level)
 EV_BUTTON_KEYS = ("recalculate_charging_loss",)
 
@@ -122,6 +138,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     # the share of the last 30 departures with the required battery level, the analysis in the attributes
     # (also without a car: the price forecast, house consumption forecast and planned days)
     "analysis": ("%", None, None, None),
+    # the adjusted cost difference of the latest What-if Scenario A (smart minus immediate), the result in the attributes
+    "what_if": ("{valuta}", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)

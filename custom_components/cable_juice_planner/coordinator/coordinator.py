@@ -50,11 +50,12 @@ from .data import CoordinatorData
 from .events import CoordinatorEvents
 from .lifecycle import CoordinatorLifecycle
 from .refresh import CoordinatorRefresh
+from .what_if import CoordinatorWhatIf
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh):
+class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh, CoordinatorWhatIf):
     """Owns the engine, the worker thread and all scheduling for one config entry."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:

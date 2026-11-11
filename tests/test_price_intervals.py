@@ -66,3 +66,16 @@ def test_price_interval_lookup_matches_provider_naive_timestamps() -> None:
         start + datetime.timedelta(minutes=30),
         2.0,
     )
+
+
+def test_full_hours_only_leaves_out_partly_covered_hours() -> None:
+    start = datetime.datetime(2026, 10, 22, 8)
+    prices = {
+        start: 1.0, start + datetime.timedelta(minutes=15): 2.0, start + datetime.timedelta(minutes=30): 3.0,
+        start + datetime.timedelta(minutes=45): 4.0,
+        start + datetime.timedelta(hours=1): 5.0, start + datetime.timedelta(hours=1, minutes=15): 6.0,
+        start + datetime.timedelta(hours=3): 7.0,
+    }
+    assert set(hourly_price_averages(prices)) >= {start, start + datetime.timedelta(hours=1)}
+    full = hourly_price_averages(prices, full_hours_only=True)
+    assert full == {start: pytest.approx(2.5)}
