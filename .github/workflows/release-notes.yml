@@ -1,6 +1,8 @@
 name: Draft release
 
-# Run by hand (Actions -> Draft release -> Run workflow) with the new tag.
+# Run by hand (Actions -> Draft release -> Run workflow). Leave the tag empty
+# and the next version is suggested from the existing tags (see
+# .github/next_version.py), or type the tag yourself.
 # Claude writes the release notes from the changes since the previous release
 # and the workflow creates (or updates) a DRAFT release with them. Review the
 # draft and press Publish; release.yml then attaches the zip.
@@ -10,8 +12,20 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: New release tag (e.g. v1.0.9)
-        required: true
+        description: New release tag, e.g. v1.0.9 (empty = suggest the next version)
+        required: false
+      beta:
+        description: Used when the tag is empty - ticked = next beta, unticked = normal release
+        type: boolean
+        default: true
+      bump:
+        description: Used when the tag is empty and the latest is stable - which number to raise
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
       previous_tag:
         description: Compare with this tag (empty = the latest published release)
         required: false
@@ -27,7 +41,9 @@ jobs:
   draft:
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ inputs.tag }}
+      INPUT_TAG: ${{ inputs.tag }}
+      RELEASE_TYPE: ${{ inputs.beta && 'beta' || 'stable' }}
+      BUMP: ${{ inputs.bump }}
       PREVIOUS_INPUT: ${{ inputs.previous_tag }}
       TARGET: ${{ github.event.repository.default_branch }}
       GH_TOKEN: ${{ github.token }}
@@ -41,6 +57,14 @@ jobs:
         id: context
         run: |
           set -euo pipefail
+          TAG="$INPUT_TAG"
+          if [ -z "$TAG" ]; then
+            TAG=$(python3 .github/next_version.py "$RELEASE_TYPE" "$BUMP" $(git tag --list 'v*'))
+            echo "No tag given, using the suggested next version $TAG"
+            echo "Suggested version: **$TAG** ($RELEASE_TYPE)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # The later steps read the tag from the environment.
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           tag_re='^v[0-9]+(\.[0-9]+)+(-[0-9A-Za-z.]+|(a|b|rc)[0-9]+)?$'
           if ! [[ "$TAG" =~ $tag_re ]]; then
             echo "::error::Tag must look like v1.0.9, v1.0.9-beta.1 or v1.0.9.1b1, got '$TAG'"
