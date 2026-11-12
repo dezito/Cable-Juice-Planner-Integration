@@ -128,6 +128,20 @@ async def test_the_month_rows_form_one_markdown_table_without_blank_lines_betwee
     assert any(line.startswith(f"| **{last['month']}**") and "*" in line.split("**", 2)[2] for line in rows)
 
 
+async def test_the_note_and_the_smart_minus_immediate_line_are_paragraphs_below_the_table_not_table_rows(hass: HomeAssistant) -> None:
+    """Directly under the last row of a Markdown table a line is one more row: narrow, in the first column. A blank line
+    ends the table, so the two lines use the whole width (a phone)."""
+    out = await _render(hass, "en", _result())
+    lines = out.splitlines()
+    table = [i for i, line in enumerate(lines) if line.startswith("| ") and "Current settings" in line][0]
+    last = max(i for i, line in enumerate(lines) if line.startswith("|") and i > table and "Final battery level" in line)
+    assert lines[last + 1] == ""  # the table ends
+    note = next(i for i, line in enumerate(lines) if "one connection less" in line)
+    difference = next(i for i, line in enumerate(lines) if line.startswith("**Smart &minus; Immediate charging:**"))
+    assert note > last and difference > note and not lines[note].startswith("|") and not lines[difference].startswith("|")
+    assert lines[note - 1] == "" and lines[difference - 1] == ""
+
+
 def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing)
@@ -149,9 +163,22 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
         ("Cumulative solar advantage (completed months)", "line", {solar}, ["Solar advantage"]),
         ("Recorded cost against the fixed price per month", "line", {"sensor.cjp_tesla_economy"}, ["Recorded cost", "Subscription"]),
     ]
+    wrappers = [c for c in _cards(view) if c.get("type") == "custom:config-template-card" and c["card"].get("type") == "custom:apexcharts-card"]
+    assert [w["card"] for w in wrappers] == charts
+    for wrapper in wrappers:
+        # the time axis follows the months of the result of the chart's own sensor, from the first month to the end of this one
+        chart = wrapper["card"]
+        entity = chart["series"][0]["entity"]
+        script = wrapper["variables"]["span_days"]
+        assert wrapper["entities"] == [entity] and {s["entity"] for s in chart["series"]} == {entity}
+        assert chart["graph_span"] == '${vars.span_days + "d"}' and chart["span"] == {"end": "month"}
+        assert f"states['{entity}']" in script and "(s && s.attributes) || {}" in script and "return 62" in script and "Math.max(" in script
+        assert ("a.result" in script) == (entity != "sensor.cjp_tesla_economy")
+        assert script.count("{") == script.count("}") and script.count("(") == script.count(")") and script.count("[") == script.count("]")
+        assert "grid_options" in wrapper and "grid_options" not in chart
     for chart in charts:
         # a chart reads the saved result of its sensor and shows nothing without one; never a point without a value
-        assert chart["graph_span"] in ("430d", "400d", "365d") and chart["now"] == {"show": False}
+        assert chart["now"] == {"show": False}
         for series in chart["series"]:
             code = series["data_generator"]
             assert "entity.attributes" in code and ("getTime()" in code or "* 1000" in code)
