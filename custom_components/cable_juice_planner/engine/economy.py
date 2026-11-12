@@ -44,8 +44,9 @@ def _finite(value) -> bool:
 
 def economy_keep_days(config) -> int:
     """How many days of hourly prices, sell prices, power statistics and solar sessions the What-if comparisons keep (and read
-    back from the recorder): the months the charging history is kept for (the option of the setup, default 12), at least
-    ECONOMY_PRICE_DAYS. The comparison can only reach as far back as the data is kept."""
+    back from the recorder): the months the charging history is kept for (the option of the setup, default 12) plus one
+    month, at least ECONOMY_PRICE_DAYS. The extra month keeps the whole month of a year ago (the 1st to the end of it)
+    in reach while the current month runs. The comparison can only reach as far back as the data is kept."""
     try:
         months = float(config["database"]["charging_history_db_data_to_save"])
     except (KeyError, TypeError, ValueError):

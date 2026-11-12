@@ -40,9 +40,9 @@ class WhatIf:
     # ------------------------------------------------------------------ #
 
     def what_if_max_days(self) -> int:
-        """The longest period the data reaches back over: the days kept (the months of history of the setup) less a month
-        of margin, never under 365."""
-        return max(WHAT_IF_DAYS[1], self.economy_keep_days() - 35)
+        """The longest period the data reaches back over: all the days kept (the months of history of the setup plus a month,
+        so the same month a year ago is complete), never under 365."""
+        return max(WHAT_IF_DAYS[1], self.economy_keep_days())
 
     def what_if_days(self) -> int:
         value = self.setting("what_if_days", WHAT_IF_DEFAULT_DAYS)

@@ -67,8 +67,8 @@ class CJPNumber(CJPUpdatingEntity, NumberEntity, RestoreEntity):
     @property
     def native_max_value(self) -> float:
         if self._key == "what_if_days":
-            # as far back as the history is kept (the months of history of the setup), see engine/economy.py
-            return float(max(self._max, economy_keep_days(self.coordinator.config) - 35))
+            # as far back as the history is kept (the months of history of the setup plus a month), see engine/economy.py
+            return float(max(self._max, economy_keep_days(self.coordinator.config)))
         # trip_range_needed follows the estimated total range (set_estimated_range)
         return self.coordinator.setting_limits.get(self._key, {}).get("max", self._max)
 
