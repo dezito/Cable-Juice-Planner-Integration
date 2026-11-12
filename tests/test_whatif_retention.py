@@ -26,12 +26,26 @@ def test_the_days_kept_follow_the_months_of_history_of_the_setup_and_never_fall_
 
 def test_the_longest_period_and_the_number_of_drives_kept_follow_it() -> None:
     engine, snap = _engine()
-    assert engine.economy_keep_days() == 403 and engine.what_if_max_days() == 368 and engine.drive_history_limit() == 806
+    assert engine.economy_keep_days() == 403 and engine.what_if_max_days() == 403 and engine.drive_history_limit() == 806
     engine.config["database"]["charging_history_db_data_to_save"] = 24
-    assert engine.what_if_max_days() == 740 and engine.drive_history_limit() == 1550
+    assert engine.what_if_max_days() == 775 and engine.drive_history_limit() == 1550
     # the period asked for is limited to what is kept
     long = snapshot_days(engine, 5000)
-    assert long == 740
+    assert long == 775
+
+
+@pytest.mark.parametrize("months", [1, 12, 24, 60])
+def test_the_same_month_a_year_ago_is_always_in_reach(months: int) -> None:
+    """The months set plus one month: from any day of a month the 1st of the same month `months` months ago is kept."""
+    import datetime  # noqa: PLC0415
+
+    keep = economy_keep_days({"database": {"charging_history_db_data_to_save": months}})
+    first = datetime.date(2024, 1, 1)
+    for offset in range(0, 3 * 366, 3):  # every third day of three years, so every day of a month and the leap year are met
+        day = first + datetime.timedelta(days=offset)
+        total = day.year * 12 + day.month - 1 - months
+        month_start = datetime.date(total // 12, total % 12 + 1, 1)
+        assert month_start >= day - datetime.timedelta(days=keep), (day, month_start)
 
 
 def snapshot_days(engine, requested: float) -> int:
@@ -70,4 +84,4 @@ def test_the_drives_are_kept_up_to_two_a_day_for_the_days_kept(months: int, expe
 
 async def test_the_period_number_reaches_as_far_back_as_the_history_is_kept(hass: HomeAssistant, loaded_entry) -> None:
     state = hass.states.get(f"number.{OBJECT_PREFIX}_what_if_days")
-    assert state.attributes["max"] == 368.0  # the default 12 months kept
+    assert state.attributes["max"] == 403.0  # the default 12 months kept plus a month

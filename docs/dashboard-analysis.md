@@ -314,7 +314,7 @@ Settings on the What-if view (they never change the live plan or settings):
 
 | Setting | Meaning |
 |---|---|
-| *What-if period* | how many days back to replay (7-365). Only completed connections inside it are used |
+| *What-if period* | how many days back to replay, from 7 up to all the data CJP keeps: the months of charging history set in the setup (default 12) plus one month, so 403 days by default and 775 with 24 months. The extra month keeps the whole month of a year ago in reach while the current month runs, so a month can be compared with the same month last year. The data is kept from the day CJP started keeping it (older data comes only from the recorder's long-term statistics). Only completed connections inside it are used |
 | *What-if target battery level* | a temporary target. 0 uses the live *max recommended charge limit* and never changes it |
 | *What-if battery level at first plug-in* | the battery level when the period's first connection began. 0 reads it from Home Assistant's history; enter a value if that is missing |
 | *What-if smart charging days* | all days, the work plan's days, Monday to Friday, the weekend, or *Selected days* (then switch on the *What-if Monday ... Sunday* switches you want). Days count by the day the car leaves (the end of the connection). The work plan's days are the days as they are set now, not as they were in the past. On the other days both calculations charge immediately, so only the selected days differ. A selection with no days gives no result |
@@ -340,7 +340,7 @@ the driving the battery could not cover, and the lowest and final battery level,
 | Data | Source | Limit |
 |---|---|---|
 | Connections | CJP's recorded plug-in and unplug times at home | only completed connections; a connection that is still open is left out |
-| Prices | the hourly buy prices CJP stored itself (incl. fees), 400 days | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this replay and flagged, and never replaces a real price in the monthly economy comparison |
+| Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this replay and flagged, and never replaces a real price in the monthly economy comparison |
 | Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded, so the demand is understated for both calculations. Without any recorded drive the demand is unknown and there is no result. CJP keeps the newest 400 drives: connections older than the oldest kept drive are left out |
 | Public charges | CJP's charging history | counted and shown, but not added to the battery level again, because the drive they belong to is already net of them. A public charge in a gap with no recorded drive changes the level by an unknown amount and is flagged |
 | Starting level | entered, or the recorder state at the first plug-in, or the hourly mean from the long-term statistics (marked as approximate) | never defaulted: when it is unknown the first connection only brings the car to the target (nothing in it is counted) and the result is labelled *estimated* |
@@ -434,7 +434,7 @@ the first time it also reads the charger status back as far as the recorder keep
 so without more they only reach back as far as CJP has been running. The long-term hourly statistics of the
 battery level and of the charger power reach much further, so the older connections are *estimated* from them
 (`economy_db["derived_windows"]`, updated by the daily economy update; the price statistics are read as far back as
-the prices are kept, 400 days):
+the prices are kept: the months of charging history set in the setup plus one month, at least 400 days):
 
 - an hour is *away* when the battery level moved by at least 1.5 % (more than a whole-percent tick or standby
   drain) while the charger delivered no power (under 500 W), or when it started lower than the hour before ended
@@ -534,7 +534,7 @@ replaced nor valued) and no whole-house result is claimed.
 
 **From the recorder's statistics, like the other what-ifs.** The daily economy update reads the long-term
 statistics of the solar production, the house consumption (the EV included), the charger power and, for providers
-that have one sensor for it (Energi Data Service), the sell price, and keeps 400 days of them. With those the
+that have one sensor for it (Energi Data Service), the sell price, and keeps as many days of them as the history is kept (months set in the setup plus one month, at least 400). With those the
 comparison is calculated **hour by hour for the whole history at once**, with no waiting: in each hour the EV
 charged (at least 0.05 kWh) the solar it could use is what the production leaves after the rest of the house,
 `max(solar - (house - EV), 0)` (CJP's own formula), never more than the EV charged. The table then counts charging
@@ -548,7 +548,7 @@ Without those statistics (an entity or its history is missing) it falls back to 
 | Data | Source | Limit |
 |---|---|---|
 | Solar energy of a session | CJP's charging history | the average power from local energy over the session times the session length, capped at the energy the EV charged (the sources are scaled down together when they would exceed it). Entries written by earlier versions stored the power as if it were kWh, which is only right for exactly 60 minutes, and cannot be told apart from correct ones: only sessions that started after the marker (stored when the integration first ran this calculation) are used |
-| Ledger | `economy_db["solar_ledger"]`, 400 days | a session is priced once while it ended less than 5 days ago, because CJP merges its charging history per day after a week (a session would become a day-long span with pauses) and a price or the refund can change later. A session whose stored price is still missing 48 hours after it ended is left out. One that was never priced in time (for example after a long outage) is counted as *not priced in time* |
+| Ledger | `economy_db["solar_ledger"]`, as many days as the history is kept | a session is priced once while it ended less than 5 days ago, because CJP merges its charging history per day after a week (a session would become a day-long span with pauses) and a price or the refund can change later. A session whose stored price is still missing 48 hours after it ended is left out. One that was never priced in time (for example after a long outage) is counted as *not priced in time* |
 | Buy prices | the hourly prices CJP stores (see above) | an hour uses the stored price, else the price sensor's recorded statistics (flagged), else an estimate; the refund is subtracted (every replay prices energy net of the refund, like CJP's own cost) |
 | Sell prices | the raw hourly sell price, stored from the first run of this calculation (own marker), together with the fixed production price in effect | the raw price and the production price are stored once per hour and the sell value (CJP's `sell_value()` rule) is applied when a session is priced, so a later change of the production price never rewrites an earlier hour. Only measured prices of complete hours are stored, like the buy prices. CJP has no sell price history to read back, so existing sessions cannot be priced |
 
