@@ -299,7 +299,10 @@ charging per month. The settings comparison
 has a monthly cost chart and a cumulative difference line, the comparison without solar monthly cost, price per kWh
 and energy charts (planned and recorded), the solar comparison monthly grid cost against sale value and the
 cumulative solar advantage, and the fixed monthly price a chart of the recorded cost against the price per month.
-The time axis of every chart follows the months in its result, from the first month to the end of the current month (at least two months), so a short *What-if period* is not drawn on a year-long axis; a chart without a result shows two months. A chart without a result, or without a value in a month, shows nothing for it; the cumulative lines of the
+The time axis of every chart follows the months in its result, from the first month to the end of the current
+month (at least two months), so a short *What-if period* is not drawn on a year-long axis; a chart without a
+result shows two months. A chart without a result, or without a value in a month, shows nothing for it; the
+cumulative lines of the
 comparisons that need equal energy are empty when the result is not comparable.
 
 The table lists the *Current settings* column first, as the reference, then smart and immediate charging, each with

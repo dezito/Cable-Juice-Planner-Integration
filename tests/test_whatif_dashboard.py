@@ -189,6 +189,19 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
     assert {"current_cost", "smart_cost", "asap_cost", "same_smart_cost", "same_asap_cost", "baseline_cost", "alternative_cost", "planned_cost", "recorded_cost"} <= fields
 
 
+def test_a_chart_whose_sensor_is_missing_is_removed_with_its_wrapper() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    existing -= {"sensor.cjp_tesla_what_if_solar", "sensor.cjp_tesla_economy"}
+    text = render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing)
+    view = yaml.safe_load(text)["views"][3]
+    wrappers = [c for c in _cards(view) if c.get("type") == "custom:config-template-card" and c["card"].get("type") == "custom:apexcharts-card"]
+    charts = [c for c in _cards(view) if c.get("type") == "custom:apexcharts-card"]
+    # no wrapper is left without its chart, no chart without its wrapper, and none reads a sensor that does not exist
+    assert wrappers and [w["card"] for w in wrappers] == charts
+    assert not {w["entities"][0] for w in wrappers} & {"sensor.cjp_tesla_what_if_solar", "sensor.cjp_tesla_economy"}
+    assert "what_if_solar" not in "".join(w["variables"]["span_days"] for w in wrappers)
+
+
 async def test_every_language_renders_the_card_without_missing_texts(hass: HomeAssistant) -> None:
     attributes = _result()
     for language in ("da", "de", "en", "en-GB", "pl", "uk"):
