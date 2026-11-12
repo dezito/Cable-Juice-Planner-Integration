@@ -3194,7 +3194,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3220,11 +3221,11 @@ views:
         | @@what_if_row_unmet_driving@@ | {{ (c.unmet_driving_kwh ~ ' kWh') if c else '&ndash;' }} | {{ r.smart.unmet_driving_kwh }} kWh | {{ r.asap.unmet_driving_kwh }} kWh | | |
         | @@what_if_row_lowest@@ | {{ (c.lowest_soc ~ ' %') if c else '&ndash;' }} | {{ r.smart.lowest_soc }} % | {{ r.asap.lowest_soc }} % | | |
         | @@what_if_row_final@@ | {{ (c.final_soc ~ ' %') if c else '&ndash;' }} | {{ r.smart.final_soc }} % | {{ r.asap.final_soc }} % | | |
-        {% if c -%}
+        {% if c %}
 
         @@what_if_current_note@@
         {%- endif %}
-        {% if d -%}
+        {% if d %}
 
         **@@what_if_col_smart@@ &minus; @@what_if_col_immediate@@:** @@what_if_row_cost@@ {{ d.cost }} @@valuta@@ &middot; @@what_if_row_terminal@@ {{ d.terminal_adjustment }} @@valuta@@ ({{ d.terminal_energy_kwh }} kWh) &middot; **@@what_if_row_adjusted@@ {{ d.adjusted_cost }} @@valuta@@** &middot; @@what_if_row_grid@@ {{ d.grid_kwh }} kWh &middot; @@what_if_row_loss@@ {{ d.loss_kwh }} kWh
         {%- endif %}
@@ -3265,148 +3266,199 @@ views:
         </details>
         {%- endif %}
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_cost_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' @@valuta@@'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_b_col_current@@'
-        color: '#7a7a85'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.current_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.current_cost]; });
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_col_smart@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.smart_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.smart_cost]; });
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_col_immediate@@'
-        color: '#eb6834'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.asap_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.asap_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_diff_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' @@valuta@@'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_col_smart_vs_current@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_smart_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_smart_cost - m.current_cost : null)]; });
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_col_immediate_vs_current@@'
-        color: '#eb6834'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_asap_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_asap_cost - m.current_cost : null)]; });
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_cost_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' @@valuta@@'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_b_col_current@@'
+          color: '#7a7a85'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.current_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.current_cost]; });
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_col_smart@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.smart_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.smart_cost]; });
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_col_immediate@@'
+          color: '#eb6834'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.asap_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.asap_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_saving_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: line
-        unit: ' @@valuta@@'
-        float_precision: 0
-        stroke_width: 2
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        markers:
-          size: 3
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if
-        name: '@@what_if_chart_saving@@'
-        color: '#1baf7a'
-        data_generator: |
-          const r = entity.attributes.result;
-          if (!r || !r.comparable) return [];
-          let sum = 0;
-          return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.asap_cost) - Number(m.smart_cost)))).map(m => { sum += Number(Number(m.asap_cost) - Number(m.smart_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_diff_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' @@valuta@@'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_col_smart_vs_current@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_smart_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_smart_cost - m.current_cost : null)]; });
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_col_immediate_vs_current@@'
+          color: '#eb6834'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_asap_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_asap_cost - m.current_cost : null)]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_saving_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: line
+          unit: ' @@valuta@@'
+          float_precision: 0
+          stroke_width: 2
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          markers:
+            size: 3
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if
+          name: '@@what_if_chart_saving@@'
+          color: '#1baf7a'
+          data_generator: |
+            const r = entity.attributes.result;
+            if (!r || !r.comparable) return [];
+            let sum = 0;
+            return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.asap_cost) - Number(m.smart_cost)))).map(m => { sum += Number(Number(m.asap_cost) - Number(m.smart_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   # Scenario B: the current settings against an alternative reserve and maximum level (engine/whatif/settings_part.py)
   - type: grid
     column_span: 2
@@ -3469,7 +3521,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3521,95 +3574,129 @@ views:
         </details>
         {%- endif %}
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_settings_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' @@valuta@@'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_settings
-        name: '@@what_if_b_col_current@@'
-        color: '#7a7a85'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.baseline_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.baseline_cost]; });
-      - entity: sensor.cjp_what_if_settings
-        name: '@@what_if_b_col_alternative@@'
-        color: '#1baf7a'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.alternative_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.alternative_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_settings
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_settings'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_cumulative_diff_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: line
-        unit: ' @@valuta@@'
-        float_precision: 0
-        stroke_width: 2
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        markers:
-          size: 3
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_settings
-        name: '@@what_if_col_difference@@'
-        color: '#1baf7a'
-        data_generator: |
-          const r = entity.attributes.result;
-          if (!r || !r.comparable) return [];
-          let sum = 0;
-          return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.alternative_cost) - Number(m.baseline_cost)))).map(m => { sum += Number(Number(m.alternative_cost) - Number(m.baseline_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_settings_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' @@valuta@@'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_settings
+          name: '@@what_if_b_col_current@@'
+          color: '#7a7a85'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.baseline_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.baseline_cost]; });
+        - entity: sensor.cjp_what_if_settings
+          name: '@@what_if_b_col_alternative@@'
+          color: '#1baf7a'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.alternative_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.alternative_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_settings
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_settings'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_cumulative_diff_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: line
+          unit: ' @@valuta@@'
+          float_precision: 0
+          stroke_width: 2
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          markers:
+            size: 3
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_settings
+          name: '@@what_if_col_difference@@'
+          color: '#1baf7a'
+          data_generator: |
+            const r = entity.attributes.result;
+            if (!r || !r.comparable) return [];
+            let sum = 0;
+            return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.alternative_cost) - Number(m.baseline_cost)))).map(m => { sum += Number(Number(m.alternative_cost) - Number(m.baseline_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   # Scenario D: the planned charging with the grid only, no solar, over the selected period (engine/whatif/plan_part.py)
   - type: grid
     column_span: 2
@@ -3666,7 +3753,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_ns_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.method == 'estimated' -%}
         <ha-alert alert-type="info">@@what_if_ns_method_estimated@@</ha-alert>
@@ -3728,144 +3816,195 @@ views:
         </details>
         {%- endif %}
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_ns_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' @@valuta@@'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_planned@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.planned_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.planned_cost]; });
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_recorded@@'
-        color: '#eda100'
-        data_generator: |
-          const r = entity.attributes.result;
-          const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-          return ((r && r.months) || []).filter(m => num(m.recorded_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.recorded_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_no_solar
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_no_solar'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_unit_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - min: 0
-        decimals: 2
-      all_series_config:
-        type: line
-        unit: ' @@valuta_kwh@@'
-        float_precision: 2
-        stroke_width: 2
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        markers:
-          size: 3
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_planned@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => m.planned_kwh > 0 && Number.isFinite(Number(m.planned_cost / m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_cost / m.planned_kwh)]);
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_recorded@@'
-        color: '#eda100'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => m.recorded_cost !== null && m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_cost / m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_cost / m.recorded_kwh)]);
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_ns_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' @@valuta@@'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_planned@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.planned_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.planned_cost]; });
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_recorded@@'
+          color: '#eda100'
+          data_generator: |
+            const r = entity.attributes.result;
+            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+            return ((r && r.months) || []).filter(m => num(m.recorded_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.recorded_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_no_solar
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_no_solar'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_energy_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' kWh'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_planned@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_kwh)]);
-      - entity: sensor.cjp_what_if_no_solar
-        name: '@@what_if_ns_col_recorded@@'
-        color: '#eda100'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_kwh)]);
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_unit_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - min: 0
+          decimals: 2
+        all_series_config:
+          type: line
+          unit: ' @@valuta_kwh@@'
+          float_precision: 2
+          stroke_width: 2
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          markers:
+            size: 3
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_planned@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => m.planned_kwh > 0 && Number.isFinite(Number(m.planned_cost / m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_cost / m.planned_kwh)]);
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_recorded@@'
+          color: '#eda100'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => m.recorded_cost !== null && m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_cost / m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_cost / m.recorded_kwh)]);
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_no_solar
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_no_solar'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_energy_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' kWh'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_planned@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_kwh)]);
+        - entity: sensor.cjp_what_if_no_solar
+          name: '@@what_if_ns_col_recorded@@'
+          color: '#eda100'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_kwh)]);
   # Scenario D: the EV's solar energy replaced by grid energy at the same charging times (engine/whatif/solar.py)
   - type: grid
     column_span: 2
@@ -3945,92 +4084,126 @@ views:
         {%- endif %}
       grid_options: *id001
   # simulated comparisons that never change the plan, the settings, the car or the charger
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_solar_value_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: column
-        unit: ' @@valuta@@'
-        float_precision: 0
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_solar
-        name: '@@what_if_d_col_grid@@'
-        color: '#eb6834'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.grid_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.grid_cost)]);
-      - entity: sensor.cjp_what_if_solar
-        name: '@@what_if_d_col_sell@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes.result;
-          return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.sell_value))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.sell_value)]);
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_solar
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_solar'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_solar_cumulative_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: line
-        unit: ' @@valuta@@'
-        float_precision: 0
-        stroke_width: 2
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        markers:
-          size: 3
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_what_if_solar
-        name: '@@what_if_d_col_advantage@@'
-        color: '#1baf7a'
-        data_generator: |
-          const r = entity.attributes.result;
-          let sum = 0;
-          return ((r && r.months) || []).filter(m => m.status === 'completed' && Number.isFinite(Number(m.advantage))).map(m => { sum += Number(m.advantage); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_solar_value_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: column
+          unit: ' @@valuta@@'
+          float_precision: 0
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_solar
+          name: '@@what_if_d_col_grid@@'
+          color: '#eb6834'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.grid_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.grid_cost)]);
+        - entity: sensor.cjp_what_if_solar
+          name: '@@what_if_d_col_sell@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes.result;
+            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.sell_value))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.sell_value)]);
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if_solar
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if_solar'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_solar_cumulative_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: line
+          unit: ' @@valuta@@'
+          float_precision: 0
+          stroke_width: 2
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          markers:
+            size: 3
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_what_if_solar
+          name: '@@what_if_d_col_advantage@@'
+          color: '#1baf7a'
+          data_generator: |
+            const r = entity.attributes.result;
+            let sum = 0;
+            return ((r && r.months) || []).filter(m => m.status === 'completed' && Number.isFinite(Number(m.advantage))).map(m => { sum += Number(m.advantage); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   - type: grid
     column_span: 2
     cards:
@@ -4088,50 +4261,67 @@ views:
         {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ sub.recorded_cost | round(0) }} @@valuta@@ &rarr; {{ sub.price | round(0) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ sub.saving | round(0) }} @@valuta@@{% endif %}
         {%- endif %}
       grid_options: *id001
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@what_if_chart_subscription_title@@'
-        show_states: false
-      graph_span: 400d
-      span:
-        end: month
-      now:
-        show: false
-      yaxis:
-      - decimals: 0
-      all_series_config:
-        type: line
-        unit: ' @@valuta@@'
-        float_precision: 0
-        stroke_width: 2
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 280px
-        dataLabels:
-          enabled: false
-        markers:
-          size: 3
-        xaxis:
-          labels:
-            format: MMM yy
-      series:
-      - entity: sensor.cjp_economy
-        name: '@@economy_subscription_recorded@@'
-        color: '#eda100'
-        data_generator: |
-          const r = entity.attributes;
-          return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_recorded_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_recorded_cost)]);
-      - entity: sensor.cjp_economy
-        name: '@@economy_subscription_price@@'
-        color: '#2a78d6'
-        data_generator: |
-          const r = entity.attributes;
-          return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_price))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_price)]);
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_economy
+      variables:
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_economy'];
+            const a = (s && s.attributes) || {};
+            const months = (a || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
+      card:
+        type: custom:apexcharts-card
+        header:
+          show: true
+          title: '@@what_if_chart_subscription_title@@'
+          show_states: false
+        graph_span: ${vars.span_days + "d"}
+        span:
+          end: month
+        now:
+          show: false
+        yaxis:
+        - decimals: 0
+        all_series_config:
+          type: line
+          unit: ' @@valuta@@'
+          float_precision: 0
+          stroke_width: 2
+          show:
+            legend_value: false
+            in_header: false
+        apex_config:
+          tooltip:
+            shared: true
+            intersect: false
+          chart:
+            height: 280px
+          dataLabels:
+            enabled: false
+          markers:
+            size: 3
+          xaxis:
+            labels:
+              format: MMM yy
+        series:
+        - entity: sensor.cjp_economy
+          name: '@@economy_subscription_recorded@@'
+          color: '#eda100'
+          data_generator: |
+            const r = entity.attributes;
+            return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_recorded_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_recorded_cost)]);
+        - entity: sensor.cjp_economy
+          name: '@@economy_subscription_price@@'
+          color: '#2a78d6'
+          data_generator: |
+            const r = entity.attributes;
+            return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_price))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_price)]);

@@ -13,7 +13,7 @@ from homeassistant.util.unit_conversion import DistanceConverter
 
 from ..const import ENTITY_UNAVAILABLE_STATES
 from ..engine.distance import DISTANCE_WEEKS
-from ..engine.economy import ECONOMY_PRICE_DAYS
+from ..engine.economy import economy_keep_days
 from ..engine.loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from ..engine.soc_power import SOC_POWER_HISTORY_DAYS
 from ..utils.helpers import float_or_none
@@ -178,7 +178,7 @@ class CoordinatorRefresh:
             if price_ids:
                 # long-term statistics are not purged with the raw history: as far back as the economy keeps prices
                 stats = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, end - datetime.timedelta(days=ECONOMY_PRICE_DAYS), end, set(price_ids), "hour", None, {"mean"}
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, set(price_ids), "hour", None, {"mean"}
                 )
                 recorded = {}
                 for price_id in price_ids:
@@ -200,7 +200,7 @@ class CoordinatorRefresh:
             await self._async_economy_ev_statistics(instance, data, end, stat_ts)
             if odometer_id:
                 months = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, end - datetime.timedelta(days=400), end, {odometer_id}, "month", None, {"change"}
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, {odometer_id}, "month", None, {"change"}
                 )
                 data["odometer_months"] = {
                     dt_util.as_local(dt_util.utc_from_timestamp(stat_ts(row))).strftime("%Y-%m"): row["change"]
@@ -236,7 +236,7 @@ class CoordinatorRefresh:
         Missing entities or statistics just leave the keys out (a failure here must never stop the rest of the update)."""
         from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
 
-        start = end - datetime.timedelta(days=400)
+        start = end - datetime.timedelta(days=economy_keep_days(self.config))
         try:
             sell_ids = provider.sell_price_entity_ids() if provider else []
             if sell_ids:
@@ -279,7 +279,7 @@ class CoordinatorRefresh:
             return
         try:
             stats = await instance.async_add_executor_job(
-                statistics_during_period, self.hass, end - datetime.timedelta(days=ECONOMY_PRICE_DAYS), end, {soc_id, power_id},
+                statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, {soc_id, power_id},
                 "hour", {"power": "W"}, {"mean", "min", "max"},
             )
             hours: dict[float, list[float | None]] = {}

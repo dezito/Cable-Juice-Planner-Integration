@@ -38,7 +38,7 @@ async def test_the_battery_level_and_the_charger_power_are_read_as_hourly_statis
     # a level row without all three values is no hour; a power row without a level row is no hour either
     assert data["ev_hours"] == {start.timestamp(): [61.0, 60.0, 62.0, 7000.0]}
     begin, finish, ids, period, units, kinds = seen["call"]
-    assert (finish - begin).days == 400 and finish == end  # as far back as the economy keeps prices
+    assert (finish - begin).days == 403 and finish == end  # as far back as the economy keeps prices (12 months of history)
     assert ids == {"sensor.level", "sensor.power"} and period == "hour" and units == {"power": "W"} and kinds == {"mean", "min", "max"}
 
 

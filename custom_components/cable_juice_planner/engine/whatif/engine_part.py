@@ -16,14 +16,13 @@ from typing import Any
 
 from ...const import WEEKDAYS
 from ..soc_power import planning_power_cap
-from ..analysis.helpers import ANALYSIS_DRIVES
 from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
 from .replay import PolicyResult, ReplayResult, replay, replay_plan
 
 _LOGGER = logging.getLogger(__name__)
 
-WHAT_IF_DAYS = (7, 365)
+WHAT_IF_DAYS = (7, 365)  # the shortest, and the lowest the longest can be (see what_if_max_days: the days kept, 403 by default)
 WHAT_IF_DEFAULT_DAYS = 30
 DAY_SELECTIONS = ("all", "work_plan", "monday_friday", "weekend")
 WHAT_IF_WINDOW_ROWS = 60  # the newest connection windows kept in the result for the dashboard
@@ -40,11 +39,16 @@ class WhatIf:
     # settings
     # ------------------------------------------------------------------ #
 
+    def what_if_max_days(self) -> int:
+        """The longest period the data reaches back over: all the days kept (the months of history of the setup plus a month,
+        so the same month a year ago is complete), never under 365."""
+        return max(WHAT_IF_DAYS[1], self.economy_keep_days())
+
     def what_if_days(self) -> int:
         value = self.setting("what_if_days", WHAT_IF_DEFAULT_DAYS)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             return WHAT_IF_DEFAULT_DAYS
-        return int(min(max(value, WHAT_IF_DAYS[0]), WHAT_IF_DAYS[1]))
+        return int(min(max(value, WHAT_IF_DAYS[0]), self.what_if_max_days()))
 
     def what_if_target(self) -> tuple[float, str]:
         """The target battery level: the temporary override, else the live maximum recommended level."""
@@ -129,7 +133,7 @@ class WhatIf:
             start_soc_source=source,
             tz=self._snap.tz,
             smart_weekdays=smart_weekdays,
-            drive_history_limit=ANALYSIS_DRIVES,
+            drive_history_limit=self.drive_history_limit(),
             dst_copied_hours=list(copies),
         )
         return data, coverage, sessions

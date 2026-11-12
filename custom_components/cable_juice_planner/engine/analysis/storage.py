@@ -47,7 +47,7 @@ class AnalysisStorage:
             if not any(d["start"] < drive["end"] and drive["start"] < d["end"] for d in known):
                 known.append(drive)
         known.sort(key=lambda d: d["start"])
-        del known[:-ANALYSIS_DRIVES]
+        del known[:-self.drive_history_limit()]
         self.mark_dirty("analysis")
 
     def analysis_check_departure(self) -> None:

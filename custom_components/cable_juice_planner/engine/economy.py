@@ -27,18 +27,32 @@ from collections.abc import Iterable
 from typing import Any
 
 from ..const import WEEKDAYS
+from .analysis.helpers import ANALYSIS_DRIVES
 from ..prices.intervals import hourly_price_averages
 
 _LOGGER = logging.getLogger(__name__)
 
 ECONOMY_MONTHS = 13
 ECONOMY_DB_VERSION = 2
-ECONOMY_PRICE_DAYS = 400  # hourly prices kept for the comparisons
+ECONOMY_PRICE_DAYS = 400  # hourly prices kept for the comparisons: at least this many days (see economy_keep_days)
 ECONOMY_WINDOW_SETTLE = 2 * 3600  # s after unplugging before a window is calculated (the last hour is recalculated)
 
 
 def _finite(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def economy_keep_days(config) -> int:
+    """How many days of hourly prices, sell prices, power statistics and solar sessions the What-if comparisons keep (and read
+    back from the recorder): the months the charging history is kept for (the option of the setup, default 12) plus one
+    month, at least ECONOMY_PRICE_DAYS. The extra month keeps the whole month of a year ago (the 1st to the end of it)
+    in reach while the current month runs. The comparison can only reach as far back as the data is kept."""
+    try:
+        months = float(config["database"]["charging_history_db_data_to_save"])
+    except (KeyError, TypeError, ValueError):
+        months = 0.0
+    months = months if math.isfinite(months) and months > 0 else 0.0
+    return max(ECONOMY_PRICE_DAYS, int(months * 31) + 31)
 
 
 def _is_measured_price(source: Any) -> bool:
@@ -110,6 +124,13 @@ def average_price(prices: dict[float, float], start: float, end: float) -> float
 
 class Economy:
     """Connection windows (database economy) and the monthly economy sensor."""
+
+    def economy_keep_days(self) -> int:
+        return economy_keep_days(self.config)
+
+    def drive_history_limit(self) -> int:
+        """How many drives are kept: two a day for the days the What-if data is kept, never fewer than the analysis uses."""
+        return max(ANALYSIS_DRIVES, 2 * self.economy_keep_days())
 
     def load_economy_db(self, database) -> None:
         self.economy_db = database if isinstance(database, dict) and isinstance(database.get("windows"), list) else {"windows": []}
@@ -203,7 +224,7 @@ class Economy:
             if first.fold == 0 and first.replace(fold=1).utcoffset() != first.utcoffset():
                 copies[ts + 3600.0] = stored[ts]
         self.economy_db.setdefault("prices_averaged_since", self._economy_ts(now))
-        oldest = self._economy_ts(now) - ECONOMY_PRICE_DAYS * 86400
+        oldest = self._economy_ts(now) - self.economy_keep_days() * 86400
         for ts in [ts for ts in stored if ts < oldest]:
             del stored[ts]
         for ts in [ts for ts in copies if ts < oldest]:
@@ -251,7 +272,7 @@ class Economy:
                     stored[ts] = round(price, 4)
                     fixed[ts] = production
         self.economy_db.setdefault("sell_prices_since", self._economy_ts(now))
-        oldest = self._economy_ts(now) - ECONOMY_PRICE_DAYS * 86400
+        oldest = self._economy_ts(now) - self.economy_keep_days() * 86400
         for table in (stored, fixed):
             for ts in [ts for ts in table if ts < oldest]:
                 del table[ts]
@@ -275,7 +296,7 @@ class Economy:
             if ts not in stored_prices and _finite(price):
                 history[ts] = round(price, 4)
         prices.update({float(ts): float(price) for ts, price in stored_prices.items()})
-        oldest_price = self._economy_ts(self.now()) - ECONOMY_PRICE_DAYS * 86400
+        oldest_price = self._economy_ts(self.now()) - self.economy_keep_days() * 86400
         for ts in [ts for ts in history if float(ts) < oldest_price or ts in stored_prices]:
             del history[ts]
         kw = int(self.config["charger"]["charging_phases"]) * float(self.config["charger"]["charging_max_amp"]) * float(self.config["charger"]["power_voltage"]) / 1000

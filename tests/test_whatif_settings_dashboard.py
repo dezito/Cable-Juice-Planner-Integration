@@ -59,7 +59,8 @@ def test_the_view_has_a_scenario_b_section_with_its_entities_and_a_read_more() -
     explain = next(c["content"] for c in _cards(view) if "alternative daily reserve" in c.get("content", ""))
     # the Read more covers what is shown beneath it
     for phrase in (
-        "alternative reserve", "alternative maximum level", "Run what-if settings", "period", "battery level at the first plug-in",
+        # the two settings are named like the entities beneath it
+        "What-if alternative daily arrival battery level", "What-if alternative EV max recommended charging limit", "Run what-if settings", "period", "battery level at the first plug-in",
         "not the plan CJP made at the time", "hindsight", "left out", "no effect", "adjusted difference", "per month", "coverage",
         "homecoming", "assumptions", "no difference is shown", "price per kWh that was actually paid", "learned charging power",
         "public charges", "where the starting level came from", "exactly 0 %",

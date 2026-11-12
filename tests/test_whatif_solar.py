@@ -353,13 +353,17 @@ def test_the_recorded_cost_is_not_used() -> None:
     assert _data(engine, snap)["months"][0]["advantage"] == cheap
 
 
-def test_the_ledger_is_trimmed_after_400_days() -> None:
+def test_the_ledger_is_trimmed_after_the_days_kept() -> None:
+    """403 days with the 12 months of history of the default setup; 24 months keep it longer."""
     engine, snap = _solar_engine()
     engine.economy_db["solar_ledger"] = {
-        "1": {"start": _ts(DAY - datetime.timedelta(days=401), 10), "end": 1.0, "month": "x", "outcome": "left_out", "reason": "public"},
+        "1": {"start": _ts(DAY - datetime.timedelta(days=404), 10), "end": 1.0, "month": "x", "outcome": "left_out", "reason": "public"},
         "2": {"start": _ts(DAY - datetime.timedelta(days=100), 10), "end": 1.0, "month": "y", "outcome": "left_out", "reason": "public"},
     }
     assert list(_ledger(engine, snap)) == ["2"]
+    engine.economy_db["solar_ledger"] = {"1": {"start": _ts(DAY - datetime.timedelta(days=404), 10), "end": 1.0, "month": "x", "outcome": "left_out", "reason": "public"}}
+    engine.config["database"]["charging_history_db_data_to_save"] = 24
+    assert list(_ledger(engine, snap)) == ["1"]  # kept as long as the setup keeps its history
 
 
 def test_a_failing_calculation_never_breaks_the_job_that_publishes_it() -> None:
@@ -449,10 +453,10 @@ def test_a_failing_sell_price_source_never_stops_the_storing_of_the_buy_prices()
     assert not engine.economy_db.get("sell_prices")
 
 
-def test_sell_prices_are_trimmed_after_400_days() -> None:
+def test_sell_prices_are_trimmed_after_the_days_kept() -> None:
     engine, snap = _solar_engine()
     engine.get_grid_prices = lambda *args, **kwargs: {}  # type: ignore[method-assign]
-    old = _ts(DAY - datetime.timedelta(days=401), 10)
+    old = _ts(DAY - datetime.timedelta(days=404), 10)
     engine.economy_db["sell_prices"] = {old: 0.1}
     engine.economy_db["sell_production_price"] = {old: -1.0}
     _sell_source(engine, DAY - datetime.timedelta(days=1), range(24))
