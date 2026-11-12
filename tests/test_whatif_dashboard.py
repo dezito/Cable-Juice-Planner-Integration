@@ -80,6 +80,23 @@ async def test_the_table_has_a_current_settings_column_and_the_settings_rows(has
     assert "None" not in out and "Undefined" not in out and "one connection less" not in out and "&ndash;" in out.replace("–", "&ndash;")
 
 
+async def test_the_heading_says_how_many_days_the_data_covers_not_only_the_period_asked_for(hass: HomeAssistant) -> None:
+    attributes = _result()
+    r = attributes["result"]
+    days = round((r["coverage"]["last_window"] - r["coverage"]["first_window"]) / 86400)
+    out = await _render(hass, "en", attributes)
+    heading = next(line for line in out.splitlines() if line.startswith("**Latest result**"))
+    # the period asked for (30 days) and, after it, the dates and days the connections used really cover
+    assert f"({r['period']['days']} days)" in heading and "data used:" in heading and f"({days} days)" in heading
+    assert heading.index("data used:") > heading.index(f"({r['period']['days']} days)")
+    # a result from before the field existed has no data span: the period alone
+    old = copy.deepcopy(attributes)
+    old["result"]["coverage"].pop("first_window")
+    old["result"]["coverage"].pop("last_window")
+    heading = next(line for line in (await _render(hass, "en", old)).splitlines() if line.startswith("**Latest result**"))
+    assert "data used:" not in heading
+
+
 async def test_a_result_saved_before_the_current_settings_column_still_renders(hass: HomeAssistant) -> None:
     """The result is saved: after an update the card first shows the one from the earlier version, without the new fields
     (current, settings, derived, the month fields of the current settings). The frontend renders strictly."""

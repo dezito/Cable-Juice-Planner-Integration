@@ -3194,7 +3194,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3469,7 +3470,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
@@ -3666,7 +3668,8 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_ns_no_result@@</ha-alert>
         {%- else -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
 
         {% if r.method == 'estimated' -%}
         <ha-alert alert-type="info">@@what_if_ns_method_estimated@@</ha-alert>

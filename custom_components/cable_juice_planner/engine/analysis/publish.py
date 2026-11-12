@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import datetime
-from .helpers import CHARGING_KINDS, linear_fit, temperature_bins
+from .helpers import ANALYSIS_DRIVES, CHARGING_KINDS, linear_fit, temperature_bins
 
 
 class AnalysisPublish:
@@ -11,7 +11,7 @@ class AnalysisPublish:
     def publish_analysis(self) -> None:
         battery_size = float(self.config["ev_car"]["battery_size"])
         points = []
-        for d in self.analysis_db["drives"]:
+        for d in self.analysis_db["drives"][-ANALYSIS_DRIVES:]:  # the analysis uses the newest ones; the What-if keeps more
             if d.get("temp") is None:
                 continue
             kwh = d["used"] / 100 * battery_size

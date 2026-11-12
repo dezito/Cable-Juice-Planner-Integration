@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 LEDGER_WINDOW = 5 * 86400.0  # s : a session is priced while it ended less than this ago (before CJP merges the history)
 PENDING_GIVE_UP = 48 * 3600.0  # s : a session whose stored prices are still missing this long after it ended is left out
-LEDGER_DAYS = 400
+# the days kept follow the months of history of the setup: see economy_keep_days (engine/economy.py)
 
 
 def _float_keys(table: Any) -> dict[float, float]:
@@ -88,7 +88,7 @@ class WhatIfSolar:
     def store_solar_statistics(self, data: dict[str, Any]) -> None:
         """economy_update: keep the hourly solar production, house consumption and charger power (W) and the sell price
         history that the coordinator read from the recorder's long-term statistics, 400 days of it."""
-        oldest = self._economy_ts(self.now()) - LEDGER_DAYS * 86400.0
+        oldest = self._economy_ts(self.now()) - self.economy_keep_days() * 86400.0
         hours = data.get("power_hours")
         if isinstance(hours, dict) and hours:
             stored = self.economy_db.setdefault("power_hours", {})
@@ -168,7 +168,7 @@ class WhatIfSolar:
                 **{k: (round(v, 4) if isinstance(v, float) else v) for k, v in result.items()},
             }
             spans.append((start, entry_end))
-        oldest = now - LEDGER_DAYS * 86400.0
+        oldest = now - self.economy_keep_days() * 86400.0
         for key in [key for key, entry in ledger.items() if not isinstance(entry, dict) or float(entry.get("start", 0.0)) < oldest]:
             del ledger[key]
         self.mark_dirty("economy")
