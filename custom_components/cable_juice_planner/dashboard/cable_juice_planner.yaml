@@ -3271,7 +3271,7 @@ views:
         show: true
         title: '@@what_if_chart_cost_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3324,7 +3324,7 @@ views:
         show: true
         title: '@@what_if_chart_diff_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3370,7 +3370,7 @@ views:
         show: true
         title: '@@what_if_chart_saving_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3528,7 +3528,7 @@ views:
         show: true
         title: '@@what_if_chart_settings_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3574,7 +3574,7 @@ views:
         show: true
         title: '@@what_if_chart_cumulative_diff_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3736,7 +3736,7 @@ views:
         show: true
         title: '@@what_if_chart_ns_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3782,7 +3782,7 @@ views:
         show: true
         title: '@@what_if_chart_unit_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3830,7 +3830,7 @@ views:
         show: true
         title: '@@what_if_chart_energy_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3953,7 +3953,7 @@ views:
         show: true
         title: '@@what_if_chart_solar_value_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -3997,7 +3997,7 @@ views:
         show: true
         title: '@@what_if_chart_solar_cumulative_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:
@@ -4096,7 +4096,7 @@ views:
         show: true
         title: '@@what_if_chart_subscription_title@@'
         show_states: false
-      graph_span: 400d
+      graph_span: 430d
       span:
         end: month
       now:

@@ -151,7 +151,7 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
     ]
     for chart in charts:
         # a chart reads the saved result of its sensor and shows nothing without one; never a point without a value
-        assert chart["graph_span"] in ("400d", "365d") and chart["now"] == {"show": False}
+        assert chart["graph_span"] in ("430d", "400d", "365d") and chart["now"] == {"show": False}
         for series in chart["series"]:
             code = series["data_generator"]
             assert "entity.attributes" in code and ("getTime()" in code or "* 1000" in code)

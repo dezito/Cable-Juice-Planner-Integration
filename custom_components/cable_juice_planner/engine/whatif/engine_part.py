@@ -22,7 +22,7 @@ from .replay import PolicyResult, ReplayResult, replay, replay_plan
 
 _LOGGER = logging.getLogger(__name__)
 
-WHAT_IF_DAYS = (7, 365)  # the shortest, and the longest when only the default 12 months are kept (see what_if_max_days)
+WHAT_IF_DAYS = (7, 365)  # the shortest, and the lowest the longest can be (see what_if_max_days: the days kept, 403 by default)
 WHAT_IF_DEFAULT_DAYS = 30
 DAY_SELECTIONS = ("all", "work_plan", "monday_friday", "weekend")
 WHAT_IF_WINDOW_ROWS = 60  # the newest connection windows kept in the result for the dashboard
