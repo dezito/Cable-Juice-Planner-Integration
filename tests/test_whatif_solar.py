@@ -575,8 +575,9 @@ def test_the_solar_the_ev_can_use_is_what_the_production_leaves_after_the_rest_o
 def test_hours_without_charging_or_without_a_price_are_left_out_and_counted() -> None:
     hours = {hour(10): [6000.0, 3000.0, 2000.0], hour(11): [6000.0, 1000.0, 10.0], hour(12): [6000.0, 3000.0, 2000.0], hour(13): [6000.0, 3000.0, 2000.0]}
     result = hourly(hours, buy={hour(10): 1.0, hour(11): 1.0, hour(13): 1.0}, sell={hour(10): 0.4, hour(11): 0.4, hour(12): 0.4})
-    assert result["sessions_counted"] == 1  # hour 11 is no charging hour (10 W), hour 12 has no buy price, hour 13 no sell price
-    assert result["left_out"]["missing_buy_price"] == 1 and result["left_out"]["missing_sell_price"] == 1
+    assert result["hours_counted"] == 1  # hour 11 is no charging hour (10 W), hour 12 has no buy price, hour 13 no sell price
+    assert result["estimated"]["left_out"]["missing_buy_price"] == 1 and result["estimated"]["left_out"]["missing_sell_price"] == 1
+    assert result["left_out"]["missing_buy_price"] == 0  # hours are counted apart from the sessions
 
 
 def test_the_sell_value_rule_the_refund_and_the_assumed_production_price_are_applied_per_hour() -> None:
@@ -591,24 +592,26 @@ def test_the_sell_value_rule_the_refund_and_the_assumed_production_price_are_app
 
 def test_the_latest_hour_and_invalid_rows_are_not_used() -> None:
     hours = {hour(10): [6000.0, 3000.0, 2000.0], hour(50): [6000.0, 3000.0, 2000.0], hour(11): [float("nan"), 3000.0, 2000.0], hour(12): [1.0, 2.0]}
-    assert hourly(hours, last=hour(20))["sessions_counted"] == 1
+    assert hourly(hours, last=hour(20))["hours_counted"] == 1
 
 
 def test_the_statistics_are_stored_and_the_sell_sensor_is_converted_by_the_provider_without_side_effects() -> None:
     engine, snap = _solar_engine()
     provider = engine.price_provider.providers[0]
-    provider.get_sell_price_entity_id = lambda: "sensor.sell"
     provider.sell_price_details = {"kept": 1}
-    provider.calculate_sell_price = lambda moment, price: (provider.sell_price_details.update({moment: 1}), round(price * 0.5, 4))[1]  # type: ignore[method-assign]
+    # the test sensor is a raw price (no tariffs attribute): the day's record only has the selling costs
+    engine.economy_db["sell_tariff_days"] = {"sensor.price": {RECENT.isoformat(): {
+        "tariffs": None, "sell_costs": {"transmissions_nettarif": 0.05, "systemtarif": 0.1}, "sell_fee": 0.0,
+    }}}
     recent = _ts(RECENT, 11)
     data = {
         "power_hours": {recent: {"solar": 6000.0, "house": 3000.0, "ev": 2000.0}, 5.0: {"solar": 1.0, "house": 1.0, "ev": 1.0}, recent + 3600: {"solar": 1.0}},
-        "sell_history": {recent: 0.8, 6.0: 9.0},
+        "sell_history": {recent: 0.8, 6.0: 9.0}, "sell_history_entity_id": "sensor.price",
     }
     result = engine.run_job(snap, engine.economy_update, {"prices": {}, "windows": [], "odometer_months": {}, **data})
     assert result.error is None, result.error
     assert engine.economy_db["power_hours"] == {recent: [6000.0, 3000.0, 2000.0]}  # old and incomplete hours are not kept
-    assert engine.economy_db["sell_prices_history"] == {recent: 0.4}
+    assert engine.economy_db["sell_prices_history"] == {recent: 0.65}  # 0.8 - net and system tariff of its day
     assert provider.sell_price_details == {"kept": 1}  # the notes of the provider are exactly as they were
 
 
@@ -628,3 +631,114 @@ def test_the_comparison_uses_the_recorder_statistics_when_there_are_some_and_the
     del engine.economy_db["sell_prices_history"][prior]
     fallback = _data(engine, snap)
     assert fallback["source"] == "sessions" and fallback["status"] == "unavailable"
+
+
+# --------------------------------------------------------------------------- sessions first, hours as an upper bound
+
+
+def ledger_entry(start: float, end: float, solar: float, month: str = "2026-01") -> dict:
+    return {"start": start, "end": end, "month": month, "outcome": "counted", "solar_kwh": solar, "grid_cost": solar * 1.0, "sell_value": solar * 0.4, "powerwall_kwh": 0.0}
+
+
+def mixed(power_hours, sessions, covered=()):
+    stamps = list(power_hours)
+    return solar_from_power_hours(
+        power_hours, dict.fromkeys(stamps, 1.0), dict.fromkeys(stamps, 0.4), {}, -1.0, 0.0, hour(100), "2026-02", lambda ts: "2026-01",
+        sessions, None, covered,
+    )
+
+
+CHARGING = [6000.0, 3000.0, 2000.0]  # 2 kWh of solar for the EV by the hourly means
+
+
+def test_without_sessions_the_hours_are_used_as_before_but_flagged_as_an_upper_bound() -> None:
+    result = hourly({hour(10): CHARGING})
+    assert result["status"] == "ok" and result["source"] == "power_history" and result["upper_bound"]
+    month = result["months"][0]
+    assert (month["sessions"], month["hours"], month["solar_kwh"], month["estimated_kwh"], month["upper_bound"]) == (0, 1, 2.0, 2.0, True)
+    assert result["total"]["upper_bound"] and result["total"]["estimated_kwh"] == 2.0 and result["total"]["hours"] == 1
+    assert result["estimated"] | {"left_out": None} == {"hours": 1, "solar_kwh": 2.0, "months": 1, "left_out": None}
+    assert result["ledger"] == {"sessions": 0, "solar_kwh": 0.0, "months": 0}
+    assert "hourly_solar_upper_bound" in result["notes"] and "solar_from_power_history" in result["notes"]
+
+
+def test_a_short_burst_reads_as_more_solar_than_it_can_have_been_which_is_why_it_is_an_upper_bound() -> None:
+    # solar 4 kW, house 0.5 kW, the charger at 11 kW for 20 minutes: the hourly means give 3.5 kWh of solar for the EV,
+    # though at most 20 min x 3.5 kW = 1.17 kWh can have come from the solar
+    result = hourly({hour(10): [4000.0, 500.0 + 11000.0 / 3, 11000.0 / 3]})
+    assert result["months"][0]["solar_kwh"] == pytest.approx(3.5) and result["upper_bound"]
+
+
+def test_an_hour_covered_by_a_priced_session_is_not_counted_twice() -> None:
+    result = mixed({hour(10): CHARGING}, [ledger_entry(hour(10), hour(11), 1.5)])
+    assert result["source"] == "sessions" and not result["upper_bound"] and result["hours_counted"] == 0
+    assert result["months"][0]["solar_kwh"] == 1.5 and result["months"][0]["sessions"] == 1
+    assert result["estimated"]["left_out"]["covered_by_sessions"] == 1
+
+
+def test_an_hour_a_session_covers_only_partly_is_left_to_the_session() -> None:
+    # 10:30-10:45 covers part of hour 10: that hour is not estimated; hour 11 has no session and is estimated
+    result = mixed({hour(10): CHARGING, hour(11): CHARGING}, [ledger_entry(hour(10.5), hour(10.75), 0.5)])
+    assert result["hours_counted"] == 1 and result["estimated"]["solar_kwh"] == 2.0
+    assert result["months"][0]["solar_kwh"] == pytest.approx(2.5)
+    # a session's end is stored to the minute (up to 59 s early): one that ends within that minute of the hour's start
+    # still covers the hour, so the energy of its last seconds is not estimated a second time
+    result = mixed({hour(10): CHARGING}, [ledger_entry(hour(9), hour(10), 0.5)])
+    assert result["hours_counted"] == 0 and result["estimated"]["left_out"]["covered_by_sessions"] == 1
+    # one that ended a full two minutes earlier does not cover the hour
+    result = mixed({hour(10): CHARGING}, [ledger_entry(hour(9), hour(10) - 120.0, 0.5)])
+    assert result["hours_counted"] == 1 and result["estimated"]["left_out"]["covered_by_sessions"] == 0
+    # a left-out session (no price, before the energy fix, no solar) covers its time as well: no hour fills it in
+    left = {"start": hour(10), "end": hour(11), "month": "2026-01", "outcome": "left_out", "reason": "missing_sell_price"}
+    result = mixed({hour(10): CHARGING}, [left])
+    assert result["hours_counted"] == 0 and result["left_out"]["missing_sell_price"] == 1
+    # and so does a session the ledger will still price (still charging, waiting for its price)
+    assert mixed({hour(10): CHARGING}, [], covered=[(hour(10.2), hour(12))])["hours_counted"] == 0
+
+
+def test_sessions_and_estimated_hours_together_are_mixed_and_flagged() -> None:
+    result = mixed({hour(10): CHARGING, hour(20): CHARGING}, [ledger_entry(hour(10), hour(11), 1.5)])
+    assert result["status"] == "ok" and result["source"] == "mixed" and result["upper_bound"]
+    assert result["ledger"] == {"sessions": 1, "solar_kwh": 1.5, "months": 1}
+    assert (result["estimated"]["hours"], result["estimated"]["solar_kwh"], result["estimated"]["months"]) == (1, 2.0, 1)
+    month = result["months"][0]
+    assert (month["sessions"], month["hours"], month["solar_kwh"], month["estimated_kwh"], month["upper_bound"]) == (1, 1, 3.5, 2.0, True)
+    assert month["advantage"] == pytest.approx(3.5 * (1.0 - 0.4))
+    assert result["sessions_counted"] == 1 and result["hours_counted"] == 1
+
+
+def test_the_engine_keeps_the_sessions_where_they_cover_the_time_and_flags_the_estimated_hours() -> None:
+    engine, snap = _solar_engine()
+    engine.config["solar"]["production_price"] = -1.0
+    day = DAY - datetime.timedelta(days=70)
+    covered, other, old = _ts(day, 11), _ts(day, 14), _ts(day, 17)
+    engine.economy_db["solar_ledger"] = {str(int(covered)): {
+        "start": covered + 300, "end": covered + 3300, "month": day.strftime("%Y-%m"), "outcome": "counted",
+        "solar_kwh": 1.0, "grid_cost": 1.3, "sell_value": 0.5, "powerwall_kwh": 0.0,
+    }}
+    engine.economy_db["prices"] = dict.fromkeys((covered, other, old), 1.5)
+    engine.economy_db["sell_prices_history"] = dict.fromkeys((covered, other, old), 0.5)
+    engine.economy_db["power_hours"] = dict.fromkeys((covered, other, old), CHARGING)
+    # a session that was never priced in time: the hourly statistics reach it, so it is estimated, not "not captured"
+    _history(engine, day, 17, "17:55")
+    result = _publish(engine, snap)
+    data = result.attributes["what_if_solar"]["result"]
+    assert data["status"] == "ok" and data["source"] == "mixed" and data["upper_bound"]
+    assert data["ledger"]["sessions"] == 1 and data["estimated"]["hours"] == 2 and data["estimated"]["left_out"]["covered_by_sessions"] == 1
+    assert data["left_out"]["not_captured"] == 0
+    month = data["months"][0]
+    assert (month["sessions"], month["hours"], month["solar_kwh"], month["estimated_kwh"]) == (1, 2, 5.0, 4.0)
+    assert result.states["what_if_solar"] == data["total"]["advantage"] and data["total"]["upper_bound"]
+    assert "hourly_solar_upper_bound" in data["notes"]
+
+
+def test_the_hours_of_a_session_still_charging_are_left_to_it() -> None:
+    engine, snap = _solar_engine()
+    for h in (10, 11):
+        engine.economy_db.setdefault("power_hours", {})[_ts(RECENT, h)] = CHARGING
+    _prices(engine, RECENT)
+    engine.economy_db["sell_prices_history"] = {_ts(RECENT, h): 0.4 for h in range(24)}
+    _history(engine, RECENT, 10, ">")
+    data = _data(engine, snap)
+    assert data["hours_counted"] == 0 and data["left_out"]["still_charging"] == 1 and data["source"] == "sessions"
+    assert data["estimated"]["left_out"]["covered_by_sessions"] == 2

@@ -55,6 +55,8 @@ def test_the_view_has_a_scenario_d_section_that_asks_for_nothing_and_reads_its_o
         "recorded before", "missing stored buy or sell price", "home battery", "since when", "no price is ever filled in",
         "existing history gives no result", "not physically no solar production", "replanned", "no whole-house result",
         "priced once", "not priced in time", "fold-out with the assumptions", "marked incomplete",
+        "no recorded session covers", "upper bound", "asterisk", "recorded sessions and what was estimated", "left out for a missing price",
+        "sessions, charging hours, or both",
     ):
         assert phrase.lower() in explain.lower(), phrase
 
@@ -103,6 +105,44 @@ async def test_waiting_for_new_sessions_says_so_and_lists_what_was_left_out(hass
     assert "this fills as new solar sessions are recorded" in out
     assert "recorded before solar energy was stored as energy (1)" in out
     assert "Month" not in out and "Completed months" not in out  # nothing is invented while there is no result
+
+
+def _mixed_result() -> dict:
+    """A ledger session and two charging hours that no session covers, one of them without a buy price."""
+    from custom_components.cable_juice_planner.engine.whatif.solar import solar_from_power_hours
+
+    entry = {"start": hour(10), "end": hour(11), "month": "2026-01", "outcome": "counted", "solar_kwh": 1.5, "grid_cost": 1.5, "sell_value": 0.6, "powerwall_kwh": 0.0}
+    power = {hour(10): [6000.0, 3000.0, 2000.0], hour(20): [6000.0, 3000.0, 2000.0], hour(21): [6000.0, 3000.0, 2000.0]}
+    result = solar_from_power_hours(
+        power, {hour(10): 1.0, hour(20): 1.0}, dict.fromkeys(power, 0.4), {}, -1.0, 0.0, hour(100), "2026-02", lambda ts: "2026-01", [entry],
+    )
+    assert result["source"] == "mixed" and result["upper_bound"]
+    return {**result, "computed_at": hour(50), "sell_prices_since": hour(0), "solar_energy_since": hour(-5)}
+
+
+async def test_estimated_hours_are_marked_as_an_upper_bound_with_the_split_and_the_hours_left_out(hass: HomeAssistant) -> None:
+    result = _mixed_result()
+    out = await _render(hass, "en", result)
+    for expected in (
+        "Sessions / Charging hours", "| 1 / 1 |", "3.5 kWh&#42;", "&#42; Includes charging hours that no recorded session covers",
+        "upper bound", "From recorded sessions:", "Sessions 1", "1.5 kWh", "Estimated from hourly averages (upper bound):",
+        "Charging hours 1", "2.0 kWh", "Charging hours left out:", "missing buy price (1)",
+        "Hours that no recorded session covers are estimated from the hourly averages",
+    ):
+        assert expected in out, expected
+    assert "covered_by_sessions" not in out and "None" not in out and "Undefined" not in out
+    assert str(result["total"]["advantage"]) in out
+    # only the sessions: no mark, no warning
+    plain = await _render(hass, "en", _result())
+    assert "&#42;" not in plain and "upper bound" not in plain
+
+
+async def test_every_language_marks_the_estimated_hours_without_missing_texts(hass: HomeAssistant) -> None:
+    result = _mixed_result()
+    for language in LANGUAGES:
+        out = await _render(hass, language, result)
+        assert "@@" not in out and "Undefined" not in out and "&#42;" in out, language
+        assert "hourly_solar_upper_bound" not in out and "missing_buy_price (" not in out, language
 
 
 async def test_no_result_at_all_shows_that_nothing_has_been_recorded_yet(hass: HomeAssistant) -> None:

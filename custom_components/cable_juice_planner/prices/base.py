@@ -59,6 +59,13 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def sell_price_parts(price: float, tariff: Mapping, costs: Mapping, sell_fee: float) -> tuple[float, float, float]:
+    """The sell price formula (see calculate_sell_price): (price without the tariffs in it, selling costs, sell price)."""
+    raw_price = price - tariff["tariff_sum"]
+    sell_tariffs = sum((sell_fee, costs["transmissions_nettarif"], costs["systemtarif"]))
+    return raw_price, sell_tariffs, round(raw_price - sell_tariffs, 2)
+
+
 class BasePriceProvider:
     source_name = "base"
     # config key of the buy price entity
@@ -172,9 +179,7 @@ class BasePriceProvider:
         tariff = self.get_tariffs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
         sell_costs = self.get_sell_costs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
         costs = tariff if sell_costs is None else sell_costs
-        raw_price = price - tariff["tariff_sum"]
-        sell_tariffs = sum((self.sell_fee, costs["transmissions_nettarif"], costs["systemtarif"]))
-        sell_price = round(raw_price - sell_tariffs, 2)
+        raw_price, sell_tariffs, sell_price = sell_price_parts(price, tariff, costs, self.sell_fee)
         self.sell_price_details[timestamp] = {
             "price": price,
             "price_timestamp": timestamp,
@@ -192,6 +197,17 @@ class BasePriceProvider:
             "solar_sell_price": sell_price,
         }
         return sell_price
+
+    def sell_tariff_day(self) -> tuple[str, dict] | None:
+        """(local date, record) of the tariffs the sell price of today is converted with, to keep for converting the
+        recorded sell price of this day later (sell_price_from_tariff_day). None when today's tariffs are not known
+        in full: a provider without a recorded sell entity, or one whose tariffs could be another day's."""
+        return None
+
+    def sell_price_from_tariff_day(self, moment: datetime.datetime, price: float, day: Mapping) -> float | None:
+        """The sell price of a recorded price at the local moment, with the tariffs kept for its day
+        (sell_tariff_day()); the same formula as calculate_sell_price(). None when the record can't convert it."""
+        return None
 
     @staticmethod
     def _periods_in_hour(prices: dict, timestamp) -> int:
@@ -419,6 +435,35 @@ class CombinedPriceProvider(BasePriceProvider):
             details = result["price"]
             return {key: details.get(key, 0.0) for key in _ZERO_TARIFFS}
         return dict(_ZERO_TARIFFS)
+
+    def sell_tariff_days(self) -> dict[str, tuple[str, dict]]:
+        """{sell entity: (local date, record)}: today's tariffs of the sell price of every provider with a recorded
+        sell entity that knows them in full (see BasePriceProvider.sell_tariff_day)."""
+        days: dict[str, tuple[str, dict]] = {}
+        for provider in self.providers:
+            entity_id = provider.get_sell_price_entity_id()
+            if not entity_id or entity_id in days:
+                continue
+            try:
+                day = provider.sell_tariff_day()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Can't read today's sell tariffs from %s: %s %s", provider.source_name, err, type(err))
+                continue
+            if day is not None:
+                days[entity_id] = day
+        return days
+
+    def convert_recorded_sell_price(self, entity_id: str, moment: datetime.datetime, price: float, day: Any) -> float | None:
+        """A recorded price of the sell entity at the local moment as the sell price, with the tariffs kept for its
+        day (a record of sell_tariff_days()). None without such a record: never with another day's tariffs or none."""
+        provider = next((p for p in self.providers if p.get_sell_price_entity_id() == entity_id), None) if entity_id else None
+        if provider is None or not isinstance(day, Mapping) or not is_number(price):
+            return None
+        try:
+            value = provider.sell_price_from_tariff_day(_naive(moment), price, day)
+        except Exception:  # noqa: BLE001
+            return None
+        return value if is_number(value) else None
 
     def get_buy_periods_in_hour(self, timestamp) -> int:
         self._sync_prices()

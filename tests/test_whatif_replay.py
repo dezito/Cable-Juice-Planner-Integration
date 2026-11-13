@@ -161,19 +161,11 @@ def test_non_finite_price_counts_as_missing() -> None:
     assert result.status == "unavailable"
 
 
-def test_public_charge_that_would_overfill_stops_the_replay() -> None:
-    public = Event(ts=hour(10), kind="public", battery_kwh=20.0)  # 33 % on a 60 kWh battery
-    result = replay(make([(0, 6), (20, 26)], flat(26), events=[public], target=80.0, start=80.0))
-    assert result.status == "partial" and result.reason == "public_overfill"
-    assert result.windows_replayed == 1
-    # a fixed public charge that fits is carried like any other energy
-    ok = replay(make([(0, 6), (20, 26)], flat(26), events=[Event(ts=hour(10), kind="public", battery_kwh=6.0)], target=80.0, start=60.0))
-    assert ok.status == "ok" and ok.smart.public_kwh == pytest.approx(6.0)
-    # 60 % -> target 80 % in the first window, then 6 kWh = 10 % from the public charger: 90 % at the next plug-in
-    assert ok.smart.windows[0].soc_out == pytest.approx(80.0)
-    assert ok.smart.windows[1].soc_in == pytest.approx(90.0)
-    assert ok.smart.windows[1].charged_kwh == 0.0
-    assert ok.max_conservation_error_kwh < 1e-6
+def test_a_drive_is_the_only_event_kind_public_charging_is_inside_the_drive() -> None:
+    # a drive is the level at departure minus the level at the next plug-in, so it is already net of public charging:
+    # anything that is not a drive is invalid input, never a second way to add energy
+    result = replay(make([(0, 6), (20, 26)], flat(26), events=[Event(ts=hour(10), kind="public")], target=80.0, start=60.0))
+    assert result.status == "unavailable" and result.reason == "invalid_event"
 
 
 def test_soc_dependent_power_limits_the_charge() -> None:

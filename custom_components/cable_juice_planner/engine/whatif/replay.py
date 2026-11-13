@@ -4,8 +4,8 @@ Nothing here touches Home Assistant, the live engine state, a charger or a car. 
 time is UTC epoch seconds and every price is the grid buy price (incl. fees) per kWh of
 the whole UTC hour that starts at the key (sub-hour prices must be averaged first).
 
-Two policies are replayed over identical demand, connection windows, public charges,
-physical limits and starting SOC; the SOC is carried continuously from window to window:
+Two policies are replayed over identical demand, connection windows, physical limits and
+starting SOC; the SOC is carried continuously from window to window:
 
 - "smart": charge to the target before unplugging, in the cheapest hours of each
   connection window that are enough to reach it (CJP's daily charging to the maximum
@@ -26,8 +26,8 @@ Rules that keep the comparison honest:
   because the SOC would no longer be the same for both policies.
 - Driving is a withdrawal from the SOC. A drive that needs more than the battery holds
   is reported as unmet driving demand (the SOC stops at 0).
-- A public charge that would take the SOC above 100 % stops the replay with
-  "public_overfill": its cost is fixed, so it is neither clipped nor ignored.
+- Public charging is not an event: a drive is the battery level at departure minus the level
+  at the next plug-in, so it is already net of any public charge in between (see inputs.py).
 - A model that returns a non-finite or negative loss/power is unavailable, not "ok", and a
   failed energy balance makes the replay unavailable.
 - Not modelled, and stated in `notes`: house/site limits, solar, standby drain while
@@ -98,14 +98,12 @@ class Window:
 class Event:
     """Something that moves the SOC while the car is away from the charger.
 
-    kind "drive": soc_percent is the SOC used (>= 0).
-    kind "public": battery_kwh is the energy added to the battery by a fixed public charge.
+    kind "drive" (the only kind): soc_percent is the SOC used (>= 0).
     """
 
     ts: float
     kind: str
     soc_percent: float = 0.0
-    battery_kwh: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -158,7 +156,6 @@ class PolicyResult:
     final_soc: float = 0.0
     end_soc: float = 0.0
     lowest_soc: float = 0.0
-    public_kwh: float = 0.0
     driven_percent: float = 0.0
     calibrated: bool = False  # the starting level was unknown (see _run)
 
@@ -214,7 +211,7 @@ class ReplayResult:
     notes: tuple[str, ...] = NOTES
     warnings: tuple[str, ...] = ()
     provenance: Mapping[str, str] = field(default_factory=dict)
-    ignored_events: int = 0  # drives/public charges that were not replayed (see warnings)
+    ignored_events: int = 0  # drives that were not replayed (see warnings)
     comparable: bool = False
     comparable_reason: str | None = None
     difference: dict[str, float] | None = None  # smart minus asap; negative cost is better
@@ -273,11 +270,9 @@ def _validate(data: ReplayInput) -> str | None:
     if any(not _finite(key) or key % HOUR != 0 for key in data.prices):
         return "prices_not_hourly"
     for event in data.events:
-        if not _finite(event.ts) or event.kind not in ("drive", "public"):
+        if not _finite(event.ts) or event.kind != "drive":
             return "invalid_event"
-        if event.kind == "drive" and not (_finite(event.soc_percent) and event.soc_percent >= 0):
-            return "invalid_event"
-        if event.kind == "public" and not (_finite(event.battery_kwh) and event.battery_kwh >= 0):
+        if not (_finite(event.soc_percent) and event.soc_percent >= 0):
             return "invalid_event"
     return None
 
@@ -421,26 +416,19 @@ def _plan_smart(data: ReplayInput, slots: list[_Slot], soc_in: float, target: fl
 
 def _apply_events(
     data: ReplayInput, soc: float, events: list[Event], result: PolicyResult, last: WindowResult
-) -> tuple[float, bool]:
-    """Apply the drives and public charges between two windows. Returns (soc, public_overfill)."""
+) -> float:
+    """Apply the drives between two windows. Returns the soc."""
     for event in events:
-        if event.kind == "drive":
-            used = event.soc_percent
-            available = max(soc, 0.0)
-            if used > available + EPS:
-                last.drive_shortfall_kwh += (used - available) / 100.0 * data.battery_kwh
-                soc = 0.0
-            else:
-                soc -= used
-            result.driven_percent += used
-            result.lowest_soc = min(result.lowest_soc, soc)
+        used = event.soc_percent
+        available = max(soc, 0.0)
+        if used > available + EPS:
+            last.drive_shortfall_kwh += (used - available) / 100.0 * data.battery_kwh
+            soc = 0.0
         else:
-            gained = event.battery_kwh / data.battery_kwh * 100.0
-            if soc + gained > 100.0 + 1e-6:
-                return soc, True
-            soc += gained
-            result.public_kwh += event.battery_kwh
-    return soc, False
+            soc -= used
+        result.driven_percent += used
+        result.lowest_soc = min(result.lowest_soc, soc)
+    return soc
 
 
 def _run(
@@ -494,9 +482,7 @@ def _run(
                 if position not in taken and _in_gap(event, window, nxt):
                     taken.add(position)
                     between.append(event)
-            soc, overfill = _apply_events(data, soc, between, result, row)
-            if overfill:
-                return _finish(result), "public_overfill", nxt, replayed
+            soc = _apply_events(data, soc, between, result, row)
         result.lowest_soc = min(result.lowest_soc, soc)
     return _finish(result, soc), None, None, replayed
 
@@ -521,9 +507,9 @@ def _conservation(data: ReplayInput, policy: PolicyResult) -> float:
     for row in policy.windows:
         delta = (row.soc_out - row.soc_in) / 100.0 * data.battery_kwh
         worst = max(worst, abs(delta - row.charged_kwh), max(-row.loss_kwh, 0.0))
-    # over the whole replay: what was charged + public - driven (minus what could not be driven)
+    # over the whole replay: what was charged - driven (minus what could not be driven)
     driven_kwh = policy.driven_percent / 100.0 * data.battery_kwh - policy.unmet_driving_kwh
-    expected = policy.start_soc / 100.0 * data.battery_kwh + policy.charged_kwh + policy.public_kwh - driven_kwh
+    expected = policy.start_soc / 100.0 * data.battery_kwh + policy.charged_kwh - driven_kwh
     if policy.windows:
         # the SOC after the last applied drive (the last unplug when no drive after it was applied)
         actual = policy.end_soc / 100.0 * data.battery_kwh
@@ -566,7 +552,7 @@ def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]
             status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance,
         )
     if count < len(ordered):
-        # run again over exactly the compared windows: no drive or public charge after the
+        # run again over exactly the compared windows: no drive after the
         # last one counts towards the lowest SOC, the energy balance or the unmet demand
         smart, _, _, _ = _run(data, "smart", ordered[:count], calibrate_to=calibrate_to)
         asap, _, _, _ = _run(data, "asap", ordered[:count], calibrate_to=calibrate_to)
@@ -806,9 +792,6 @@ def _replay_settings(
     base, base_stop, base_at, base_n = _run(data, "baseline", candidates, base_targets, ordered[-1].start, calibrate_to)
     alt, alt_stop, alt_at, alt_n = _run(data, "alternative", candidates, alt_targets, ordered[-1].start, calibrate_to)
 
-    if "public_overfill" in (base_stop, alt_stop):
-        # a fixed public charge that does not fit also hits the last gap, whose drives are applied for the readiness
-        return SettingsResult(status="unavailable", reason="public_overfill", windows_total=len(ordered), provenance=provenance)
     count = min(base_n, alt_n)
     stop, stopped = (base_stop, base_at) if base_n <= alt_n else (alt_stop, alt_at)
     if count == 0:
@@ -952,8 +935,6 @@ def _replay_plan(data: ReplayInput, ordered: list[Window], settings: CjpSettings
         return PlanResult(status="unavailable", reason="missing_prices", windows_total=len(ordered), provenance=provenance, warnings=measured.warnings)
     targets = [settings_target(need, settings) for need in needs]
     plan, stop, _, count = _run(data, "planned", candidates, targets, ordered[-1].start, targets[0])
-    if stop == "public_overfill":
-        return PlanResult(status="unavailable", reason="public_overfill", windows_total=len(ordered), provenance=provenance)
     if count == 0:
         return PlanResult(status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance)
     compared = ordered[:count]

@@ -247,6 +247,7 @@ class CoordinatorRefresh:
                     hourly = {stat_ts(row): row["mean"] for row in stats.get(sell_id, []) if row.get("mean") is not None}
                     if hourly:
                         data["sell_history"] = hourly  # the first provider that has a history
+                        data["sell_history_entity_id"] = sell_id  # converted by the provider of this entity
                         break
             solar_id = self.config["solar"]["entity_ids"].get("production_entity_id") if self.engine.is_solar_configured() else ""
             house_id = self.config["home"]["entity_ids"].get("power_consumption_entity_id")

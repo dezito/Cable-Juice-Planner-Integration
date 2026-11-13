@@ -203,10 +203,3 @@ def test_the_settings_replay_does_not_change_scenario_a() -> None:
     replay_settings(data, LIVE, CjpSettings(50.0, 90.0))
     after = replay(data)
     assert (before.smart.cost, before.asap.cost, before.status) == (after.smart.cost, after.asap.cost, after.status)
-
-
-def test_a_public_charge_that_does_not_fit_makes_the_comparison_unavailable() -> None:
-    data = three_days()
-    data = replace(data, events=(*data.events, Event(ts=hour(14), kind="public", battery_kwh=55.0)))
-    result = replay_settings(data, LIVE, CjpSettings(reserve=50.0, maximum=90.0))
-    assert result.status == "unavailable" and result.reason == "public_overfill"

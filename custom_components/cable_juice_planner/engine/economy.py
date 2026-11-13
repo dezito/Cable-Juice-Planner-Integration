@@ -36,6 +36,10 @@ ECONOMY_MONTHS = 13
 ECONOMY_DB_VERSION = 2
 ECONOMY_PRICE_DAYS = 400  # hourly prices kept for the comparisons: at least this many days (see economy_keep_days)
 ECONOMY_WINDOW_SETTLE = 2 * 3600  # s after unplugging before a window is calculated (the last hour is recalculated)
+# economy_db["sell_prices_history"] (the recorded sell price converted to CJP's sell price): 2 = converted with the
+# tariffs kept for the hour's own day (sell_tariff_days). Earlier hours were converted with the tariffs of the day of
+# the conversion and are dropped on load.
+SELL_PRICES_HISTORY_VERSION = 2
 
 
 def _finite(value) -> bool:
@@ -145,6 +149,14 @@ class Economy:
         self.economy_db.setdefault("solar_energy_since", self._economy_ts(self.now()))
         if not isinstance(self.economy_db.get("derived_windows"), dict):
             self.economy_db.pop("derived_windows", None)
+        if self.economy_db.get("sell_prices_history_version") != SELL_PRICES_HISTORY_VERSION:
+            # converted with one day's tariffs for every hour: never kept, the hours are converted again where the
+            # tariffs of their own day are known (also when an older backup is restored)
+            self.economy_db.pop("sell_prices_history", None)
+            self.economy_db.pop("sell_tariff_unknown_hours", None)
+            self.economy_db["sell_prices_history_version"] = SELL_PRICES_HISTORY_VERSION
+        if not isinstance(self.economy_db.get("sell_tariff_days"), dict):
+            self.economy_db.pop("sell_tariff_days", None)
 
     # connection windows ------------------------------------------------ #
 
@@ -232,11 +244,35 @@ class Economy:
         self.mark_dirty("economy")
         try:
             # the What-if solar comparison must never stop the storing of the buy prices above
+            self.economy_store_sell_tariffs(now)
             self._economy_store_sell_prices(now)
             self.update_solar_ledger()
             self.publish_what_if_solar()
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("The What-if solar data could not be stored: %s %s", err, type(err))
+
+    def economy_store_sell_tariffs(self, now: datetime.datetime) -> None:
+        """Today's tariffs of the sell price per sell entity: economy_db["sell_tariff_days"] = {entity: {local date:
+        record}} (see BasePriceProvider.sell_tariff_day). The recorded sell price of a day can only be converted to
+        CJP's sell price with the tariffs of that day, and Energi Data Service does not record its tariffs. Written
+        every hour, so the last complete record of a day is kept; kept as long as the sell prices."""
+        days_of_provider = getattr(self.price_provider, "sell_tariff_days", None)
+        if not self.is_solar_configured() or days_of_provider is None:
+            return
+        days = self.economy_db.setdefault("sell_tariff_days", {})
+        for entity_id, (date, record) in days_of_provider().items():
+            if not isinstance(days.get(entity_id), dict):
+                days[entity_id] = {}
+            days[entity_id][date] = record
+        oldest = self._economy_local(self._economy_ts(now) - self.economy_keep_days() * 86400).date().isoformat()
+        for entity_id in list(days):
+            table = days[entity_id]
+            if isinstance(table, dict):
+                for date in [date for date in table if not isinstance(date, str) or date < oldest]:
+                    del table[date]
+            if not isinstance(table, dict) or not table:
+                del days[entity_id]
+        self.mark_dirty("economy")
 
     def _economy_store_sell_prices(self, now: datetime.datetime) -> None:
         """The raw hourly sell prices (and the fixed production price in effect) of the hours that have passed.
@@ -345,6 +381,7 @@ class Economy:
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("The What-if older connections could not be estimated: %s %s", err, type(err))
         try:
+            self.economy_store_sell_tariffs(self.now())  # today's, before the recorded sell prices are converted
             self.store_solar_statistics(data)
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("The What-if solar statistics could not be stored: %s %s", err, type(err))

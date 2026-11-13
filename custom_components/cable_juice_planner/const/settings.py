@@ -150,7 +150,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "what_if_settings": ("{valuta}", None, None, None),
     # the solar advantage of the completed months in What-if Scenario D (grid cost of the EV's solar energy minus its sell value)
     "what_if_solar": ("{valuta}", None, None, None),
-    # the estimated solar advantage of the latest What-if Scenario D (the recorded energy at the planned grid price minus the recorded cost)
+    # the difference vs plan of the latest What-if without solar (the recorded cost minus the recorded energy at the planned
+    # price per kWh; positive: the recorded charging cost more). It is not the value of the solar energy.
     "what_if_no_solar": ("{valuta}", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
