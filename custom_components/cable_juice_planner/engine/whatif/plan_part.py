@@ -3,8 +3,10 @@
 The solar energy is taken out completely: the period's connections are planned again, with CJP's current
 reserve and maximum level and the recorded driving, and all energy is bought from the grid at the hourly
 price (engine/whatif/replay.py, replay_plan). The recorded charging of the same period (with solar, valued
-the way CJP values it) is shown next to it as a reference, and the recorded energy priced at the planned
-grid price gives an estimate of what the solar was worth. Nothing live is changed. The result is saved
+the way CJP values it) is shown next to it as a reference. The "difference vs plan" is the recorded cost minus
+the recorded energy priced at the planned grid price per kWh (positive: the recorded charging cost more than the
+plan's price per kWh). It is NOT the value of the solar energy: it also holds the difference in charging times
+and price choices between the plan and what happened. Nothing live is changed. The result is saved
 separately (economy database, key "what_if_no_solar") and shown on sensor.<prefix>_what_if_no_solar.
 
 It shares the period, the starting battery level and the input data with Scenario A and B.
@@ -136,21 +138,27 @@ class WhatIfNoSolar:
         kwh = sum(s["kwh"] for s in inside)
         cost_valid = bool(inside) and all(s["cost_valid"] for s in inside)
         recorded_cost = sum(s["cost"] for s in inside) if cost_valid else None
-        solar = sum(s["solar"] for s in inside)
+        # sessions that started before the solar energy was recorded as energy have an unusable solar part (see
+        # load_economy_db): their energy and cost count, their solar kWh do not
+        since = self.economy_db.get("solar_energy_since")
+        solar_known = isinstance(since, (int, float)) and not isinstance(since, bool) and math.isfinite(since)
+        solar = sum(s["solar"] for s in inside if not solar_known or s["ts"] >= since)
         published["recorded"] = {
             "sessions": len(inside), "kwh": _round(kwh, 3), "cost": _round(recorded_cost, 2), "solar_kwh": _round(solar, 3),
             "powerwall_kwh": _round(sum(s["powerwall"] for s in inside), 3),
             "unit": _round(recorded_cost / kwh, 3) if recorded_cost is not None and kwh > 1e-9 else None,
         }
         plan = published["plan"]
-        # what the recorded energy would have cost from the grid at the price the planned charging paid per kWh: an estimate,
-        # because the recorded energy also holds drives and standby that the replay does not have
-        # only with recorded solar energy: without it there is nothing to value, and a difference would only be timing
+        # the recorded energy at the price per kWh the planned grid-only charging paid, against the recorded cost:
+        # difference_vs_plan = recorded cost - recorded kWh x planned price per kWh (positive: the recorded charging cost
+        # more). It is not the value of the solar energy: it mixes the solar with the charging times and price choices
+        # (and the recorded energy also holds drives and standby that the replay does not have). Only with recorded
+        # solar energy, as the card compares the charging with solar against the plan without it.
         if recorded_cost is not None and kwh > 1e-9 and solar > 1e-9 and plan and measured_unit is not None:
-            without_solar = kwh * measured_unit
+            at_plan_price = kwh * measured_unit
             published["estimate"] = {
-                "cost_without_solar": _round(without_solar, 2), "recorded_cost": _round(recorded_cost, 2),
-                "solar_advantage": _round(without_solar - recorded_cost, 2), "kwh": _round(kwh, 3), "unit": measured_unit,
+                "cost_at_plan_price": _round(at_plan_price, 2), "recorded_cost": _round(recorded_cost, 2),
+                "difference_vs_plan": _round(recorded_cost - at_plan_price, 2), "kwh": _round(kwh, 3), "unit": measured_unit,
             }
 
         months: dict[str, dict[str, Any]] = {}
@@ -196,6 +204,8 @@ class WhatIfNoSolar:
         """Startup: a calculation that was running when Home Assistant stopped did not finish."""
         if not isinstance(self.economy_db.get("what_if_no_solar"), dict):
             self.economy_db.pop("what_if_no_solar", None)
+        else:
+            self._what_if_no_solar_migrate(self.economy_db["what_if_no_solar"])
         attempt = self.economy_db.get("what_if_no_solar_attempt")
         if isinstance(attempt, dict) and attempt.get("status") == "running":
             self.economy_db["what_if_no_solar_attempt"] = {**attempt, "status": "unavailable", "reason": "interrupted"}
@@ -203,10 +213,27 @@ class WhatIfNoSolar:
             self.economy_db.pop("what_if_no_solar_attempt", None)
         self.publish_what_if_no_solar()
 
+    def _what_if_no_solar_migrate(self, saved: dict[str, Any]) -> None:
+        """A result saved with the older estimate (cost_without_solar, solar_advantage = that minus the recorded cost) gets
+        the current keys: cost_at_plan_price and difference_vs_plan = recorded cost - cost at the plan price."""
+        estimate = saved.get("estimate")
+        if not isinstance(estimate, dict) or "difference_vs_plan" in estimate:
+            return
+        at_plan_price, recorded = estimate.get("cost_without_solar"), estimate.get("recorded_cost")
+        if _round(at_plan_price, 2) is None or _round(recorded, 2) is None:
+            saved["estimate"] = None
+        else:
+            saved["estimate"] = {
+                "cost_at_plan_price": _round(at_plan_price, 2), "recorded_cost": _round(recorded, 2),
+                "difference_vs_plan": _round(recorded - at_plan_price, 2), "kwh": estimate.get("kwh"), "unit": estimate.get("unit"),
+            }
+        self.mark_dirty("economy")
+
     def publish_what_if_no_solar(self, result: dict[str, Any] | None = None) -> None:
-        """The latest successful calculation (or the saved one after a restart); the state is the estimated solar advantage."""
+        """The latest successful calculation (or the saved one after a restart); the state is the difference vs plan
+        (recorded cost minus the recorded energy at the planned price per kWh)."""
         result = result or self.economy_db.get("what_if_no_solar")
         estimate = (result or {}).get("estimate")
-        self.set_state("what_if_no_solar", estimate.get("solar_advantage") if estimate else None)
+        self.set_state("what_if_no_solar", estimate.get("difference_vs_plan") if isinstance(estimate, dict) else None)
         self.set_attr("what_if_no_solar", "result", result)
         self.set_attr("what_if_no_solar", "attempt", self.economy_db.get("what_if_no_solar_attempt"))

@@ -219,13 +219,17 @@ async def test_not_comparable_shows_no_difference_and_why(hass: HomeAssistant) -
     assert str(result["smart"]["cost"]) in out
 
 
-async def test_a_replay_stopped_by_a_public_charge_says_where_and_why(hass: HomeAssistant) -> None:
+async def test_a_saved_result_from_when_public_charges_were_replayed_still_renders(hass: HomeAssistant) -> None:
+    # public charges are no replay events any more; a stored result may still hold the old stop reason and public_kwh
     attributes = _result()
     result = copy.deepcopy(attributes["result"])
     result.update(status="partial", reason="public_overfill")
     result["windows"] = {"total": 9, "replayed": 5, "stopped_at": result["period"]["end"] - 86400}
-    out = await _render(hass, "en", {**attributes, "result": result})
-    assert "The replay stopped early at" in out and "would take the battery above 100 %" in out and "5 / 9" in out
+    result["smart"]["public_kwh"] = 6.0
+    result["asap"]["public_kwh"] = 6.0
+    for language in ("da", "en"):
+        out = await _render(hass, language, {**attributes, "result": result})
+        assert "public_overfill" in out and "5 / 9" in out and "Undefined" not in out, language  # an unknown code is shown as it is
 
 
 async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
@@ -255,7 +259,7 @@ async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeA
                 "many_connections_without_drive", "prices_dst_hour_copied", "connections_before_drive_history_left_out"]
     reasons = ["no_battery_capacity", "no_charging_power", "no_start_soc", "invalid_target", "no_windows", "invalid_window",
                "overlapping_windows", "prices_not_hourly", "invalid_event", "invalid_loss_model", "invalid_power_model",
-               "energy_conservation", "missing_prices", "public_overfill", "invalid_day_selection", "interrupted", "internal_error",
+               "energy_conservation", "missing_prices", "invalid_day_selection", "interrupted", "internal_error",
                "no_drives", "no_days_selected", "start_level_stale"]
     for language in ("da", "de", "en", "en-GB", "pl", "uk"):
         result = copy.deepcopy(attributes["result"])

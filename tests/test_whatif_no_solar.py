@@ -17,7 +17,7 @@ from custom_components.cable_juice_planner.management.dashboard_build import ren
 
 from .conftest import OBJECT_PREFIX
 from .test_dashboard import OPTIONS, _cards, _own
-from .test_economy import _engine
+from .test_economy import _engine, _ts
 from .test_engine import DAY
 from .test_whatif_coordinator import _seed as _seed_coordinator
 from .test_whatif_engine import _seed, snapshot_with
@@ -74,7 +74,9 @@ def _run(engine, snap, start=None):
 
 
 def _recorded(engine, solar: float = 4.0, cost: float = 9.0) -> None:
-    """Two private charging sessions with solar energy inside the seeded connections."""
+    """Two private charging sessions with solar energy inside the seeded connections (recorded after the solar energy
+    was stored as energy)."""
+    engine.economy_db["solar_energy_since"] = 0.0
     for back in (3, 2):
         day = DAY - datetime.timedelta(days=back)
         engine.charging_history_db[datetime.datetime.combine(day, datetime.time(20, 5))] = {
@@ -94,10 +96,12 @@ def test_the_plan_replays_the_period_and_compares_it_with_the_recorded_charging(
     recorded = r["recorded"]
     assert recorded["sessions"] == 2 and recorded["kwh"] == 20.0 and recorded["cost"] == 18.0 and recorded["solar_kwh"] == 8.0
     estimate = r["estimate"]
-    # the recorded energy at the price per kWh the planned charging paid, against what was recorded
-    assert estimate["cost_without_solar"] == pytest.approx(20.0 * r["plan"]["unit"], abs=0.01)
-    assert estimate["solar_advantage"] == pytest.approx(estimate["cost_without_solar"] - 18.0, abs=0.011)
-    assert result.states["what_if_no_solar"] == estimate["solar_advantage"]
+    # the recorded energy at the price per kWh the planned charging paid, against what was recorded:
+    # difference vs plan = recorded cost - that (positive: the recorded charging cost more), not a solar value
+    assert set(estimate) == {"cost_at_plan_price", "recorded_cost", "difference_vs_plan", "kwh", "unit"}
+    assert estimate["cost_at_plan_price"] == pytest.approx(20.0 * r["plan_measured"]["unit"], abs=0.01)
+    assert estimate["difference_vs_plan"] == pytest.approx(18.0 - estimate["cost_at_plan_price"], abs=0.011)
+    assert result.states["what_if_no_solar"] == estimate["difference_vs_plan"]
     assert "grid_only_no_solar" in r["notes"] and engine.economy_db["what_if_no_solar"]["computed_at"] == r["computed_at"]
     assert r["months"] and r["months"][0]["recorded_kwh"] > 0
     assert "what_if" not in engine.economy_db and "what_if_settings" not in engine.economy_db  # the other scenarios keep their own
@@ -138,7 +142,7 @@ def test_a_failed_run_keeps_the_previous_result_and_an_interrupted_one_is_marked
     saved = engine.economy_db["what_if_no_solar"]
     _, failed = _run(engine, snap, {"soc": 50.0, "source": "entered", "first_window_start": 1.0})
     assert failed.value["reason"] == "start_level_stale" and engine.economy_db["what_if_no_solar"] is saved
-    assert failed.states["what_if_no_solar"] == first.value["estimate"]["solar_advantage"]
+    assert failed.states["what_if_no_solar"] == first.value["estimate"]["difference_vs_plan"]
     engine.economy_db["what_if_no_solar_attempt"] = {"status": "running", "reason": None, "at": 1.0}
     engine.load_what_if_no_solar()
     assert engine.economy_db["what_if_no_solar_attempt"]["reason"] == "interrupted"
@@ -182,13 +186,14 @@ async def test_the_card_shows_the_plan_the_recorded_charging_the_estimate_and_th
     out = await _render(hass, "en", attributes)
     for expected in (
         "Latest result", "Current settings, from the grid (no solar)", "Recorded (with solar)", "Difference (without solar - recorded)", "Price per kWh", "Of which solar energy", "Estimate for the recorded energy",
-        "Solar advantage (estimate)", "Per month", "Coverage", "Estimate: part of the data was missing", "first connection is only used to bring the car",
+        "Difference vs plan (recorded - at the plan's price)", "This is not the value of the solar energy", "Per month", "Coverage", "Estimate: part of the data was missing", "first connection is only used to bring the car",
         "All energy is bought from the grid", "Assumptions and what is not included", "Homecomings below the current reserve",
     ):
         assert expected in out, expected
     assert "None" not in out and "Undefined" not in out and "@@" not in out
     r = attributes["result"]
-    assert str(r["plan"]["cost"]) in out and str(r["estimate"]["solar_advantage"]) in out and str(r["recorded"]["cost"]) in out
+    assert str(r["plan"]["cost"]) in out and str(r["estimate"]["difference_vs_plan"]) in out and str(r["recorded"]["cost"]) in out
+    assert "Solar advantage" not in out
 
 
 async def test_a_result_saved_before_the_difference_and_measured_span_fields_still_renders(hass: HomeAssistant) -> None:
@@ -219,7 +224,26 @@ async def test_without_a_recorded_comparison_the_card_says_so(hass: HomeAssistan
     attributes = _attributes()
     result = {**attributes["result"], "estimate": None, "recorded": {"sessions": 0, "kwh": 0.0, "cost": None, "solar_kwh": 0.0, "unit": None}}
     out = await _render(hass, "en", {**attributes, "result": result})
-    assert "No recorded private charging in the period to compare with." in out and "Solar advantage (estimate)" not in out
+    assert "No recorded private charging in the period to compare with." in out and "Difference vs plan" not in out
+
+
+async def test_a_result_saved_with_the_older_estimate_keys_still_renders_and_is_migrated_on_load(hass: HomeAssistant) -> None:
+    attributes = _attributes()
+    old_estimate = {"cost_without_solar": 25.0, "recorded_cost": 18.0, "solar_advantage": 7.0, "kwh": 20.0, "unit": 1.25}
+    old = {**attributes, "result": {**attributes["result"], "estimate": old_estimate}}
+    for language in ("da", "en"):
+        out = await _render(hass, language, old)  # an unmigrated result: the line is left out, never an undefined value
+        assert "Undefined" not in out and "None" not in out and str(old["result"]["plan"]["cost"]) in out, language
+    engine, snap = _engine()
+    engine.economy_db["what_if_no_solar"] = {**attributes["result"], "estimate": dict(old_estimate)}
+    result = engine.run_job(snap, engine.load_what_if_no_solar)
+    assert result.error is None, result.error
+    migrated = engine.economy_db["what_if_no_solar"]["estimate"]
+    assert migrated == {"cost_at_plan_price": 25.0, "recorded_cost": 18.0, "difference_vs_plan": -7.0, "kwh": 20.0, "unit": 1.25}
+    assert result.states["what_if_no_solar"] == -7.0  # recorded minus the plan's price: the opposite sign of the old number
+    engine.economy_db["what_if_no_solar"] = {**attributes["result"], "estimate": {"cost_without_solar": None, "recorded_cost": 18.0}}
+    result = engine.run_job(snap, engine.load_what_if_no_solar)
+    assert engine.economy_db["what_if_no_solar"]["estimate"] is None and result.states["what_if_no_solar"] is None
 
 
 async def test_running_and_empty_states(hass: HomeAssistant) -> None:
@@ -232,10 +256,12 @@ def test_the_read_more_covers_what_the_section_shows() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     view = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing))["views"][3]
     explain = next(c["content"] for c in _cards(view) if "Takes the solar charging out completely" in c.get("content", ""))
+    assert "what the solar was worth" not in explain and "value of the solar energy." not in explain
     for phrase in (
         "period", "battery level at the first plug-in", "Run what-if without solar", "nothing changes in the plan", "planned grid-only charging", "price per kWh",
         "estimate", "table per month", "price sensor history", "estimated price", "calibrates", "fewer than half", "latest connection is left out",
-        "fold-out", "result sensor", "house limits", "standby",
+        "fold-out", "result sensor", "house limits", "standby", "difference vs plan", "positive number means the recorded charging cost more",
+        "not the value of the solar energy", "charging times and price choices", "after the solar energy was stored as energy",
     ):
         assert phrase.lower() in explain.lower(), phrase
 
@@ -269,6 +295,43 @@ def test_without_recorded_solar_energy_there_is_no_estimate_and_the_home_battery
             entry["powerwall_kwh_of_local_energy"] = 1.5
     r = _run(engine, snap)[1].value
     assert r["recorded"]["powerwall_kwh"] == 3.0 and r["estimate"] is not None
+
+
+def test_sessions_before_the_solar_energy_marker_keep_their_energy_but_not_their_solar_part() -> None:
+    """Sessions that started before the solar energy was stored as energy have an unusable solar part: it neither
+    counts in the recorded solar energy nor opens the estimate line, but their energy and cost are still recorded."""
+    engine, snap = _engine()
+    _seed(engine, public=False)
+    _recorded(engine)
+    # between the two sessions (3 and 2 days back, 20:05): only the later one counts its solar energy
+    engine.economy_db["solar_energy_since"] = _ts(DAY - datetime.timedelta(days=2), 0)
+    r = _run(engine, snap)[1].value
+    assert r["recorded"]["sessions"] == 2 and r["recorded"]["kwh"] == 20.0 and r["recorded"]["cost"] == 18.0
+    assert r["recorded"]["solar_kwh"] == 4.0 and r["estimate"] is not None
+    # after both: no usable solar energy, so no estimate line, although the energy and cost are still shown
+    engine.economy_db["solar_energy_since"] = _ts(DAY, 0)
+    r = _run(engine, snap)[1].value
+    assert r["recorded"]["sessions"] == 2 and r["recorded"]["kwh"] == 20.0 and r["recorded"]["cost"] == 18.0
+    assert r["recorded"]["solar_kwh"] == 0.0 and r["estimate"] is None
+
+
+def test_the_difference_vs_plan_is_recorded_minus_the_plan_price_and_not_a_solar_value() -> None:
+    """The difference vs plan is the recorded cost minus the recorded energy at the plan's price per kWh, so it follows
+    the recorded cost one to one: it holds when and at which price the energy was bought, not only what the solar was
+    worth (e.g. 10 of 100 kWh from solar valued 0.5 and 90 kWh bought at 2.5, 230 in all, against a plan price of 1.5
+    gives +80, although the solar was worth 20)."""
+    engine, snap = _engine()
+    _seed(engine, public=False)
+    _recorded(engine)
+    r = _run(engine, snap)[1].value
+    unit = r["plan_measured"]["unit"]
+    estimate = r["estimate"]
+    assert estimate["unit"] == unit and estimate["kwh"] == 20.0
+    assert estimate["difference_vs_plan"] == pytest.approx(estimate["recorded_cost"] - estimate["cost_at_plan_price"], abs=0.011)
+    # the sign follows the recorded cost: a dearer recorded charging gives a larger difference vs plan
+    _recorded(engine, cost=30.0)
+    dearer = _run(engine, snap)[1].value["estimate"]
+    assert dearer["difference_vs_plan"] == pytest.approx(estimate["difference_vs_plan"] + 2 * (30.0 - 9.0), abs=0.02)
 
 
 def test_the_plan_uses_the_prices_net_of_the_refund_like_the_recorded_cost() -> None:

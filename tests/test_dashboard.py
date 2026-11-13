@@ -1,6 +1,7 @@
 """The generated dashboard: entities mapped to the instance, missing cards removed, texts translated."""
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 import yaml
@@ -613,6 +614,34 @@ def test_charging_loss_section_on_analysis() -> None:
     no_ev = yaml.safe_load(render_dashboard(no_ev_config, "tesla", "entry1", no_ev_entities))
     assert "Ladetab pr. effekt" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
     assert "Ladeeffekt efter SOC" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
+
+
+def test_what_if_scenarios_that_need_drives_are_left_out_without_a_car() -> None:
+    """A virtual EV records no drives, so the scenarios that replay them could only answer "no drive recorded"."""
+    texts = load_texts("en")
+    needing_drives = [texts[f"dashboard.what_if_{key}_title"] for key in ("a", "b", "ns")]
+    kept = [texts["dashboard.what_if_d_title"], texts["dashboard.economy_subscription_title"]]
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+
+    def render(**options) -> dict:
+        config = const.build_config({**OPTIONS, "language": "en", **options})
+        return yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
+
+    def what_if(dashboard: dict) -> dict:
+        return next(view for view in dashboard["views"] if view.get("path") == "what-if")
+
+    with_car = what_if(render())
+    headings = [card.get("heading") for card in _cards(with_car) if card.get("type") == "heading"]
+    assert all(heading in headings for heading in [*needing_drives, *kept])
+
+    virtual = what_if(render(usable_battery_level_entity_id=""))
+    headings = [card.get("heading") for card in _cards(virtual) if card.get("type") == "heading"]
+    assert not any(heading in headings for heading in needing_drives)
+    assert all(heading in headings for heading in kept)
+    dumped = yaml.safe_dump(virtual)
+    for entity in ("what_if", "what_if_settings", "what_if_no_solar"):
+        assert not re.search(rf"sensor\.cjp_tesla_{entity}(?!\w)", dumped), entity
+    assert re.search(r"sensor\.cjp_tesla_what_if_solar(?!\w)", dumped)
 
 
 def test_soc_power_section_on_analysis() -> None:

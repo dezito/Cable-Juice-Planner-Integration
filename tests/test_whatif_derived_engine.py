@@ -85,6 +85,7 @@ def test_the_plan_without_solar_values_the_recorded_energy_at_the_price_of_the_m
     engine, snap = _engine({"what_if_days": 365})
     _seed(engine)
     engine.run_job(snap, engine.store_derived_windows, {"ev_hours": _statistics((*MEASURED_BACKS, *OLDER_BACKS))})
+    engine.economy_db["solar_energy_since"] = 0.0  # the sessions below were recorded after the solar energy was stored as energy
     for back in (3, 2):  # recorded private charging with solar energy inside measured connections
         day = DAY - datetime.timedelta(days=back)
         engine.charging_history_db[datetime.datetime.combine(day, datetime.time(20, 5))] = {
@@ -98,7 +99,7 @@ def test_the_plan_without_solar_values_the_recorded_energy_at_the_price_of_the_m
     assert r["status"] == "ok", r
     assert r["windows"]["derived"] == len(OLDER_BACKS) and r["windows"]["total"] == len(OLDER_BACKS) + len(MEASURED_BACKS)
     assert r["recorded"]["sessions"] == 2 and r["estimate"] is not None
-    # the older period is three times dearer: valuing the recorded energy at the price of the whole replay would inflate the solar advantage
+    # the older period is three times dearer: valuing the recorded energy at the price of the whole replay would distort the difference vs plan
     assert r["estimate"]["unit"] < r["plan"]["unit"]
     # the table compares the recorded charging with the plan over the same (measured) span
     assert r["plan_measured"]["unit"] == r["estimate"]["unit"] and r["plan_measured"]["cost"] < r["plan"]["cost"]

@@ -49,7 +49,8 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
 
     def statistics(hass_, begin, end, ids, period, units, kinds):
         seen[tuple(sorted(ids))] = (period, units, kinds)
-        return {entity_id: [{"start": start, "mean": 1500.0 if "solar" in entity_id else 800.0}] for entity_id in ids}
+        # the first sell sensor has no statistics: the history (and its conversion) is the second one's
+        return {entity_id: [] if entity_id == "sensor.sell_first" else [{"start": start, "mean": 1500.0 if "solar" in entity_id else 800.0}] for entity_id in ids}
 
     provider = coordinator.price_provider
     with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.object(
@@ -57,11 +58,12 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
     ), patch.dict(coordinator.config["solar"]["entity_ids"], {"production_entity_id": "sensor.solar"}), patch.dict(
         coordinator.config["home"]["entity_ids"], {"power_consumption_entity_id": "sensor.house"}
     ), patch.dict(coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.charger"}), patch.object(
-        provider, "sell_price_entity_ids", return_value=["sensor.sell"]
+        provider, "sell_price_entity_ids", return_value=["sensor.sell_first", "sensor.sell"]
     ):
         data: dict = {}
         await coordinator._async_economy_solar_statistics(_FakeRecorder(), provider, data, datetime(2026, 10, 2, tzinfo=UTC), lambda row: row["start"].timestamp())
     assert data["sell_history"] == {start.timestamp(): 800.0}
+    assert data["sell_history_entity_id"] == "sensor.sell"
     assert data["power_hours"] == {start.timestamp(): {"solar": 1500.0, "house": 800.0, "ev": 800.0}}
     # the power is asked for in watts whatever unit the sensors have, hourly means
     assert seen[("sensor.charger", "sensor.house", "sensor.solar")] == ("hour", {"power": "W"}, {"mean"})

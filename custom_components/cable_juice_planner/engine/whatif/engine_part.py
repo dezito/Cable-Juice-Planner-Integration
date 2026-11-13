@@ -291,7 +291,7 @@ class WhatIf:
             "loss_kwh": _round(policy.loss_kwh, 3), "unmet_target_kwh": _round(policy.unmet_target_kwh, 3),
             "unmet_driving_kwh": _round(policy.unmet_driving_kwh, 3), "targets_met": policy.targets_met,
             "windows": len(policy.windows), "start_soc": _round(policy.start_soc, 1), "final_soc": _round(policy.final_soc, 1),
-            "lowest_soc": _round(policy.lowest_soc, 1), "public_kwh": _round(policy.public_kwh, 3),
+            "lowest_soc": _round(policy.lowest_soc, 1),
         }
 
     def _what_if_result(

@@ -99,35 +99,49 @@ class WhatIfSolar:
                 del stored[ts]
         sell = data.get("sell_history")
         if isinstance(sell, dict) and sell:
-            self._store_sell_history(sell, oldest)
+            self._store_sell_history(sell, oldest, data.get("sell_history_entity_id"))
         self.mark_dirty("economy")
 
-    def _store_sell_history(self, raw: dict[float, float], oldest: float) -> None:
-        """The recorded sell sensor turned into CJP's sell price, once per hour (the provider's own conversion).
+    def _store_sell_history(self, raw: dict[float, float], oldest: float, entity_id: str | None = None) -> None:
+        """The recorded sell sensor (entity_id) turned into CJP's sell price, once per hour, with the tariffs of the
+        hour's own day.
 
-        Only hours CJP has not stored itself. The conversion runs on a provider that keeps notes of what it converted:
-        those notes are put back, so this never changes what the plan sees. A failing hour is left out."""
-        provider = next((p for p in getattr(self.price_provider, "providers", []) if p.get_sell_price_entity_id()), None)
-        if provider is None:
+        Only hours CJP has not stored itself. The tariffs are the ones CJP kept for that local day
+        (economy_db["sell_tariff_days"], see economy_store_sell_tariffs): Energi Data Service does not record its tariffs
+        attribute, so there is no other source. An hour of a day without them is never converted with another day's
+        tariffs or with none: it is left out (the comparison counts it as a missing sell price), and the hours left out
+        are counted in economy_db["sell_tariff_unknown_hours"] (counted again on every run). The provider's notes of the
+        live sell prices are put back, so this never changes what the plan sees."""
+        provider = self.price_provider
+        convert = getattr(provider, "convert_recorded_sell_price", None)
+        if convert is None:
             return
+        if not entity_id:
+            entity_id = next(iter(provider.sell_price_entity_ids()), "")
+        days = (self.economy_db.get("sell_tariff_days") or {}).get(entity_id)
+        days = days if isinstance(days, dict) else {}
         stored = self.economy_db.get("sell_prices", {})
         history = self.economy_db.setdefault("sell_prices_history", {})
-        saved = dict(getattr(provider, "sell_price_details", {}))
+        notes = [
+            (holder, dict(holder.sell_price_details)) for holder in (provider, *getattr(provider, "providers", []))
+            if isinstance(getattr(holder, "sell_price_details", None), dict)
+        ]
+        unknown = 0
         try:
             for ts, price in raw.items():
                 if ts < oldest or ts in history or ts in stored or not _finite(price):
                     continue
-                try:
-                    moment = datetime.datetime.fromtimestamp(ts, self._snap.tz).replace(tzinfo=None)
-                    converted = provider.calculate_sell_price(moment, float(price))
-                except Exception:  # noqa: BLE001
-                    continue
+                moment = self._economy_local(float(ts))
+                converted = convert(entity_id, moment, float(price), days.get(moment.date().isoformat()))
                 if _finite(converted):
                     history[float(ts)] = round(float(converted), 4)
+                else:
+                    unknown += 1
         finally:
-            if hasattr(provider, "sell_price_details"):
-                provider.sell_price_details.clear()
-                provider.sell_price_details.update(saved)
+            for holder, saved in notes:
+                holder.sell_price_details.clear()
+                holder.sell_price_details.update(saved)
+        self.economy_db["sell_tariff_unknown_hours"] = unknown
         for ts in [ts for ts in history if float(ts) < oldest or ts in stored]:
             del history[ts]
 
@@ -186,38 +200,55 @@ class WhatIfSolar:
         ledger = [entry for entry in (self.economy_db.get("solar_ledger") or {}).values() if isinstance(entry, dict)]
         spans = [(float(e["start"]), float(e["end"])) for e in ledger if _finite(e.get("start")) and _finite(e.get("end"))]
         since = self.economy_db.get("solar_energy_since")
+        power_hours = self.economy_db.get("power_hours")
+        power_hours = {float(ts): values for ts, values in power_hours.items()} if isinstance(power_hours, dict) else {}
         still_charging = not_captured = 0
+        waiting: list[tuple[float, float]] = []  # sessions the ledger will still price: their hours are left to them
         for session in self._solar_sessions():
             start, end = session["start"], session["end"]
             if end is None:
                 still_charging += 1
+                waiting.append((start, now))
+            elif _finite(end) and now - end <= LEDGER_WINDOW and not _overlaps(spans, start, end):
+                waiting.append((start, end))
             elif (
                 _finite(end) and not session["public"] and isinstance(since, (int, float)) and start >= since
                 and now - end > LEDGER_WINDOW and min(session["solar"], session["local"], session["kwh"]) > 1e-9
-                and not _overlaps(spans, start, end)
+                and not _overlaps(spans, start, end) and not self._solar_hours_known(power_hours, start, end)
             ):
-                not_captured += 1  # merged into the daily history before it was priced (for example after a long outage)
-        summary = summarize(ledger, self._solar_month(now), {"still_charging": still_charging, "not_captured": not_captured})
-        summary["source"] = "sessions"
-        power_hours = self.economy_db.get("power_hours")
-        if isinstance(power_hours, dict) and power_hours:
-            # the hourly solar, house and charger power from the recorder: the whole history at once, no waiting
+                # merged into the daily history before it was priced (for example after a long outage), and the hourly
+                # statistics do not reach it either
+                not_captured += 1
+        extra = {"still_charging": still_charging, "not_captured": not_captured}
+        summary = summarize(ledger, self._solar_month(now), extra)
+        if power_hours:
+            # the hourly solar, house and charger power from the recorder: the whole history at once, no waiting. The
+            # priced sessions are kept wherever they cover the time; the other charging hours are estimated from the
+            # hourly means, an upper bound of their solar energy (see solar.py, power_hour_entries)
             buy = {**_float_keys(self.economy_db.get("prices_history")), **_float_keys(self.economy_db.get("prices"))}
             sell = {**_float_keys(self.economy_db.get("sell_prices_history")), **_float_keys(self.economy_db.get("sell_prices"))}
             try:
                 assumed = float(self.config["solar"]["production_price"])
             except (KeyError, TypeError, ValueError):
                 assumed = -1.0
-            reconstructed = solar_from_power_hours(
-                {float(ts): values for ts, values in power_hours.items()}, buy, sell,
+            summary = solar_from_power_hours(
+                power_hours, buy, sell,
                 _float_keys(self.economy_db.get("sell_production_price")), assumed, self._solar_refund() or 0.0, now - 3600.0,
-                self._solar_month(now), self._solar_month,
+                self._solar_month(now), self._solar_month, ledger, extra, waiting,
             )
-            if reconstructed["status"] == "ok":
-                if reconstructed["assumed_production_hours"]:
-                    reconstructed["notes"].append("production_price_assumed_current")
-                summary = {**reconstructed, "source": "power_history"}
+            if summary["hours_counted"] and summary["assumed_production_hours"]:
+                summary["notes"].append("production_price_assumed_current")
         return {**base, **summary}
+
+    @staticmethod
+    def _solar_hours_known(power_hours: dict[float, Any], start: float, end: float) -> bool:
+        """The hourly statistics hold an hour of [start, end) (that time is then estimated from them)."""
+        hour = start - start % 3600.0
+        while hour < max(end, start + 1.0):
+            if hour in power_hours:
+                return True
+            hour += 3600.0
+        return False
 
     def publish_what_if_solar(self) -> None:
         """The state is the solar advantage of the completed months; nothing when there is none."""
@@ -227,6 +258,10 @@ class WhatIfSolar:
             # a failing comparison must never break the job that calls this
             _LOGGER.warning("The What-if solar comparison could not be calculated: %s %s", err, type(err))
             result = {"status": "unavailable", "reason": "internal_error"}
+        unknown = self.economy_db.get("sell_tariff_unknown_hours")
+        if isinstance(unknown, int) and not isinstance(unknown, bool):
+            # recorded sell price hours left out because the tariffs of their day are not known (see _store_sell_history)
+            result = {**result, "sell_tariff_unknown_hours": unknown}
         total = result.get("total") or {}
         self.set_state("what_if_solar", total.get("advantage") if result.get("status") == "ok" and total.get("months") else None)
         self.set_attr("what_if_solar", "result", result)

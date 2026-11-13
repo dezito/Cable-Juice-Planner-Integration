@@ -14,6 +14,7 @@ entities. At setup it is rewritten for this config entry:
   entity, the min. charge limit without its charge limit entity: ``hidden_settings()``)
 * cards bound to an entity that does not exist are removed, and a heading left
   without settings below it; without a car also the analysis sections with only its data
+  and the What-if scenarios that replay recorded drives (A, B, no solar)
 * ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
 
 The result is written to .storage and served as a Lovelace dashboard that can be edited in
@@ -63,6 +64,10 @@ _DROP = object()
 PREHEAT_ENTITIES = (("switch", "trip_preheat"), ("number", "preheat_minutes_before"), *(("switch", f"preheat_{day}") for day in WEEKDAYS))
 # analysis sections with only the car's data (sensor.cjp_analysis also exists without a car)
 EV_SECTIONS = ("@@section_drive_temperature@@", "@@section_departures@@", "@@section_learn_distance@@")
+# What-if scenarios A, B and the no-solar plan replay the connections between recorded drives. Without a car integration
+# (virtual EV) no drive is ever recorded or derived, so they never give a result: left out of the view.
+# The solar scenario (D) and the fixed monthly price do not use drives and stay.
+EV_WHAT_IF_SECTIONS = ("@@what_if_a_title@@", "@@what_if_b_title@@", "@@what_if_ns_title@@")
 
 
 def dashboard_url(prefix: str) -> str:
@@ -372,7 +377,7 @@ def render_dashboard(
         # public charging needs the car's location: its card goes (also while the old entities are still registered)
         missing |= {f"binary_sensor.{own}_public_charging_session_done", f"number.{own}_public_charging_session_cost"}
     if not is_ev_configured(config):
-        template = _drop_sections(template, EV_SECTIONS)
+        template = _drop_sections(template, (*EV_SECTIONS, *EV_WHAT_IF_SECTIONS))
     texts = load_texts(normalize_language(config.get("language")), currency, distance)
     # the sell price chart subtracts the same sell fee as the planner
     texts["dashboard.sell_fee_value"] = f"{abs(float(config['prices'].get('sell_fee', 0.0))):g}"
