@@ -339,7 +339,8 @@ async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeA
                 "recorded_solar_share", "recorded_days_split", "recorded_sessions_outside_connections", "windows_before_recorded_gap_left_out",
                 "recorded_path_short", "recorded_prices_estimated_lean_cjp", "connections_estimated_from_battery_statistics",
                 "connections_modelled_from_work_plan", "older_connections_not_validated", "work_plan_model_not_validated",
-                "estimated_connections_without_prices_left_out", "start_level_unknown_calibrated"]
+                "estimated_connections_without_prices_left_out", "start_level_unknown_calibrated", "recorded_segments",
+                "recorded_stretches_left_out"]
     reasons = ["no_battery_capacity", "no_charging_power", "no_start_soc", "invalid_target", "no_windows", "invalid_window",
                "overlapping_windows", "prices_not_hourly", "invalid_event", "invalid_loss_model", "invalid_power_model",
                "energy_conservation", "missing_prices", "invalid_day_selection", "interrupted", "internal_error",
@@ -390,7 +391,6 @@ async def test_estimated_connections_are_marked_with_their_count_the_date_they_s
 async def test_estimates_that_are_not_used_say_why(hass: HomeAssistant) -> None:
     base = _result()
     for code, text in (
-        ("not_all_measured", "Older estimated connections are not added: a measured connection could not be read"),
         ("no_record", "The charging history of CJP does not reach the estimated connections"),
         ("outside_charging", "The estimated connections are not used: much of what CJP charged lies outside them"),
         ("not_stable", "could not be fitted to the charging history and are not used"),
@@ -417,7 +417,7 @@ async def test_estimates_that_are_not_used_say_why(hass: HomeAssistant) -> None:
 async def test_every_text_of_the_estimates_exists_in_every_language(hass: HomeAssistant) -> None:
     base = _result()
     stops = ("before_history", "invalid_history", "not_settled")
-    notes = ("not_all_measured", "none_available", "no_record", "outside_charging", "not_stable", "no_prices")
+    notes = ("none_available", "no_record", "outside_charging", "not_stable", "no_prices")
     reasons = ("no_statistics", "too_few_measured", "not_validated", "no_older_connections", "anchor_mismatch", "no_plan", "no_workdays",
                "too_few_drives", "no_modelled_connections")
     for language in ("da", "de", "en", "en-GB", "pl", "uk"):
@@ -434,3 +434,32 @@ async def test_every_text_of_the_estimates_exists_in_every_language(hass: HomeAs
             attributes["result"]["derived"] = None
             out = await _render(hass, language, attributes)
             assert f": {reason}" not in out and f"{reason})" not in out, (language, reason)
+
+
+async def test_estimates_left_out_for_want_of_prices_say_where_the_prices_end(hass: HomeAssistant) -> None:
+    attributes = _estimated(
+        _result(), recorded_estimates="no_prices", recorded_estimated_windows=0, estimated_unpriced_left_out=42,
+        estimated_unpriced_until=1_689_012_000.0,
+    )
+    attributes["result"]["derived"] = None
+    out = await _render(hass, "en", attributes)
+    assert "(42 connections, the newest one without a price ends 2023-07-10)" in out
+    for language in ("da", "de", "pl", "uk"):
+        assert "@@" not in await _render(hass, language, attributes) and "Undefined" not in await _render(hass, language, attributes)
+
+
+async def test_the_connections_left_out_and_the_stretches_are_listed_with_their_reasons(hass: HomeAssistant) -> None:
+    attributes = _estimated(_result(), recorded_skipped={"invalid_history": 2, "no_prices": 1}, recorded_left_out=3)
+    attributes["result"]["segments"] = 3
+    out = await _render(hass, "en", attributes)
+    assert "Not compared: 2 connections (an entry of the charging history has a missing or invalid figure" in out
+    assert "1 connections (no price was stored for it (no price is estimated for an estimated connection)) &middot; 3 stretches" in out
+    for language in ("da", "de", "en-GB", "pl", "uk"):
+        rendered = await _render(hass, language, attributes)
+        assert "@@" not in rendered and "Undefined" not in rendered and "invalid_history" not in rendered and "no_prices" not in rendered, language
+    # a plain result lists nothing, and the days of the heading are the days the stretches cover, not the days between the ends
+    plain = _result()
+    assert "Not compared" not in await _render(hass, "en", plain)
+    covered = copy.deepcopy(plain)
+    covered["result"]["coverage"]["covered_days"] = 3.0
+    assert re.search(r"data used: \S+ &ndash; \S+ \(3 days\)", await _render(hass, "en", covered))

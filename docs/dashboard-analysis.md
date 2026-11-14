@@ -359,27 +359,39 @@ the month valued at what the calculation holding more energy paid per kWh over t
 adjusted difference. A battery level taken from the hourly mean of the statistics (the hour of a plug-in or unplug also holds
 driving or charging) is approximate, and a warning says so.
 
-**The period.** Only the newest unbroken stretch of connections that the charging history of CJP reaches and that can be read is
-compared. A connection cannot be read when it ended before the first entry of the history (nothing is known about it, never
-"charged nothing"), or when an entry that touches it has a missing or invalid figure (a missing cost is not a zero). A
-connection that is not settled yet (a session is still running, or it ended less than two hours ago) is left aside and does not
-break the stretch. Older connections than the first break are left out and counted, with the reason. A night in which CJP
-charged nothing is a connection with no charging, where the history reaches it.
+**The period.** Every connection of the period that the charging history of CJP reaches and that can be read is compared, back to the
+start of the period asked for. A connection cannot be read when it ended before the first entry of the history (nothing is known
+about it, never "charged nothing"), when an entry that touches it has a missing or invalid figure (a missing cost is not a zero),
+or, for an estimated connection, when an hour of it has no stored price (no price is made up for something that is itself an
+estimate). A connection that is not settled yet (a session is still running, or it ended less than two hours ago) is only left
+aside: the next run has it. A night in which CJP charged nothing is a connection with no charging, where the history reaches it.
+
+**Gaps.** A connection that cannot be read is a gap, and the comparison goes on after it, like BattMind's replay does after a gap in
+its history: the connections form *stretches* without a gap, and each stretch is replayed on its own, from its own battery level at
+the start and its own level at the end (read from the history like the first and the last level; a level is never carried over a
+gap). The costs, energy and differences of the stretches are added up, the adjusted differences stretch by stretch, so the months
+of a pair still add up to its adjusted difference. When the level at the start of a later stretch cannot be read, its first connection
+only brings the three to a common level and what CJP charged in it is not counted (a warning says so); without a start level for
+the first stretch there is no result. A stretch of one connection (no driving in it) or with too few prices cannot be compared and
+is left out and counted (also said). A stretch that has no level at its end cannot be balanced, so the adjusted difference, the
+year and the adjusted months are not given then. CJP's reconstructed level is not held at 0 %: it is the path (start level plus what
+the history says CJP charged minus the drives), and a path that goes below 0 % is warned about; its end level and months are the
+path's own. The card says how many connections were left out and
+why, how many stretches there are, and, where the comparison begins, why it does not reach further back (the history does not go
+back, an entry is invalid) and when. The days of the heading, and the year, count only the days the stretches cover.
+
 **Estimated connections.** Before the measured connections the comparison adds the connections estimated from the battery level
-statistics or modelled from the work plan (the same ones the settings comparison and the comparison without solar use), as far
-back as the charging history reaches them: the history is laid over them the same way, with two hours of room at their edges,
-because their times are estimates. They are marked ESTIMATE (the card says how many of the connections they are and from when
-the connections are measured, marks them in the table per month and shows their own cost line), and a year made of them is
-an estimate however long it is. They are only added when every measured connection of the period could be read (an estimate before
-a measured connection that has no record would leave a hole in the middle), when the history reaches them (a connection that
-starts before the first entry of the history, or has an entry with a missing figure, ends the stretch), and when not much of what
-CJP charged lies outside them (more than a tenth of its kWh in that time, and more than 1 kWh: that energy would be missing from
-CJP's column and make CJP look cheaper). Otherwise the measured connections are compared alone, and the card says why. Where the
-comparison stops it says why and when (the history does not reach further back, an entry is invalid), or, when nothing could be
-estimated, why not (the reason of the battery level statistics and of the work plan). The level at the first estimated connection
-is the one of the statistics; for a connection modelled from the work plan the level is unknown, so the first connection only
-brings all three to a common level, and what CJP charged in it is not counted (a warning says so). The estimates give way to
-measured connections as CJP records them.
+statistics or modelled from the work plan (the same ones the settings comparison and the comparison without solar use): the
+history is laid over them the same way, with two hours of room at their edges (never into a neighbouring connection), because
+their times are estimates. They are marked ESTIMATE (the card says how many of the connections they are and from when the
+connections are measured, marks them in the table per month and shows their own cost line), and a year made of them is an
+estimate however long it is. They are only used when not much of what CJP charged lies outside them (more than a tenth of its kWh
+in that time, and more than 1 kWh: that energy would be missing from CJP's column and make CJP look cheaper); otherwise the measured
+connections are compared alone, and the card says why. Without any estimated connection (no statistics, the method not checked
+against the measured connections, no work plan) the card says why not. The level at the start of a stretch that begins with an
+estimated connection is the one of the statistics; for a connection modelled from the work plan the level is unknown, so the first
+connection of the stretch only brings all three to a common level. The estimates give way to measured connections as CJP records
+them.
 
 Charts under the results (they need the apexcharts-card, like the other charts) show the cost per month of the three, the
 difference per month of Smart and of charging at once against CJP (positive: CJP cheaper), and a line chart of the cumulative saving of CJP per
@@ -398,9 +410,9 @@ Settings on the What-if view (they never change the live plan or settings):
 
 | Setting | Meaning |
 |---|---|
-| *What-if period* | how many days back to compare, from 7 up to all the data CJP keeps: the months of charging history set in the setup (default 12) plus one month (at least 400 days), so 403 days by default and 775 with 24 months. The extra month keeps the whole month of a year ago in reach while the current month runs, so a month can be compared with the same month last year. Only completed connections inside it are used, and of those only the newest unbroken stretch with a complete record of what CJP charged |
+| *What-if period* | how many days back to compare, from 7 up to all the data CJP keeps: the months of charging history set in the setup (default 12) plus one month (at least 400 days), so 403 days by default and 775 with 24 months. The extra month keeps the whole month of a year ago in reach while the current month runs, so a month can be compared with the same month last year. Only completed connections inside it are used, and of those the ones with a complete record of what CJP charged, in stretches without a gap |
 | *What-if EV max recommended charging limit* | 0 uses the live *max recommended charge limit* and never changes it. It is the level Smart and charging at once charge to here, and the alternative maximum in *Reserve and maximum level* (the same setting) |
-| *What-if battery level at first plug-in* | the battery level when the first compared connection began. 0 reads it from Home Assistant's history; enter a value if that is missing. Without it there is no result. The level at the last unplug is read the same way and is never entered |
+| *What-if battery level at first plug-in* | the battery level when the first compared connection began. 0 reads it from Home Assistant's history; enter a value if that is missing. Without it there is no result. The level at the last unplug, and the levels at the start and end of every later stretch after a gap, are read the same way and are never entered. An entered level is not used when estimated connections come before the first measured one |
 | *What-if Smart days* | all days, the work plan's days, Monday to Friday, the weekend, or *Selected days* (then switch on the *What-if Monday ... Sunday* switches you want). Days count by the day the car leaves (the end of the connection). The work plan's days are the days as they are set now, not as they were in the past. On the other days Smart charges at once, so only the selected days differ; what CJP charged never changes. A selection with no days gives no result |
 | *Run what-if* (button) | calculates. It never changes the plan, the settings, the car or the charger |
 
@@ -417,8 +429,8 @@ result saved by an earlier model of this comparison is not shown any more: run t
 
 | Data | Source | Limit |
 |---|---|---|
-| Connections | CJP's recorded plug-in and unplug times at home | only completed, settled connections that the charging history of CJP reaches and that can be read; the newest unbroken stretch. Before the measured ones, estimated or modelled connections (marked ESTIMATE) under the conditions of *Estimated connections* |
-| CJP's charging | CJP's charging history (without public charging): kWh, battery percent, kWh from solar or the home battery, booked cost and start and end of each entry | laid over the connections by time; a merged day (older than a week) reaching into two connections is split by time; a missing cost ends the stretch |
+| Connections | CJP's recorded plug-in and unplug times at home | every completed, settled connection of the period that the charging history of CJP reaches and that can be read, in stretches without a gap (see *Gaps*). Before the measured ones, estimated or modelled connections (marked ESTIMATE) under the conditions of *Estimated connections* |
+| CJP's charging | CJP's charging history (without public charging): kWh, battery percent, kWh from solar or the home battery, booked cost and start and end of each entry | laid over the connections by time; a merged day (older than a week) reaching into two connections is split by time; a missing cost is a gap |
 | Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this comparison and flagged, and never replaces a real price in the monthly economy comparison |
 | Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded: the energy they use is found from the levels at both ends and added (see *The same energy*). Without any recorded drive the demand is unknown and there is no result. CJP keeps up to two drives a day for the days kept (at least the newest 400): connections older than the oldest kept drive are left out |
 | Public charges | CJP's charging history | counted and shown, but not added to the battery level again, because the drive they belong to is already net of them. A public charge in a gap with no recorded drive changes the level by an unknown amount and is flagged |

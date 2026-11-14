@@ -231,12 +231,25 @@ private agent memory). Update or remove a note when it stops being true.
   not replayed. It is what CJP booked in the charging history (kWh, battery
   percent and cost, with solar and the home battery at CJP's own value), without
   public charging, laid over the measured connections by overlap in time
-  (`engine/whatif/recorded.py`). Sessions of the same calendar day are merged
+  (`engine/whatif/recorded.py`) and, before them, over the connections estimated
+  from the battery statistics or modelled from the work plan (marked as
+  estimates, with a wider tolerance at their edges that never reaches into a
+  neighbour). Estimates are only used when little of what CJP charged lies
+  outside them (a lost kWh makes CJP look cheaper, so it is never dropped
+  silently). Sessions of the same calendar day are merged
   (`engine/history/combine.py`) and have lost their hours, so a merged day that
   spans two connections is split between them by time and flagged; the booked
   price is one per session (the price when it was booked), and grid energy
-  booked at 0 is a missing price, not a free night. Smart and charging at once are replayed from the battery level at the
-  first plug-in over the same recorded drives and are grid only. Their target is
+  booked at 0 is a missing price, not a free night.
+  The comparison covers the whole period asked for: a connection that cannot be
+  read (history does not reach it, an invalid entry, an estimated connection
+  without a stored price) is a gap, never the end. The connections form
+  stretches without a gap, each replayed on its own (`replay_segments`) from its
+  own battery level at the start and at the end, read from the history; a level
+  is never carried over a gap, and a stretch without a known start level
+  calibrates on its first connection (modelled connections have none either).
+  Smart and charging at once are replayed over the same recorded drives and are
+  grid only. Their target is
   the What-if max recommended level (`what_if_max_recommended_battery_level`),
   shared with Scenario B.
 - Dashboard texts (`texts/*.json`) that the dashboard inserts into single-quoted

@@ -131,16 +131,18 @@ def test_a_history_that_reaches_no_estimated_connection_keeps_only_the_measured_
     assert coverage["recorded_stop_at"] < coverage["first_window"] and r["provenance"]["start_soc"] == "entered"
 
 
-def test_a_broken_measured_stretch_leaves_no_hole_for_an_estimate_to_fill() -> None:
+def test_a_connection_in_the_middle_that_cannot_be_read_is_a_gap_and_the_estimates_before_it_are_still_compared() -> None:
     engine, snap = _engine({"what_if_days": 365, "fill_up": True})
     _seed(engine)
-    _session(engine, 8, cost=None)  # a measured connection in the middle has a missing cost: the stretch is the newer ones only
+    _session(engine, 8, cost=None)  # a measured connection in the middle has a missing cost
     _, r = _run(engine, snap)
     coverage = r["coverage"]
-    assert r["status"] == "ok"
-    assert coverage["recorded_estimates"] == "not_all_measured" and coverage["recorded_estimated_windows"] == 0 and coverage["windows_derived"] == 0
-    assert coverage["recorded_reason"] == "invalid_history" and coverage["recorded_left_out"] > 0
-    assert r["windows"]["total"] == 7 and r["derived"] is None  # (the connections after the broken one)
+    assert r["status"] == "ok" and coverage["recorded_estimates"] == "used" and coverage["recorded_estimated_windows"] == len(OLDER_BACKS)
+    # one gap: two stretches, the older one with the estimated connections and the measured ones to the gap, the newer one after it
+    assert coverage["recorded_skipped"] == {"invalid_history": 1} and r["segments"] == 2
+    assert [s["windows"] for s in coverage["recorded_segments"]] == [len(OLDER_BACKS) + 7, 7]
+    assert r["windows"]["total"] == len(OLDER_BACKS) + len(MEASURED_BACKS) - 1 and coverage["recorded_reason"] is None
+    assert "recorded_segments" in r["warnings"] and "windows_before_recorded_gap_left_out" in r["warnings"]
 
 
 def test_much_charging_outside_the_estimated_connections_means_they_are_not_used() -> None:
@@ -200,7 +202,9 @@ def test_connections_modelled_from_the_work_plan_have_no_start_level_so_the_firs
     assert r["status"] == "ok", r
     coverage = r["coverage"]
     assert coverage["modelled_status"] == "ok" and coverage["windows_modelled"] > 0 and coverage["recorded_estimates"] == "used"
-    assert coverage["recorded_estimated_windows"] == coverage["windows_modelled"] and r["derived"]["modelled"] == coverage["windows_modelled"]
+    # the modelled connections further back than any price was stored are gaps in the data, not the end of the comparison
+    assert 0 < coverage["recorded_estimated_windows"] <= coverage["windows_modelled"] and r["derived"]["modelled"] == coverage["recorded_estimated_windows"]
+    assert sum(coverage["recorded_skipped"].values()) == coverage["windows_modelled"] - coverage["recorded_estimated_windows"]
     assert "connections_modelled_from_work_plan" in r["warnings"] and "start_level_unknown_calibrated" in r["warnings"]
     assert r["provenance"]["start_soc"] == "unavailable" and r["calibrated_start"] is True and r["method"] == "estimated"
     # the first connection only brings all three to the same level: nothing CJP charged in it is counted anywhere
@@ -233,3 +237,36 @@ def test_estimated_connections_without_a_stored_price_say_that_and_not_that_noth
             engine.economy_db["prices"].pop(float(hour), None)
     _, r = _run(engine, snap)
     assert r["status"] == "ok" and r["coverage"]["recorded_estimates"] == "no_prices" and r["windows"]["total"] == len(MEASURED_BACKS)
+    # and where the prices end: how many estimated connections that left out, and when the newest one without a price ends
+    assert r["coverage"]["estimated_unpriced_left_out"] > 0 and r["coverage"]["estimated_unpriced_until"] is not None
+
+
+def test_one_estimated_connection_without_a_price_does_not_stop_the_older_ones() -> None:
+    """The comparison goes as far back as the period asked for: a small gap in the prices is a gap, not the end."""
+    engine, snap = _engine({"what_if_days": 365, "fill_up": True})
+    _seed(engine)
+    start, end = _evening(30)  # in the middle of the estimated connections
+    engine.economy_db["prices"].pop(float(start + 3600 * 3), None)
+    _, r = _run(engine, snap)
+    coverage = r["coverage"]
+    assert r["status"] == "ok" and coverage["recorded_estimates"] == "used"
+    assert coverage["recorded_skipped"] == {"no_prices": 1} and r["segments"] == 2
+    assert coverage["recorded_estimated_windows"] == len(OLDER_BACKS) - 1  # all the others, also the ones before the gap
+    assert [s["windows"] for s in coverage["recorded_segments"]] == [10, 14 + len(MEASURED_BACKS)]  # 40..31 back, then 29..16 and the measured
+    assert coverage["first_window"] == _evening(max(OLDER_BACKS))[0]
+    assert "estimated_connections_without_prices_left_out" in r["warnings"]
+
+
+def test_a_stretch_that_ends_with_an_estimated_connection_has_the_level_of_the_statistics_at_its_end() -> None:
+    """The unplug time of an estimated connection is an estimate: a level read there would belong to the drive after it."""
+    engine, snap = _engine({"what_if_days": 365, "fill_up": True})
+    _seed(engine)
+    _session(engine, max(MEASURED_BACKS), cost=None)  # the oldest measured connection cannot be read: the estimates end there
+    engine.run_job(snap, engine.store_derived_windows, {"ev_hours": _statistics((*MEASURED_BACKS, *OLDER_BACKS))})
+    prepared = engine.run_job(snap, engine.what_if_prepare)
+    level = {"soc": 33.0, "source": "entered", "end_soc": 80.0, "end_source": "recorded_state"}
+    collected = engine.run_job(snap, engine.what_if_collect, {**level, "levels": [level, level], "period": prepared.value["period"], "segments": prepared.value["segments"]}).value
+    first, second = collected["calculations"]
+    assert first.windows[-1].derived and first.provenance["end_soc"] == "battery_statistics" and first.end_soc is not None
+    assert first.provenance["start_soc"] == "battery_statistics" and not second.windows[0].derived and second.provenance["start_soc"] == "entered"
+    assert second.provenance["end_soc"] == "recorded_state"

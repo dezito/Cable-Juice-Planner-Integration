@@ -5,7 +5,6 @@ import datetime
 import logging
 import math
 import time
-from dataclasses import replace
 from functools import partial
 from typing import Any
 
@@ -13,7 +12,7 @@ from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
 
 from ..const import ENTITY_UNAVAILABLE_STATES
-from ..engine.whatif.replay import WhatIfCancelled, replay
+from ..engine.whatif.replay import WhatIfCancelled, replay_segments
 from ..utils.helpers import float_or_none
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,9 +54,16 @@ class CoordinatorWhatIf:
             # the run uses the same period and first connection the starting level was read for
             start = {**start, "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]}
             if name == "what_if":
-                # the level at the last unplug balances the energy of the three calculations (it is not a setting: never entered)
-                end = await self._async_what_if_end_soc(prepared.value)
-                start = {**start, "end_soc": end["soc"], "end_source": end["source"], "last_window_end": prepared.value["last_window_end"]}
+                # the level at the start and at the end of every stretch of connections without a gap: the end level balances the
+                # energy of the three calculations (it is not a setting: never entered)
+                levels = await self._async_what_if_levels(prepared.value, start)
+                last = levels[-1] if levels else await self._async_what_if_end_soc(prepared.value)
+                start = {
+                    **start, "end_soc": last.get("end_soc", last.get("soc")), "end_source": last.get("end_source", last.get("source")),
+                    "last_window_end": prepared.value["last_window_end"], "segments": prepared.value.get("segments") or [],
+                }
+                if levels:
+                    start = {**start, "levels": levels, "soc": levels[0]["soc"], "source": levels[0]["source"]}
                 await self._async_what_if_planned(start)
                 return
             result = await self.async_run_job(f"{name}_run", start)
@@ -98,9 +104,10 @@ class CoordinatorWhatIf:
             if self._what_if_stop_requested():  # stopped (or unloaded) while the copies were being made
                 await self._async_what_if_stopped()
                 return
-            calculation = replace(prepared["calculation"], on_window=self._what_if_window)
             try:
-                result = await self.hass.loop.run_in_executor(self._what_if_executor, replay, calculation)
+                result = await self.hass.loop.run_in_executor(
+                    self._what_if_executor, partial(replay_segments, prepared["calculations"], self._what_if_window)
+                )
             except WhatIfCancelled:
                 await self._async_what_if_stopped()
                 return
@@ -149,6 +156,16 @@ class CoordinatorWhatIf:
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("What-if: could not read the battery level history at the last unplug: %s", err)
             return {"soc": None, "source": "unavailable"}
+
+    async def _async_what_if_levels(self, prepared: dict[str, Any], first: dict[str, Any]) -> list[dict[str, Any]]:
+        """The battery level at the start and at the end of every stretch of connections without a gap (a gap leaves the level
+        after it unknown, so each stretch has its own). The first start level may be the one entered. Never defaulted."""
+        levels = []
+        for index, (segment_start, segment_end) in enumerate(prepared.get("segments") or []):
+            begin = first if index == 0 else await self._async_what_if_start_soc({"first_window_start": segment_start})
+            end = await self._async_what_if_end_soc({"last_window_end": segment_end})
+            levels.append({"soc": begin["soc"], "source": begin["source"], "end_soc": end["soc"], "end_source": end["source"]})
+        return levels
 
     async def _async_what_if_start_soc(self, prepared: dict[str, Any]) -> dict[str, Any]:
         """The battery level at the first replayed plug-in: entered by the user, else from the recorder.
