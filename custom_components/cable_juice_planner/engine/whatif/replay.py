@@ -171,6 +171,13 @@ class ReplayInput:
     """The battery level at the last connection's unplug, read like the starting level. With it the energy CJP bought
     that no recorded drive explains (small trips, standby drain) is added as driving in all three calculations, so they
     deliver the same energy. Without it the three are not balanced and no adjusted difference is given."""
+    start_levels: Mapping[float, float] = field(default_factory=dict)
+    """The battery level at the start of connections that were estimated from the battery statistics (by their start)."""
+    end_levels: Mapping[float, float] = field(default_factory=dict)
+    """And at their end (by their start): the unplug time of an estimated connection is an estimate, a level read there is not."""
+    may_calibrate: bool = False
+    """Scenario A, a stretch after a gap in the data: without a known start level its first connection only brings the three
+    to a common level, instead of the calculation being refused."""
 
 
 @dataclass
@@ -188,6 +195,7 @@ class WindowResult:
     calibrated: bool = False  # the level before this connection was unknown: it only brings the car to a common level
     derived: bool = False  # the connection itself was estimated (from the battery level statistics or modelled from the work plan)
     modelled: bool = False  # of those: modelled from the work plan
+    segment: int = 0  # the stretch of connections without a gap (scenario A) this connection belongs to
 
     @property
     def loss_kwh(self) -> float:
@@ -204,6 +212,7 @@ class PolicyResult:
     lowest_soc: float = 0.0
     driven_percent: float = 0.0
     calibrated: bool = False  # the starting level was unknown (see _run)
+    finals: list[float] = field(default_factory=list)  # the level at the last unplug of each stretch (scenario A with gaps)
 
     @property
     def estimated_cost(self) -> float:
@@ -269,6 +278,10 @@ class ReplayResult:
     differences: dict[str, dict[str, float | None]] | None = None  # scenario A: cjp_asap, cjp_smart and smart_asap (first minus second)
     energy: dict[str, float | None] | None = None  # scenario A: the energy balance (gap, charged and driven percent, end level)
     unit_prices: dict[str, Any] | None = None  # scenario A: the average price per kWh of the three and CJP's kWh at the others' price
+    priced_hours: float = 0.0  # scenario A: the hours behind average_price (to combine the stretches)
+    segments: int = 1  # scenario A: the stretches of connections without a gap that were compared
+    skipped_segments: list[tuple[int, str]] = field(default_factory=list)  # (stretch, why) of those that could not be replayed
+    parts: list[Any] = field(default_factory=list)  # scenario A with more than one stretch: the result of each
 
 
 @dataclass
@@ -465,12 +478,22 @@ def _plan_smart(data: ReplayInput, slots: list[_Slot], soc_in: float, target: fl
 
 
 def _apply_events(
-    data: ReplayInput, soc: float, events: list[Event], result: PolicyResult, last: WindowResult
+    data: ReplayInput, soc: float, events: list[Event], result: PolicyResult, last: WindowResult, clamp: bool = True
 ) -> float:
-    """Apply the drives between two windows. Returns the soc."""
+    """Apply the drives between two windows. Returns the soc.
+
+    clamp False (the reconstructed level of CJP): the level is not held at 0 %, it can go below it: it is then the path
+    (start + what the history says CJP charged - the drives) and the part below 0 % is the shortfall of that path."""
     for event in events:
         used = event.soc_percent
         available = max(soc, 0.0)
+        if not clamp:
+            before = max(-soc, 0.0)
+            soc -= used
+            last.drive_shortfall_kwh += (max(-soc, 0.0) - before) / 100.0 * data.battery_kwh
+            result.driven_percent += used
+            result.lowest_soc = min(result.lowest_soc, soc)
+            continue
         if used > available + EPS:
             last.drive_shortfall_kwh += (used - available) / 100.0 * data.battery_kwh
             soc = 0.0
@@ -586,7 +609,7 @@ def _run_recorded(data: ReplayInput, windows: list[Window], calibrate_to: float 
                 if position not in taken and _in_gap(event, window, windows[index + 1].start):
                     taken.add(position)
                     between.append(event)
-            soc = _apply_events(data, soc, between, result, row)
+            soc = _apply_events(data, soc, between, result, row, clamp=False)
             if data.arrival_reserve is not None:
                 missing = max(data.arrival_reserve - soc, 0.0) / 100.0 * data.battery_kwh
                 row.unmet_target_kwh = missing if missing > 1e-6 else 0.0
@@ -786,9 +809,9 @@ def _replay_recorded(
 ) -> ReplayResult:
     """Scenario A: CJP's own recorded charging against "smart" and "asap", replayed from the level the car comes home with."""
     assert data.recorded is not None
-    if data.start_soc is None and not any(window.modelled for window in ordered):
-        # only connections modelled from the work plan have no level to start from (the first one then brings all three to a
-        # common level): for the others an unknown level is not made up
+    if data.start_soc is None and not data.may_calibrate and not any(window.modelled for window in ordered):
+        # only connections modelled from the work plan (and a stretch after a gap) have no level to start from (the first one
+        # then brings all three to a common level): for the others an unknown level is not made up
         return ReplayResult(status="unavailable", reason="no_start_soc", windows_total=len(ordered), provenance=provenance)
     calibrate_to = measured.target_soc  # an unknown start level: the first connection brings all three to this level
     if any(window.start not in data.recorded for window in ordered):
@@ -859,6 +882,7 @@ def _replay_recorded(
         max_conservation_error_kwh=error, warnings=tuple(warnings), provenance=provenance,
         ignored_events=len(data.events) - applied, method="estimated" if estimated_windows or cjp.calibrated else "strict",
         estimated_windows=estimated_windows, price_estimate=price_fill, notes=RECORDED_NOTES, calibrated_start=cjp.calibrated,
+        priced_hours=hours,
         energy={
             "gap_percent": energy_gap, "charged_percent": charged, "driven_percent": cjp.driven_percent,
             "end_soc": data.end_soc, "start_soc": cjp.start_soc, "cut_percent": cut,
@@ -877,9 +901,7 @@ def _replay_recorded(
         # Without the end level, with charging CJP did not record (the energy is missing: it would be valued at the holder's
         # price, not at what it cost) or with a gap that could not be put anywhere, the energy bought is not known to be the
         # same, and no value is put on the end levels.
-        # (a reconstructed level of CJP that had to be held at 0 % ends higher than the car did: its end level is not known to
-        # be comparable either)
-        balanced = "energy_not_balanced" not in warnings and "recorded_energy_short" not in warnings and path_short <= COMPARE_TOLERANCE_KWH
+        balanced = "energy_not_balanced" not in warnings and "recorded_energy_short" not in warnings
 
         def pair(first: PolicyResult, second: PolicyResult) -> dict[str, float | None]:
             holder = first if first.final_soc >= second.final_soc else second
@@ -889,6 +911,115 @@ def _replay_recorded(
         result.differences = {"cjp_asap": pair(cjp, asap), "cjp_smart": pair(cjp, smart), "smart_asap": pair(smart, asap)}
         result.difference = result.differences["cjp_asap"]
     return result
+
+
+# ---------------------------------------------------------------------------- #
+# Scenario A over a history with gaps: the stretches without a gap are replayed one by one and added up
+# ---------------------------------------------------------------------------- #
+
+_DIFFERENCE_FIELDS = ("cost", "measured_cost", "terminal_energy_kwh", "terminal_adjustment", "adjusted_cost", "grid_kwh", "loss_kwh")
+_SKIPPABLE = ("too_few_windows", "missing_prices")  # why a stretch may be left out while the others are compared
+_ENERGY_SUMS = ("charged_percent", "driven_percent", "cut_percent", "local_kwh", "kwh", "path_shortfall_kwh")
+
+
+def replay_segments(calculations: list[ReplayInput], on_window: Callable[[int, int], None] | None = None) -> ReplayResult:
+    """Scenario A: replay each stretch of connections without a gap on its own (its own start and end level) and add them up.
+
+    A gap (a connection that could not be read) leaves the battery level after it unknown, so a stretch never carries a level
+    over a gap. on_window is called with the progress over all stretches."""
+    total = sum(len(calculation.windows) for calculation in calculations)
+    done = 0
+    results = []
+    for calculation in calculations:
+        hook = None if on_window is None else (lambda finished, _count, offset=done: on_window(offset + finished, total))
+        results.append(replay(replace(calculation, on_window=hook) if hook else calculation))
+        done += len(calculation.windows)
+    return merge_results(results)
+
+
+def _merge_policy(name: str, parts: list[tuple[int, PolicyResult]]) -> PolicyResult:
+    merged = PolicyResult(name=name, start_soc=parts[0][1].start_soc, lowest_soc=min(p.lowest_soc for _, p in parts))
+    for index, policy in parts:
+        for row in policy.windows:
+            row.segment = index
+            merged.windows.append(row)
+        merged.driven_percent += policy.driven_percent
+        merged.finals.append(policy.final_soc)
+        merged.calibrated = merged.calibrated or policy.calibrated
+    merged.final_soc, merged.end_soc = parts[-1][1].final_soc, parts[-1][1].end_soc
+    return merged
+
+
+def merge_results(results: list[ReplayResult]) -> ReplayResult:
+    """The results of the stretches of scenario A as one. A stretch that cannot be compared (one connection only, or too few prices)
+    is left out and counted; any other reason makes the whole result unavailable (it is shown as it is). A stretch whose energy
+    is not balanced (no level at its end) takes the adjusted difference of the whole away: it is not known for the period."""
+    if not results:
+        return ReplayResult(status="unavailable", reason="no_windows")
+    usable: list[tuple[int, ReplayResult]] = []
+    skipped: list[tuple[int, str]] = []
+    for index, result in enumerate(results):
+        if result.status in ("ok", "partial") and result.cjp is not None and result.smart is not None and result.asap is not None:
+            if len(results) > 1 and result.windows_total <= 1:
+                skipped.append((index, "too_few_windows"))  # one connection has no driving in it: nothing to compare the three on
+            else:
+                usable.append((index, result))
+        elif len(results) > 1 and result.reason in _SKIPPABLE:
+            skipped.append((index, str(result.reason)))
+        else:
+            return result
+    if not usable:
+        return results[0]
+    if len(results) == 1:
+        return results[0]
+    cjp = _merge_policy("cjp", [(n, r.cjp) for n, (_, r) in enumerate(usable)])  # type: ignore[misc]
+    smart = _merge_policy("smart", [(n, r.smart) for n, (_, r) in enumerate(usable)])  # type: ignore[misc]
+    asap = _merge_policy("asap", [(n, r.asap) for n, (_, r) in enumerate(usable)])  # type: ignore[misc]
+    warnings: list[str] = []
+    for _, result in usable:
+        warnings.extend(w for w in result.warnings if w not in warnings)
+    if skipped:
+        warnings.append("recorded_stretches_left_out")  # (a stretch of one connection without a start level)
+    hours = sum(r.priced_hours for _, r in usable)
+    average = sum((r.average_price or 0.0) * r.priced_hours for _, r in usable) / hours if hours > 0 else None
+    partial = next((r for _, r in usable if r.status == "partial"), None)
+    merged = ReplayResult(
+        status="ok" if partial is None else "partial", reason=None if partial is None else partial.reason,
+        smart=smart, asap=asap, cjp=cjp,
+        windows_total=sum(r.windows_total for _, r in usable), windows_replayed=sum(r.windows_replayed for _, r in usable),
+        stopped_at=None if partial is None else partial.stopped_at, average_price=average,
+        max_conservation_error_kwh=max(r.max_conservation_error_kwh for _, r in usable), warnings=tuple(warnings),
+        provenance=usable[0][1].provenance, ignored_events=sum(r.ignored_events for _, r in usable),
+        method="estimated" if any(r.method == "estimated" for _, r in usable) else "strict",
+        estimated_windows=sum(r.estimated_windows for _, r in usable),
+        price_estimate=next((r.price_estimate for _, r in usable if r.price_estimate is not None), None),
+        calibrated_start=usable[0][1].calibrated_start, notes=usable[0][1].notes, priced_hours=hours,
+        segments=len(usable), skipped_segments=skipped, parts=[r for _, r in usable],
+    )
+    energy: dict[str, float | None] = {}
+    for key in _ENERGY_SUMS:
+        energy[key] = sum((r.energy or {}).get(key) or 0.0 for _, r in usable)
+    gaps = [(r.energy or {}).get("gap_percent") for _, r in usable]
+    energy["gap_percent"] = None if any(g is None for g in gaps) else sum(gaps)  # type: ignore[arg-type]
+    energy["start_soc"] = (usable[0][1].energy or {}).get("start_soc")
+    energy["end_soc"] = (usable[-1][1].energy or {}).get("end_soc")
+    merged.energy = energy
+    merged.unit_prices = _unit_prices(cjp, smart, asap)
+    not_comparable = next((r for _, r in usable if not r.comparable), None)
+    if not_comparable is not None:
+        merged.comparable_reason = not_comparable.comparable_reason
+        return merged
+    merged.comparable = True
+    differences: dict[str, dict[str, float | None]] = {}
+    for key in ("cjp_asap", "cjp_smart", "smart_asap"):
+        items = [(r.differences or {}).get(key) or {} for _, r in usable]
+        differences[key] = {
+            field_: (None if any(item.get(field_) is None for item in items) else sum(item[field_] for item in items))
+            for field_ in _DIFFERENCE_FIELDS
+        }
+    merged.differences = differences
+    merged.difference = differences["cjp_asap"]
+    return merged
 
 
 # ---------------------------------------------------------------------------- #

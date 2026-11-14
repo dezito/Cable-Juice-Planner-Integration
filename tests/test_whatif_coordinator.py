@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import datetime
 import threading
 import time
@@ -21,12 +22,12 @@ START = {"soc": 55.0, "source": "recorded_state"}
 END = {"soc": 70.0, "source": "recorded_state"}  # 55 % + 3 x 15 % charged - 2 x 15 % driven
 
 
-def _seed(coordinator) -> None:
+def _seed(coordinator, backs=(2, 3, 4)) -> None:
     """Three connections (evening to morning) with hourly prices, a drive after each and the charging CJP did in each (its history)."""
     engine = coordinator.engine
     now = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
     prices = engine.economy_db.setdefault("prices", {})
-    for back in (2, 3, 4):
+    for back in backs:
         start = (now - datetime.timedelta(days=back)).replace(hour=17)
         end = start + datetime.timedelta(hours=14)
         engine.economy_db["windows"].append({"start": start.timestamp(), "end": end.timestamp()})
@@ -110,6 +111,33 @@ async def test_the_button_reads_the_levels_replays_and_publishes(hass: HomeAssis
     assert state.attributes["attempt"]["status"] == "ok"
     # the live plan, settings and car are untouched
     assert dict(coordinator.settings) == settings_before
+
+
+async def test_the_levels_are_read_at_the_start_and_the_end_of_every_stretch_after_a_gap(hass: HomeAssistant, loaded_entry) -> None:
+    coordinator = loaded_entry.runtime_data
+    _seed(coordinator, backs=(2, 3, 4, 5, 6))
+    middle = sorted(coordinator.engine.charging_history_db)[3]  # the history entry of the middle connection (the oldest one is the marker)
+    del coordinator.engine.charging_history_db[middle]["cost"]  # that connection cannot be read: a gap between two stretches
+    reads: list[tuple[str, float]] = []
+
+    async def start_level(self, prepared):
+        reads.append(("start", prepared["first_window_start"]))
+        return {"soc": 55.0, "source": "recorded_state"}
+
+    async def end_level(self, prepared):
+        reads.append(("end", prepared["last_window_end"]))
+        return {"soc": 55.0, "source": "recorded_state"}
+
+    with patch.object(type(coordinator), "_async_what_if_start_soc", start_level), patch.object(type(coordinator), "_async_what_if_end_soc", end_level):
+        await _press(hass)
+    assert hass.states.get(SENSOR).attributes["attempt"]["status"] == "ok", hass.states.get(SENSOR).attributes["attempt"]
+    result = hass.states.get(SENSOR).attributes["result"]
+    assert result["status"] == "ok" and result["segments"] == 2 and result["windows"]["replayed"] == 4
+    segments = result["coverage"]["recorded_segments"]
+    assert reads == [("start", segments[0]["start"]), ("end", segments[0]["end"]), ("start", segments[1]["start"]), ("end", segments[1]["end"])]
+    # every stretch starts from the level read for it, never from where the one before it ended
+    assert len(result["rows"]) == 4 and result["rows"][0]["soc_in"] == 55.0 and result["rows"][2]["soc_in"] == 55.0
+    assert "recorded_segments" in result["warnings"] and "start_level_unknown_calibrated" not in result["warnings"]
 
 
 async def test_the_level_at_the_end_is_read_like_the_start_and_never_defaulted(hass: HomeAssistant, loaded_entry) -> None:
@@ -260,6 +288,15 @@ async def _wait_for(hass: HomeAssistant, condition, seconds: float = 20.0) -> No
         await asyncio.sleep(0.02)
 
 
+def _single(fake):
+    """The coordinator hands the stretches and the progress hook to the replay: the tests below fake the replay of one stretch."""
+
+    def replay_of_one(calculations, on_window=None):
+        return fake(dataclasses.replace(calculations[0], on_window=on_window))
+
+    return replay_of_one
+
+
 async def test_the_replay_runs_on_its_own_thread_so_the_live_worker_is_never_held_up(hass: HomeAssistant, loaded_entry) -> None:
     coordinator = loaded_entry.runtime_data
     _seed(coordinator)
@@ -273,7 +310,7 @@ async def test_the_replay_runs_on_its_own_thread_so_the_live_worker_is_never_hel
         return real_replay(data)
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", blocked_replay
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(blocked_replay)
     ):
         await _press_without_waiting(hass)
         await _wait_for(hass, started.is_set)
@@ -300,7 +337,7 @@ async def test_the_progress_is_shown_while_it_runs_and_not_saved(hass: HomeAssis
         return real_replay(data)
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", reporting_replay
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(reporting_replay)
     ):
         await _press_without_waiting(hass)
         await _wait_for(hass, lambda: (hass.states.get(SENSOR).attributes["attempt"] or {}).get("progress") is not None)
@@ -327,7 +364,7 @@ async def test_the_stop_button_stops_the_calculation_and_keeps_the_saved_result(
             time.sleep(0.005)
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", endless_replay
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(endless_replay)
     ):
         await _press_without_waiting(hass)
         await _wait_for(hass, started.is_set)
@@ -353,7 +390,7 @@ async def test_a_stop_requested_while_the_run_is_prepared_still_stops_it_before_
         return START
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", start_level_and_stop), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", lambda data: replayed.append(True)
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(lambda data: replayed.append(True))
     ):
         await _press(hass)
     attempt = hass.states.get(SENSOR).attributes["attempt"]
@@ -378,7 +415,7 @@ async def test_a_replay_that_only_looks_after_the_unload_has_finished_still_stop
             raise
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", late_replay
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(late_replay)
     ):
         await _press_without_waiting(hass)
         await _wait_for(hass, started.is_set)
@@ -409,7 +446,7 @@ async def test_unloading_stops_a_running_calculation(hass: HomeAssistant, loaded
             stopped.set()
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch(
-        "custom_components.cable_juice_planner.coordinator.what_if.replay", endless_replay
+        "custom_components.cable_juice_planner.coordinator.what_if.replay_segments", _single(endless_replay)
     ):
         await _press_without_waiting(hass)
         await _wait_for(hass, started.is_set)

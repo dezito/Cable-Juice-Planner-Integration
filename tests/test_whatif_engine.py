@@ -103,7 +103,7 @@ def test_scenario_a_compares_what_cjp_charged_with_smart_and_asap_and_publishes_
 
 def test_the_three_steps_give_the_same_result_as_one_run() -> None:
     """what_if_run = collect (quick job) + the replay (the coordinator runs it on its own thread) + finish (quick job)."""
-    from custom_components.cable_juice_planner.engine.whatif.replay import replay
+    from custom_components.cable_juice_planner.engine.whatif.replay import replay_segments
 
     engine, snap = _engine(PLAN)
     _seed(engine)
@@ -112,8 +112,8 @@ def test_the_three_steps_give_the_same_result_as_one_run() -> None:
     collected = engine.run_job(snap, engine.what_if_collect, start)
     assert collected.error is None and not (collected.states or collected.attributes or collected.db_saves)  # nothing is published yet
     prepared = collected.value
-    assert prepared["result"] is None and prepared["calculation"].recorded
-    result = replay(prepared["calculation"])  # on any thread: it holds copies only
+    assert prepared["result"] is None and len(prepared["calculations"]) == 1 and prepared["calculations"][0].recorded
+    result = replay_segments(prepared["calculations"])  # on any thread: it holds copies only
     finished = engine.run_job(snap, engine.what_if_finish, prepared, result)
     assert finished.error is None
     for key in ("cjp", "smart", "asap", "difference", "differences", "energy"):
@@ -126,7 +126,7 @@ def test_collect_says_why_there_is_nothing_to_replay() -> None:
     _seed(engine)
     engine.analysis_db["drives"].clear()
     prepared = engine.run_job(snap, engine.what_if_collect, {"soc": 50.0, "source": "entered"}).value
-    assert prepared["calculation"] is None and prepared["result"].status == "unavailable" and prepared["result"].reason == "no_drives"
+    assert prepared["calculations"] == [] and prepared["result"].status == "unavailable" and prepared["result"].reason == "no_drives"
 
 
 def test_the_progress_is_shown_on_the_sensor_while_running_and_never_saved() -> None:
@@ -176,22 +176,44 @@ def test_a_night_without_a_session_is_charged_nothing_where_the_history_reaches_
     assert r["status"] == "ok" and r["windows"]["total"] == 5 and r["coverage"]["recorded_left_out"] == 0
 
 
-def test_a_connection_that_is_not_settled_yet_is_left_aside_and_does_not_break_the_stretch() -> None:
+def test_a_connection_that_is_not_settled_yet_is_left_aside_and_is_no_gap() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine, public=False)
     newest = max(engine.economy_db["windows"], key=lambda w: w["start"])
     newest["end"] = _ts(DAY, 11)  # unplugged an hour ago: the last hour of its charging may still change
     r = _run(engine, snap, {"soc": 50.0, "source": "entered"})[1].value
     assert r["status"] == "ok" and r["windows"]["total"] == 4 and r["coverage"]["recorded_left_out"] == 0
-    assert "windows_before_recorded_gap_left_out" not in r["warnings"]
+    assert r["coverage"]["recorded_skipped"] == {"not_settled": 1} and r["segments"] == 1
+    assert "windows_before_recorded_gap_left_out" not in r["warnings"] and "recorded_segments" not in r["warnings"]
 
 
-def test_an_entry_with_a_missing_cost_ends_the_stretch() -> None:
+def test_an_entry_with_a_missing_cost_is_a_gap_and_the_comparison_goes_on_after_it() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine, public=False)
-    del _session_of(engine, 3)["cost"]  # a missing booked cost is not a zero: that connection cannot be read
-    r = _run(engine, snap)[1].value
-    assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_reason"] == "invalid_history"
+    del _session_of(engine, 3)["cost"]  # a missing booked cost is not a zero: that connection cannot be read, and is a gap
+    prepared, result = _run(engine, snap)
+    r = result.value
+    # the older two and the newer two connections are compared, each stretch with its own levels; nothing is carried over the gap
+    assert r["status"] == "ok" and r["windows"]["total"] == 4 and r["segments"] == 2 and len(prepared.value["segments"]) == 2
+    assert r["coverage"]["recorded_skipped"] == {"invalid_history": 1} and r["coverage"]["recorded_left_out"] == 1
+    assert [s["windows"] for s in r["coverage"]["recorded_segments"]] == [2, 2] and r["coverage"]["recorded_reason"] is None
+    assert "windows_before_recorded_gap_left_out" in r["warnings"] and "recorded_segments" in r["warnings"]
+    assert "start_level_unknown_calibrated" in r["warnings"]  # no level was read for the second stretch: its first connection only calibrates
+    # the days the stretches cover, not the days between the first and the last connection
+    assert r["coverage"]["covered_days"] < (r["coverage"]["last_window"] - r["coverage"]["first_window"]) / 86400.0
+    assert [m["windows"] for m in r["months"]] == [4]
+
+
+def test_every_stretch_has_its_own_levels_and_the_months_add_up_to_the_adjusted_difference_over_a_gap() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    del _session_of(engine, 3)["cost"]
+    level = {"soc": 50.0, "source": "entered", "end_soc": 70.0, "end_source": "recorded_state"}
+    r = _run(engine, snap, {**level, "levels": [level, level]})[1].value
+    assert r["status"] == "ok" and r["segments"] == 2 and "start_level_unknown_calibrated" not in r["warnings"]
+    assert r["energy"]["gap_percent"] == pytest.approx(0.0, abs=0.01)
+    for key, pair in (("cjp_vs_asap_adjusted", "cjp_asap"), ("cjp_vs_smart_adjusted", "cjp_smart"), ("smart_vs_asap_adjusted", "smart_asap")):
+        assert sum(m[key] for m in r["months"]) == pytest.approx(r["differences"][pair]["adjusted_cost"], abs=0.01), key
 
 
 def test_grid_energy_booked_at_zero_is_a_missing_price_not_a_free_night() -> None:
@@ -199,7 +221,7 @@ def test_grid_energy_booked_at_zero_is_a_missing_price_not_a_free_night() -> Non
     _seed(engine, public=False)
     _session_of(engine, 3)["cost"] = 0.0  # what CJP writes when it could not calculate the price
     r = _run(engine, snap)[1].value
-    assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_reason"] == "invalid_history"
+    assert r["status"] == "ok" and r["windows"]["total"] == 4 and r["coverage"]["recorded_skipped"] == {"invalid_history": 1}
 
 
 def test_a_neighbour_outside_the_period_keeps_its_share_of_a_merged_day() -> None:
@@ -224,10 +246,20 @@ def test_a_shortfall_in_the_reconstructed_path_of_cjp_is_said_and_does_not_make_
     # ... so a drive of 20 % after it empties the reconstructed level (15 % + 0 - 20 %): the car was driven, the path is wrong
     assert "recorded_path_short" in r["warnings"] and r["energy"]["path_shortfall_kwh"] > 0.5
     assert r["cjp"]["unmet_driving_kwh"] == 0.0 and r["comparable"] is True
-    # CJP's reconstructed level was held at 0 %, so it ends higher than the car did: its end level is not known to be comparable,
-    # and no adjusted difference (and so no year) is given, that would favour CJP
-    assert all(d["adjusted_cost"] is None for d in r["differences"].values())
-    assert r["annual"] is None or r["annual"]["available"] is False
+    # CJP's reconstructed level was held at 0 % in the first gap, so the clamped path would end at 20 %: its end level is the path
+    # without that (15 + 80 - 80), so no energy that was never in the battery is valued in the adjusted difference
+    assert r["cjp"]["final_soc"] == pytest.approx(15.0, abs=0.5)
+
+
+def test_the_months_add_up_to_the_adjusted_difference_also_when_the_path_of_cjp_goes_below_zero() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=4), datetime.time(2))]  # nothing charged in the first connection
+    r = _run(engine, snap, {"soc": 15.0, "source": "entered", "end_soc": 15.0, "end_source": "recorded_state"})[1].value
+    assert "recorded_path_short" in r["warnings"] and r["cjp"]["lowest_soc"] < 0.0  # the path itself, not held at 0 %
+    assert r["cjp"]["final_soc"] == pytest.approx(15.0, abs=0.5) and r["energy"]["gap_percent"] == pytest.approx(0.0, abs=0.5)
+    for key, pair in (("cjp_vs_asap_adjusted", "cjp_asap"), ("cjp_vs_smart_adjusted", "cjp_smart"), ("smart_vs_asap_adjusted", "smart_asap")):
+        assert sum(m[key] for m in r["months"]) == pytest.approx(r["differences"][pair]["adjusted_cost"], abs=0.01), key
 
 
 def test_cjp_is_what_it_booked_and_the_solar_share_is_said() -> None:

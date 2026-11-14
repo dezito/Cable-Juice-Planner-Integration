@@ -155,6 +155,7 @@ def _derived_connections(
     info["windows_derived"] = len(windows)
     info["derived_first_soc"] = kept[0][2] if kept else None
     info["derived_soc_by_start"] = {s: soc_in for s, _, soc_in, _ in kept}
+    info["derived_soc_out_by_start"] = {s: soc_out for s, _, _, soc_out in kept}
     return windows, gaps, final, info
 
 
@@ -225,6 +226,7 @@ def build_replay_input(
     derived: Mapping[str, Any] | None = None,
     work_plan: Mapping[str, Any] | None = None,
     all_windows: Iterable[Mapping[str, Any]] | None = None,
+    keep_unpriced: bool = False,
 ) -> tuple[ReplayInput, dict[str, Any]]:
     """The replay input for [period_start, period_end) and what the data covered.
 
@@ -235,6 +237,9 @@ def build_replay_input(
     modelled.py), when that model has found the measured connections. Their start level is not known: start_soc is used.
     all_windows: every measured connection there is (default: `windows`): the model never covers a time one of them exists in,
     also one that is not replayed because only part of the connections was handed in.
+    keep_unpriced: an estimated connection with an hour without a price stays in the input (the caller leaves it out of the
+    comparison itself, and the connections after it keep their own place): by default it and every older estimated one are
+    dropped, because the battery use between two connections is only known between neighbours.
     """
     drives = list(drives)
     valid_drives = [d for d in drives if _finite(d.get("start")) and _finite(d.get("used")) and d["used"] >= 0]
@@ -270,7 +275,7 @@ def build_replay_input(
     # reaches back to must not pull the share of priced connections under the replay's limit and cost the whole result).
     ordered_estimates = [*modelled_chosen, *derived_chosen]
     last_unpriced = max((i for i, w in enumerate(ordered_estimates) if any(h not in hourly for h in _hours(w))), default=-1)
-    unpriced_left_out = last_unpriced + 1
+    unpriced_left_out = 0 if keep_unpriced else last_unpriced + 1
     if unpriced_left_out:
         kept = ordered_estimates[unpriced_left_out:]
         first_kept_end = kept[0].end if kept else math.inf
@@ -348,6 +353,7 @@ def build_replay_input(
         "windows_measured": len(measured_chosen),
         "windows_derived": len(derived_chosen),
         "estimated_unpriced_left_out": unpriced_left_out,
+        "estimated_unpriced_until": ordered_estimates[last_unpriced].end if unpriced_left_out else None,
         "derived_plan_bounds": bool(derived.get("plan_bounds")) if isinstance(derived, Mapping) else False,
         "windows_modelled": len(modelled_chosen),
         "modelled_status": modelled_info["modelled_status"],
@@ -436,6 +442,9 @@ def build_replay_input(
         provenance=provenance,
         warnings=tuple(warnings),
         smart_weekdays=smart_weekdays,
+        # the battery level at the start of each estimated connection that the statistics know (the others: unknown)
+        start_levels={s: float(v) for s, v in (derived_info.get("derived_soc_by_start") or {}).items() if any(w.start == s for w in derived_chosen)},
+        end_levels={s: float(v) for s, v in (derived_info.get("derived_soc_out_by_start") or {}).items() if any(w.start == s for w in derived_chosen)},
     )
     return data, coverage
 

@@ -9,7 +9,9 @@ from custom_components.cable_juice_planner.engine.whatif.replay import (
     Recorded,
     ReplayInput,
     Window,
+    merge_results,
     replay,
+    replay_segments,
 )
 
 H = 3600.0
@@ -143,6 +145,9 @@ def test_a_shortfall_in_the_reconstructed_level_of_cjp_is_a_warning_and_not_an_u
     result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(0.0), 6: charged(0.0)}, events=[drive], start=50.0))
     assert "recorded_path_short" in result.warnings and result.energy["path_shortfall_kwh"] > 0
     assert result.cjp.unmet_driving_kwh == 0 and result.asap.unmet_driving_kwh == 0 and result.comparable is True
+    # the level of CJP is the path itself, not held at 0 % (50 - 60 = -10): its end level and its rows are the path's own
+    assert result.cjp.final_soc == pytest.approx(-10.0, abs=0.01) and result.cjp.windows[-1].soc_out == pytest.approx(-10.0, abs=0.01)
+    assert result.cjp.lowest_soc == pytest.approx(-10.0, abs=0.01) and result.energy["path_shortfall_kwh"] == pytest.approx(6.0, abs=0.01)
 
 
 def test_the_record_must_cover_every_connection_and_the_start_level_must_be_known() -> None:
@@ -174,3 +179,101 @@ def test_cjp_is_never_cheaper_than_the_cheapest_hours_for_the_same_energy() -> N
     """A cross-check of the pricing: a record priced hour by hour cannot beat the cheapest hours of its own connection."""
     result = replay(make([(0, 9)], PRICES, {0: charged(60.0, price=1.0)}))
     assert result.cjp.cost >= result.smart.cost - 1e-9
+
+
+# --------------------------------------------------------------------------- stretches without a gap
+
+
+def _stretch(first: int, price: float, **kwargs) -> ReplayInput:
+    """Two connections of 9 hours that start at hour `first`, CJP charging 40 % in each of them, 40 % driven in the gap."""
+    a, b = first, first + 10
+    drive = Event(hour(a + 9.5), "drive", 40.0)
+    prices = {n: price for n in range(first, first + 20)}
+    return make([(a, a + 9), (b, b + 9)], prices, {a: charged(40.0, price), b: charged(40.0, price)}, events=[drive], end_soc=60.0, start=60.0, **kwargs)
+
+
+def test_stretches_are_replayed_on_their_own_and_added_up() -> None:
+    one, two = _stretch(0, 1.0), _stretch(100, 2.0)
+    first, second = replay(one), replay(two)
+    merged = replay_segments([one, two])
+    assert merged.status == "ok" and merged.segments == 2 and merged.comparable is True and len(merged.parts) == 2
+    for name in ("cjp", "smart", "asap"):
+        policy, a, b = getattr(merged, name), getattr(first, name), getattr(second, name)
+        assert policy.cost == pytest.approx(a.cost + b.cost) and policy.grid_kwh == pytest.approx(a.grid_kwh + b.grid_kwh)
+        assert [w.segment for w in policy.windows] == [0, 0, 1, 1] and policy.finals == pytest.approx([a.final_soc, b.final_soc])
+        assert policy.final_soc == pytest.approx(b.final_soc) and policy.start_soc == pytest.approx(a.start_soc)
+    for key in ("cjp_asap", "cjp_smart", "smart_asap"):
+        for field in ("cost", "adjusted_cost", "grid_kwh", "terminal_energy_kwh"):
+            assert merged.differences[key][field] == pytest.approx(first.differences[key][field] + second.differences[key][field])
+    assert merged.difference == merged.differences["cjp_asap"] and merged.windows_total == 4 and merged.windows_replayed == 4
+    # the price of the period weights each stretch by its hours; the energy of the three is the sum
+    assert merged.average_price == pytest.approx((1.0 * first.priced_hours + 2.0 * second.priced_hours) / (first.priced_hours + second.priced_hours))
+    assert merged.energy["charged_percent"] == pytest.approx(first.energy["charged_percent"] + second.energy["charged_percent"])
+    assert merged.unit_prices["cjp_kwh"] == pytest.approx(merged.cjp.grid_kwh)
+
+
+def test_a_stretch_never_carries_its_level_over_a_gap() -> None:
+    """The second stretch starts from its own level, not from where the first one ended."""
+    low, high = _stretch(0, 1.0), _stretch(100, 1.0)
+    from dataclasses import replace as _replace
+
+    high = _replace(high, start_soc=30.0, end_soc=30.0)
+    merged = replay_segments([low, high])
+    assert merged.cjp.windows[2].soc_in == pytest.approx(30.0) and merged.cjp.windows[0].soc_in == pytest.approx(60.0)
+    assert merged.smart.windows[2].soc_in == pytest.approx(30.0)
+
+
+def test_a_stretch_of_one_connection_without_a_level_is_left_out_and_counted_not_the_whole_result() -> None:
+    from dataclasses import replace as _replace
+
+    alone = make([(200, 209)], {n: 1.0 for n in range(200, 209)}, {200: charged(20.0)}, start=None, end_soc=None)
+    merged = replay_segments([_stretch(0, 1.0), _replace(alone, may_calibrate=True)])
+    assert merged.status == "ok" and merged.segments == 1 and merged.skipped_segments == [(1, "too_few_windows")] and merged.windows_total == 2
+
+
+def test_a_stretch_with_another_failure_makes_the_whole_result_unavailable_with_that_reason() -> None:
+    first = _stretch(0, 1.0)
+    prices_missing = _stretch(100, 1.0)
+    from dataclasses import replace as _replace
+
+    prices_missing = _replace(prices_missing, phases=5)  # a failure that is not about the stretch itself: the charger cannot be modelled
+    merged = replay_segments([first, prices_missing])
+    assert merged.status == "unavailable" and merged.reason == "no_charging_power"
+    # the first stretch has no start level and may not calibrate: that is refused too, never made up
+    refused = _replace(first, start_soc=None)
+    assert replay_segments([refused, _stretch(100, 1.0)]).reason == "no_start_soc"
+    assert replay_segments([]).reason == "no_windows" and merge_results([]).status == "unavailable"
+
+
+def test_the_progress_is_counted_over_all_the_stretches() -> None:
+    seen: list[tuple[int, int]] = []
+    replay_segments([_stretch(0, 1.0), _stretch(100, 1.0)], lambda done, total: seen.append((done, total)))
+    assert seen == [(0, 4), (1, 4), (2, 4), (3, 4)]
+
+
+def test_a_stretch_of_one_connection_is_left_out_also_with_a_known_level_and_counted() -> None:
+    from dataclasses import replace as _replace
+
+    alone = make([(200, 209)], {n: 1.0 for n in range(200, 209)}, {200: charged(20.0)}, start=40.0, end_soc=50.0)
+    merged = replay_segments([_stretch(0, 1.0), _replace(alone, may_calibrate=True)])
+    assert merged.status == "ok" and merged.segments == 1 and merged.skipped_segments == [(1, "too_few_windows")]
+    assert "recorded_stretches_left_out" in merged.warnings and merged.differences["cjp_asap"]["adjusted_cost"] is not None
+
+
+def test_a_stretch_with_too_few_prices_is_left_out_and_does_not_take_the_whole_result_with_it() -> None:
+    from dataclasses import replace as _replace
+
+    unpriced = _replace(_stretch(100, 1.0), prices={})
+    merged = replay_segments([_stretch(0, 1.0), unpriced])
+    assert merged.status == "ok" and merged.segments == 1 and merged.skipped_segments == [(1, "missing_prices")]
+    assert replay_segments([unpriced]).reason == "missing_prices"  # alone it is still refused, never made up
+
+
+def test_a_stretch_that_cannot_be_balanced_takes_the_adjusted_difference_of_the_period_away() -> None:
+    from dataclasses import replace as _replace
+
+    open_end = _replace(_stretch(100, 1.0), end_soc=None)  # no level at its end: the energy cannot be balanced
+    merged = replay_segments([_stretch(0, 1.0), open_end])
+    assert merged.status == "ok" and merged.comparable is True and "energy_not_balanced" in merged.warnings
+    assert all(d["adjusted_cost"] is None for d in merged.differences.values())
+    assert merged.differences["cjp_asap"]["cost"] == pytest.approx(replay(_stretch(0, 1.0)).differences["cjp_asap"]["cost"] + replay(open_end).differences["cjp_asap"]["cost"])
