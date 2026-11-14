@@ -463,3 +463,19 @@ async def test_the_connections_left_out_and_the_stretches_are_listed_with_their_
     covered = copy.deepcopy(plain)
     covered["result"]["coverage"]["covered_days"] = 3.0
     assert re.search(r"data used: \S+ &ndash; \S+ \(3 days\)", await _render(hass, "en", covered))
+
+
+async def test_the_price_history_of_each_entity_is_shown_with_where_its_hours_came_from(hass: HomeAssistant) -> None:
+    attributes = _result()
+    attributes["result"]["price_sources"] = {
+        "sensor.energi_data_service": {"statistics": 8000, "states": 240, "first": 1_689_012_000.0, "last": 1_699_034_400.0},
+        "sensor.stromligning": {"statistics": 0, "states": 0, "first": None, "last": None},
+    }
+    out = await _render(hass, "en", attributes)
+    assert "**Price history from Home Assistant:** sensor.energi_data_service: 8000 hours from the statistics + 240 from the recorder states (2023-07-10 &ndash; 2023-11-03)" in out
+    assert "sensor.stromligning: 0 hours from the statistics + 0 from the recorder states &middot;" not in out and "sensor.stromligning: 0 hours from the statistics + 0 from the recorder states" in out
+    for language in ("da", "de", "en-GB", "pl", "uk"):
+        rendered = await _render(hass, language, attributes)
+        assert "@@" not in rendered and "Undefined" not in rendered, language
+    attributes["result"]["price_sources"] = None
+    assert "Price history from Home Assistant" not in await _render(hass, "en", attributes)

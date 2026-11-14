@@ -366,6 +366,16 @@ or, for an estimated connection, when an hour of it has no stored price (no pric
 estimate). A connection that is not settled yet (a session is still running, or it ended less than two hours ago) is only left
 aside: the next run has it. A night in which CJP charged nothing is a connection with no charging, where the history reaches it.
 
+**Gaps in the recorded data.** What Home Assistant's recorder holds is read the way BattMind's what-if reads it: the hourly
+long-term statistics first (the mean, else the state), and every hour they lack from the recorder's own states (a day at a time,
+only the days that have a missing hour and only as far back as the recorder keeps raw states; the mean of an hour is
+time-weighted and an hour is only filled when its states cover it completely: nothing is made up). That is done for the buy and sell
+price entities of every price provider (Energi Data Service and Strømligning, each hour from the first provider that has it), the
+battery level and the charger power of the estimated connections, and the solar, house and charger power of the comparison without
+solar (power in whatever unit the entity has, brought to W). An hour taken from the statistics always wins. The card shows per
+price entity how many hours came from the statistics and from the states, and the span, so a missing history can be seen. Hours
+from the recorded history of a price entity are an ordinary source and get no warning.
+
 **Gaps.** A connection that cannot be read is a gap, and the comparison goes on after it, like BattMind's replay does after a gap in
 its history: the connections form *stretches* without a gap, and each stretch is replayed on its own, from its own battery level at
 the start and its own level at the end (read from the history like the first and the last level; a level is never carried over a
@@ -431,7 +441,7 @@ result saved by an earlier model of this comparison is not shown any more: run t
 |---|---|---|
 | Connections | CJP's recorded plug-in and unplug times at home | every completed, settled connection of the period that the charging history of CJP reaches and that can be read, in stretches without a gap (see *Gaps*). Before the measured ones, estimated or modelled connections (marked ESTIMATE) under the conditions of *Estimated connections* |
 | CJP's charging | CJP's charging history (without public charging): kWh, battery percent, kWh from solar or the home battery, booked cost and start and end of each entry | laid over the connections by time; a merged day (older than a week) reaching into two connections is split by time; a missing cost is a gap |
-| Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this comparison and flagged, and never replaces a real price in the monthly economy comparison |
+| Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400), and for the hours it did not store the recorded history of the price entities (statistics first, the recorder's states for what they lack, see *Gaps in the recorded data*) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this comparison and flagged, and never replaces a real price in the monthly economy comparison |
 | Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded: the energy they use is found from the levels at both ends and added (see *The same energy*). Without any recorded drive the demand is unknown and there is no result. CJP keeps up to two drives a day for the days kept (at least the newest 400): connections older than the oldest kept drive are left out |
 | Public charges | CJP's charging history | counted and shown, but not added to the battery level again, because the drive they belong to is already net of them. A public charge in a gap with no recorded drive changes the level by an unknown amount and is flagged |
 | Levels at both ends | entered, or the recorder state, or the hourly mean from the long-term statistics (marked as approximate) | never defaulted: an unknown starting level gives no result; an unknown end level gives a result without the energy balance and without an adjusted difference |

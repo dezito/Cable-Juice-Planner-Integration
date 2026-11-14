@@ -556,7 +556,8 @@ class WhatIf:
             "estimated_windows": result.estimated_windows,
             "price_estimate": _round(result.price_estimate, 4),
             "calibrated_start": result.calibrated_start,
-            "warnings": list(result.warnings),
+            # (hours from the price entity's recorded history are an ordinary source here, as in BattMind: no warning for them)
+            "warnings": [w for w in result.warnings if w != "prices_from_price_history"],
             "notes": list(result.notes),
             "provenance": dict(result.provenance),
             "ignored_events": result.ignored_events,
@@ -573,6 +574,7 @@ class WhatIf:
             "months": [],
             "rows": [],
             "derived": None,
+            "price_sources": self.economy_db.get("price_sources") or None,
         }
         if result.smart is None or result.asap is None or result.cjp is None:
             return published
