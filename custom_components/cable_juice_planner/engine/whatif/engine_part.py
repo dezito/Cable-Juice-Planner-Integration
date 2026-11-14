@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import logging
 import math
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import replace
 from typing import Any
@@ -23,10 +24,12 @@ from ..economy import ECONOMY_WINDOW_SETTLE
 from ..soc_power import planning_power_cap
 from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
+from .recorded import TOLERANCE, allocate, history_rows, outside_kwh
 from .replay import REPLAY_MODEL_VERSION, PolicyResult, Recorded, ReplayResult, replay
 
 _LOGGER = logging.getLogger(__name__)
 
+OUTSIDE_KWH_TOLERANCE = 1.0  # kWh of CJP charging that lies outside every connection before the card says so
 ANNUAL_MIN_DAYS = 30  # under this a year is not estimated: the connections say too little about a year
 ANNUAL_MEASURED_DAYS = 360  # from this the connections cover a year and the figure is the last year, not an estimate
 DEFAULT_DEPARTURE_SECONDS = 7 * 3600  # with Fill up the car is taken to leave at 07:00 (like the planner assumes)
@@ -41,7 +44,7 @@ def _round(value: Any, digits: int) -> float | None:
 
 
 class WhatIf:
-    """Scenario A: what CJP actually charged (its stored record per connection) against Smart and charging at once (replayed)."""
+    """Scenario A: what CJP actually charged (its charging history, as booked) against Smart and charging at once (replayed)."""
 
     # ------------------------------------------------------------------ #
     # settings
@@ -99,8 +102,8 @@ class WhatIf:
     ):
         """The replay input and coverage for a target and day selection (Scenarios A and B).
 
-        recorded (scenario A): only the measured connections CJP has a complete record of its own charging for, as the
-        newest unbroken stretch of them, each with what CJP charged (ReplayInput.recorded) and the planned departure."""
+        recorded (scenario A): the measured connections the charging history reaches, as the newest unbroken stretch of
+        them, each with what CJP charged in it (ReplayInput.recorded, from the charging history) and the planned departure."""
         battery = self.config["ev_car"].get("battery_size")
         max_kw = float(self.max_kwh_charging)
         kws = {round(watt / 1000.0, 3) for watt in self.charging_power_dict()} | {round(max_kw, 3)}
@@ -150,10 +153,6 @@ class WhatIf:
                 dst_copied_hours=list(copies),
             )
 
-        if recorded:
-            # a connection that has settled since the daily economy update has no record yet: make it now, from the prices
-            # this calculation uses (the history is combined per day after a week, so it can only be done in time)
-            self._economy_store_records(self.economy_db["windows"], {**history, **copies, **stored}, self._economy_ts(self.now()))
         data, coverage = build(self.economy_db["windows"])
         if recorded:
             data, coverage = self._what_if_with_recorded(data, coverage, build)
@@ -164,10 +163,10 @@ class WhatIf:
     # ------------------------------------------------------------------ #
 
     def _what_if_with_recorded(self, data: Any, coverage: dict[str, Any], build) -> tuple[Any, dict[str, Any]]:
-        """Keep the newest unbroken stretch of connections that CJP has a complete record of its own charging for, give
-        each what CJP charged (priced hour by hour) and the planned departure, and build the input again for just those."""
+        """Keep the newest unbroken stretch of connections that the charging history of CJP reaches (and that can be read),
+        give each what CJP charged in it and the planned departure, and build the input again for just those."""
         all_windows = list(data.windows)
-        records, reasons = self._what_if_recorded_charging(all_windows)
+        records, reasons, split, outside = self._what_if_recorded_charging(all_windows)
         # the newest connections that are not settled yet are left aside: they do not break the stretch, the next run has them
         newest = len(all_windows)
         while newest and reasons.get(all_windows[newest - 1].start) == "not_settled":
@@ -185,39 +184,57 @@ class WhatIf:
             return replace(data, windows=(), recorded={}), {
                 **coverage, "windows": 0, "first_window": None, "last_window": None, "recorded_candidates": len(all_windows),
                 "recorded_windows": 0, "recorded_left_out": left_out, "recorded_reason": reason,
+                "recorded_outside_kwh": 0.0, "recorded_split_entries": 0,
             }
         data, coverage = build([{"start": w.start, "end": w.end} for w in stretch])
         windows = tuple(replace(w, deadline=self._what_if_deadline(w)) for w in data.windows)
-        warnings = (*data.warnings, "windows_before_recorded_gap_left_out") if left_out else data.warnings
+        warnings = (*data.warnings, *(("windows_before_recorded_gap_left_out",) if left_out else ()))
+        # the entries of the history that no connection of the stretch holds, and the merged days split between two
+        first, last = windows[0].start, windows[-1].end
+        outside_total = outside(first, last)
+        split_days = split(first, last)
+        if outside_total > OUTSIDE_KWH_TOLERANCE:
+            warnings = (*warnings, "recorded_sessions_outside_connections")
+        if split_days:
+            warnings = (*warnings, "recorded_days_split")
         coverage = {
             **coverage, "recorded_candidates": len(all_windows), "recorded_windows": len(windows),
             "recorded_left_out": left_out, "recorded_reason": reason,
+            "recorded_outside_kwh": round(outside_total, 3), "recorded_split_entries": split_days,
         }
         return replace(data, windows=windows, warnings=warnings, recorded={w.start: records[w.start] for w in windows}), coverage
 
-    def _what_if_recorded_charging(self, windows: list[Any]) -> tuple[dict[float, Recorded], dict[float, str]]:
-        """What CJP charged in each connection: the record stored with it when it was settled (engine/economy.py, priced hour
-        by hour; the charging history itself is combined per day after a week and has lost the hours by then). A connection
-        without a stored record is not in the first dict and says why in the second: it is never given one."""
-        stored = {w["start"]: w for w in self.economy_db["windows"]}
+    def _what_if_recorded_charging(
+        self, windows: list[Any]
+    ) -> tuple[dict[float, Recorded], dict[float, str], Callable[[float, float], int], Callable[[float, float], float]]:
+        """What CJP charged in each connection, from its charging history (engine/whatif/recorded.py: every entry laid over the
+        connections by overlap in time, public charging taken out). A connection that cannot be read is not in the first dict
+        and says why in the second (not settled, invalid history, before the history). The last two are the number of merged
+        days split between two connections, and the home kWh outside every connection, between two moments."""
+        battery = self.config["ev_car"].get("battery_size")
+        rows = history_rows(
+            self.charging_history_db, self._economy_ts, float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else None
+        )
+        # every measured connection takes part in the allocation, also the ones the comparison leaves out (before the period,
+        # before the drive history, still open): an entry that reaches into a neighbour gives that neighbour its share, so the
+        # edges of the comparison neither get energy that belongs to a connection outside it nor lose any that is theirs
         now = self._economy_ts(self.now())
-        records: dict[float, Recorded] = {}
-        reasons: dict[float, str] = {}
-        for window in windows:
-            record = (stored.get(window.start) or {}).get("record")
-            if now - window.end < ECONOMY_WINDOW_SETTLE:
-                reasons[window.start] = "not_settled"  # the last hour may still change
-            elif not isinstance(record, dict):
-                reasons[window.start] = "no_stored_record"  # settled before the record existed, or its charging could not be priced
-            elif any(not isinstance(record.get(name), (int, float)) or isinstance(record.get(name), bool) or not math.isfinite(record[name]) or record[name] < 0 for name in ("kwh", "percent", "local_kwh", "cost")):
-                reasons[window.start] = "invalid_record"
-            else:
-                booked = record.get("booked_cost")
-                records[window.start] = Recorded(
-                    kwh=float(record["kwh"]), percent=float(record["percent"]), cost=float(record["cost"]),
-                    local_kwh=float(record["local_kwh"]), recorded_cost=float(booked) if isinstance(booked, (int, float)) and not isinstance(booked, bool) else None,
-                )
-        return records, reasons
+        every = {
+            w["start"]: (w["start"], w["end"] if w.get("end") is not None else now)
+            for w in self.economy_db["windows"] if isinstance(w.get("start"), (int, float))
+        }
+        every.update({w.start: (w.start, w.end) for w in windows})
+        allocation = allocate(rows, sorted(every.values()), now, ECONOMY_WINDOW_SETTLE)
+        records = {
+            start: Recorded(kwh=r["kwh"], percent=r["percent"], cost=r["cost"], local_kwh=r["local_kwh"])
+            for start, r in allocation["records"].items()
+        }
+        weights = allocation["weights"]
+
+        def split(first: float, last: float) -> int:
+            return sum(1 for row, shares in zip(rows, weights) if len(shares) > 1 and first - TOLERANCE <= row["ts"] <= last)
+
+        return records, allocation["reasons"], split, lambda first, last: outside_kwh(rows, weights, first, last)
 
     def _what_if_deadline(self, window: Any) -> float | None:
         """The planned departure inside a connection, for the charger "smart" stands for: the work plan's departure of the
@@ -411,7 +428,6 @@ class WhatIf:
             "annual": None,
             "months": [],
             "rows": [],
-            "recorded_reference": None,
             "derived": None,
         }
         if result.smart is None or result.asap is None or result.cjp is None:
@@ -477,19 +493,6 @@ class WhatIf:
         published["rows"] = rows[-WHAT_IF_WINDOW_ROWS:]
         published["annual"] = self._what_if_annual(result, coverage, months)
 
-        # what CJP booked itself in the same span: one price per session and solar at CJP's own value, so a reference only
-        first, last = result.smart.windows[0].start, result.smart.windows[-1].end
-        # (from the record stored with each connection: the charging history itself is combined per day after a week)
-        inside = [
-            w["record"] for w in self.economy_db["windows"]
-            if isinstance(w.get("record"), dict) and first <= w["start"] and w["end"] is not None and w["end"] <= last
-        ]
-        booked = [r.get("booked_cost") for r in inside]
-        published["recorded_reference"] = {
-            "kwh": _round(sum(r["kwh"] for r in inside), 3),
-            "cost": _round(sum(booked), 2) if inside and all(isinstance(b, (int, float)) and not isinstance(b, bool) for b in booked) else None,
-            "sessions": len(inside),
-        }
         return published
 
     @staticmethod

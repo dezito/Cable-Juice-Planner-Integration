@@ -15,8 +15,8 @@ PLAN = {"fill_up": True}
 
 
 def _seed(engine, days=range(1, 6), skip_price_day: int | None = None, public: bool = True, charge: bool = True) -> list[tuple[float, float]]:
-    """Five evening-to-morning connections with cheap hours 02-04, a 20 % drive after each and what CJP charged in each:
-    20 % in the cheap hours 02-05 (so the car comes home with the same level every day)."""
+    """Five evening-to-morning connections with cheap hours 02-04, a 20 % drive after each and what CJP charged in each (its
+    charging history): 20 % in the cheap hours 02-05, booked at 0.3 (so the car comes home with the same level every day)."""
     windows = []
     prices = engine.economy_db.setdefault("prices", {})
     loss = abs(float(engine.config["charger"]["charging_loss"]))
@@ -25,11 +25,12 @@ def _seed(engine, days=range(1, 6), skip_price_day: int | None = None, public: b
         day = DAY - datetime.timedelta(days=back)
         start, end = _ts(day, LOCAL_START), _ts(day + datetime.timedelta(days=1), LOCAL_END)
         windows.append((start, end))
-        window = {"start": start, "end": end}
+        engine.economy_db["windows"].append({"start": start, "end": end})
         if charge:
-            # the record stored with the connection when it was settled (engine/whatif/recorded.py): hour by hour at 0.3
-            window["record"] = {"kwh": kwh, "percent": 20.0, "local_kwh": 0.0, "cost": kwh * 0.3, "booked_cost": kwh * 0.3}
-        engine.economy_db["windows"].append(window)
+            engine.charging_history_db[datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time(2))] = {
+                "kWh": kwh, "kWh_from_grid": kwh, "kWh_from_local_energy": 0.0, "percentage": 20.0, "cost": kwh * 0.3,
+                "ended": "05:00", "charging_type": ["planned"],
+            }
         hour = start
         while hour < end:
             local = datetime.datetime.fromtimestamp(hour, TZ).hour
@@ -41,6 +42,13 @@ def _seed(engine, days=range(1, 6), skip_price_day: int | None = None, public: b
         public_day = DAY - datetime.timedelta(days=3)
         engine.charging_history_db[datetime.datetime.combine(public_day, datetime.time(12))] = {
             "kWh": 4.0, "cost": 3.0, "kWh_from_public": 4.0, "charging_type": "public_charging",
+        }
+    if charge:
+        # a session before the first connection: the history reaches back past it (without one the first connection could have
+        # lost the entries of its evening, and has no record)
+        engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=max(days) + 1), datetime.time(12))] = {
+            "kWh": 1.0, "kWh_from_grid": 1.0, "kWh_from_local_energy": 0.0, "percentage": 1.0, "cost": 0.3, "ended": "12:30",
+            "charging_type": ["planned"],
         }
     engine.economy_db["prices_averaged_since"] = _ts(DAY - datetime.timedelta(days=40), 0)
     return windows
@@ -74,7 +82,7 @@ def test_scenario_a_compares_what_cjp_charged_with_smart_and_asap_and_publishes_
     assert r["energy"]["driven_percent"] == pytest.approx(80.0)
     assert r["coverage"]["drives"] == 4 and r["coverage"]["recorded_windows"] == 5 and r["coverage"]["recorded_left_out"] == 0
     assert r["warnings"] == [] and r["conservation_error_kwh"] < 1e-6
-    assert {"recorded_charging", "grid_equivalent_cost", "smart_planned_departure", "energy_balanced_to_cjp"} <= set(r["notes"])
+    assert {"recorded_charging", "booked_cost", "smart_planned_departure", "energy_balanced_to_cjp"} <= set(r["notes"])
     assert [m["windows"] for m in r["months"]] == [5] and r["months"][0]["cjp_cost"] == pytest.approx(r["cjp"]["cost"], abs=0.01)
     # three differences, the headline one is CJP against charging at once, valued with what the one that holds more energy paid
     assert set(r["differences"]) == {"cjp_asap", "cjp_smart", "smart_asap"} and r["difference"] == r["differences"]["cjp_asap"]
@@ -140,18 +148,32 @@ def test_without_a_record_of_what_cjp_charged_there_is_nothing_to_compare() -> N
     assert r["status"] == "unavailable" and r["reason"] == "no_recorded_charging" and r["cjp"] is None and "what_if" not in engine.economy_db
 
 
-def test_a_connection_without_a_complete_record_ends_the_stretch_and_the_rest_is_counted_as_left_out() -> None:
+def _session_of(engine, back: int):
+    """The history entry of the connection `back` days ago (see _seed)."""
+    return engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=back - 1), datetime.time(2))]
+
+
+def test_a_connection_before_the_charging_history_ends_the_stretch_and_the_rest_is_counted_as_left_out() -> None:
     engine, snap = _engine(PLAN)
     windows = _seed(engine, public=False)
-    # the third newest connection has no stored record (settled before the record existed, or it could not be priced):
-    # nothing older can be compared, and the rest is counted
-    third_newest = sorted(engine.economy_db["windows"], key=lambda w: w["start"])[2]
-    del third_newest["record"]
+    # the history of CJP starts inside the third oldest connection: nothing is known about it or the older ones (never "charged
+    # nothing", never a part of a night)
+    del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=6), datetime.time(12))]
+    for back in (5, 4):
+        del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=back - 1), datetime.time(2))]
     prepared, result = _run(engine, snap)
     r = result.value
     assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_left_out"] == 3
-    assert r["coverage"]["recorded_reason"] == "no_stored_record" and "windows_before_recorded_gap_left_out" in r["warnings"]
+    assert r["coverage"]["recorded_reason"] == "before_history" and "windows_before_recorded_gap_left_out" in r["warnings"]
     assert prepared.value["first_window_start"] == sorted(start for start, _ in windows)[3]  # the level is read at the first one kept
+
+
+def test_a_night_without_a_session_is_charged_nothing_where_the_history_reaches_it() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=2), datetime.time(2))]  # nothing charged that night
+    r = _run(engine, snap)[1].value
+    assert r["status"] == "ok" and r["windows"]["total"] == 5 and r["coverage"]["recorded_left_out"] == 0
 
 
 def test_a_connection_that_is_not_settled_yet_is_left_aside_and_does_not_break_the_stretch() -> None:
@@ -159,39 +181,100 @@ def test_a_connection_that_is_not_settled_yet_is_left_aside_and_does_not_break_t
     _seed(engine, public=False)
     newest = max(engine.economy_db["windows"], key=lambda w: w["start"])
     newest["end"] = _ts(DAY, 11)  # unplugged an hour ago: the last hour of its charging may still change
-    del newest["record"]
     r = _run(engine, snap, {"soc": 50.0, "source": "entered"})[1].value
     assert r["status"] == "ok" and r["windows"]["total"] == 4 and r["coverage"]["recorded_left_out"] == 0
     assert "windows_before_recorded_gap_left_out" not in r["warnings"]
 
 
-def test_an_invalid_stored_record_ends_the_stretch() -> None:
+def test_an_entry_with_a_missing_cost_ends_the_stretch() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine, public=False)
-    sorted(engine.economy_db["windows"], key=lambda w: w["start"])[2]["record"]["kwh"] = float("nan")
+    del _session_of(engine, 3)["cost"]  # a missing booked cost is not a zero: that connection cannot be read
     r = _run(engine, snap)[1].value
-    assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_reason"] == "invalid_record"
+    assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_reason"] == "invalid_history"
 
 
-def test_cjp_is_priced_with_the_stored_hourly_cost_not_the_price_cjp_booked_for_the_session() -> None:
+def test_grid_energy_booked_at_zero_is_a_missing_price_not_a_free_night() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    _session_of(engine, 3)["cost"] = 0.0  # what CJP writes when it could not calculate the price
+    r = _run(engine, snap)[1].value
+    assert r["status"] == "ok" and r["windows"]["total"] == 2 and r["coverage"]["recorded_reason"] == "invalid_history"
+
+
+def test_a_neighbour_outside_the_period_keeps_its_share_of_a_merged_day() -> None:
+    engine, snap = _engine({**PLAN, "what_if_days": 7})  # the 8th and 9th connection are outside the period
+    _seed(engine, days=range(1, 10), public=False)
+    # the merged day 02:00-23:30 holds the morning of the 8th connection (outside) and an evening session of the 7th (inside)
+    entry = _session_of(engine, 8)
+    kwh = entry["kWh"]
+    entry.update(kWh=2 * kwh, kWh_from_grid=2 * kwh, percentage=2 * entry["percentage"], cost=2 * entry["cost"], ended="23:30")
+    r = _run(engine, snap)[1].value
+    assert r["status"] == "ok" and r["windows"]["total"] == 7
+    # the 7th connection gets only its share of the merged day (by time), not the whole of it: the neighbour that is not compared
+    # keeps what belongs to it (all of it would be 9 x kWh)
+    assert 7.0 * kwh < r["cjp"]["grid_kwh"] < 8.5 * kwh
+
+
+def test_cjp_is_what_it_booked_and_the_solar_share_is_said() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine)
-    for window in engine.economy_db["windows"]:
-        window["record"]["booked_cost"] = 99.0  # one price for the whole session, and solar at CJP's own value: not comparable
+    for back in range(1, 6):
+        entry = _session_of(engine, back)
+        entry["kWh_from_local_energy"] = entry["kWh"] / 2  # half of what was charged came from solar
+        entry["cost"] = 1.0  # what CJP booked for it: solar at CJP's own value, one price for the session
     r = _run(engine, snap)[1].value
-    kwh = r["cjp"]["grid_kwh"]
-    assert r["cjp"]["cost"] == pytest.approx(kwh * 0.3, abs=0.05)  # every kWh at the hourly price of 02-05
-    assert r["recorded_reference"]["cost"] == pytest.approx(5 * 99.0)  # what CJP booked is kept as a labelled reference only
-
-
-def test_solar_and_home_battery_energy_is_priced_at_the_grid_price_and_the_share_is_said() -> None:
-    engine, snap = _engine(PLAN)
-    _seed(engine)
-    for window in engine.economy_db["windows"]:
-        window["record"]["local_kwh"] = window["record"]["kwh"] / 2  # half of what was charged came from solar
-    r = _run(engine, snap)[1].value
+    assert r["cjp"]["cost"] == pytest.approx(5.0)  # what CJP booked, not a re-priced kWh
     assert "recorded_solar_share" in r["warnings"] and r["energy"]["local_kwh"] == pytest.approx(r["energy"]["kwh"] / 2, abs=0.05)
-    assert r["cjp"]["cost"] == pytest.approx(r["cjp"]["grid_kwh"] * 0.3, abs=0.05)  # all kWh, none of it free
+
+
+def test_public_charging_inside_a_merged_day_is_taken_out() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    entry = _session_of(engine, 2)
+    battery = float(engine.config["ev_car"]["battery_size"])
+    entry["kWh"] += 10.0  # a public charge merged into the same day
+    entry["kWh_from_public"] = 10.0
+    entry["cost"] += 8.0
+    entry["public_cost"] = 8.0
+    entry["percentage"] += 10.0 / battery * 100.0
+    r = _run(engine, snap)[1].value
+    plain = _run(*_plain_engine())[1].value
+    assert r["cjp"]["grid_kwh"] == pytest.approx(plain["cjp"]["grid_kwh"], abs=0.01)
+    assert r["cjp"]["cost"] == pytest.approx(plain["cjp"]["cost"], abs=0.01)
+
+
+def _plain_engine():
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    return engine, snap
+
+
+def test_a_merged_day_that_reaches_into_two_connections_is_split_between_them_and_said() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    # sessions older than a week are merged per calendar day: the day of the morning charging also holds the evening charging
+    # that belongs to the next connection (the entry starts at 02:00 and ends at 23:30)
+    first = _session_of(engine, 4)
+    second = _session_of(engine, 3)
+    merged = {key: first[key] + second[key] for key in ("kWh", "kWh_from_grid", "percentage", "cost")}
+    key_first = datetime.datetime.combine(DAY - datetime.timedelta(days=3), datetime.time(2))
+    key_second = datetime.datetime.combine(DAY - datetime.timedelta(days=2), datetime.time(2))
+    del engine.charging_history_db[key_second]
+    engine.charging_history_db[key_first] = {**first, **merged, "kWh_from_local_energy": 0.0, "ended": "23:30"}
+    r = _run(engine, snap)[1].value
+    assert r["status"] == "ok" and r["coverage"]["recorded_split_entries"] >= 1 and "recorded_days_split" in r["warnings"]
+    assert r["cjp"]["grid_kwh"] == pytest.approx(5 * first["kWh"], abs=0.05)  # nothing is lost by the split
+
+
+def test_charging_that_no_connection_holds_is_counted_and_said() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=2), datetime.time(12))] = {
+        "kWh": 6.0, "kWh_from_grid": 6.0, "kWh_from_local_energy": 0.0, "percentage": 8.0, "cost": 2.0, "ended": "13:00", "charging_type": ["planned"],
+    }
+    r = _run(engine, snap)[1].value
+    assert r["coverage"]["recorded_outside_kwh"] == pytest.approx(6.0) and "recorded_sessions_outside_connections" in r["warnings"]
 
 
 def test_without_the_level_at_the_end_the_three_are_not_known_to_be_balanced() -> None:
@@ -325,27 +408,7 @@ def test_a_connection_with_an_hour_without_a_price_is_estimated_for_smart_and_as
     assert r["status"] == "ok" and r["method"] == "estimated" and r["estimated_windows"] == 1
     assert r["windows"]["replayed"] == r["windows"]["total"] == 5 and r["price_estimate"] is not None
     assert "prices_estimated_windows" in r["warnings"] and r["coverage"]["price_hours_missing"] > 0
-    assert "recorded_prices_estimated_lean_cjp" in r["warnings"]  # CJP keeps its real hourly prices there: said to lean its way
-    assert r["coverage"]["recorded_left_out"] == 0  # CJP's own record needs no price in that hour
-
-
-def test_a_connection_settled_since_the_daily_update_is_recorded_when_the_what_if_runs() -> None:
-    """The record is made from the charging history as it was recorded (it is combined per day after a week); the daily
-    economy update only runs at night, so the What-if makes it for a connection that settled in the meantime."""
-    engine, snap = _engine(PLAN)
-    _seed(engine, charge=False, public=False)
-    kwh = 20.0 / 100.0 * float(engine.config["ev_car"]["battery_size"]) * (1.0 + abs(float(engine.config["charger"]["charging_loss"])))
-    for back in range(1, 6):  # 20 % in the cheap hours 02-05 of the morning the car is unplugged
-        engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=back - 1), datetime.time(2))] = {
-            "kWh": kwh, "kWh_from_grid": kwh, "kWh_from_local_energy": 0.0, "percentage": 20.0, "cost": kwh * 0.3,
-            "ended": "05:00", "charging_type": ["planned"],
-        }
-    assert all("record" not in w for w in engine.economy_db["windows"])
-    _, result = _run(engine, snap)
-    r = result.value
-    assert r["status"] == "ok" and r["windows"]["total"] == 5 and r["coverage"]["recorded_left_out"] == 0
-    assert all("record" in w for w in engine.economy_db["windows"])
-    assert r["cjp"]["cost"] == pytest.approx(r["cjp"]["grid_kwh"] * 0.3, abs=0.05) and "economy" in result.db_saves
+    assert r["coverage"]["recorded_left_out"] == 0  # what CJP booked needs no price in that hour
 
 
 def test_the_months_are_adjusted_for_the_change_of_the_battery_level() -> None:
@@ -547,8 +610,15 @@ def test_a_drive_that_can_not_be_applied_does_not_count_as_recorded_demand() -> 
     engine, snap = _engine(PLAN)
     first = (_ts(DAY - datetime.timedelta(days=3), 18), _ts(DAY - datetime.timedelta(days=2), 7))
     second = (_ts(DAY - datetime.timedelta(days=2), 18), _ts(DAY - datetime.timedelta(days=1), 7))
-    for start, end in (first, second):  # CJP charged a little in each (so the record is complete)
-        engine.economy_db["windows"].append({"start": start, "end": end, "record": {"kwh": 5.0, "percent": 5.0, "local_kwh": 0.0, "cost": 1.5, "booked_cost": 1.5}})
+    engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=5), datetime.time(12))] = {
+        "kWh": 1.0, "kWh_from_grid": 1.0, "kWh_from_local_energy": 0.0, "percentage": 1.0, "cost": 0.3, "ended": "12:30", "charging_type": ["planned"],
+    }  # (the history reaches back past the first connection)
+    for start, end in (first, second):  # CJP charged a little in each (so the history reaches both)
+        engine.economy_db["windows"].append({"start": start, "end": end})
+        engine.charging_history_db[datetime.datetime.fromtimestamp(start + 8 * 3600, TZ).replace(tzinfo=None)] = {
+            "kWh": 5.0, "kWh_from_grid": 5.0, "kWh_from_local_energy": 0.0, "percentage": 5.0, "cost": 1.5, "ended": "02:00",
+            "charging_type": ["planned"],
+        }
         hour = start
         while hour < end:
             engine.economy_db.setdefault("prices", {})[hour] = 1.0

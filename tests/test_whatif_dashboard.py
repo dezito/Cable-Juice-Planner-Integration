@@ -45,7 +45,7 @@ async def test_a_result_is_shown_with_the_three_columns_months_and_assumptions(h
     out = await _render(hass, "da", attributes)
     for expected in (
         "Seneste resultat", "CJP (registreret)", "Smart", "Opladning med det samme", "Justeret forskel", "Ladeomkostning", "Mål nået",
-        "Pr. måned", "Dækning", "5 / 5", "bagklogskab", "Sol er ikke modelleret", "indtastet", "For få dage", "Energi",
+        "Pr. måned", "Dækning", "5 / 5", "bagklogskab", "CJP-prisen er det, CJP har bogført", "indtastet", "For få dage", "Energi",
         "batteriniveau ved sidste frakobling",
     ):
         assert expected in out, expected
@@ -53,7 +53,7 @@ async def test_a_result_is_shown_with_the_three_columns_months_and_assumptions(h
     r = attributes["result"]
     assert all(str(r[name]["cost"]) in out for name in ("cjp", "smart", "asap"))
     assert f'{0 - r["difference"]["adjusted_cost"]:.2f}' in out and r["months"][0]["month"] in out
-    assert "Kun til reference" in out and "5 tilslutninger" in out  # what CJP booked itself: a labelled reference only
+    assert "Kun til reference" not in out and "tilslutninger, " not in out  # the booked cost IS the CJP column now: no separate reference line
 
 
 async def test_the_table_has_the_three_calculations_the_differences_and_what_targets_met_means(hass: HomeAssistant) -> None:
@@ -83,7 +83,7 @@ async def test_the_price_per_kwh_is_a_row_and_cjps_kwh_at_the_price_of_the_other
     row = next(item for item in out.splitlines() if item.startswith("| Price per kWh |"))
     assert row.endswith(f"| {unit['smart'] - unit['cjp']:.2f} $/kWh | {unit['asap'] - unit['cjp']:.2f} $/kWh |")  # each minus CJP: positive, CJP bought cheaper
     line = next(item for item in out.splitlines() if item.startswith("**CJP kWh at the price per kWh of Smart and charging at once"))
-    assert f"({unit['cjp_kwh']:.1f} kWh)" in line and f"CJP actually paid {unit['cjp_cost']:.2f}" in line  # kWh with one decimal
+    assert f"({unit['cjp_kwh']:.1f} kWh)" in line and f"CJP booked {unit['cjp_cost']:.2f}" in line  # kWh with one decimal
     assert f"Smart vs CJP {0 - unit['cjp_vs_smart']:.2f} $" in line and f"Charging at once vs CJP {0 - unit['cjp_vs_asap']:.2f} $" in line
     assert "The price per kWh says when the energy was bought, not how much" in out
     # a calculation that bought nothing has no price: dashes, never "None"
@@ -324,8 +324,8 @@ async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
 async def test_what_if_card_assumptions_list_everything_not_modelled(hass: HomeAssistant) -> None:
     out = await _render(hass, "en", _result())
     for text in (
-        "CJP column: what CJP actually charged", "priced at the grid buy price", "Smart charges in the cheapest hours before the planned departure",
-        "Smart knows every price of the connection in advance (hindsight)", "added as driving in all three", "Solar is not modelled",
+        "CJP column: what CJP actually charged", "The CJP cost is what CJP booked", "Smart charges in the cheapest hours before the planned departure",
+        "Smart knows every price of the connection in advance (hindsight)", "added as driving in all three",
         "House and site limits are not replayed",
     ):
         assert text in out, text
@@ -335,7 +335,8 @@ async def test_what_if_card_assumptions_list_everything_not_modelled(hass: HomeA
 async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeAssistant) -> None:
     attributes = _result()
     warnings = ["events_inside_windows", "prices_legacy_unverified", "invalid_input_entries_left_out", "public_charge_without_drive",
-                "many_connections_without_drive", "prices_dst_hour_copied", "connections_before_drive_history_left_out"]
+                "many_connections_without_drive", "prices_dst_hour_copied", "connections_before_drive_history_left_out",
+                "recorded_solar_share", "recorded_days_split", "recorded_sessions_outside_connections", "windows_before_recorded_gap_left_out"]
     reasons = ["no_battery_capacity", "no_charging_power", "no_start_soc", "invalid_target", "no_windows", "invalid_window",
                "overlapping_windows", "prices_not_hourly", "invalid_event", "invalid_loss_model", "invalid_power_model",
                "energy_conservation", "missing_prices", "invalid_day_selection", "interrupted", "internal_error",
