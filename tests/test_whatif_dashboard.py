@@ -336,7 +336,10 @@ async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeA
     attributes = _result()
     warnings = ["events_inside_windows", "prices_legacy_unverified", "invalid_input_entries_left_out", "public_charge_without_drive",
                 "many_connections_without_drive", "prices_dst_hour_copied", "connections_before_drive_history_left_out",
-                "recorded_solar_share", "recorded_days_split", "recorded_sessions_outside_connections", "windows_before_recorded_gap_left_out"]
+                "recorded_solar_share", "recorded_days_split", "recorded_sessions_outside_connections", "windows_before_recorded_gap_left_out",
+                "recorded_path_short", "recorded_prices_estimated_lean_cjp", "connections_estimated_from_battery_statistics",
+                "connections_modelled_from_work_plan", "older_connections_not_validated", "work_plan_model_not_validated",
+                "estimated_connections_without_prices_left_out", "start_level_unknown_calibrated"]
     reasons = ["no_battery_capacity", "no_charging_power", "no_start_soc", "invalid_target", "no_windows", "invalid_window",
                "overlapping_windows", "prices_not_hourly", "invalid_event", "invalid_loss_model", "invalid_power_model",
                "energy_conservation", "missing_prices", "invalid_day_selection", "interrupted", "internal_error",
@@ -350,3 +353,84 @@ async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeA
         for code in reasons:
             out = await _render(hass, language, {"result": None, "attempt": {"status": "unavailable", "reason": code}})
             assert f": {code}</ha-alert>" not in out, (language, code)
+
+
+def _estimated(attributes: dict, **coverage) -> dict:
+    result = copy.deepcopy(attributes["result"])
+    result["coverage"].update({
+        "recorded_estimated_windows": 3, "recorded_measured_from": 1699984800.0, "recorded_estimates": "used",
+        "recorded_reason": None, "recorded_stop_at": None, **coverage,
+    })
+    result["months"][0]["estimated_connections"] = 3
+    result["derived"] = {
+        "windows": 3, "modelled": 1, "first": 1690048800.0, "last": 1699034400.0, "cjp_cost": 11.5, "smart_cost": 14.25,
+        "asap_cost": 20.75, "cjp_kwh": 40.0, "smart_kwh": 41.0, "asap_kwh": 42.0,
+    }
+    return {**attributes, "result": result}
+
+
+async def test_estimated_connections_are_marked_with_their_count_the_date_they_stop_and_the_reason_they_stop(hass: HomeAssistant) -> None:
+    attributes = _estimated(
+        _result(), recorded_reason="before_history", recorded_stop_at=1689012000.0, recorded_left_out=4,
+    )
+    out = await _render(hass, "en", attributes)
+    assert "ESTIMATE: part of the period is connections that were not measured but estimated" in out
+    assert "(3 / 5 connections &middot; measured from 2023-11-14)" in out
+    assert "The comparison stops here: the charging history of CJP does not reach further back (2023-07-10)" in out
+    # the months and the estimated part on their own
+    assert "| 5 (3 ESTIMATE) |" in out
+    assert "Of this, estimated (battery level statistics or the work plan) (**ESTIMATE**): 3 connections (1 of which modelled from the work plan), 2023-07-22 &ndash; 2023-11-03" in out
+    assert re.search(r"CJP \(recorded\) 11\.50 \S+ \(40\.0 kWh\) &middot; Smart 14\.25 \S+ &middot; Charging at once 20\.75 ", out)
+    assert "None" not in out and "Undefined" not in out and "@@" not in out
+    # without any estimated connection none of it is shown
+    plain = await _render(hass, "en", _result())
+    assert "ESTIMATE: part of the period" not in plain and "The comparison stops here" not in plain and "ESTIMATE)" not in plain
+
+
+async def test_estimates_that_are_not_used_say_why(hass: HomeAssistant) -> None:
+    base = _result()
+    for code, text in (
+        ("not_all_measured", "Older estimated connections are not added: a measured connection could not be read"),
+        ("no_record", "The charging history of CJP does not reach the estimated connections"),
+        ("outside_charging", "The estimated connections are not used: much of what CJP charged lies outside them"),
+        ("not_stable", "could not be fitted to the charging history and are not used"),
+        ("no_prices", "The estimated connections have no stored prices"),
+    ):
+        attributes = _estimated(base, recorded_estimates=code, recorded_estimated_windows=0)
+        attributes["result"]["derived"] = None
+        out = await _render(hass, "en", attributes)
+        assert text in out, code
+        assert "ESTIMATE: part of the period" not in out
+    # nothing could be estimated: the reasons of both methods
+    attributes = _estimated(
+        base, recorded_estimates="none_available", recorded_estimated_windows=0, derived_reason="no_statistics", modelled_reason="no_plan",
+    )
+    attributes["result"]["derived"] = None
+    out = await _render(hass, "en", attributes)
+    assert "No older connections could be estimated (Battery level statistics: the battery level statistics have no data; Work plan: no work plan)" in out
+    # one reason only
+    attributes = _estimated(base, recorded_estimates="none_available", recorded_estimated_windows=0, modelled_reason="not_validated")
+    attributes["result"]["derived"] = None
+    assert "No older connections could be estimated (Work plan: the method did not find the measured connections well enough)" in await _render(hass, "en", attributes)
+
+
+async def test_every_text_of_the_estimates_exists_in_every_language(hass: HomeAssistant) -> None:
+    base = _result()
+    stops = ("before_history", "invalid_history", "not_settled")
+    notes = ("not_all_measured", "none_available", "no_record", "outside_charging", "not_stable", "no_prices")
+    reasons = ("no_statistics", "too_few_measured", "not_validated", "no_older_connections", "anchor_mismatch", "no_plan", "no_workdays",
+               "too_few_drives", "no_modelled_connections")
+    for language in ("da", "de", "en", "en-GB", "pl", "uk"):
+        for stop in stops:
+            out = await _render(hass, language, _estimated(base, recorded_reason=stop, recorded_stop_at=1689012000.0))
+            assert f"{stop} (" not in out, (language, stop)  # a missing text would show the raw code
+        for code in notes:
+            attributes = _estimated(base, recorded_estimates=code, recorded_estimated_windows=0, derived_reason=reasons[0], modelled_reason=reasons[5])
+            attributes["result"]["derived"] = None
+            out = await _render(hass, language, attributes)
+            assert "@@" not in out and "Undefined" not in out, (language, code)
+        for reason in reasons:
+            attributes = _estimated(base, recorded_estimates="none_available", recorded_estimated_windows=0, derived_reason=reason, modelled_reason=reason)
+            attributes["result"]["derived"] = None
+            out = await _render(hass, language, attributes)
+            assert f": {reason}" not in out and f"{reason})" not in out, (language, reason)

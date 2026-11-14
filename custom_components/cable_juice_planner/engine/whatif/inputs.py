@@ -224,6 +224,7 @@ def build_replay_input(
     refund: float = 0.0,
     derived: Mapping[str, Any] | None = None,
     work_plan: Mapping[str, Any] | None = None,
+    all_windows: Iterable[Mapping[str, Any]] | None = None,
 ) -> tuple[ReplayInput, dict[str, Any]]:
     """The replay input for [period_start, period_end) and what the data covered.
 
@@ -232,6 +233,8 @@ def build_replay_input(
     work_plan: the work plan as set now (see engine_part.what_if_work_plan). For the time before the first estimated or
     measured connection, and before the statistics begin, the connections and the battery use are modelled from it (see
     modelled.py), when that model has found the measured connections. Their start level is not known: start_soc is used.
+    all_windows: every measured connection there is (default: `windows`): the model never covers a time one of them exists in,
+    also one that is not replayed because only part of the connections was handed in.
     """
     drives = list(drives)
     valid_drives = [d for d in drives if _finite(d.get("start")) and _finite(d.get("used")) and d["used"] >= 0]
@@ -246,7 +249,7 @@ def build_replay_input(
     )
     real = [*derived_chosen, *measured_chosen]
     modelled_chosen, modelled_gap_drives, modelled_final_drive, modelled_info = _modelled_connections(
-        work_plan, tz, windows, drives, period_start, derived_info, derived, real
+        work_plan, tz, windows if all_windows is None else all_windows, drives, period_start, derived_info, derived, real
     )
 
     hourly: dict[float, float] = {}

@@ -128,12 +128,21 @@ def test_the_arrival_level_is_judged_against_the_daily_minimum_for_cjp() -> None
 
 
 def test_the_three_are_only_compared_when_all_cover_the_driving() -> None:
-    # CJP's record leaves the car at 50 % and the drive uses 60 %: the record and the drive do not fit (CJP is short), while the
-    # replayed calculations that charge to the target cover it
+    # CJP charged 50 % and covered the drive of 90 % (it was driven), but charging to the target (80 %) leaves the replayed
+    # calculations 10 % short: they do not deliver what CJP did
+    drive = Event(hour(4.5), "drive", 90.0)
+    result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(50.0), 6: charged(0.0)}, events=[drive], start=50.0))
+    assert result.cjp.unmet_driving_kwh == 0 and result.asap.unmet_driving_kwh > 0 and result.smart.unmet_driving_kwh > 0
+    assert result.comparable is False and result.comparable_reason == "unmet_driving_differs" and result.differences is None
+
+
+def test_a_shortfall_in_the_reconstructed_level_of_cjp_is_a_warning_and_not_an_uncovered_drive() -> None:
+    # CJP's record leaves the car at 50 % and the drive uses 60 %: the record and the drive do not fit, but the car was driven
+    # (so the path is wrong, not the car): said, and kept out of what is compared; the replayed calculations cover the drive
     drive = Event(hour(4.5), "drive", 60.0)
     result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(0.0), 6: charged(0.0)}, events=[drive], start=50.0))
-    assert result.cjp.unmet_driving_kwh > 0 and result.asap.unmet_driving_kwh == 0
-    assert result.comparable is False and result.comparable_reason == "unmet_driving_differs" and result.differences is None
+    assert "recorded_path_short" in result.warnings and result.energy["path_shortfall_kwh"] > 0
+    assert result.cjp.unmet_driving_kwh == 0 and result.asap.unmet_driving_kwh == 0 and result.comparable is True
 
 
 def test_the_record_must_cover_every_connection_and_the_start_level_must_be_known() -> None:
@@ -154,7 +163,7 @@ def test_the_price_per_kwh_of_each_and_cjps_kwh_at_the_price_of_the_others() -> 
 
 
 def test_the_price_per_kwh_is_given_when_the_three_cannot_be_compared_on_the_amount() -> None:
-    drive = Event(hour(4.5), "drive", 60.0)  # CJP's record leaves too little for it: the three do not cover the same driving
+    drive = Event(hour(4.5), "drive", 90.0)  # more than the target leaves: the replayed calculations are short, CJP covered it
     result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(0.0), 6: charged(0.0)}, events=[drive], start=50.0))
     assert result.comparable is False and result.differences is None
     assert result.unit_prices is not None and result.unit_prices["asap"] == pytest.approx(1.0)  # the price does not depend on the amount

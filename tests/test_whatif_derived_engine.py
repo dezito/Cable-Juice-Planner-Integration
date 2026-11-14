@@ -73,8 +73,9 @@ def test_the_statistics_become_older_connections_after_being_checked_against_the
     assert "connections_estimated_from_battery_statistics" in r["warnings"]
 
 
-def test_the_comparison_of_cjp_with_smart_and_asap_uses_only_connections_cjp_measured_itself() -> None:
-    """Estimated and modelled older connections have no record of what CJP charged: scenario A leaves them out."""
+def test_without_a_charging_history_scenario_a_has_no_record_of_what_cjp_charged_in_the_estimated_connections() -> None:
+    """Scenario A takes estimated and modelled older connections only where CJP's charging history reaches them (see
+    test_whatif_estimated_cjp.py): this install has no history, so there is nothing to compare and nothing is estimated."""
     engine, snap = _engine({"what_if_days": 365, "fill_up": True})
     _seed(engine)
     engine.run_job(snap, engine.store_derived_windows, {"ev_hours": _statistics((*MEASURED_BACKS, *OLDER_BACKS))})

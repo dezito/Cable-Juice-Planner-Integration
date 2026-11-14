@@ -216,6 +216,20 @@ def test_a_neighbour_outside_the_period_keeps_its_share_of_a_merged_day() -> Non
     assert 7.0 * kwh < r["cjp"]["grid_kwh"] < 8.5 * kwh
 
 
+def test_a_shortfall_in_the_reconstructed_path_of_cjp_is_said_and_does_not_make_the_three_not_comparable() -> None:
+    engine, snap = _engine(PLAN)
+    _seed(engine, public=False)
+    del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=4), datetime.time(2))]  # nothing charged in the first connection ...
+    r = _run(engine, snap, {"soc": 15.0, "source": "entered", "end_soc": 70.0, "end_source": "recorded_state"})[1].value
+    # ... so a drive of 20 % after it empties the reconstructed level (15 % + 0 - 20 %): the car was driven, the path is wrong
+    assert "recorded_path_short" in r["warnings"] and r["energy"]["path_shortfall_kwh"] > 0.5
+    assert r["cjp"]["unmet_driving_kwh"] == 0.0 and r["comparable"] is True
+    # CJP's reconstructed level was held at 0 %, so it ends higher than the car did: its end level is not known to be comparable,
+    # and no adjusted difference (and so no year) is given, that would favour CJP
+    assert all(d["adjusted_cost"] is None for d in r["differences"].values())
+    assert r["annual"] is None or r["annual"]["available"] is False
+
+
 def test_cjp_is_what_it_booked_and_the_solar_share_is_said() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine)
@@ -409,6 +423,7 @@ def test_a_connection_with_an_hour_without_a_price_is_estimated_for_smart_and_as
     assert r["windows"]["replayed"] == r["windows"]["total"] == 5 and r["price_estimate"] is not None
     assert "prices_estimated_windows" in r["warnings"] and r["coverage"]["price_hours_missing"] > 0
     assert r["coverage"]["recorded_left_out"] == 0  # what CJP booked needs no price in that hour
+    assert "recorded_prices_estimated_lean_cjp" in r["warnings"]  # Smart and charging at once cannot choose cheap hours there: said to lean CJP's way
 
 
 def test_the_months_are_adjusted_for_the_change_of_the_battery_level() -> None:

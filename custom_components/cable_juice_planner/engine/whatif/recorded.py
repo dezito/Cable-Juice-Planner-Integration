@@ -12,6 +12,10 @@ them by the time it overlaps each, and counted as split so that the card can say
 is counted as outside. Public charging inside an entry (kWh_from_public, public_cost) is taken out: the drives already
 contain it (a drive is the level at departure minus the level at the next plug-in).
 
+The connections can be estimated ones too (older than CJP's own measuring): the same history is laid over them, with a wider
+tolerance at their edges, and the card marks them as estimates. Charging that then lies outside every estimated connection
+is counted: it would otherwise be missing from CJP's column and make CJP look cheaper.
+
 Nothing is filled in: an entry with a missing or invalid figure makes the connections it touches invalid (no record), an
 entry that is still running makes them not settled, and a connection that starts before the first entry of the history has
 no record (the entries before it may be gone: nothing is known, never a favourable zero or a part of a night).
@@ -27,11 +31,12 @@ from __future__ import annotations
 
 import datetime
 import math
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any
 
 TOLERANCE = 600.0  # s: a session may start this long before the plug-in time of its connection
 END_TOLERANCE = 60.0  # s: and end this long after the unplug time
+ESTIMATE_TOLERANCE = 7200.0  # s: the same for a connection that is itself an estimate (derive.py works in whole hours)
 MIN_HOME_KWH = 1e-3  # kWh: an entry with less home charging than this is public charging only
 MIN_BOOKED_GRID_KWH = 0.1  # kWh: grid energy booked at 0 above this is a missing price
 
@@ -93,20 +98,33 @@ def history_rows(
 
 
 def allocate(
-    rows: Sequence[Mapping[str, Any]], windows: Sequence[tuple[float, float]], now: float, settle: float
+    rows: Sequence[Mapping[str, Any]], windows: Sequence[tuple[float, float]], now: float, settle: float,
+    estimated: Collection[float] = (),
 ) -> dict[str, Any]:
     """Lay the rows over the connections (start, end) by overlap in time.
+
+    estimated: the starts of the connections that are themselves estimates (from the battery statistics or the work plan):
+    their edges are only known to about ESTIMATE_TOLERANCE, so an entry may begin that long before and end that long after.
 
     Returns {"records": start -> {kwh, percent, local_kwh, cost}, "reasons": start -> why a connection has none (not_settled,
     invalid_history, before_history), "weights": per row [(start of a connection, its share)], "split": the number of rows
     that went to more than one connection}."""
     oldest = min((row["ts"] for row in rows), default=None)
+    guess = frozenset(estimated)
+    # the room at the edges of an estimated connection stops at its neighbours: it never reaches into another connection
+    windows = sorted(windows)
+    reach: list[tuple[float, float, float]] = []
+    for position, (start, end) in enumerate(windows):
+        if start in guess:
+            before = max(start - ESTIMATE_TOLERANCE, windows[position - 1][1]) if position else start - ESTIMATE_TOLERANCE
+            after = min(end + ESTIMATE_TOLERANCE, windows[position + 1][0]) if position + 1 < len(windows) else end + ESTIMATE_TOLERANCE
+            reach.append((start, min(before, start), max(after, end)))
+        else:
+            reach.append((start, start - TOLERANCE, end + END_TOLERANCE))
     touching: dict[float, list[tuple[int, float]]] = {}
     weights: list[list[tuple[float, float]]] = []
     for index, row in enumerate(rows):
-        overlaps = [
-            (start, min(row["end"], end + END_TOLERANCE) - max(row["ts"], start - TOLERANCE)) for start, end in windows
-        ]
+        overlaps = [(start, min(row["end"], after) - max(row["ts"], before)) for start, before, after in reach]
         overlaps = [(start, overlap) for start, overlap in overlaps if overlap > 0.0]
         total = sum(overlap for _, overlap in overlaps)
         shares = [(start, overlap / total) for start, overlap in overlaps] if total > 0.0 else []
@@ -121,7 +139,7 @@ def allocate(
             reasons[start] = "not_settled"  # the last session may still change
         elif any(not rows[index]["valid"] for index, _ in inside):
             reasons[start] = "invalid_history"
-        elif oldest is None or start - TOLERANCE < oldest:
+        elif oldest is None or start - (ESTIMATE_TOLERANCE if start in guess else TOLERANCE) < oldest:
             # the history does not reach the whole connection (the entries before the first one may be gone): nothing is
             # known, not "charged nothing" and not a part of the night
             reasons[start] = "before_history"
