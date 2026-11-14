@@ -1,37 +1,55 @@
-"""What CJP itself charged in one connection, from its charging history (pure: plain dicts in, no Home Assistant).
+"""What CJP itself charged, from its charging history, laid over the connections (pure: plain dicts in, no Home Assistant).
 
-The charging history is combined later: sessions older than a week are merged per day (the first start, the last end, one
-type), so the hour in which the energy was charged is lost. The record of a connection is therefore made when the connection
-is settled, from the sessions as they were recorded, and stored with the connection (economy database, window["record"]).
-Only a connection that was settled within RECORD_BACKFILL_DAYS of the first run of a version with this record can be
-recorded from the history (older ones are already combined): the others have no record and are never given one.
+The charging history holds, for every session, the kWh, the battery percent, the kWh that came from solar or the home
+battery, and the cost CJP booked for it (solar and the home battery at CJP's own value, one price per session). Sessions
+older than a week are merged per calendar day (engine/history/combine.py): the entry then starts at the first session of
+the day and ends at the last one, and the hours in between are lost. A merged day can therefore hold the end of one
+connection and the start of the next.
 
-The kWh of a session (from the grid and from solar or the home battery, without public charging) are spread evenly over the
-session's own start..end and priced per hour at the hourly buy price: one price per session, as CJP books it, and solar at
-CJP's own value, would not be on the same footing as the calculations it is compared with. Never filled in: an hour in
-which CJP charged and that has no price makes the connection unrecorded (None).
+So every entry is laid over the connections by overlap in time: an entry that lies inside one connection gives all of its
+figures to it, an entry that reaches into two (a merged day, or a session that runs on past the unplug) is split between
+them by the time it overlaps each, and counted as split so that the card can say so. An entry that overlaps no connection
+is counted as outside. Public charging inside an entry (kWh_from_public, public_cost) is taken out: the drives already
+contain it (a drive is the level at departure minus the level at the next plug-in).
+
+Nothing is filled in: an entry with a missing or invalid figure makes the connections it touches invalid (no record), an
+entry that is still running makes them not settled, and a connection that starts before the first entry of the history has
+no record (the entries before it may be gone: nothing is known, never a favourable zero or a part of a night).
+
+What the cost is: the price CJP booked, one per session, set when the session ends (or is recalculated in its last hour), so
+it can differ from the hourly prices the session was charged at. A booked cost of 0 for grid energy is what CJP writes when
+it could not calculate a price: such an entry is invalid, never a free night. After a merge a zero inside a sum cannot be seen.
+Entries within the last week are merged per day as well (not only the older ones), and a merged entry ends at the end of its
+newest session: when that session runs past midnight the end is read as the same day, so such an entry can be given to the
+connection of its first session.
 """
 from __future__ import annotations
 
 import datetime
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-HOUR = 3600.0
-RECORD_BACKFILL_DAYS = 6  # sessions of the last 6 days are not yet combined per day (they are from the 8th day)
-RECORD_FIELDS = ("kwh", "percent", "local_kwh", "cost", "booked_cost")
+TOLERANCE = 600.0  # s: a session may start this long before the plug-in time of its connection
+END_TOLERANCE = 60.0  # s: and end this long after the unplug time
+MIN_HOME_KWH = 1e-3  # kWh: an entry with less home charging than this is public charging only
+MIN_BOOKED_GRID_KWH = 0.1  # kWh: grid energy booked at 0 above this is a missing price
 
 
-def _number(value: Any) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+def _number(value: Any, minimum: float | None = 0.0) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    if minimum is not None and value < minimum:
         return None
     return float(value)
 
 
-def raw_sessions(history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime], float]) -> list[dict[str, Any]]:
-    """The sessions of the charging history as plain rows: start and end in epoch seconds, kWh, battery percent, local
-    energy, booked cost, public and ongoing. A row with a figure that is missing or not a finite number is "invalid"."""
+def history_rows(
+    history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime], float], battery_kwh: float | None
+) -> list[dict[str, Any]]:
+    """The home charging of every entry of the charging history as a plain row: start and end in epoch seconds, kWh,
+    battery percent, kWh from local energy and cost, without the public charging inside the entry. A row with a figure that
+    is missing or not a finite number is "valid" False, never zero; a row that is only public charging is left out."""
     rows: list[dict[str, Any]] = []
     for key, value in history.items():
         if not isinstance(key, datetime.datetime) or not isinstance(value, Mapping):
@@ -39,7 +57,7 @@ def raw_sessions(history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime]
         start = to_ts(key)
         ended = value.get("ended")
         ongoing = ended == ">"
-        end = start + 60.0  # a session without an end time is one minute at its start
+        end = start + 60.0  # an entry without an end time is one minute at its start
         if isinstance(ended, str) and not ongoing:
             try:
                 hour, minute = (int(part) for part in ended.split(":")[:2])
@@ -50,44 +68,78 @@ def raw_sessions(history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime]
                 end = max(to_ts(moment), start + 60.0)
             except (ValueError, TypeError):
                 pass
-        figures = {name: _number(value.get(source)) for name, source in (("kwh", "kWh"), ("percent", "percentage"), ("local", "kWh_from_local_energy"))}
-        cost = value.get("cost")
+        kwh, percent, local = _number(value.get("kWh")), _number(value.get("percentage")), _number(value.get("kWh_from_local_energy"))
+        cost = _number(value.get("cost"), None)  # a booked cost can be negative (a negative price), never missing
+        public_kwh = _number(value.get("kWh_from_public"))
+        public_cost = _number(value.get("public_cost"), None)
+        valid = None not in (kwh, percent, local, cost, public_kwh if value.get("kWh_from_public") is not None else 0.0)
+        if valid and abs(cost or 0.0) < 1e-9 and (kwh or 0.0) - (local or 0.0) - (public_kwh or 0.0) > MIN_BOOKED_GRID_KWH:
+            valid = False  # grid energy booked at 0: CJP could not calculate the price, it is not a free night
+        if valid and public_kwh:
+            # a merged day can hold public charging next to home charging: take it out (its percent from its kWh)
+            battery = battery_kwh if battery_kwh and battery_kwh > 0 else None
+            if public_cost is None or battery is None or public_kwh > kwh + MIN_HOME_KWH:
+                valid = False
+            else:
+                kwh, percent, cost = max(kwh - public_kwh, 0.0), max(percent - public_kwh / battery * 100.0, 0.0), cost - public_cost  # type: ignore[operator]
+                local = min(local, kwh)  # type: ignore[type-var]
+        if valid and not ongoing and (kwh or 0.0) < MIN_HOME_KWH and (percent or 0.0) < 0.1 and abs(cost or 0.0) < 0.005:
+            continue  # only public charging
         rows.append({
-            "ts": start, "end": end, "ongoing": ongoing,
-            "public": "public_charging" in str(value.get("charging_type", "")) or bool(value.get("kWh_from_public")),
-            # a missing figure is not a zero: the session is invalid
-            "valid": all(number is not None for number in figures.values()),
-            "cost": float(cost) if _number(cost) is not None else None,
-            **{name: number if number is not None else 0.0 for name, number in figures.items()},
+            "ts": start, "end": end, "ongoing": ongoing, "valid": valid,
+            "kwh": kwh or 0.0, "percent": percent or 0.0, "local": local or 0.0, "cost": cost if cost is not None else 0.0,
         })
     return rows
 
 
-def window_record(
-    sessions: Iterable[Mapping[str, Any]], start: float, end: float, prices: Mapping[float, float], refund: float = 0.0
-) -> tuple[dict[str, float] | None, str | None]:
-    """(the record of the connection, or None and why). prices: hourly buy price per UTC hour start (gross, the refund is
-    taken off like the replay does)."""
-    inside = [s for s in sessions if start - 600 <= s["ts"] <= end and not s["public"]]
-    if any(s["ongoing"] for s in inside):
-        return None, "not_settled"
-    if any(not s["valid"] for s in inside):
-        return None, "invalid_record"
-    cost = 0.0
-    for session in inside:
-        span = max(session["end"] - session["ts"], 1.0)
-        hour = session["ts"] - session["ts"] % HOUR
-        while hour < session["end"]:
-            overlap = (min(hour + HOUR, session["end"]) - max(hour, session["ts"])) / span
-            if overlap > 0:
-                price = prices.get(hour)
-                if price is None or not math.isfinite(price):
-                    return None, "unpriced_hours"  # an hour CJP charged in has no price: never filled in
-                cost += session["kwh"] * overlap * (price - refund)
-            hour += HOUR
-    booked = [s["cost"] for s in inside]
-    return {
-        "kwh": round(sum(s["kwh"] for s in inside), 4), "percent": round(sum(s["percent"] for s in inside), 4),
-        "local_kwh": round(sum(s["local"] for s in inside), 4), "cost": round(cost, 4),
-        "booked_cost": round(sum(booked), 4) if all(c is not None for c in booked) else None,
-    }, None
+def allocate(
+    rows: Sequence[Mapping[str, Any]], windows: Sequence[tuple[float, float]], now: float, settle: float
+) -> dict[str, Any]:
+    """Lay the rows over the connections (start, end) by overlap in time.
+
+    Returns {"records": start -> {kwh, percent, local_kwh, cost}, "reasons": start -> why a connection has none (not_settled,
+    invalid_history, before_history), "weights": per row [(start of a connection, its share)], "split": the number of rows
+    that went to more than one connection}."""
+    oldest = min((row["ts"] for row in rows), default=None)
+    touching: dict[float, list[tuple[int, float]]] = {}
+    weights: list[list[tuple[float, float]]] = []
+    for index, row in enumerate(rows):
+        overlaps = [
+            (start, min(row["end"], end + END_TOLERANCE) - max(row["ts"], start - TOLERANCE)) for start, end in windows
+        ]
+        overlaps = [(start, overlap) for start, overlap in overlaps if overlap > 0.0]
+        total = sum(overlap for _, overlap in overlaps)
+        shares = [(start, overlap / total) for start, overlap in overlaps] if total > 0.0 else []
+        weights.append(shares)
+        for start, share in shares:
+            touching.setdefault(start, []).append((index, share))
+    records: dict[float, dict[str, float]] = {}
+    reasons: dict[float, str] = {}
+    for start, end in windows:
+        inside = touching.get(start, [])
+        if now - end < settle or any(rows[index]["ongoing"] for index, _ in inside):
+            reasons[start] = "not_settled"  # the last session may still change
+        elif any(not rows[index]["valid"] for index, _ in inside):
+            reasons[start] = "invalid_history"
+        elif oldest is None or start - TOLERANCE < oldest:
+            # the history does not reach the whole connection (the entries before the first one may be gone): nothing is
+            # known, not "charged nothing" and not a part of the night
+            reasons[start] = "before_history"
+        else:
+            records[start] = {
+                "kwh": round(sum(rows[i]["kwh"] * share for i, share in inside), 4),
+                "percent": round(sum(rows[i]["percent"] * share for i, share in inside), 4),
+                "local_kwh": round(sum(rows[i]["local"] * share for i, share in inside), 4),
+                "cost": round(sum(rows[i]["cost"] * share for i, share in inside), 4),
+            }
+    return {"records": records, "reasons": reasons, "weights": weights, "split": sum(1 for shares in weights if len(shares) > 1)}
+
+
+def outside_kwh(rows: Sequence[Mapping[str, Any]], weights: Sequence[Sequence[tuple[float, float]]], first: float, last: float) -> float:
+    """The home kWh of the valid, finished rows that lie between `first` and `last` but overlap no connection: charging
+    that no connection of the comparison holds (the connections are the car's time at home, so it was charged elsewhere
+    or the connection is missing)."""
+    return sum(
+        row["kwh"] for row, shares in zip(rows, weights)
+        if not shares and row["valid"] and not row["ongoing"] and first - TOLERANCE <= row["ts"] <= last + END_TOLERANCE
+    )

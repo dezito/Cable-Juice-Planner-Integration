@@ -22,24 +22,31 @@ END = {"soc": 70.0, "source": "recorded_state"}  # 55 % + 3 x 15 % charged - 2 x
 
 
 def _seed(coordinator) -> None:
-    """Three connections (evening to morning) with hourly prices, a drive after each and the charging CJP did in each."""
+    """Three connections (evening to morning) with hourly prices, a drive after each and the charging CJP did in each (its history)."""
     engine = coordinator.engine
     now = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
     prices = engine.economy_db.setdefault("prices", {})
     for back in (2, 3, 4):
         start = (now - datetime.timedelta(days=back)).replace(hour=17)
         end = start + datetime.timedelta(hours=14)
-        # the record stored with the connection when it was settled: 8 kWh (15 %) in the cheap hours at 0.4
-        engine.economy_db["windows"].append({
-            "start": start.timestamp(), "end": end.timestamp(),
-            "record": {"kwh": 8.0, "percent": 15.0, "local_kwh": 0.0, "cost": 3.2, "booked_cost": 3.2},
-        })
+        engine.economy_db["windows"].append({"start": start.timestamp(), "end": end.timestamp()})
+        # what CJP charged in it (its charging history): 8 kWh (15 %) in the cheap hours, booked at 0.4
+        began = dt_util.as_local(start + datetime.timedelta(hours=9)).replace(tzinfo=None)
+        engine.charging_history_db[began] = {
+            "kWh": 8.0, "kWh_from_grid": 8.0, "kWh_from_local_energy": 0.0, "percentage": 15.0, "cost": 3.2,
+            "ended": (began + datetime.timedelta(hours=1)).strftime("%H:%M"), "charging_type": ["planned"],
+        }
         hour = start
         while hour < end:
             prices[hour.timestamp()] = 0.4 if 1 <= hour.hour < 5 else 1.2
             hour += datetime.timedelta(hours=1)
         engine.analysis_db["drives"].append({"start": end.timestamp() + 600, "end": end.timestamp() + 3000, "km": 30.0, "used": 15.0, "temp": None})
     engine.economy_db["prices_averaged_since"] = (now - datetime.timedelta(days=30)).timestamp()
+    old = dt_util.as_local(now - datetime.timedelta(days=7)).replace(tzinfo=None)  # a session before the first connection: the history reaches it
+    engine.charging_history_db[old] = {
+        "kWh": 1.0, "kWh_from_grid": 1.0, "kWh_from_local_energy": 0.0, "percentage": 1.0, "cost": 0.3,
+        "ended": (old + datetime.timedelta(minutes=30)).strftime("%H:%M"), "charging_type": ["planned"],
+    }
 
 
 async def _press(hass: HomeAssistant) -> None:
@@ -55,10 +62,7 @@ async def test_a_connection_that_settles_while_the_end_level_is_read_makes_the_r
     async def end_level_while_another_connection_settles(self, prepared):
         now = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
         start = (now - datetime.timedelta(days=1)).replace(hour=17)
-        coordinator.engine.economy_db["windows"].append({
-            "start": start.timestamp(), "end": (start + datetime.timedelta(hours=3)).timestamp(),
-            "record": {"kwh": 8.0, "percent": 15.0, "local_kwh": 0.0, "cost": 3.2, "booked_cost": 3.2},
-        })
+        coordinator.engine.economy_db["windows"].append({"start": start.timestamp(), "end": (start + datetime.timedelta(hours=3)).timestamp()})
         return END
 
     with patch.object(type(coordinator), "_async_what_if_start_soc", return_value=START), patch.object(

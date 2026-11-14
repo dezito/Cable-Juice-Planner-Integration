@@ -42,7 +42,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-REPLAY_MODEL_VERSION = 7
+REPLAY_MODEL_VERSION = 8
 EPS = 1e-9
 HOUR = 3600.0
 SOC_STEP = 10.0  # % : the SOC power model is learned in bands this wide (engine/soc_power.py)
@@ -63,11 +63,10 @@ NOTES = (
 # Scenario A with CJP's own recorded charging: three calculations over the same connections, drives and prices.
 RECORDED_NOTES = (
     "recorded_charging",
-    "grid_equivalent_cost",
+    "booked_cost",
     "smart_planned_departure",
     "smart_hindsight_prices",
     "energy_balanced_to_cjp",
-    "solar_not_modelled",
     "site_limits_not_replayed",
 )
 ENERGY_GAP_TOLERANCE = 0.05  # battery percent: a smaller difference between the recorded energy and the driving is rounding
@@ -118,17 +117,15 @@ class Window:
 
 @dataclass(frozen=True)
 class Recorded:
-    """What CJP itself charged in one connection (its own charging history), for the "CJP" column of scenario A.
+    """What CJP itself charged in one connection (its charging history), for the "CJP" column of scenario A.
 
-    cost: the kWh (from the grid and from solar/home battery) priced at the hourly grid buy price of the hours they were
-    charged, so it is on the same footing as the grid-only calculations (CJP's own booked cost is one price per session
-    and values solar at CJP's own value: it is kept as recorded_cost, a reference only)."""
+    cost: what CJP booked for it: one price per session, with solar and the home battery at CJP's own value. Smart and
+    charging at once are grid only, so part of a difference to them can be the solar (local_kwh says how much)."""
 
     kwh: float  # from the charger: grid + local energy, without public charging
     percent: float  # battery percent charged (CJP's recorded percentage)
     cost: float
     local_kwh: float = 0.0
-    recorded_cost: float | None = None
 
 
 @dataclass(frozen=True)
@@ -818,14 +815,12 @@ def _replay_recorded(
         warnings.append("events_inside_windows")
     if estimated_windows:
         warnings.append("prices_estimated_windows")
-        # Smart and charging at once get one flat price in such a connection, CJP keeps the hourly prices it really charged at
-        warnings.append("recorded_prices_estimated_lean_cjp")
     if cut / max(charged, EPS) * 100.0 > CLAMP_TOLERANCE or cut > CLAMP_TOLERANCE:
         warnings.append("recorded_path_cut")  # the record charged past 100 %: the drives and the record do not fit together
     local = sum(data.recorded[w.start].local_kwh for w in compared)
     total_kwh = sum(data.recorded[w.start].kwh for w in compared)
     if total_kwh > EPS and local / total_kwh >= 0.05:
-        warnings.append("recorded_solar_share")  # solar / home battery energy is priced at the grid price like the rest
+        warnings.append("recorded_solar_share")  # CJP's cost values solar / home battery energy at CJP's own value, the others are grid only
     error = max(_conservation(data, smart), _conservation(data, asap))
     if not error <= CONSERVATION_TOLERANCE_KWH:
         return ReplayResult(
