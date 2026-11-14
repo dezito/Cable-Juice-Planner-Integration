@@ -822,6 +822,83 @@ async def test_economy_uses_the_raw_price_history_without_statistics(hass: HomeA
     assert prices[(hour - datetime.timedelta(hours=3)).timestamp()] == pytest.approx(1.3)
 
 
+def test_hourly_means_are_time_weighted_and_only_for_hours_that_are_known_all_the_way() -> None:
+    from custom_components.cable_juice_planner.coordinator.refresh import hourly_means  # noqa: PLC0415
+
+    h = 3600.0
+    rows = [(0.0, 1.0), (1.5 * h, 3.0), (4.0 * h, None), (5.0 * h, 2.0)]
+    result = hourly_means(rows, 0.0, 8.0 * h)
+    # hour 0: 1.0; hour 1: half 1.0 and half 3.0; hour 2 and 3: 3.0; hour 4: unknown (no hour is made up); hour 5-7: 2.0
+    assert result == {0.0: 1.0, h: 2.0, 2 * h: 3.0, 3 * h: 3.0, 5 * h: 2.0, 6 * h: 2.0, 7 * h: 2.0}
+    assert hourly_means([], 0.0, 4 * h) == {} and hourly_means([(2 * h, 5.0)], 0.0, 4 * h) == {2 * h: 5.0, 3 * h: 5.0}  # (nothing before the first state)
+
+
+async def test_economy_fills_the_hours_the_statistics_lack_from_the_recorder_states_like_battmind(hass: HomeAssistant, loaded_entry) -> None:
+    """The statistics hold only the newest days of a price entity (it got a state_class late); the older hours are in the raw history."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    from .conftest import PRICE  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    rows = [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 2.0} for h in range(48, 0, -1)]  # two days of statistics
+    # the states: a price per hour for ten days, 1.0 + day number (so the overlap with the statistics can be told apart)
+    raw = {PRICE: [
+        State(PRICE, str(1.0 + (h // 24)), last_changed=hour - datetime.timedelta(hours=h), last_updated=hour - datetime.timedelta(hours=h))
+        for h in range(240, 0, -1)
+    ]}
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    captured = {}
+    original = coordinator.async_run_job
+
+    async def run_job(name, *args, **kwargs):
+        if name == "economy_update":
+            captured.update(args[0])
+        return await original(name, *args, **kwargs)
+
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", side_effect=lambda _hass, _s, _e, ids, *_a, **_k: raw if PRICE in ids else {}),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=lambda *args, **kwargs: {PRICE: rows}),
+        patch.object(coordinator, "async_run_job", side_effect=run_job),
+    ):
+        await coordinator._async_economy_refresh()
+    prices = captured["prices"]
+    assert prices[(hour - datetime.timedelta(hours=10)).timestamp()] == 2.0  # a statistic always wins
+    assert prices[(hour - datetime.timedelta(hours=100)).timestamp()] == pytest.approx(1.0 + 100 // 24)  # older: from the states
+    info = captured["price_sources"][PRICE]
+    assert info["statistics"] == 48 and info["states"] > 150 and info["first"] < info["last"]
+    assert coordinator.engine.economy_db["price_sources"][PRICE]["statistics"] == 48
+
+
+async def test_economy_does_not_read_the_recorder_states_when_the_statistics_cover_the_period(hass: HomeAssistant, loaded_entry) -> None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    from .conftest import PRICE  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    from custom_components.cable_juice_planner.engine.economy import economy_keep_days  # noqa: PLC0415
+
+    days = economy_keep_days(coordinator.config)
+    rows = [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 1.5} for h in range(days * 24, 0, -1)]
+    calls = []
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", side_effect=lambda _hass, _s, _e, ids, *_a, **_k: calls.append(list(ids)) or {}),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=lambda *args, **kwargs: {PRICE: rows}),
+    ):
+        await coordinator._async_economy_refresh()
+    assert [PRICE] not in calls  # nothing to fill: the (heavy) raw history of a year is not read for nothing
+
+
 async def test_economy_prefers_stromligning_over_energi_data_service(hass: HomeAssistant, loaded_entry) -> None:
     """With both price providers the economy uses Strømligning per hour and Energi Data Service where it has none."""
     from types import SimpleNamespace  # noqa: PLC0415

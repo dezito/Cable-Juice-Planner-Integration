@@ -1,8 +1,10 @@
 """Charging loss, economy, analysis and learned driving distance refresh."""
 from __future__ import annotations
 
+import bisect
 import datetime
 import logging
+import math
 from functools import partial
 from typing import Any
 
@@ -20,6 +22,46 @@ from ..utils.helpers import float_or_none
 from .constants import CHARGING_LOSS_STATISTICS_CHUNK_DAYS, CHARGING_LOSS_STATISTICS_DAYS, CONNECTED_STATUS
 
 _LOGGER = logging.getLogger(__name__)
+
+def hourly_stats(rows: list[tuple[float, float | None]], start: float, end: float) -> dict[float, tuple[float, float, float]]:
+    """(mean, lowest, highest) per full hour from the recorder states of an entity [(time, value)]: a value holds until the next,
+    the mean is time-weighted.
+
+    Only an hour that is covered completely by known, finite values has a row: no hour is made up (the rule BattMind's what-if
+    uses for the hours the long-term statistics lack)."""
+    events = sorted({ts: value for ts, value in rows}.items())
+    times = [ts for ts, _ in events]
+    values = [value for _, value in events]
+    result: dict[float, tuple[float, float, float]] = {}
+    hour = start - start % 3600.0
+    while hour + 3600.0 <= end:
+        index = bisect.bisect_right(times, hour) - 1
+        if index >= 0:
+            cursor, total, low, high, valid = hour, 0.0, math.inf, -math.inf, True
+            while cursor < hour + 3600.0:
+                value = values[index]
+                if value is None or not math.isfinite(value):
+                    valid = False
+                    break
+                following = times[index + 1] if index + 1 < len(times) else hour + 3600.0
+                segment_end = min(following, hour + 3600.0)
+                if segment_end > cursor:
+                    total += value * (segment_end - cursor)
+                    low, high = min(low, value), max(high, value)
+                    cursor = segment_end
+                if cursor < hour + 3600.0:
+                    index += 1
+                    if index >= len(values):
+                        valid = False
+                        break
+            if valid and cursor == hour + 3600.0:
+                result[hour] = (total / 3600.0, low, high)
+        hour += 3600.0
+    return result
+
+
+def hourly_means(rows: list[tuple[float, float | None]], start: float, end: float) -> dict[float, float]:
+    return {hour: row[0] for hour, row in hourly_stats(rows, start, end).items()}
 
 
 class CoordinatorRefresh:
@@ -147,6 +189,68 @@ class CoordinatorRefresh:
         await self.async_run_job("charging_loss_update", {"backfill": True, "soc_power_statistics_done": statistics_ok})
         _LOGGER.info("Charging loss: history read back to %s, measurements per group %s", chunk_end.date(), groups)
 
+    async def _async_fill_hours(
+        self, instance, have: dict[str, set[float]], first: datetime.datetime, end: datetime.datetime, keep_days: int,
+        convert: dict[str, Any] | None = None,
+    ) -> dict[str, dict[float, tuple[float, float, float]]]:
+        """The hours the long-term statistics lack, from the recorder's own states, like BattMind's what-if does.
+
+        have: the hours the statistics hold per entity. Returns {entity: {hour: (mean, lowest, highest)}} of the others. The
+        states are read a day at a time, only the days that have a missing hour and only as far back as the recorder keeps raw
+        states, and turned into hours outside the event loop (a power sensor has thousands of states a day). convert: a
+        function per entity that brings a state to the unit of its statistics. An hour is only filled when its states cover it
+        completely: nothing is made up."""
+        from homeassistant.components.recorder import history  # noqa: PLC0415
+
+        filled: dict[str, dict[float, tuple[float, float, float]]] = {entity: {} for entity in have}
+        raw_from = max(first, end - datetime.timedelta(days=keep_days + 1))
+        day = raw_from.replace(hour=0, minute=0, second=0, microsecond=0)
+        while day < end:
+            begin, stop = max(day, raw_from), min(day + datetime.timedelta(days=1), end)
+            begin_ts, stop_ts = begin.timestamp(), stop.timestamp()
+            hours = []
+            hour = begin_ts + (-begin_ts) % 3600.0  # the first full hour
+            while hour + 3600.0 <= stop_ts:
+                hours.append(hour)
+                hour += 3600.0
+            wanted = sorted(entity for entity, present in have.items() if any(h not in present for h in hours))
+            if hours and wanted:
+                try:
+                    raw = await instance.async_add_executor_job(
+                        partial(
+                            history.get_significant_states, self.hass, begin, stop, wanted, None,
+                            include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                        )
+                    )
+                except Exception as err:  # noqa: BLE001
+                    # filling is best effort: the hours the statistics hold are never lost because the states could not be read
+                    _LOGGER.debug("Economy: could not read the recorder states of %s: %s", wanted, err)
+                    day += datetime.timedelta(days=1)
+                    continue
+                for entity in wanted:
+                    rows = []
+                    function = (convert or {}).get(entity)
+                    for state in raw.get(entity, []):
+                        try:
+                            value = float_or_none(state.state) if state.state not in ENTITY_UNAVAILABLE_STATES else None
+                            rows.append((state.last_updated.timestamp(), function(value) if function and value is not None else value))
+                        except AttributeError:
+                            continue
+                    got = await self.hass.async_add_executor_job(hourly_stats, rows, begin_ts, stop_ts)
+                    filled[entity].update({h: v for h, v in got.items() if h not in have[entity]})
+            day += datetime.timedelta(days=1)
+        return filled
+
+    def _power_to_watt(self, entity_id: str):
+        """A function that brings a state of this power entity to W (its unit as it is now), or None when it has no known unit."""
+        from homeassistant.util.unit_conversion import PowerConverter  # noqa: PLC0415
+
+        state = self.hass.states.get(entity_id)
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if state is not None else None
+        if unit not in PowerConverter.VALID_UNITS:
+            return None
+        return lambda value: PowerConverter.convert(value, unit, "W")
+
     @callback
     def _economy_daily(self, _now) -> None:
         self._background(self._async_economy_refresh(), "economy")
@@ -176,28 +280,34 @@ class CoordinatorRefresh:
 
         try:
             if price_ids:
-                # long-term statistics are not purged with the raw history: as far back as the economy keeps prices
+                # like BattMind's what-if: the long-term statistics first (not purged with the raw history: as far back as the
+                # economy keeps prices), and every hour they lack from the recorder's own states as far as it keeps them
+                first = end - datetime.timedelta(days=economy_keep_days(self.config))
                 stats = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, set(price_ids), "hour", None, {"mean"}
+                    statistics_during_period, self.hass, first, end, set(price_ids), "hour", None, {"mean", "state"}
                 )
                 recorded = {}
+                sources = {}
                 for price_id in price_ids:
-                    hourly = {stat_ts(row): row["mean"] for row in stats.get(price_id, []) if row.get("mean") is not None}
-                    if not hourly:
-                        # no long-term statistics (no state_class): the raw history, the price changes every hour
-                        start = end - datetime.timedelta(days=keep_days)
-                        raw = await instance.async_add_executor_job(
-                            partial(
-                                history.get_significant_states, self.hass, start, end, [price_id], None,
-                                include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
-                            )
-                        )
-                        series = as_series((state.last_changed.timestamp(), state.state) for state in raw.get(price_id, []))
-                        hourly = {row[0]: row[1] for row in resample_steps(series, start.timestamp(), end.timestamp(), 3600.0)}
+                    hourly = {}
+                    for row in stats.get(price_id, []):
+                        value = row.get("mean") if row.get("mean") is not None else row.get("state")
+                        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+                            hourly[stat_ts(row)] = float(value)
                     recorded[price_id] = hourly
+                from_statistics = {price_id: len(hourly) for price_id, hourly in recorded.items()}
+                filled = await self._async_fill_hours(instance, {pid: set(h) for pid, h in recorded.items()}, first, end, keep_days)
+                for price_id, hourly in recorded.items():
+                    for hour, row in filled[price_id].items():
+                        hourly.setdefault(hour, row[0])  # a statistic always wins
+                    sources[price_id] = {
+                        "statistics": from_statistics[price_id], "states": len(hourly) - from_statistics[price_id],
+                        "first": min(hourly, default=None), "last": max(hourly, default=None),
+                    }
                 data["prices"] = provider.combine_history(recorded)
-            await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts)
-            await self._async_economy_ev_statistics(instance, data, end, stat_ts)
+                data["price_sources"] = sources
+            await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts, keep_days)
+            await self._async_economy_ev_statistics(instance, data, end, stat_ts, keep_days)
             if odometer_id:
                 months = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, {odometer_id}, "month", None, {"change"}
@@ -230,7 +340,9 @@ class CoordinatorRefresh:
         if backfill:
             await self.async_run_job("economy_mark_backfilled")
 
-    async def _async_economy_solar_statistics(self, instance, provider, data: dict[str, Any], end: datetime.datetime, stat_ts) -> None:
+    async def _async_economy_solar_statistics(
+        self, instance, provider, data: dict[str, Any], end: datetime.datetime, stat_ts, keep_days: int = 10
+    ) -> None:
         """The What-if solar comparison: the hourly sell price and the hourly solar production, house consumption and
         charger power (W) from the long-term statistics, so it does not have to wait for CJP's own records.
         Missing entities or statistics just leave the keys out (a failure here must never stop the rest of the update)."""
@@ -243,8 +355,13 @@ class CoordinatorRefresh:
                 stats = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, start, end, set(sell_ids), "hour", None, {"mean"}
                 )
+                filled = await self._async_fill_hours(
+                    instance, {sell_id: {stat_ts(row) for row in stats.get(sell_id, []) if row.get("mean") is not None} for sell_id in sell_ids},
+                    start, end, keep_days,
+                )
                 for sell_id in sell_ids:
                     hourly = {stat_ts(row): row["mean"] for row in stats.get(sell_id, []) if row.get("mean") is not None}
+                    hourly.update({hour: row[0] for hour, row in filled[sell_id].items() if hour not in hourly})
                     if hourly:
                         data["sell_history"] = hourly  # the first provider that has a history
                         data["sell_history_entity_id"] = sell_id  # converted by the provider of this entity
@@ -261,12 +378,24 @@ class CoordinatorRefresh:
                     for row in stats.get(entity_id, []):
                         if row.get("mean") is not None:
                             hours.setdefault(stat_ts(row), {})[key] = abs(float(row["mean"]))
+                converters = {entity_id: self._power_to_watt(entity_id) for entity_id in (solar_id, house_id, ev_id)}
+                filled = await self._async_fill_hours(
+                    instance, {
+                        entity_id: {ts for ts, row in hours.items() if key in row}
+                        for key, entity_id in (("solar", solar_id), ("house", house_id), ("ev", ev_id)) if converters[entity_id]
+                    }, start, end, keep_days, convert={e: f for e, f in converters.items() if f},
+                )
+                for key, entity_id in (("solar", solar_id), ("house", house_id), ("ev", ev_id)):
+                    for hour, row in filled.get(entity_id, {}).items():
+                        hours.setdefault(hour, {}).setdefault(key, abs(row[0]))
                 if hours:
                     data["power_hours"] = hours
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Economy: could not load the solar statistics: %s", err)
 
-    async def _async_economy_ev_statistics(self, instance, data: dict[str, Any], end: datetime.datetime, stat_ts) -> None:
+    async def _async_economy_ev_statistics(
+        self, instance, data: dict[str, Any], end: datetime.datetime, stat_ts, keep_days: int = 10
+    ) -> None:
         """The What-if older connections: the hourly battery level (mean, lowest, highest) and the charger power (W) from
         the long-term statistics, as far back as the economy keeps its prices. Without the entities, or without statistics
         for them, "ev_hours" is empty (nothing is estimated); when the statistics cannot be read the key is left out
@@ -287,10 +416,21 @@ class CoordinatorRefresh:
             for row in stats.get(soc_id, []):
                 if None not in (row.get("mean"), row.get("min"), row.get("max")):
                     hours[stat_ts(row)] = [row["mean"], row["min"], row["max"], None]
-            for row in stats.get(power_id, []):
-                ts = stat_ts(row)
-                if ts in hours and row.get("mean") is not None:
-                    hours[ts][3] = abs(float(row["mean"]))
+            power: dict[float, float] = {stat_ts(row): abs(float(row["mean"])) for row in stats.get(power_id, []) if row.get("mean") is not None}
+            # the hours the statistics lack (an entity without a state_class has none): from the recorder states, like BattMind
+            to_watt = self._power_to_watt(power_id)
+            first = end - datetime.timedelta(days=economy_keep_days(self.config))
+            filled = await self._async_fill_hours(
+                instance, {soc_id: set(hours), **({power_id: set(power)} if to_watt else {})}, first, end, keep_days,
+                convert={power_id: to_watt} if to_watt else None,
+            )
+            for ts, (mean, low, high) in filled[soc_id].items():
+                hours.setdefault(ts, [mean, low, high, None])
+            for ts, row in filled.get(power_id, {}).items():
+                power.setdefault(ts, abs(row[0]))
+            for ts, watt in power.items():
+                if ts in hours:
+                    hours[ts][3] = watt
             data["ev_hours"] = hours
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Economy: could not load the battery level statistics: %s", err)

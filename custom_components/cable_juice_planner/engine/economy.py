@@ -325,6 +325,12 @@ class Economy:
         windows.sort(key=lambda w: w["start"])
         # the price sensor's history (statistics or raw), the plan's own prices win
         prices = {float(ts): float(price) for ts, price in (data.get("prices") or {}).items()}
+        # what each price entity gave (hours from the statistics and from the recorder states, and the span): the What-if shows it
+        if isinstance(data.get("price_sources"), dict):
+            self.economy_db["price_sources"] = {
+                str(entity): {key: value for key, value in info.items() if key in ("statistics", "states", "first", "last")}
+                for entity, info in data["price_sources"].items() if isinstance(info, dict)
+            }
         # keep the statistics prices CJP did not store itself: the What-if replays use them for hours without a stored price
         history = self.economy_db.setdefault("prices_history", {})
         stored_prices = self.economy_db.get("prices", {})

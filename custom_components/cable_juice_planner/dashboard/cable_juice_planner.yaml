@@ -3286,6 +3286,10 @@ views:
         {% endif %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
+        {% if r.get('price_sources') -%}
+
+        **@@what_if_price_sources@@:** {% for entity, source in r.price_sources.items() %}{{ entity }}: {{ source.statistics }} @@what_if_price_from_statistics@@ + {{ source.states }} @@what_if_price_from_states@@{% if source.get('first') %} ({{ source.first | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ source.last | timestamp_custom('%Y-%m-%d', true) }}){% endif %}{{ ' &middot; ' if not loop.last else '' }}{% endfor %}
+        {%- endif %}
         {% set dv = r.get('derived') %}
         {% if dv -%}
 

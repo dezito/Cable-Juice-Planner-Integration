@@ -497,7 +497,7 @@ def test_prices_from_the_price_sensor_history_fill_hours_cjp_did_not_store() -> 
     _, result = _run(engine, snap)
     r = result.value
     assert r["status"] == "ok" and r["method"] == "strict" and r["estimated_windows"] == 0
-    assert r["coverage"]["price_hours_from_history"] > 0 and "prices_from_price_history" in r["warnings"]
+    assert r["coverage"]["price_hours_from_history"] > 0 and "prices_from_price_history" not in r["warnings"]  # an ordinary source, as in BattMind
     assert r["provenance"]["prices"] == "measured_partly_unverified"
     # a price CJP stored itself always wins over the history
     engine.economy_db["prices_history"] = {ts: 99.0 for ts in engine.economy_db["prices"]}
