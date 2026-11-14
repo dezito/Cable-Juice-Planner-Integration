@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from copy import deepcopy
 from dataclasses import replace
 from typing import Any
@@ -30,6 +30,8 @@ from .replay import REPLAY_MODEL_VERSION, PolicyResult, Recorded, ReplayResult, 
 _LOGGER = logging.getLogger(__name__)
 
 OUTSIDE_KWH_TOLERANCE = 1.0  # kWh of CJP charging that lies outside every connection before the card says so
+OUTSIDE_SHARE = 0.1  # of the kWh CJP charged during the estimated connections: more than this outside them and they are not used
+ESTIMATE_COVERAGE_KEYS = ("derived_status", "derived_reason", "modelled_status", "modelled_reason")
 ANNUAL_MIN_DAYS = 30  # under this a year is not estimated: the connections say too little about a year
 ANNUAL_MEASURED_DAYS = 360  # from this the connections cover a year and the figure is the last year, not an estimate
 DEFAULT_DEPARTURE_SECONDS = 7 * 3600  # with Fill up the car is taken to leave at 07:00 (like the planner assumes)
@@ -125,18 +127,22 @@ class WhatIf:
             float(ts): price for ts, price in self.economy_db.get("prices_history", {}).items()
             if ts not in stored and ts not in copies and isinstance(price, (int, float)) and math.isfinite(price)
         }
-        def build(windows):
+        def build(windows, estimates=False, start=None):
+            """estimates: with the connections estimated from the battery statistics and modelled from the work plan (always
+            so for scenario B); start: the period starts here instead (the older estimated connections are left out)."""
+            use = estimates or not recorded
             return build_replay_input(
                 windows=windows,
                 prices={**history, **copies, **stored},
                 history_hours=list(history),
                 refund=self._solar_refund() or 0.0,
-                # scenario A uses CJP's own recorded connections only: no estimated or modelled older ones
-                derived=None if recorded else self.economy_db.get("derived_windows"),
-                work_plan=None if recorded else self.what_if_work_plan(),
+                derived=self.economy_db.get("derived_windows") if use else None,
+                work_plan=self.what_if_work_plan() if use else None,
+                # the model never covers a time a measured connection exists in, whichever of them are compared
+                all_windows=self.economy_db["windows"] if estimates else None,
                 drives=self.analysis_db.get("drives", []),
                 public_sessions=public,
-                period_start=period_start,
+                period_start=period_start if start is None else start,
                 period_end=period_end,
                 battery_kwh=float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else math.nan,
                 max_kw=max_kw,
@@ -163,8 +169,19 @@ class WhatIf:
     # ------------------------------------------------------------------ #
 
     def _what_if_with_recorded(self, data: Any, coverage: dict[str, Any], build) -> tuple[Any, dict[str, Any]]:
-        """Keep the newest unbroken stretch of connections that the charging history of CJP reaches (and that can be read),
-        give each what CJP charged in it and the planned departure, and build the input again for just those."""
+        """The newest unbroken stretch of connections that the charging history of CJP reaches (and that can be read), each with
+        what CJP charged in it and the planned departure: the measured connections first, then the estimated ones before them
+        (from the battery statistics or the work plan, marked as estimates) as far back as the history reaches."""
+        data, coverage = self._what_if_measured_stretch(data, coverage, build)
+        if not data.windows:
+            return data, {**coverage, "recorded_estimates": None, "recorded_estimated_windows": 0}
+        if coverage["recorded_left_out"]:
+            # an older measured connection could not be read: an estimate before it would leave a hole in the middle
+            return data, {**coverage, "recorded_estimates": "not_all_measured", "recorded_estimated_windows": 0}
+        return self._what_if_estimated_stretch(data, coverage, build)
+
+    def _what_if_measured_stretch(self, data: Any, coverage: dict[str, Any], build) -> tuple[Any, dict[str, Any]]:
+        """The measured connections: the newest unbroken stretch that the charging history reaches and that can be read."""
         all_windows = list(data.windows)
         records, reasons, split, outside = self._what_if_recorded_charging(all_windows)
         # the newest connections that are not settled yet are left aside: they do not break the stretch, the next run has them
@@ -179,12 +196,14 @@ class WhatIf:
         stretch.reverse()
         left_out = newest - len(stretch)
         # why the stretch stops: the reason of the newest connection before it that has no record
-        reason = reasons.get(all_windows[newest - len(stretch) - 1].start) if left_out else None
+        stop = all_windows[newest - len(stretch) - 1] if left_out else None
+        reason = reasons.get(stop.start) if stop is not None else None
+        stop_at = stop.end if stop is not None else None
         if not stretch:
             return replace(data, windows=(), recorded={}), {
                 **coverage, "windows": 0, "first_window": None, "last_window": None, "recorded_candidates": len(all_windows),
-                "recorded_windows": 0, "recorded_left_out": left_out, "recorded_reason": reason,
-                "recorded_outside_kwh": 0.0, "recorded_split_entries": 0,
+                "recorded_windows": 0, "recorded_left_out": left_out, "recorded_reason": reason, "recorded_stop_at": stop_at,
+                "recorded_outside_kwh": 0.0, "recorded_split_entries": 0, "recorded_measured_from": None,
             }
         data, coverage = build([{"start": w.start, "end": w.end} for w in stretch])
         windows = tuple(replace(w, deadline=self._what_if_deadline(w)) for w in data.windows)
@@ -199,18 +218,88 @@ class WhatIf:
             warnings = (*warnings, "recorded_days_split")
         coverage = {
             **coverage, "recorded_candidates": len(all_windows), "recorded_windows": len(windows),
-            "recorded_left_out": left_out, "recorded_reason": reason,
+            "recorded_left_out": left_out, "recorded_reason": reason, "recorded_stop_at": stop_at,
             "recorded_outside_kwh": round(outside_total, 3), "recorded_split_entries": split_days,
+            "recorded_measured_from": first,
         }
         return replace(data, windows=windows, warnings=warnings, recorded={w.start: records[w.start] for w in windows}), coverage
 
+    def _what_if_estimated_stretch(self, data: Any, coverage: dict[str, Any], build) -> tuple[Any, dict[str, Any]]:
+        """Add the connections estimated from the battery statistics and modelled from the work plan before the measured ones,
+        as far back as the charging history reaches them (the card marks them as estimates). Nothing is added, and the reason
+        is kept, when there are none, when the history does not reach any, or when much of what CJP charged lies outside them
+        (that energy would be missing from CJP's column and make it look cheaper)."""
+        measured = [{"start": w.start, "end": w.end} for w in data.windows]
+        estimates, estimate_coverage = build(measured, estimates=True)
+        kept = {key: estimate_coverage.get(key) for key in ESTIMATE_COVERAGE_KEYS}
+
+        def without(reason: str, **extra: Any) -> tuple[Any, dict[str, Any]]:
+            return data, {**coverage, **kept, "recorded_estimates": reason, "recorded_estimated_windows": 0, **extra}
+
+        if not any(w.derived for w in estimates.windows):
+            # (every estimated connection can have been left out for want of a stored price: no price is made up for an estimate)
+            return without("no_prices" if estimate_coverage.get("estimated_unpriced_left_out") else "none_available")
+        first_count = len(estimates.windows)
+        stop: tuple[float, str | None] | None = None
+        for _ in range(3):
+            windows = list(estimates.windows)
+            records, reasons, split, outside = self._what_if_recorded_charging(windows, {w.start for w in windows if w.derived})
+            run: list[Any] = []
+            for window in reversed(windows):
+                if window.start not in records:
+                    break
+                run.append(window)
+            run.reverse()
+            if len(run) == len(windows):
+                break
+            # the run stops at an older connection that has no record: build again from the oldest one of the run, so that the
+            # drives and the start level are the ones of that period
+            broken = windows[len(windows) - len(run) - 1]
+            stop = (broken.end, reasons.get(broken.start))
+            if not any(w.derived for w in run):
+                return without("no_record", recorded_reason=stop[1], recorded_stop_at=stop[0])
+            estimates, estimate_coverage = build(measured, estimates=True, start=run[0].start)
+        else:
+            return without("not_stable")
+        derived = [w for w in windows if w.derived]
+        if not derived:  # (the build from the oldest connection of the run did not give that estimated connection again)
+            return without("not_stable")
+        estimated_kwh = sum(records[w.start].kwh for w in derived)
+        outside_estimated = outside(windows[0].start, derived[-1].end)
+        if outside_estimated > OUTSIDE_KWH_TOLERANCE and outside_estimated > OUTSIDE_SHARE * (estimated_kwh + outside_estimated):
+            return without("outside_charging", recorded_estimated_outside_kwh=round(outside_estimated, 3))
+        windows = [replace(w, deadline=self._what_if_deadline(w)) for w in windows]
+        dropped = first_count - len(windows)
+        first, last = windows[0].start, windows[-1].end
+        outside_total = outside(first, last)
+        split_days = split(first, last)
+        warnings = (*estimates.warnings, *(("windows_before_recorded_gap_left_out",) if dropped else ()))
+        # (the measured stretch said these about its own period: it is part of this one)
+        warnings = (*warnings, *(w for w in data.warnings if w.startswith("recorded_") and w not in warnings))
+        if outside_total > OUTSIDE_KWH_TOLERANCE and "recorded_sessions_outside_connections" not in warnings:
+            warnings = (*warnings, "recorded_sessions_outside_connections")
+        if split_days and "recorded_days_split" not in warnings:
+            warnings = (*warnings, "recorded_days_split")
+        coverage = {
+            **estimate_coverage, **{k: v for k, v in coverage.items() if k.startswith("recorded_")},
+            "recorded_windows": len(windows), "recorded_estimated_windows": len(derived), "recorded_estimates": "used",
+            "recorded_candidates": first_count, "recorded_left_out": dropped,
+            "recorded_reason": stop[1] if stop else None, "recorded_stop_at": stop[0] if stop else None,
+            "recorded_outside_kwh": round(outside_total, 3), "recorded_split_entries": split_days,
+            "recorded_estimated_outside_kwh": round(outside_estimated, 3),
+        }
+        return replace(
+            estimates, windows=tuple(windows), warnings=warnings, recorded={w.start: records[w.start] for w in windows}
+        ), coverage
+
     def _what_if_recorded_charging(
-        self, windows: list[Any]
+        self, windows: list[Any], estimated: Collection[float] = ()
     ) -> tuple[dict[float, Recorded], dict[float, str], Callable[[float, float], int], Callable[[float, float], float]]:
         """What CJP charged in each connection, from its charging history (engine/whatif/recorded.py: every entry laid over the
         connections by overlap in time, public charging taken out). A connection that cannot be read is not in the first dict
         and says why in the second (not settled, invalid history, before the history). The last two are the number of merged
-        days split between two connections, and the home kWh outside every connection, between two moments."""
+        days split between two connections, and the home kWh outside every connection, between two moments.
+        estimated: the starts of the connections that are estimates (their edges are only known to about two hours)."""
         battery = self.config["ev_car"].get("battery_size")
         rows = history_rows(
             self.charging_history_db, self._economy_ts, float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else None
@@ -224,7 +313,7 @@ class WhatIf:
             for w in self.economy_db["windows"] if isinstance(w.get("start"), (int, float))
         }
         every.update({w.start: (w.start, w.end) for w in windows})
-        allocation = allocate(rows, sorted(every.values()), now, ECONOMY_WINDOW_SETTLE)
+        allocation = allocate(rows, sorted(every.values()), now, ECONOMY_WINDOW_SETTLE, estimated)
         records = {
             start: Recorded(kwh=r["kwh"], percent=r["percent"], cost=r["cost"], local_kwh=r["local_kwh"])
             for start, r in allocation["records"].items()
@@ -439,10 +528,11 @@ class WhatIf:
         for cjp, smart, asap in zip(result.cjp.windows, result.smart.windows, result.asap.windows):
             key = self._economy_local(smart.end).strftime("%Y-%m")
             month = months.setdefault(key, {
-                "month": key, "windows": 0, "cjp_cost": 0.0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0,
+                "month": key, "windows": 0, "estimated_connections": 0, "cjp_cost": 0.0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0,
                 "smart_grid_kwh": 0.0, "asap_grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0,
             })
             month["windows"] += 1
+            month["estimated_connections"] += 1 if cjp.derived else 0  # (the connection itself is an estimate, not its prices)
             for name, window in (("cjp", cjp), ("smart", smart), ("asap", asap)):
                 levels = levels_by_month.setdefault(key, {}).setdefault(name, [window.soc_in, window.soc_out])
                 levels[1] = window.soc_out  # the first level in the month stays, the last one follows
@@ -458,6 +548,7 @@ class WhatIf:
                 "start": smart.start, "end": smart.end, "soc_in": _round(cjp.soc_in, 1), "soc_out": _round(cjp.soc_out, 1),
                 "cjp_cost": _round(cjp.cost, 2), "smart_cost": _round(smart.cost, 2), "asap_cost": _round(asap.cost, 2),
                 "kwh": _round(cjp.grid_kwh, 2), "unmet_kwh": _round(cjp.unmet_target_kwh, 2),
+                "estimated": cjp.derived, "modelled": cjp.modelled,
             })
         # A month's cost is not comparable between the three: they end it at different battery levels. The difference of two
         # is therefore adjusted the way the difference of the whole period is: the change of the battery level in the month
@@ -491,21 +582,47 @@ class WhatIf:
             {k: (_round(v, 3) if isinstance(v, float) or v is None else v) for k, v in month.items()} for _, month in sorted(months.items())
         ]
         published["rows"] = rows[-WHAT_IF_WINDOW_ROWS:]
-        published["annual"] = self._what_if_annual(result, coverage, months)
+        published["annual"] = self._what_if_annual(result, coverage, months, any(row.derived for row in result.cjp.windows))
+        published["derived"] = self._what_if_estimated_part(result)
 
         return published
+
+    @staticmethod
+    def _what_if_estimated_part(result: ReplayResult) -> dict[str, Any] | None:
+        """The connections that are themselves estimates (from the battery statistics or the work plan), on their own: how many,
+        and what each calculation paid in them. Their cost is not adjusted for the battery level: it is only shown."""
+        if result.cjp is None or result.smart is None or result.asap is None:
+            return None
+        indexes = [i for i, row in enumerate(result.cjp.windows) if row.derived]
+        if not indexes:
+            return None
+
+        def part(policy: PolicyResult) -> tuple[float, float]:
+            rows = [policy.windows[i] for i in indexes if i < len(policy.windows)]
+            return sum(r.cost for r in rows), sum(r.grid_kwh for r in rows)
+
+        (cjp_cost, cjp_kwh), (smart_cost, smart_kwh), (asap_cost, asap_kwh) = part(result.cjp), part(result.smart), part(result.asap)
+        return {
+            "windows": len(indexes), "modelled": sum(1 for i in indexes if result.cjp.windows[i].modelled),
+            "first": result.cjp.windows[indexes[0]].start, "last": result.cjp.windows[indexes[-1]].end,
+            "cjp_cost": _round(cjp_cost, 2), "smart_cost": _round(smart_cost, 2), "asap_cost": _round(asap_cost, 2),
+            "cjp_kwh": _round(cjp_kwh, 3), "smart_kwh": _round(smart_kwh, 3), "asap_kwh": _round(asap_kwh, 3),
+        }
 
     @staticmethod
     def _differences_rounded(difference: dict[str, float | None] | None) -> dict[str, float | None] | None:
         return {key: _round(value, 3) for key, value in difference.items()} if difference else None
 
-    def _what_if_annual(self, result: ReplayResult, coverage: dict, months: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    def _what_if_annual(
+        self, result: ReplayResult, coverage: dict, months: dict[str, dict[str, Any]], has_estimated_connections: bool = False
+    ) -> dict[str, Any] | None:
         """What the differences between the three would be per year, from the connections the comparison covers.
 
         Only the adjusted differences are scaled: the raw costs end at different battery levels, and scaling that difference
         by 365 / the days would multiply it. A year or more of connections is the last year (scaled to exactly 365 days);
         less is an ESTIMATE that scales by the days the connections span and says nothing about the seasons the data does
-        not cover. Without the end level there is no adjusted difference and no estimate."""
+        not cover. Connections that are themselves estimates make it an ESTIMATE too, however long. Without the end level
+        there is no adjusted difference and no estimate."""
         first, last = coverage.get("first_window"), coverage.get("last_window")
         if not first or not last or result.cjp is None or not result.comparable or not result.differences:
             return None
@@ -520,7 +637,7 @@ class WhatIf:
             return {"available": False, "basis_days": round(days, 1), "minimum_days": ANNUAL_MIN_DAYS, "reason": "not_balanced"}
         return {
             "available": True,
-            "method": "measured" if days >= ANNUAL_MEASURED_DAYS else "estimated",
+            "method": "measured" if days >= ANNUAL_MEASURED_DAYS and not has_estimated_connections else "estimated",
             "basis_days": round(days, 1), "scale": round(scale, 3), "months_covered": len(months),
             "cjp_vs_asap": _round(adjusted["cjp_asap"] * scale, 0), "cjp_vs_smart": _round(adjusted["cjp_smart"] * scale, 0),
             "smart_vs_asap": _round(adjusted["smart_asap"] * scale, 0),

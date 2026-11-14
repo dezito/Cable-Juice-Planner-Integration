@@ -151,3 +151,29 @@ def test_an_entry_that_is_still_running_makes_only_its_own_connections_not_settl
     rows = _rows({**_older(), **_entry(3, 2, ">"), **_entry(1, 2, "04:00")})
     result = allocate(rows, [first, second], NOW, 7200.0)
     assert first[0] in result["records"] and result["reasons"] == {second[0]: "not_settled"}
+
+
+def test_the_edges_of_an_estimated_connection_are_known_to_about_two_hours() -> None:
+    """The connection estimated from the battery statistics runs 18:00-07:00; a session at 15:30-16:30 lies 1.5 h before it."""
+    window = _window(0)
+    rows = _rows({**_older(), **_entry(0, 15, "16:30")})
+    measured = allocate(rows, [window], NOW, 7200.0)
+    estimated = allocate(rows, [window], NOW, 7200.0, estimated={window[0]})
+    assert window[0] in measured["records"] and measured["records"][window[0]]["kwh"] == 0.0  # not inside: the connection has nothing
+    assert estimated["records"][window[0]]["kwh"] == 8.0  # inside the estimate's wider edge: it is CJP's charging of that connection
+    assert outside_kwh(rows, measured["weights"], window[0], window[1]) == 0.0  # (the session starts before the period asked for)
+    far = _rows({**_older(), **_entry(0, 10, "11:00")})
+    assert allocate(far, [window], NOW, 7200.0, estimated={window[0]})["records"][window[0]]["kwh"] == 0.0  # eight hours before: no
+    # the history must reach the wider edge too: the first entry two hours before the start is not enough to know the night
+    near_start = _rows(_entry(0, 17, "17:30"))
+    assert window[0] not in allocate(near_start, [window], NOW, 7200.0, estimated={window[0]})["records"]
+    assert allocate(near_start, [window], NOW, 7200.0, estimated={window[0]})["reasons"][window[0]] == "before_history"
+
+
+def test_the_room_at_the_edge_of_an_estimated_connection_never_reaches_into_its_neighbour() -> None:
+    """An estimated connection ends right before the first measured one: a session just after that start belongs to the measured one."""
+    estimated, measured = _window(0, 18, 7), (_to_ts(_at(1, 7, 30)), _to_ts(_at(1, 15)))
+    rows = _rows({**_older(), **_entry(1, 8, "09:00")})  # inside the measured connection, within two hours of the estimated one's end
+    result = allocate(rows, [estimated, measured], NOW, 7200.0, estimated={estimated[0]})
+    assert result["records"][measured[0]]["kwh"] == 8.0 and result["records"][estimated[0]]["kwh"] == 0.0 and result["split"] == 0
+

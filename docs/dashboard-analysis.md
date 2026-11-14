@@ -365,9 +365,21 @@ compared. A connection cannot be read when it ended before the first entry of th
 connection that is not settled yet (a session is still running, or it ended less than two hours ago) is left aside and does not
 break the stretch. Older connections than the first break are left out and counted, with the reason. A night in which CJP
 charged nothing is a connection with no charging, where the history reaches it.
-The connections estimated from the battery statistics or modelled from the work plan are not used in this comparison (their
-times are estimates, and CJP's column is laid over measured connections by time); the comparison without solar and the settings
-comparison still use them.
+**Estimated connections.** Before the measured connections the comparison adds the connections estimated from the battery level
+statistics or modelled from the work plan (the same ones the settings comparison and the comparison without solar use), as far
+back as the charging history reaches them: the history is laid over them the same way, with two hours of room at their edges,
+because their times are estimates. They are marked ESTIMATE (the card says how many of the connections they are and from when
+the connections are measured, marks them in the table per month and shows their own cost line), and a year made of them is
+an estimate however long it is. They are only added when every measured connection of the period could be read (an estimate before
+a measured connection that has no record would leave a hole in the middle), when the history reaches them (a connection that
+starts before the first entry of the history, or has an entry with a missing figure, ends the stretch), and when not much of what
+CJP charged lies outside them (more than a tenth of its kWh in that time, and more than 1 kWh: that energy would be missing from
+CJP's column and make CJP look cheaper). Otherwise the measured connections are compared alone, and the card says why. Where the
+comparison stops it says why and when (the history does not reach further back, an entry is invalid), or, when nothing could be
+estimated, why not (the reason of the battery level statistics and of the work plan). The level at the first estimated connection
+is the one of the statistics; for a connection modelled from the work plan the level is unknown, so the first connection only
+brings all three to a common level, and what CJP charged in it is not counted (a warning says so). The estimates give way to
+measured connections as CJP records them.
 
 Charts under the results (they need the apexcharts-card, like the other charts) show the cost per month of the three, the
 difference per month of Smart and of charging at once against CJP (positive: CJP cheaper), and a line chart of the cumulative saving of CJP per
@@ -405,7 +417,7 @@ result saved by an earlier model of this comparison is not shown any more: run t
 
 | Data | Source | Limit |
 |---|---|---|
-| Connections | CJP's recorded plug-in and unplug times at home | only completed, settled connections that the charging history of CJP reaches and that can be read; the newest unbroken stretch |
+| Connections | CJP's recorded plug-in and unplug times at home | only completed, settled connections that the charging history of CJP reaches and that can be read; the newest unbroken stretch. Before the measured ones, estimated or modelled connections (marked ESTIMATE) under the conditions of *Estimated connections* |
 | CJP's charging | CJP's charging history (without public charging): kWh, battery percent, kWh from solar or the home battery, booked cost and start and end of each entry | laid over the connections by time; a merged day (older than a week) reaching into two connections is split by time; a missing cost ends the stretch |
 | Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this comparison and flagged, and never replaces a real price in the monthly economy comparison |
 | Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded: the energy they use is found from the levels at both ends and added (see *The same energy*). Without any recorded drive the demand is unknown and there is no result. CJP keeps up to two drives a day for the days kept (at least the newest 400): connections older than the oldest kept drive are left out |
