@@ -71,7 +71,8 @@ LOG_FILE_LINES = 2000
 JOB_HISTORY = 50
 SNAPSHOTS = 2
 # jobs of the debug services themselves are not part of the history
-DEBUG_JOBS = {"debug_info", "debug_state"}
+# (the What-if jobs hand over copies of the engine and the whole replay input, which cannot be exported)
+DEBUG_JOBS = {"debug_info", "debug_state", "what_if_collect", "what_if_finish", "what_if_progress"}
 # the snapshot of the last planning job is kept as well, so small jobs cannot push it out
 PLANNING_JOBS = {"cron", "recalculate"}
 # larger job arguments (the databases of startup, statistics) are not kept

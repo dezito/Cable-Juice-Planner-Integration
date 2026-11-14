@@ -989,9 +989,6 @@
       "what_if_days": {
         "name": "Період what-if"
       },
-      "what_if_target_battery_level": {
-        "name": "Цільовий рівень батареї what-if"
-      },
       "what_if_start_battery_level": {
         "name": "Рівень батареї what-if при першому підключенні"
       },
@@ -999,7 +996,7 @@
         "name": "What-if альтернативний мін. рівень при поверненні"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if альтернативна макс. рекомендована межа EV"
+        "name": "What-if макс. рекомендована межа EV"
       }
     },
     "select": {
@@ -1007,7 +1004,7 @@
         "name": "Виберіть тип прогнозу"
       },
       "what_if_day_selection": {
-        "name": "Дні розумного заряджання what-if",
+        "name": "What-if дні Smart",
         "state": {
           "all": "Усі дні",
           "work_plan": "Дні плану роботи",

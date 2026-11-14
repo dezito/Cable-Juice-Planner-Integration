@@ -186,9 +186,6 @@
       "what_if_days": {
         "default": "mdi:calendar-range"
       },
-      "what_if_target_battery_level": {
-        "default": "mdi:battery-charging-high"
-      },
       "what_if_start_battery_level": {
         "default": "mdi:battery-arrow-up"
       },

@@ -10,7 +10,7 @@ from queue import SimpleQueue
 from typing import Any
 
 from homeassistant.components import persistent_notification
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CoreState, Event, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -50,6 +50,9 @@ class CoordinatorLifecycle:
 
         if self.config.get("enable_diagnostic_file_log"):
             await self._async_enable_file_log()
+        # Home Assistant stopping does not unload the entries, and the what-if thread (a worker thread of an executor) is
+        # waited for when the process exits: a replay with minutes left would hold up the stop or the restart
+        self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
 
         ent_reg = er.async_get(self.hass)
         dev_reg = dr.async_get(self.hass)
@@ -97,6 +100,12 @@ class CoordinatorLifecycle:
             self._started_unsub = self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self._start_background)
 
     @callback
+    def _on_ha_stop(self, _event: Event) -> None:
+        """Home Assistant is stopping: a running What-if stops at its next plan (no job can be run from now on)."""
+        self._what_if_closed = True
+        self._what_if_cancel.set()
+
+    @callback
     def _start_background(self, _event: Event | None = None) -> None:
         self._started_unsub = None
         self._background(self._async_startup(), "startup")
@@ -116,6 +125,9 @@ class CoordinatorLifecycle:
         for task in (self._public_cost_task, *self._tasks):
             if task and not task.done():
                 task.cancel()
+        self._what_if_closed = True
+        self._what_if_cancel.set()  # a running What-if stops at its next connection instead of planning on after the unload
+        self._what_if_executor.shutdown(wait=False, cancel_futures=True)
         self._executor.shutdown(wait=False, cancel_futures=True)
         await self._async_disable_file_log()
 

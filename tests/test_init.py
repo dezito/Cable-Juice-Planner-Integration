@@ -294,6 +294,21 @@ async def test_simulated_battery_level_entity(hass: HomeAssistant) -> None:
     await async_unload_and_join(hass, entry)
 
 
+async def test_a_retired_number_and_button_leave_the_registry(hass: HomeAssistant) -> None:
+    """The What-if target number (the maximum recommended level is the target) and the stop button are gone: old registry entries are removed."""
+    entry = make_entry()
+    ent_reg = er.async_get(hass)
+    old = [
+        ent_reg.async_get_or_create(platform, DOMAIN, f"{entry.entry_id}_{key}", suggested_object_id=f"{OBJECT_PREFIX}_{key}").entity_id
+        for platform, key in (("number", "what_if_target_battery_level"), ("button", "stop_what_if"))
+    ]
+    set_source_states(hass)
+    await async_setup(hass, entry)
+    assert all(ent_reg.async_get(entity_id) is None and hass.states.get(entity_id) is None for entity_id in old)
+    assert hass.states.get(f"number.{OBJECT_PREFIX}_what_if_max_recommended_battery_level") is not None  # the target now
+    await async_unload_and_join(hass, entry)
+
+
 async def test_no_public_charging_entities_without_a_location(hass: HomeAssistant) -> None:
     """Without the car's location no public charge is detected: its entities are not created, old ones leave the registry."""
     entry = make_entry(options={**MOCK_OPTIONS, "location_entity_id": ""})

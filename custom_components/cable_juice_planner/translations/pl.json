@@ -989,9 +989,6 @@
       "what_if_days": {
         "name": "Okres what-if"
       },
-      "what_if_target_battery_level": {
-        "name": "Docelowy poziom baterii what-if"
-      },
       "what_if_start_battery_level": {
         "name": "Poziom baterii what-if przy pierwszym podłączeniu"
       },
@@ -999,7 +996,7 @@
         "name": "What-if alternatywne dzienne minimum baterii"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternatywny maksymalny zalecany limit ładowania EV"
+        "name": "What-if maksymalny zalecany limit ładowania EV"
       }
     },
     "select": {
@@ -1007,7 +1004,7 @@
         "name": "Wybierz typ prognozy"
       },
       "what_if_day_selection": {
-        "name": "Dni inteligentnego ładowania what-if",
+        "name": "What-if dni Smart",
         "state": {
           "all": "Wszystkie dni",
           "work_plan": "Dni planu pracy",

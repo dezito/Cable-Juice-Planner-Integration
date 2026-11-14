@@ -20,7 +20,13 @@ from .test_dashboard import OPTIONS, _cards, _own
 from .test_economy import _engine, _ts
 from .test_engine import DAY
 from .test_whatif_coordinator import _seed as _seed_coordinator
-from .test_whatif_engine import _seed, snapshot_with
+from .test_whatif_engine import _seed as _seed_connections
+from .test_whatif_engine import snapshot_with
+
+
+def _seed(engine, **kwargs):
+    """The connections, prices and drives, without the charging CJP did (scenario A's record): this scenario has its own sessions."""
+    return _seed_connections(engine, charge=False, **kwargs)
 from .test_whatif_replay import LOSS, flat, hour, make
 from .test_whatif_settings_replay import three_days
 

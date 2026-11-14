@@ -989,9 +989,6 @@
       "what_if_days": {
         "name": "What-if-Zeitraum"
       },
-      "what_if_target_battery_level": {
-        "name": "What-if-Ziel-Akkustand"
-      },
       "what_if_start_battery_level": {
         "name": "What-if-Akkustand beim ersten Anstecken"
       },
@@ -999,7 +996,7 @@
         "name": "What-if alternatives tägliches Heimkehr-Niveau"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternative max. empfohlene Ladegrenze des EV"
+        "name": "What-if max. empfohlene Ladegrenze des EV"
       }
     },
     "select": {
@@ -1007,7 +1004,7 @@
         "name": "Prognose-Typ auswählen"
       },
       "what_if_day_selection": {
-        "name": "What-if-Tage mit Smart-Laden",
+        "name": "What-if Smart-Tage",
         "state": {
           "all": "Alle Tage",
           "work_plan": "Tage des Arbeitsplans",

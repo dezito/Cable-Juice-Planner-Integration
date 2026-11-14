@@ -313,11 +313,11 @@ The settings from the dashboard are entities that are kept across restarts:
 
 | Type | Examples |
 |---|---|
-| `switch` | charging rules, workdays and preheating per day, the What-if smart charging days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
-| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, target, start level, alternative reserve and alternative maximum level |
+| `switch` | charging rules, workdays and preheating per day, the What-if Smart days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
+| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, start level, alternative reserve and the maximum recommended level (also the level Smart and charging at once charge to) |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
-| `select` | forecast type, What-if smart charging days |
+| `select` | forecast type, What-if Smart days |
 | `button` | force planning, reset trip, run what-if, run what-if settings, run what-if without solar, recalculate charging loss, export data, reset dashboard |
 | `binary_sensor` | public charging session done (waiting for the price; with location) |
 
@@ -345,8 +345,8 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choos
   solar/home battery, charging loss and virtual EV – with "Read more"
 - **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price
   forecast, battery capacity and charging loss
-- **What-if:** simulated comparisons that never change the plan: daily smart charging to the maximum
-  recommended level against immediate charging, the current daily reserve and maximum level against alternative
+- **What-if:** simulated comparisons that never change the plan: what CJP actually charged against a Smart charger
+  and charging at once (with an estimate of the difference per year), the current daily reserve and maximum level against alternative
   ones, the charging planned from the grid only (without solar), the EV's solar energy replaced by grid energy, and the cost recorded in the charging history against a fixed monthly charging price. The first three need a car integration (they replay recorded drives) and are left out with a virtual EV. Connections from before CJP began recording are estimated from the recorder's battery level and charger power statistics (only after they have been checked against the measured connections), cut to the work plan's homecoming and departure, and, for the time before any record, modelled from the work plan; all of it is labelled
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own

@@ -3126,7 +3126,7 @@ views:
       - entity: number.cjp_what_if_days
         name:
           type: entity
-      - entity: number.cjp_what_if_target_battery_level
+      - entity: number.cjp_what_if_max_recommended_battery_level
         name:
           type: entity
       - entity: number.cjp_what_if_start_battery_level
@@ -3181,13 +3181,13 @@ views:
         {% set a = states.sensor.cjp_what_if.attributes %}
         {% set r = a.result %}
         {% set at = a.attempt %}
-        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@', 'connections_estimated_from_battery_statistics': '@@what_if_warning_connections_estimated_from_battery_statistics@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@'} %}
-        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@', 'departure_buffer_not_modelled': '@@what_if_note_departure_buffer_not_modelled@@'} %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'stopped': '@@what_if_reason_stopped@@', 'no_recorded_charging': '@@what_if_reason_no_recorded_charging@@'} %}
+        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@', 'connections_estimated_from_battery_statistics': '@@what_if_warning_connections_estimated_from_battery_statistics@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@', 'energy_not_balanced': '@@what_if_warning_energy_not_balanced@@', 'recorded_energy_short': '@@what_if_warning_recorded_energy_short@@', 'recorded_path_cut': '@@what_if_warning_recorded_path_cut@@', 'recorded_solar_share': '@@what_if_warning_recorded_solar_share@@', 'levels_approximate': '@@what_if_warning_levels_approximate@@', 'recorded_prices_estimated_lean_cjp': '@@what_if_warning_recorded_prices_estimated_lean_cjp@@', 'windows_before_recorded_gap_left_out': '@@what_if_warning_windows_before_recorded_gap_left_out@@'} %}
+        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@', 'departure_buffer_not_modelled': '@@what_if_note_departure_buffer_not_modelled@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'recorded_charging': '@@what_if_note_recorded_charging@@', 'grid_equivalent_cost': '@@what_if_note_grid_equivalent_cost@@', 'smart_planned_departure': '@@what_if_note_smart_planned_departure@@', 'smart_hindsight_prices': '@@what_if_note_smart_hindsight_prices@@', 'energy_balanced_to_cjp': '@@what_if_note_energy_balanced_to_cjp@@'} %}
         {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'battery_statistics': '@@what_if_source_battery_statistics@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
         {% set day_selections = {'all': '@@what_if_day_selection_all@@', 'work_plan': '@@what_if_day_selection_work_plan@@', 'monday_friday': '@@what_if_day_selection_monday_friday@@', 'weekend': '@@what_if_day_selection_weekend@@', 'selected': '@@what_if_day_selection_selected@@'} %}
         {% if at and at.status == 'running' -%}
-        <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
+        <ha-alert alert-type="info">@@what_if_running@@{% if at.get('progress') %} &middot; {{ at.progress.done }} / {{ at.progress.total }} @@what_if_connections@@{% endif %}</ha-alert>
         {%- elif at and at.status == 'unavailable' -%}
         <ha-alert alert-type="warning">@@what_if_failed@@: {{ reasons.get(at.reason, at.reason) }}</ha-alert>
         {%- endif %}
@@ -3195,61 +3195,84 @@ views:
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
         {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.smart.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ r.cjp.start_soc ~ ' % ' if r.cjp else '' }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }}) &middot; @@what_if_end_soc@@ {% if r.energy and r.energy.end_soc is not none %}{{ r.energy.end_soc | round(0) }} % ({{ sources.get(r.provenance.end_soc, r.provenance.end_soc) }}){% else %}@@what_if_source_unavailable@@{% endif %}
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
         {%- endif %}
         {% if not r.comparable -%}
-        <ha-alert alert-type="warning">@@what_if_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}</ha-alert>
+        <ha-alert alert-type="warning">@@what_if_a_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}{% if r.get('unit_prices') %}. @@what_if_unit_only@@{% endif %}</ha-alert>
         {%- endif %}
-        {% set d = r.difference %}
-        {% set c = r.get('current') %}
-        {% set cs = r.get('settings') %}
-        {% set sm = c.get('same') if c else none %}
-        | | @@what_if_b_col_current@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_current@@ | @@what_if_col_immediate_vs_current@@ |
+        {% set ds = r.differences %}
+        {% set e = r.energy %}
+        {% set u = r.get('unit_prices') %}
+        {% set an = r.get('annual') %}
+        {% set cs = ds.get('cjp_smart') if (ds and r.comparable) else none %}
+        {% set ca = ds.get('cjp_asap') if (ds and r.comparable) else none %}
+        {% set uvs = u.get('cjp_vs_smart') if u else none %}
+        {% set uva = u.get('cjp_vs_asap') if u else none %}
+        | | @@what_if_col_cjp@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_cjp@@ | @@what_if_col_immediate_vs_cjp@@ |
         |:---|---:|---:|---:|---:|---:|
-        | @@what_if_a_row_target@@ | {{ (cs.maximum | round(0) ~ ' %') if cs else '&ndash;' }} | {{ r.target.battery_level | round(0) }} % ({{ '@@what_if_b_source_override@@' if r.target.source == 'override' else '@@what_if_b_source_live_setting@@' }}) | {{ r.target.battery_level | round(0) }} % | | |
+        | @@what_if_a_row_target@@ | &ndash; | {{ r.target.battery_level | round(0) }} % ({{ '@@what_if_b_source_override@@' if r.target.source == 'override' else '@@what_if_b_source_live_setting@@' }}) | {{ r.target.battery_level | round(0) }} % | | |
         | @@what_if_a_row_days@@ | @@what_if_a_every_day@@ | {{ day_selections.get(r.day_selection, r.day_selection) }} | @@what_if_a_every_day@@ | | |
-        | @@what_if_b_reserve@@ | {{ (cs.reserve | round(0) ~ ' %') if cs else '&ndash;' }} | | | | |
-        | @@what_if_b_maximum@@ | {{ (cs.maximum | round(0) ~ ' %') if cs else '&ndash;' }} | | | | |
-        | @@what_if_row_cost@@ | {{ (c.cost ~ ' @@valuta@@') if c else '&ndash;' }} | {{ r.smart.cost }} @@valuta@@ | {{ r.asap.cost }} @@valuta@@ | {{ (((sm.smart_cost - sm.current_cost) | round(2) ~ ' @@valuta@@') if sm and r.comparable else '&ndash;') }} | {{ (((sm.asap_cost - sm.current_cost) | round(2) ~ ' @@valuta@@') if sm and r.comparable else '&ndash;') }} |
-        | @@what_if_row_grid@@ | {{ (c.grid_kwh ~ ' kWh') if c else '&ndash;' }} | {{ r.smart.grid_kwh }} kWh | {{ r.asap.grid_kwh }} kWh | {{ (((sm.smart_grid_kwh - sm.current_grid_kwh) | round(2) ~ ' kWh') if sm and r.comparable else '&ndash;') }} | {{ (((sm.asap_grid_kwh - sm.current_grid_kwh) | round(2) ~ ' kWh') if sm and r.comparable else '&ndash;') }} |
-        | @@what_if_row_loss@@ | {{ (c.loss_kwh ~ ' kWh') if c else '&ndash;' }} | {{ r.smart.loss_kwh }} kWh | {{ r.asap.loss_kwh }} kWh | {{ (((sm.smart_loss_kwh - sm.current_loss_kwh) | round(2) ~ ' kWh') if sm and r.comparable else '&ndash;') }} | {{ (((sm.asap_loss_kwh - sm.current_loss_kwh) | round(2) ~ ' kWh') if sm and r.comparable else '&ndash;') }} |
-        | @@what_if_row_targets@@ | | {{ r.smart.targets_met }} / {{ r.smart.windows }} | {{ r.asap.targets_met }} / {{ r.asap.windows }} | | |
-        | @@what_if_row_unmet_target@@ | | {{ r.smart.unmet_target_kwh }} kWh | {{ r.asap.unmet_target_kwh }} kWh | | |
-        | @@what_if_row_unmet_driving@@ | {{ (c.unmet_driving_kwh ~ ' kWh') if c else '&ndash;' }} | {{ r.smart.unmet_driving_kwh }} kWh | {{ r.asap.unmet_driving_kwh }} kWh | | |
-        | @@what_if_row_lowest@@ | {{ (c.lowest_soc ~ ' %') if c else '&ndash;' }} | {{ r.smart.lowest_soc }} % | {{ r.asap.lowest_soc }} % | | |
-        | @@what_if_row_final@@ | {{ (c.final_soc ~ ' %') if c else '&ndash;' }} | {{ r.smart.final_soc }} % | {{ r.asap.final_soc }} % | | |
-        {% if c %}
-
-        @@what_if_current_note@@
+        | @@what_if_row_cost@@ | {{ '%.2f' | format((r.cjp.cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((r.smart.cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((r.asap.cost) | round(2) + 0.0) }} @@valuta@@ | {{ ((('&asymp; ' if cs.adjusted_cost is none else '') ~ '%.2f' | format((0 - cs.cost) | round(2) + 0.0) ~ ' @@valuta@@') if cs else (('&asymp; ' ~ '%.2f' | format((0 - uvs) | round(2) + 0.0) ~ ' @@valuta@@') if uvs is not none else '&ndash;')) }} | {{ ((('&asymp; ' if ca.adjusted_cost is none else '') ~ '%.2f' | format((0 - ca.cost) | round(2) + 0.0) ~ ' @@valuta@@') if ca else (('&asymp; ' ~ '%.2f' | format((0 - uva) | round(2) + 0.0) ~ ' @@valuta@@') if uva is not none else '&ndash;')) }} |
+        | @@what_if_row_grid@@ | {{ '%.1f' | format((r.cjp.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((0 - cs.grid_kwh if cs else r.smart.grid_kwh - r.cjp.grid_kwh) | round(1) + 0.0) ~ ' kWh' }} | {{ '%.1f' | format((0 - ca.grid_kwh if ca else r.asap.grid_kwh - r.cjp.grid_kwh) | round(1) + 0.0) ~ ' kWh' }} |
+        | @@what_if_row_loss@@ | {{ '%.1f' | format((r.cjp.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((0 - cs.loss_kwh if cs else r.smart.loss_kwh - r.cjp.loss_kwh) | round(1) + 0.0) ~ ' kWh' }} | {{ '%.1f' | format((0 - ca.loss_kwh if ca else r.asap.loss_kwh - r.cjp.loss_kwh) | round(1) + 0.0) ~ ' kWh' }} |
+        {% if cs %}| @@what_if_row_adjusted@@ | | | | {{ (('%.2f' | format((0 - cs.adjusted_cost) | round(2) + 0.0) ~ ' @@valuta@@') if cs and cs.adjusted_cost is not none else '&ndash;') }} | {{ (('%.2f' | format((0 - ca.adjusted_cost) | round(2) + 0.0) ~ ' @@valuta@@') if ca and ca.adjusted_cost is not none else '&ndash;') }} |
+        {% endif %}| @@what_if_row_targets@@ | {{ r.cjp.targets_met }} / {{ r.cjp.windows }} | {{ r.smart.targets_met }} / {{ r.smart.windows }} | {{ r.asap.targets_met }} / {{ r.asap.windows }} | | |
+        | @@what_if_row_unmet_target@@ | {{ '%.1f' | format((r.cjp.unmet_target_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.unmet_target_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.unmet_target_kwh) | round(1) + 0.0) }} kWh | | |
+        | @@what_if_row_unmet_driving@@ | {{ '%.1f' | format((r.cjp.unmet_driving_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.unmet_driving_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.unmet_driving_kwh) | round(1) + 0.0) }} kWh | | |
+        | @@what_if_row_lowest@@ | {{ r.cjp.lowest_soc }} % | {{ r.smart.lowest_soc }} % | {{ r.asap.lowest_soc }} % | | |
+        | @@what_if_row_final@@ | {{ r.cjp.final_soc }} % | {{ r.smart.final_soc }} % | {{ r.asap.final_soc }} % | | |
+        {% if u %}| @@what_if_row_unit@@ | {{ ('%.2f' | format((u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.asap is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.asap is not none else '&ndash;' }} |
+        {% endif %}{% if an and an.available %}| @@what_if_annual_row@@ ({{ '@@what_if_annual_measured@@' if an.method == 'measured' else '@@what_if_annual_estimate@@' }}) | &ndash; | &ndash; | &ndash; | {{ '%.2f' | format((0 - an.cjp_vs_smart) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((0 - an.cjp_vs_asap) | round(2) + 0.0) }} @@valuta@@ |
+        {% endif %}
+        @@what_if_a_targets_note@@
+        {% if an and an.available and an.method != 'measured' %}
+        <ha-alert alert-type="warning">@@what_if_annual_caveat@@ ({{ an.basis_days }} @@what_if_days_unit@@, {{ an.months_covered }} @@what_if_annual_months@@)</ha-alert>
+        {%- elif an and not an.available and not an.get('reason') %}
+        @@what_if_annual_too_short@@ ({{ an.basis_days }} @@what_if_days_unit@@)
         {%- endif %}
-        {% if d %}
+        {% if e %}
 
-        **@@what_if_col_smart@@ &minus; @@what_if_col_immediate@@:** @@what_if_row_cost@@ {{ d.cost }} @@valuta@@ &middot; @@what_if_row_terminal@@ {{ d.terminal_adjustment }} @@valuta@@ ({{ d.terminal_energy_kwh }} kWh) &middot; **@@what_if_row_adjusted@@ {{ d.adjusted_cost }} @@valuta@@** &middot; @@what_if_row_grid@@ {{ d.grid_kwh }} kWh &middot; @@what_if_row_loss@@ {{ d.loss_kwh }} kWh
+        **@@what_if_energy@@:** @@what_if_energy_charged@@ {{ e.charged_percent }} % &middot; @@what_if_energy_driven@@ {{ e.driven_percent }} % &middot; @@what_if_energy_gap@@ {{ (e.gap_percent ~ ' %') if e.gap_percent is not none else '&ndash;' }}{% if e.local_kwh %} &middot; @@what_if_energy_local@@ {{ '%.1f' | format((e.local_kwh) | round(1) + 0.0) }} / {{ '%.1f' | format((e.kwh) | round(1) + 0.0) }} kWh{% endif %}
+        {%- endif %}
+        {% if ds and r.comparable %}
+        {% for key, label, sg in [('cjp_asap', '@@what_if_col_immediate@@ &minus; @@what_if_col_cjp@@', -1), ('cjp_smart', '@@what_if_col_smart@@ &minus; @@what_if_col_cjp@@', -1), ('smart_asap', '@@what_if_col_smart@@ &minus; @@what_if_col_immediate@@', 1)] -%}
+        {%- set x = ds.get(key) %}
+
+        **{{ label }}:** @@what_if_row_cost@@ {{ '%.2f' | format(((sg * x.cost) + 0.0) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_row_terminal@@ {{ ('%.2f' | format(((sg * x.terminal_adjustment) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@ (' ~ '%.1f' | format(((sg * x.terminal_energy_kwh) + 0.0) | round(1) + 0.0) ~ ' kWh)') if x.terminal_adjustment is not none else '&ndash;' }} &middot; **@@what_if_row_adjusted@@ {{ ('%.2f' | format(((sg * x.adjusted_cost) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@') if x.adjusted_cost is not none else '&ndash;' }}** &middot; @@what_if_row_grid@@ {{ '%.1f' | format(((sg * x.grid_kwh) + 0.0) | round(1) + 0.0) }} kWh &middot; @@what_if_row_loss@@ {{ '%.1f' | format(((sg * x.loss_kwh) + 0.0) | round(1) + 0.0) }} kWh
+        {% endfor %}
+        {%- endif %}
+        {% if u %}
+
+        **@@what_if_unit_title@@ ({{ '%.1f' | format((u.cjp_kwh) | round(1) + 0.0) }} kWh):** @@what_if_col_smart@@ {{ ('%.2f' | format((u.smart_at_cjp_kwh) | round(2) + 0.0) ~ ' @@valuta@@') if u.smart_at_cjp_kwh is not none else '&ndash;' }} &middot; @@what_if_col_immediate@@ {{ ('%.2f' | format((u.asap_at_cjp_kwh) | round(2) + 0.0) ~ ' @@valuta@@') if u.asap_at_cjp_kwh is not none else '&ndash;' }} &middot; @@what_if_unit_cjp_paid@@ {{ '%.2f' | format((u.cjp_cost) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_col_smart_vs_cjp@@ {{ ('%.2f' | format((0 - u.cjp_vs_smart) | round(2) + 0.0) ~ ' @@valuta@@') if u.cjp_vs_smart is not none else '&ndash;' }} &middot; @@what_if_col_immediate_vs_cjp@@ {{ ('%.2f' | format((0 - u.cjp_vs_asap) | round(2) + 0.0) ~ ' @@valuta@@') if u.cjp_vs_asap is not none else '&ndash;' }}
+
+        *@@what_if_unit_caveat@@*
         {%- endif %}
 
         {% if r.months -%}
         **@@what_if_months@@**
 
-        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_b_col_current@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_current@@ | @@what_if_col_immediate_vs_current@@ | @@what_if_row_targets@@ |
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_col_cjp@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_cjp@@ | @@what_if_col_immediate_vs_cjp@@ | @@what_if_row_targets@@ |
         |:---|---:|---:|---:|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        {%- set cc = m.get('current_cost') -%}
-        {%- set same = m.get('same_windows') -%}
-        | **{{ m.month }}** | {{ m.windows }} | {{ ((cc | round(2)) ~ ' @@valuta@@' ~ ('*' if same != m.windows else '')) if cc is not none else '&ndash;' }} | {{ m.smart_cost | round(2) }} @@valuta@@ | {{ m.asap_cost | round(2) }} @@valuta@@ | {{ (((m.same_smart_cost - cc) | round(2) ~ ' @@valuta@@' ~ ('*' if same != m.windows else '')) if same and r.comparable else '&ndash;') }} | {{ (((m.same_asap_cost - cc) | round(2) ~ ' @@valuta@@' ~ ('*' if same != m.windows else '')) if same and r.comparable else '&ndash;') }} | {{ m.targets_met }} / {{ m.windows }} |
+        | **{{ m.month }}** | {{ m.windows }} | {{ '%.2f' | format((m.cjp_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.smart_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.asap_cost) | round(2) + 0.0) }} @@valuta@@ | {{ (('%.2f' | format((0 - m.cjp_vs_smart_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_smart_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_smart_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_smart_unit') is not none else '&ndash;') }} | {{ (('%.2f' | format((0 - m.cjp_vs_asap_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_asap_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_asap_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_asap_unit') is not none else '&ndash;') }} | {{ m.targets_met }} / {{ m.windows }} |
         {% endfor %}
+        {% if not r.comparable %}
+
+        *@@what_if_a_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}. @@what_if_unit_only@@*
+        {% endif %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
         {% set dv = r.get('derived') %}
         {% if dv -%}
 
-        @@what_if_derived_line@@: {{ dv.windows }} @@what_if_connections@@{% if dv.modelled %} ({{ dv.modelled }} @@what_if_derived_modelled@@){% endif %} &middot; @@what_if_col_smart@@ {{ dv.smart_cost }} @@valuta@@ &middot; @@what_if_col_immediate@@ {{ dv.asap_cost }} @@valuta@@ &middot; @@what_if_col_difference@@ {{ dv.difference }} @@valuta@@
+        @@what_if_derived_line@@: {{ dv.windows }} @@what_if_connections@@{% if dv.modelled %} ({{ dv.modelled }} @@what_if_derived_modelled@@){% endif %} &middot; @@what_if_col_smart@@ {{ '%.2f' | format((dv.smart_cost) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_col_immediate@@ {{ '%.2f' | format((dv.asap_cost) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_col_difference@@ {{ '%.2f' | format((dv.difference) | round(2) + 0.0) }} @@valuta@@
         {%- endif %}
         {% if r.recorded_reference and r.recorded_reference.sessions -%}
 
-        @@what_if_recorded_reference@@: {{ r.recorded_reference.sessions }} @@what_if_sessions@@, {{ r.recorded_reference.kwh }} kWh{% if r.recorded_reference.cost is not none %}, {{ r.recorded_reference.cost }} @@valuta@@{% endif %}
+        @@what_if_recorded_reference@@: {{ r.recorded_reference.sessions }} @@what_if_reference_connections@@, {{ '%.1f' | format((r.recorded_reference.kwh) | round(1) + 0.0) }} kWh{% if r.recorded_reference.cost is not none %}, {{ '%.2f' | format((r.recorded_reference.cost) | round(2) + 0.0) }} @@valuta@@{% endif %}
         {%- endif %}
         {% if r.warnings -%}
 
@@ -3316,12 +3339,12 @@ views:
               format: MMM yy
         series:
         - entity: sensor.cjp_what_if
-          name: '@@what_if_b_col_current@@'
-          color: '#7a7a85'
+          name: '@@what_if_col_cjp@@'
+          color: '#1baf7a'
           data_generator: |
             const r = entity.attributes.result;
             const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.current_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.current_cost]; });
+            return ((r && r.months) || []).filter(m => num(m.cjp_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.cjp_cost]; });
         - entity: sensor.cjp_what_if
           name: '@@what_if_col_smart@@'
           color: '#2a78d6'
@@ -3336,129 +3359,157 @@ views:
             const r = entity.attributes.result;
             const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
             return ((r && r.months) || []).filter(m => num(m.asap_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.asap_cost]; });
-    - type: custom:config-template-card
-      entities:
-      - sensor.cjp_what_if
-      variables:
-        span_days: |
-          (() => {
-            const s = states['sensor.cjp_what_if'];
-            const a = (s && s.attributes) || {};
-            const months = (a.result || {}).months || [];
-            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
-            if (!keys.length) return 62;
-            const now = new Date();
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
-            return Math.max(Math.round((end - first) / 86400000), 62);
-          })()
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: sensor.cjp_what_if
+        state_not: unknown
+      - condition: state
+        entity: sensor.cjp_what_if
+        state_not: unavailable
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_diff_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' @@valuta@@'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_col_smart_vs_current@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_smart_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_smart_cost - m.current_cost : null)]; });
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_col_immediate_vs_current@@'
-          color: '#eb6834'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num((m.same_windows ? m.same_asap_cost - m.current_cost : null))).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), (m.same_windows ? m.same_asap_cost - m.current_cost : null)]; });
-    - type: custom:config-template-card
-      entities:
-      - sensor.cjp_what_if
-      variables:
-        span_days: |
-          (() => {
-            const s = states['sensor.cjp_what_if'];
-            const a = (s && s.attributes) || {};
-            const months = (a.result || {}).months || [];
-            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
-            if (!keys.length) return 62;
-            const now = new Date();
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
-            return Math.max(Math.round((end - first) / 86400000), 62);
-          })()
+        type: custom:config-template-card
+        entities:
+        - sensor.cjp_what_if
+        variables:
+          span_days: |
+            (() => {
+              const s = states['sensor.cjp_what_if'];
+              const a = (s && s.attributes) || {};
+              const months = (a.result || {}).months || [];
+              const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+              if (!keys.length) return 62;
+              const now = new Date();
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+              const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+              return Math.max(Math.round((end - first) / 86400000), 62);
+            })()
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_diff_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 0
+          all_series_config:
+            type: column
+            unit: ' @@valuta@@'
+            float_precision: 0
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_col_smart_vs_cjp@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              if (!r || !r.comparable) return [];
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.cjp_vs_smart_adjusted)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), Math.round(-m.cjp_vs_smart_adjusted * 100) / 100 + 0]; });
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_col_immediate_vs_cjp@@'
+            color: '#eb6834'
+            data_generator: |
+              const r = entity.attributes.result;
+              if (!r || !r.comparable) return [];
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.cjp_vs_asap_adjusted)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), Math.round(-m.cjp_vs_asap_adjusted * 100) / 100 + 0]; });
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: sensor.cjp_what_if
+        state_not: unknown
+      - condition: state
+        entity: sensor.cjp_what_if
+        state_not: unavailable
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_saving_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: line
-          unit: ' @@valuta@@'
-          float_precision: 0
-          stroke_width: 2
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          markers:
-            size: 3
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_chart_saving@@'
-          color: '#1baf7a'
-          data_generator: |
-            const r = entity.attributes.result;
-            if (!r || !r.comparable) return [];
-            let sum = 0;
-            return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.asap_cost) - Number(m.smart_cost)))).map(m => { sum += Number(Number(m.asap_cost) - Number(m.smart_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+        type: custom:config-template-card
+        entities:
+        - sensor.cjp_what_if
+        variables:
+          span_days: |
+            (() => {
+              const s = states['sensor.cjp_what_if'];
+              const a = (s && s.attributes) || {};
+              const months = (a.result || {}).months || [];
+              const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+              if (!keys.length) return 62;
+              const now = new Date();
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+              const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+              return Math.max(Math.round((end - first) / 86400000), 62);
+            })()
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_saving_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 0
+          all_series_config:
+            type: line
+            unit: ' @@valuta@@'
+            float_precision: 0
+            stroke_width: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            markers:
+              size: 3
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_chart_saving_vs_asap@@'
+            color: '#eb6834'
+            data_generator: |
+              const r = entity.attributes.result;
+              if (!r || !r.comparable) return [];
+              let sum = 0;
+              return ((r && r.months) || []).filter(m => m.cjp_vs_asap_adjusted !== null && m.cjp_vs_asap_adjusted !== undefined && Number.isFinite(Number(m.cjp_vs_asap_adjusted))).map(m => { sum -= Number(m.cjp_vs_asap_adjusted); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_chart_saving_vs_smart@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              if (!r || !r.comparable) return [];
+              let sum = 0;
+              return ((r && r.months) || []).filter(m => m.cjp_vs_smart_adjusted !== null && m.cjp_vs_smart_adjusted !== undefined && Number.isFinite(Number(m.cjp_vs_smart_adjusted))).map(m => { sum -= Number(m.cjp_vs_smart_adjusted); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   # Scenario B: the current settings against an alternative reserve and maximum level (engine/whatif/settings_part.py)
   - type: grid
     column_span: 2
@@ -3536,14 +3587,14 @@ views:
         |:---|---:|---:|---:|
         | @@what_if_b_reserve@@ | {{ s.baseline.reserve | round(0) }} % | {{ s.alternative.reserve | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.reserve == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
         | @@what_if_b_maximum@@ | {{ s.baseline.maximum | round(0) }} % | {{ s.alternative.maximum | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.maximum == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
-        | @@what_if_row_cost@@ | {{ r.baseline.cost }} @@valuta@@ | {{ r.alternative.cost }} @@valuta@@ | {{ (d.cost ~ ' @@valuta@@') if d else '&ndash;' }} |
-        {% if d -%}
-        | @@what_if_row_terminal@@ | | | {{ d.terminal_adjustment }} @@valuta@@ ({{ d.terminal_energy_kwh }} kWh) |
-        | **@@what_if_row_adjusted@@** | | | **{{ d.adjusted_cost }} @@valuta@@** |
+        | @@what_if_row_cost@@ | {{ '%.2f' | format(r.baseline.cost) }} @@valuta@@ | {{ '%.2f' | format(r.alternative.cost) }} @@valuta@@ | {{ ('%.2f' | format(d.cost) ~ ' @@valuta@@') if d else '&ndash;' }} |
+        {% if d and d.adjusted_cost is not none -%}
+        | @@what_if_row_terminal@@ | | | {{ '%.2f' | format(d.terminal_adjustment) }} @@valuta@@ ({{ '%.1f' | format(d.terminal_energy_kwh) }} kWh) |
+        | **@@what_if_row_adjusted@@** | | | **{{ '%.2f' | format(d.adjusted_cost) }} @@valuta@@** |
         {% endif -%}
-        | @@what_if_row_grid@@ | {{ r.baseline.grid_kwh }} kWh | {{ r.alternative.grid_kwh }} kWh | {{ (d.grid_kwh ~ ' kWh') if d else '&ndash;' }} |
-        | @@what_if_row_loss@@ | {{ r.baseline.loss_kwh }} kWh | {{ r.alternative.loss_kwh }} kWh | {{ (d.loss_kwh ~ ' kWh') if d else '&ndash;' }} |
-        | @@what_if_row_unmet_driving@@ | {{ r.baseline.unmet_driving_kwh }} kWh | {{ r.alternative.unmet_driving_kwh }} kWh | |
+        | @@what_if_row_grid@@ | {{ '%.1f' | format(r.baseline.grid_kwh) }} kWh | {{ '%.1f' | format(r.alternative.grid_kwh) }} kWh | {{ ('%.1f' | format(d.grid_kwh) ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_loss@@ | {{ '%.1f' | format(r.baseline.loss_kwh) }} kWh | {{ '%.1f' | format(r.alternative.loss_kwh) }} kWh | {{ ('%.1f' | format(d.loss_kwh) ~ ' kWh') if d else '&ndash;' }} |
+        | @@what_if_row_unmet_driving@@ | {{ '%.1f' | format(r.baseline.unmet_driving_kwh) }} kWh | {{ '%.1f' | format(r.alternative.unmet_driving_kwh) }} kWh | |
         | @@what_if_row_lowest@@ | {{ r.baseline.lowest_soc }} % | {{ r.alternative.lowest_soc }} % | |
         | @@what_if_b_row_arrivals_below@@ | {{ r.baseline.arrivals_below_reserve }} / {{ r.baseline.arrivals }} | {{ r.alternative.arrivals_below_reserve }} / {{ r.alternative.arrivals }} | |
         | @@what_if_b_row_lowest_arrival@@ | {{ r.baseline.lowest_arrival }} % | {{ r.alternative.lowest_arrival }} % | |
@@ -3555,7 +3606,7 @@ views:
         | @@economy_month@@ | @@what_if_connections@@ | @@what_if_b_col_current@@ | @@what_if_b_col_alternative@@ | @@what_if_col_difference@@ |
         |:---|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        | **{{ m.month }}** | {{ m.windows }} | {{ m.baseline_cost | round(2) }} @@valuta@@ | {{ m.alternative_cost | round(2) }} @@valuta@@ | {{ (((m.alternative_cost - m.baseline_cost) | round(2) ~ ' @@valuta@@') if r.comparable else '&ndash;') }} |
+        | **{{ m.month }}** | {{ m.windows }} | {{ '%.2f' | format(m.baseline_cost) }} @@valuta@@ | {{ '%.2f' | format(m.alternative_cost) }} @@valuta@@ | {{ (('%.2f' | format(m.alternative_cost - m.baseline_cost) ~ ' @@valuta@@') if r.comparable else '&ndash;') }} |
         {% endfor %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})

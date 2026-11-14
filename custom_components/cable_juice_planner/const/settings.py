@@ -68,19 +68,19 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "public_charging"},
     # 0 disables the Economy comparison with an ideal all-inclusive monthly charging fee
     "subscription_monthly_price": {"min": 0, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0},
-    # What-if Scenario A: the period, a temporary target (0 = the live maximum recommended level)
-    # and the battery level at the first plug-in (0 = read it from Home Assistant's history)
+    # What-if Scenario A: the period and the battery level at the first plug-in (0 = read it from Home Assistant's history).
+    # Its target is what_if_max_recommended_battery_level below (shared with Scenario B)
     "what_if_days": {"min": 7, "max": 365, "step": 1, "mode": "box", "unit": "d", "default": 30.0},
-    "what_if_target_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
     "what_if_start_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0},
-    # What-if Scenario B: the alternative daily homecoming reserve and maximum recommended level (0 = the live setting)
+    # What-if Scenario B: the alternative daily homecoming reserve and maximum recommended level (0 = the live setting);
+    # the maximum is also the level Smart and charging at once charge to in Scenario A
     "what_if_min_daily_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
     "what_if_max_recommended_battery_level": {"min": 0, "max": 100, "step": 5, "mode": "box", "unit": "%", "default": 0.0},
 }
 
 # the What-if settings only feed a simulation: changing one must not recalculate the live plan
 WHAT_IF_SETTING_KEYS = (
-    "what_if_days", "what_if_target_battery_level", "what_if_start_battery_level", "what_if_day_selection",
+    "what_if_days", "what_if_start_battery_level", "what_if_day_selection",
     "what_if_min_daily_battery_level", "what_if_max_recommended_battery_level",
     *(f"what_if_day_{day}" for day in WEEKDAYS),
 )

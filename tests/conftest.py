@@ -194,8 +194,9 @@ async def async_unload_and_join(hass: HomeAssistant, entry: MockConfigEntry) -> 
     coordinator = entry.runtime_data
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-    if hasattr(coordinator, "_executor"):
-        await hass.async_add_executor_job(coordinator._executor.shutdown, True)
+    for name in ("_executor", "_what_if_executor"):
+        if hasattr(coordinator, name):
+            await hass.async_add_executor_job(getattr(coordinator, name).shutdown, True)
 
 
 @pytest.fixture

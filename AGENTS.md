@@ -227,6 +227,20 @@ private agent memory). Update or remove a note when it stops being true.
   stable tag is compared with the latest stable release. Both workflows run
   `.github/check_version.py`, which rejects versions Home Assistant won't load
   (e.g. `1.0.7.1-beta.1`; use `1.0.7.1b1`).
+- What-if Scenario A (CJP against Smart and charging at once): the CJP column is
+  not replayed. It is the record stored with each connection in the economy
+  database (`window["record"]`, made by `_economy_store_records` once the
+  connection has settled), because the charging history is combined per day
+  after a week and loses the hours. Only connections with a record are
+  compared; an older connection is never given one. Smart and charging at once
+  are replayed from the battery level at the first plug-in over the same
+  recorded drives. Their target is the What-if max recommended level
+  (`what_if_max_recommended_battery_level`), shared with Scenario B.
+- Dashboard texts (`texts/*.json`) that the dashboard inserts into single-quoted
+  Jinja literals (`@@key@@` inside `'...'`, e.g. reasons, warnings, column names)
+  must contain no ASCII apostrophe or quote character (`'`, `"`): use wording
+  without possessives (the typographic ’ is fine). Only keys inserted as plain
+  markup, such as the "Read more" explanations, may contain them.
 
 ### HACS default-catalog review
 

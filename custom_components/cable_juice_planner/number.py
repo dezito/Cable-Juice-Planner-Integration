@@ -21,6 +21,9 @@ PARALLEL_UPDATES = 0
 
 # values the user changes while using the car (trip, virtual battery), the rest are configuration
 PRIMARY_NUMBERS = ("battery_level", "trip_charge_procent", "trip_range_needed", "public_charging_session_cost")
+# number entities that no longer exist: removed from the registry at start so no unavailable entity is left behind
+# (what_if_target_battery_level: the What-if target is what_if_max_recommended_battery_level)
+RETIRED_NUMBERS = ("what_if_target_battery_level",)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
@@ -32,6 +35,9 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
         if not requirement_met(coordinator, NUMBER_SETTINGS[key]["requires"]):
             if entity_id := ent_reg.async_get_entity_id("number", DOMAIN, f"{entry.entry_id}_{key}"):
                 ent_reg.async_remove(entity_id)
+    for key in RETIRED_NUMBERS:
+        if entity_id := ent_reg.async_get_entity_id("number", DOMAIN, f"{entry.entry_id}_{key}"):
+            ent_reg.async_remove(entity_id)
     async_add_entities(
         CJPNumber(coordinator, key, info) for key, info in NUMBER_SETTINGS.items() if requirement_met(coordinator, info.get("requires"))
     )
