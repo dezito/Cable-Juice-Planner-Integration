@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from logging.handlers import QueueHandler, QueueListener
@@ -83,6 +84,12 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self.ignore_next_update = False
 
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{self.object_prefix}_worker")
+        # the What-if replay (Smart and charging at once over a period) runs on a thread of its own, so the worker above,
+        # which the charger control and the load balancing run on, is never held up by it
+        self._what_if_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{self.object_prefix}_what_if")
+        self._what_if_cancel = threading.Event()
+        self._what_if_closed = False  # unloaded: no job can be run any more
+        self._what_if_progress_at = 0.0
         self._job_lock = asyncio.Lock()
         self._unsubs: list[Callable[[], None]] = []
         self._started_unsub: Callable[[], None] | None = None

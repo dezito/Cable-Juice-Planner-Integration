@@ -56,29 +56,34 @@ def _seed(engine) -> None:
 
 
 def test_the_statistics_become_older_connections_after_being_checked_against_the_measured_ones() -> None:
-    engine, snap = _engine({"what_if_days": 365})
+    engine, snap = _engine({"what_if_days": 365, "fill_up": True})
     _seed(engine)
     stored = engine.run_job(snap, engine.store_derived_windows, {"ev_hours": _statistics((*MEASURED_BACKS, *OLDER_BACKS))})
     assert stored.error is None, stored.error
     derived = engine.economy_db["derived_windows"]
     assert derived["status"] == "ok" and derived["validation"]["passed"] and derived["validation"]["recall"] == 1.0
     assert len(derived["windows"]) == len(OLDER_BACKS)
-    prepared = engine.run_job(snap, engine.what_if_prepare)
-    result = engine.run_job(snap, engine.what_if_run, {"soc": 33.0, "source": "entered", "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]})
+    # the plan without solar (scenario D) uses them, together with the measured ones
+    prepared = engine.run_job(snap, engine.what_if_no_solar_prepare)
+    result = engine.run_job(snap, engine.what_if_no_solar_run, {"soc": 33.0, "source": "entered", "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]})
     assert result.error is None, result.error
     r = result.value
     assert r["status"] == "ok", r
-    assert r["windows"]["total"] == len(MEASURED_BACKS) + len(OLDER_BACKS)
-    assert r["coverage"]["windows_derived"] == len(OLDER_BACKS) and r["coverage"]["windows_measured"] == len(MEASURED_BACKS)
-    # the level at the first estimated connection comes from the statistics, not from the entered one
-    assert r["provenance"]["start_soc"] == "battery_statistics" and r["smart"]["start_soc"] == 60.0
+    assert r["windows"]["total"] == len(MEASURED_BACKS) + len(OLDER_BACKS) and r["windows"]["derived"] == len(OLDER_BACKS)
     assert "connections_estimated_from_battery_statistics" in r["warnings"]
-    assert r["derived"]["windows"] == len(OLDER_BACKS)
-    assert r["derived"]["difference"] < 0 < r["derived"]["asap_cost"] and r["derived"]["smart_cost"] < r["derived"]["asap_cost"]
-    # the whole figure is the sum of the estimated part and the measured part, which stays apart
-    assert sum(m["derived_windows"] for m in r["months"]) == len(OLDER_BACKS)
-    assert r["difference"]["cost"] == pytest.approx(r["smart"]["cost"] - r["asap"]["cost"], abs=1e-2)
-    assert r["smart"]["targets_met"] == r["windows"]["total"]
+
+
+def test_the_comparison_of_cjp_with_smart_and_asap_uses_only_connections_cjp_measured_itself() -> None:
+    """Estimated and modelled older connections have no record of what CJP charged: scenario A leaves them out."""
+    engine, snap = _engine({"what_if_days": 365, "fill_up": True})
+    _seed(engine)
+    engine.run_job(snap, engine.store_derived_windows, {"ev_hours": _statistics((*MEASURED_BACKS, *OLDER_BACKS))})
+    assert engine.economy_db["derived_windows"]["status"] == "ok"
+    prepared = engine.run_job(snap, engine.what_if_prepare)
+    result = engine.run_job(snap, engine.what_if_run, {"soc": 33.0, "source": "entered", "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]})
+    r = result.value
+    assert r["coverage"]["windows_derived"] == 0 and r["coverage"]["windows_modelled"] == 0 and r["derived"] is None
+    assert all(not warning.startswith(("connections_estimated", "older_connections")) for warning in r["warnings"])
 
 
 def test_the_plan_without_solar_values_the_recorded_energy_at_the_price_of_the_measured_span_only() -> None:
@@ -113,11 +118,11 @@ def test_statistics_that_do_not_match_the_measured_connections_give_no_older_con
     quiet = _statistics(OLDER_BACKS) | _statistics(MEASURED_BACKS, charging=False)
     engine.run_job(snap, engine.store_derived_windows, {"ev_hours": quiet})
     assert engine.economy_db["derived_windows"]["status"] == "unavailable" and engine.economy_db["derived_windows"]["reason"] == "not_validated"
-    prepared = engine.run_job(snap, engine.what_if_prepare)
-    result = engine.run_job(snap, engine.what_if_run, {"soc": 50.0, "source": "entered", "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]})
+    prepared = engine.run_job(snap, engine.what_if_no_solar_prepare)
+    result = engine.run_job(snap, engine.what_if_no_solar_run, {"soc": 50.0, "source": "entered", "period": prepared.value["period"], "first_window_start": prepared.value["first_window_start"]})
     r = result.value
-    assert r["status"] == "ok" and r["windows"]["total"] == len(MEASURED_BACKS) and r["derived"] is None
-    assert r["provenance"]["start_soc"] == "entered" and "older_connections_not_validated" in r["warnings"]
+    assert r["status"] == "ok" and r["windows"]["total"] == len(MEASURED_BACKS) and r["windows"]["derived"] == 0
+    assert "older_connections_not_validated" in r["warnings"]
 
 
 def test_a_failed_statistics_read_keeps_what_was_stored_and_empty_statistics_clear_it() -> None:

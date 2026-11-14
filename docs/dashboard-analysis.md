@@ -273,35 +273,97 @@ solar charging over time.
 The What-if view collects simulated comparisons based on the history CJP has recorded. They never change the
 live plan, the settings, the car or the charger, and they are estimates, not guaranteed or actual savings.
 Each comparison states which data it uses and when it is unavailable; missing or invalid data is never
-replaced with a favourable value. The view holds the daily smart charging comparison, the comparison of the
-daily reserve and maximum level, the charging planned from the grid only (*Without solar: planned from the
-grid*), the EV's solar energy replaced by grid energy, and the comparison with a fixed monthly charging price;
-more are added as they are built.
+replaced with a favourable value. The view holds the comparison of what CJP charged with Smart and charging at
+once, the comparison of the daily reserve and maximum level, the charging planned from the grid only (*Without solar:
+planned from the grid*), the EV's solar energy replaced by grid energy, and the comparison with a fixed monthly
+charging price; more are added as they are built.
 
-*Daily smart charging*, *Reserve and maximum level* and *Without solar: planned from the grid* replay the
+*CJP against Smart and charging at once*, *Reserve and maximum level* and *Without solar: planned from the grid* replay the
 drives between the connections, so they need the car integration (the car's odometer, range and battery level).
 With a virtual EV (no car integration) no drive is ever recorded, so the dashboard leaves these three out.
 *EV solar energy replaced by grid energy* and the fixed monthly price do not use drives and stay.
 
-### Daily smart charging to the maximum recommended level
+### CJP against Smart and charging at once
 
-Compares two ways of charging at home over a past period, with your own recorded history:
+Compares three ways of charging at home over the connections CJP has recorded:
 
-- **Smart:** in every connection (plug-in to unplug), charge in the cheapest hours until the target battery
-  level before departure, like CJP's daily charging to the maximum recommended level.
-- **Immediate charging (the reference):** charge from plug-in until the same target.
+- **CJP:** what CJP actually charged in each connection. The kWh of each charging session are spread evenly over the session and priced per hour. It is not replayed. The record is made once,
+  as soon as the connection has settled (two hours after it ends: by the daily economy update, or when the What-if runs, whichever comes first), from the charging history as it was recorded, and stored with the connection
+  (the charging history is combined per day after a week and has lost the hours by then, so it cannot be read later; a
+  connection from before this record existed has none and is never given one). Every kWh (also from solar and the home battery) is priced at the hourly grid buy price of the hour it was
+  charged in, so all three are grid only. What CJP booked itself (one price for the whole session, solar at CJP's own
+  value) is shown apart, as a labelled reference.
+- **Smart:** replayed from the battery level the car came home with. It charges in the cheapest hours before the
+  *planned* departure (the departure of the work plan on the day the car leaves, or 07:00 with *Fill up* on; otherwise
+  the real unplug) up to the target level (the *What-if max recommended charging limit*; 0 uses the live maximum recommended level). A charger that is told
+  a departure time does not know when the car really leaves, so the real unplug is not used.
+- **Charging at once:** replayed the same way, charging from the plug-in to the same target, the way most chargers do.
 
-Both calculations use exactly the same connections, drives, public charges, charging loss, learned charging
-power by battery level and hourly grid prices, and the battery level is carried from one connection to the
-next (it is never reset at a plug-in). The reference is immediate charging, not CJP's recorded cost, because
-the recorded history lacks small drives, standby drain, house limits and the solar valuation: a difference
-against it would reward buying less energy. CJP's recorded cost and energy in the same span are shown only as
-a labelled reference.
+Smart and charging at once fill up to the target after every drive. CJP may charge a lot one day (when it is cheapest) and
+little or nothing on other days, so the three end at different battery levels, on purpose: that is what makes the comparison
+interesting. They use exactly the same connections, drives, public charges, charging loss, learned charging power by battery
+level and hourly grid prices.
 
-Charts under the results (they need the apexcharts-card, like the other charts) show the cost per month of the
-current settings, smart and immediate charging, and the difference of smart and immediate charging against the
-current settings per month (over the connections all three cover). A line chart shows the cumulative saving of smart
-charging per month. The settings comparison
+**Hours without a price.** An hour of a connection without a price gets one estimated (flat) price for Smart and charging at once,
+because they have nothing to choose between then, while CJP keeps the hourly prices it really charged at. Such connections lean
+towards CJP, and a warning says so.
+
+**The same energy.** Over a long time the energy CJP buys is the energy the car uses. The recorded drives are only the
+accepted ones (long and large enough), so small trips and standby drain are missing, and the replayed calculations would not
+need that energy. The battery level is therefore read at the first plug-in and at the last unplug (from the recorder, like the
+starting level): what CJP charged minus the recorded drives minus the change in the battery level is the energy that no drive
+explains, and it is added as driving, spread over the gaps between the connections, in all three. The card shows how much it is.
+If the level at the last unplug cannot be read, the three are not known to deliver the same energy: the card says so and gives no
+adjusted difference. If the car holds more than the record and the drives explain, there was charging CJP did not record, and
+that is shown too. The monthly odometer is not used for this: only the monthly total is stored, not the days.
+
+**Comparing them.** The three aim at different levels, so only what must be delivered is compared: the driving. If one of them
+could not cover the driving of the others, the cost differences are only an indication (see below). The *adjusted difference* values a difference in the battery
+level at the end at what the calculation that holds more energy actually paid per kWh, so one calculation cannot look cheaper
+by ending with less energy. Three differences are shown. The table has the columns *Smart vs CJP* and *Charging at once vs CJP* (the other minus CJP, so
+a positive number means CJP was cheaper), and the lines under it also give Smart minus
+charging at once; a negative number means the first was cheaper. The attributes of the sensor hold the pairs the other way
+around (`differences.cjp_smart` is CJP minus Smart): the card turns the sign. The table also shows the energy from the charger, the charging loss, how
+many connections reached the target (for CJP: the car came home with at least the daily minimum level, the last connection
+counts as met because the arrival after it is not known; for Smart and charging at once: they left with the target level), what
+is missing to it, the driving that could not be covered, and the lowest and final battery level, per month and in total.
+
+**Price per kWh.** The table also shows the average price per kWh of each (its cost divided by the energy from the
+charger) and, in the two difference columns, the price per kWh of the other minus that of CJP, and under the differences the card shows CJP's own kWh at the price per kWh of
+Smart and of charging at once next to what CJP actually paid. When the three do not deliver the same (one of them could not
+cover the driving) the cost differences of the table are these figures (CJP's kWh at the price per kWh of each, minus what
+CJP paid), marked with an approximately-equal sign and with a warning; the differences in energy and loss are shown as they
+are; no adjusted difference or year is shown, and the table per month shows the same indication for each month (the two charts
+of the differences are hidden). It is an indication, never a saving: the price per kWh says *when* the
+energy was bought, not *how much*, and it takes no account of the battery level at the end, so a calculation that tops up a
+lot in the cheap hours gets a low price per kWh. A calculation that bought no energy has no price.
+
+**Decimals.** Money, also the price per kWh, is shown with two decimals and energy with one decimal in the tables of the comparison (the charts use
+whole numbers).
+
+**Per year.** The card shows the adjusted differences per year (Smart against CJP, charging at once against CJP; the attribute
+`annual` holds CJP minus the other, and also Smart minus charging at once); the raw costs are not scaled, because they end at different battery levels. The adjusted
+differences are scaled to 365 days by the days the connections span. With a year (360 days) or more of data that is shown as a
+year of data; with less (at least 30 days) it is an **estimate**, and is labelled so, and say nothing about the seasons the data does not cover
+(the card shows the days and the months the estimate rests on). Below 30 days, or without the battery level at the last unplug,
+no year is estimated. The table per month and the charts use the same adjustment per month (the change of the battery level in
+the month valued at what the calculation holding more energy paid per kWh over the period), so the months of a pair add up to its
+adjusted difference. A battery level taken from the hourly mean of the statistics (the hour of a plug-in or unplug also holds
+driving or charging) is approximate, and a warning says so.
+
+**The period.** Only the newest unbroken stretch of connections that have a stored record of what CJP charged is compared. A
+connection has none when it was settled before the record existed (the record is made for connections that ended within the last
+6 days), when a figure of its sessions was invalid, a session was still running, or an hour CJP charged in had no price (CJP's own
+charging is never given an estimated price; a connection that could not be priced is tried again for up to 6 days). A connection
+that is not settled yet (the last two hours may still change) is left aside and does not break the stretch. Older connections than
+the first break are left out and counted, with the reason. The record fills as new connections settle, so a first run right after
+an update may have only a few connections.
+The connections estimated from the battery statistics or modelled from the work plan are not used in this comparison (there is no
+record of what CJP charged in them); the comparison without solar and the settings comparison still use them.
+
+Charts under the results (they need the apexcharts-card, like the other charts) show the cost per month of the three, the
+difference per month of Smart and of charging at once against CJP (positive: CJP cheaper), and a line chart of the cumulative saving of CJP per
+month. The settings comparison
 has a monthly cost chart and a cumulative difference line, the comparison without solar monthly cost, price per kWh
 and energy charts (planned and recorded), the solar comparison monthly grid cost against sale value and the
 cumulative solar advantage, and the fixed monthly price a chart of the recorded cost against the price per month.
@@ -309,65 +371,53 @@ The time axis of every chart follows the months in its result, from the first mo
 month (at least two months), so a short *What-if period* is not drawn on a year-long axis; a chart without a
 result shows two months. A chart without a result, or without a value in a month, shows nothing for it; the
 cumulative lines of the
-comparisons that need equal energy are empty when the result is not comparable.
-
-The table lists the *Current settings* column first, as the reference, then smart and immediate charging, each with
-its difference against the current settings. It replays your current daily reserve and maximum recommended level (each
-connection charged in the cheapest hours to what the next recorded drive needs plus the reserve, capped at the
-maximum, the same model as the settings comparison below) over the same period, so the table shows the two
-what-if ways next to what the settings you run now would have done. It leaves out the last connection (what the
-next drive needs is not known yet), so it covers one connection less; the card says so. If that replay cannot be
-made the column shows dashes.
+comparisons that need equal energy are empty when the result is not comparable (the two charts of Scenario A that need it are hidden
+then, and also without the battery level at the last unplug).
 
 Settings on the What-if view (they never change the live plan or settings):
 
 | Setting | Meaning |
 |---|---|
-| *What-if period* | how many days back to replay, from 7 up to all the data CJP keeps: the months of charging history set in the setup (default 12) plus one month (at least 400 days), so 403 days by default and 775 with 24 months. The extra month keeps the whole month of a year ago in reach while the current month runs, so a month can be compared with the same month last year. The data is kept from the day CJP started keeping it (older data comes only from the recorder's long-term statistics). Only completed connections inside it are used |
-| *What-if target battery level* | a temporary target. 0 uses the live *max recommended charge limit* and never changes it |
-| *What-if battery level at first plug-in* | the battery level when the period's first connection began. 0 reads it from Home Assistant's history; enter a value if that is missing |
-| *What-if smart charging days* | all days, the work plan's days, Monday to Friday, the weekend, or *Selected days* (then switch on the *What-if Monday ... Sunday* switches you want). Days count by the day the car leaves (the end of the connection). The work plan's days are the days as they are set now, not as they were in the past. On the other days both calculations charge immediately, so only the selected days differ. A selection with no days gives no result |
+| *What-if period* | how many days back to compare, from 7 up to all the data CJP keeps: the months of charging history set in the setup (default 12) plus one month (at least 400 days), so 403 days by default and 775 with 24 months. The extra month keeps the whole month of a year ago in reach while the current month runs, so a month can be compared with the same month last year. Only completed connections inside it are used, and of those only the newest unbroken stretch with a complete record of what CJP charged |
+| *What-if EV max recommended charging limit* | 0 uses the live *max recommended charge limit* and never changes it. It is the level Smart and charging at once charge to here, and the alternative maximum in *Reserve and maximum level* (the same setting) |
+| *What-if battery level at first plug-in* | the battery level when the first compared connection began. 0 reads it from Home Assistant's history; enter a value if that is missing. Without it there is no result. The level at the last unplug is read the same way and is never entered |
+| *What-if Smart days* | all days, the work plan's days, Monday to Friday, the weekend, or *Selected days* (then switch on the *What-if Monday ... Sunday* switches you want). Days count by the day the car leaves (the end of the connection). The work plan's days are the days as they are set now, not as they were in the past. On the other days Smart charges at once, so only the selected days differ; what CJP charged never changes. A selection with no days gives no result |
 | *Run what-if* (button) | calculates. It never changes the plan, the settings, the car or the charger |
 
 The latest successful result is kept across restarts and shown on the view, and on
-`sensor.<prefix>_what_if` (its state is the adjusted cost difference, the details are in the attributes).
-A calculation that gives no result (for example without recorded drives, or with fewer than half of the connections priced) leaves the previous result in place and says why; one that is labelled *estimated* is a result and replaces it. A year of history takes
-about a tenth of a second. If a connection ends while the starting level is being read, the calculation is
-refused (the level would belong to another first connection) and can simply be run again. The sensor state
-is set for every result with a difference (also an *estimated* one, whose method and estimated connections are in the attributes).
-
-**Reading the result.** *Difference* is smart minus immediate charging, so a negative number means smart
-charging was cheaper. The *adjusted difference* also values any battery level difference at the end of the
-period at the period's time-weighted average buy price, so one calculation cannot look cheaper by ending with
-less energy. If the two calculations do not deliver the same (the target is missed by a different amount, or a
-different amount of driving cannot be covered) no difference is shown at all. The table also shows the energy
-from the charger, the charging loss, how many connections reached the target, what is missing to the target,
-the driving the battery could not cover, and the lowest and final battery level, per month and in total.
+`sensor.<prefix>_what_if` (its state is the adjusted cost difference of CJP minus charging at once, the details are in the
+attributes: `cjp`, `smart` and `asap` hold the figures of the three, `differences` the three differences, `energy` the energy
+balance and `annual` the estimate per year). A calculation that gives no result (for example without recorded drives, without a
+starting level or without a complete record of CJP's charging) leaves the previous result in place and says why; one that is
+labelled *estimated* (prices estimated for Smart and charging at once) is a result and replaces it. If a connection ends while the
+levels are being read, the calculation is refused (the level would belong to another connection) and can simply be run again. A
+result saved by an earlier model of this comparison is not shown any more: run the calculation again.
 
 **Where the data comes from.**
 
 | Data | Source | Limit |
 |---|---|---|
-| Connections | CJP's recorded plug-in and unplug times at home | only completed connections; a connection that is still open is left out |
-| Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this replay and flagged, and never replaces a real price in the monthly economy comparison |
-| Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded, so the demand is understated for both calculations. Without any recorded drive the demand is unknown and there is no result. CJP keeps up to two drives a day for the days kept (at least the newest 400): connections older than the oldest kept drive are left out |
+| Connections | CJP's recorded plug-in and unplug times at home | only completed, settled connections with a complete record of CJP's charging; the newest unbroken stretch |
+| CJP's charging | CJP's charging history (without public charging): kWh, battery percent and start and end of each session | the kWh are spread over the hours of the session at an even rate and priced per hour; an hour without a price ends the stretch |
+| Prices | the hourly buy prices CJP stored itself (incl. fees), as many days as the history is kept (months set in the setup plus one month, at least 400) | an hour is the duration-weighted average of its quarter-hour prices, only when every price was published and it was a real price (not a forecast or an estimate from the price history); hours stored before this was introduced are flagged as unverified. The repeated hour when the clocks go back has one published price: it is kept in a separate copy for the second real hour, used only by this comparison and flagged, and never replaces a real price in the monthly economy comparison |
+| Driving | the drives CJP accepted: the battery level when the car left minus the level at the next plug-in | small drives and standby drain are not recorded: the energy they use is found from the levels at both ends and added (see *The same energy*). Without any recorded drive the demand is unknown and there is no result. CJP keeps up to two drives a day for the days kept (at least the newest 400): connections older than the oldest kept drive are left out |
 | Public charges | CJP's charging history | counted and shown, but not added to the battery level again, because the drive they belong to is already net of them. A public charge in a gap with no recorded drive changes the level by an unknown amount and is flagged |
-| Starting level | entered, or the recorder state at the first plug-in, or the hourly mean from the long-term statistics (marked as approximate) | never defaulted: when it is unknown the first connection only brings the car to the target (nothing in it is counted) and the result is labelled *estimated* |
+| Levels at both ends | entered, or the recorder state, or the hourly mean from the long-term statistics (marked as approximate) | never defaulted: an unknown starting level gives no result; an unknown end level gives a result without the energy balance and without an adjusted difference |
 | Loss and charging power | the configured or measured charging loss, and the learned power by battery level when learning of charging power is switched on | |
 
-**What stops or limits a result.** A connection with a missing, invalid or non-finite price is not a stop: its
-hours use the price sensor's recorded history, else an estimated price (the average of the priced hours, the same for
-every calculation), and the connection is counted and the result labelled *estimated*. With fewer than half of the
-connections priced there is no result. An unknown starting level is calibrated by the first connection (see
-*Without solar* below). Public charges are not replayed as events (see the table above), so they never stop the replay. Entries that
-had to be left out (an invalid drive, a drive dated inside a connection) are counted and shown as warnings.
-If the energy balance does not add up the result is withheld.
+**What stops or limits a result.** An hour without a price in a connection where CJP did not charge is not a stop for Smart and
+charging at once: it uses the price sensor's recorded history, else an estimated price (the average of the priced hours, the same
+for every calculation), and the connection is counted and the result labelled *estimated*. With fewer than half of the
+connections priced there is no result. Public charges are not replayed as events (see the table above), so they never stop the
+replay. Entries that had to be left out (an invalid drive, a drive dated inside a connection) are counted and shown as warnings.
+If the energy balance of Smart or charging at once does not add up the result is withheld. If the record of CJP's charging does
+not fit the drives (CJP charged past 100 %) that is said, because the figures for CJP are then uncertain.
 
-**Not included, and stated on the card:** it is a hindsight estimate (smart knows every price of the
-connection and the exact departure time), not a forecast and not a guaranteed or actual saving; solar and the
-home battery, house and site limits, standby drain, a departure buffer and charging that CJP did not record.
-Charging at another charger cannot be seen. A temporary target above what the car can reach in a connection
-shows as *missing to the target* for both calculations.
+**Not included, and stated on the card:** it is a hindsight comparison, not a forecast and not a guaranteed or actual saving:
+Smart knows every price of the connection in advance, the record is only as complete as CJP's charging history, charging at
+another charger cannot be seen, and solar and the home battery (CJP's solar kWh are priced as grid energy), house and site limits
+and standby drain are not modelled. A target above what the car can reach in a connection shows as *missing to the
+target* for Smart and charging at once.
 
 ### Reserve and maximum level
 
@@ -376,18 +426,19 @@ car should still have when it comes home) and/or an **alternative maximum recomm
 period. Neither the live settings nor the plan are changed, and the current settings are replayed as they are
 now: earlier settings are not stored, so this is never the plan CJP actually made at the time.
 
-This is a deliberately simple, modelled policy, not CJP's planner (which reads live state, forecasts and solar
-and cannot be replayed). In every connection the car is charged, in the cheapest hours of the connection, to the
-level that the next recorded drive needs plus the reserve, never above the maximum level. A drive that needs
-more than the maximum is still covered, as CJP lifts the limit for a trip. The reserve can therefore have no
-effect when the maximum already decides the level (for example a drive plus the reserve above the maximum).
-The calculation above always charges to a fixed target and does not use the reserve at all.
+This is a deliberately simple, modelled policy, not CJP's planner (the comparison above uses what CJP really charged;
+this one and *Without solar* model the daily charging rule). In every connection the car is charged, in the
+cheapest hours of the connection, to the level that the next recorded drive needs plus the reserve, never above
+the maximum level. A drive that needs more than the maximum is still covered, as CJP lifts the limit for a trip.
+The reserve can therefore have no effect when the maximum already decides the level (for example a drive plus the
+reserve above the maximum). Charging at once, in the comparison above, always charges to a fixed target and does
+not use the reserve at all.
 
 | Setting | Meaning |
 |---|---|
 | *What-if period* and *What-if battery level at first plug-in* | the same two settings as the calculation above |
 | *What-if alternative daily arrival battery level* | the reserve to try. 0 uses the current setting and never changes it, so a reserve of exactly 0 % cannot be tried (use 1) |
-| *What-if alternative EV max recommended charging limit* | the maximum recommended level to try. 0 uses the current setting and never changes it |
+| *What-if EV max recommended charging limit* | the maximum recommended level to try. 0 uses the current setting and never changes it. The same setting is the level Smart and charging at once charge to in the calculation above |
 | *Run what-if settings* (button) | calculates. It never changes the plan, the settings, the car or the charger. Both values at 0 (or equal to the current settings) give nothing to compare |
 
 The latest successful result is kept across restarts and shown on `sensor.<prefix>_what_if_settings` (its
@@ -482,7 +533,7 @@ hours claims time the car was not plugged in), and the median error of the depar
 2 hours. If it fails, or without the statistics, or with fewer than 10 measured connections, no older connection
 is used (the reason is in the coverage of the result sensor, and the card warns when the check failed). The
 estimated connections come first in the calculation (the others are unchanged), the warning says they are
-estimates, and the card shows what they contributed to the daily smart charging comparison on its own line. The
+estimates, and the comparison without solar shows what they contributed on its own line. The
 same connections are used by the reserve and maximum level comparison and by the comparison without solar; there
 the recorded energy is valued at the price per kWh of the measured connections only, because CJP's recorded
 sessions only exist from when it began recording. A smart charger that was used in the past already charged in
@@ -522,7 +573,7 @@ set now, not as it was in the past) is used in two ways:
   whole period.
 
 Every result table also shows the settings it used: the target battery level (and whether it is the live setting
-or the temporary target) and the days with smart charging for the daily smart charging comparison, the current and
+or the What-if setting) and the days with Smart for the comparison of CJP with Smart and charging at once, the current and
 the alternative daily reserve and maximum level for the settings comparison, and the daily reserve and maximum
 level for the comparison without solar.
 

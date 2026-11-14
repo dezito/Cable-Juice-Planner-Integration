@@ -1,27 +1,35 @@
 """What-if Scenario A in the engine: collects the stored data, replays it and publishes the result.
 
-Runs as an ordinary engine job (a year of history replays in about 0.1 s). Nothing here
-changes the live plan, a setting, the car or the charger: the replay only reads CJP's
-databases and its result is saved separately (economy database, key "what_if") and shown on
-sensor.<prefix>_what_if.
+Runs as three jobs: what_if_collect (a quick copy of the data the replay reads), the replay itself (Smart and charging at
+once over the connections, next to what CJP actually charged: the coordinator runs it on its own thread, never the worker
+the charger control uses) and what_if_finish (publish). Nothing here changes the live plan, a setting, the car or the
+charger: the replay only reads CJP's databases and its result is saved separately (economy database, key "what_if") and
+shown on sensor.<prefix>_what_if.
 
 The starting SOC is read by the coordinator from the recorder (see coordinator/what_if.py) or
 entered by the user; without it the replay is unavailable. It is never defaulted.
 """
 from __future__ import annotations
 
+import datetime
 import logging
 import math
+from copy import deepcopy
+from dataclasses import replace
 from typing import Any
 
 from ...const import WEEKDAYS
+from ..economy import ECONOMY_WINDOW_SETTLE
 from ..soc_power import planning_power_cap
 from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
-from .replay import PolicyResult, ReplayResult, replay, replay_plan
+from .replay import REPLAY_MODEL_VERSION, PolicyResult, Recorded, ReplayResult, replay
 
 _LOGGER = logging.getLogger(__name__)
 
+ANNUAL_MIN_DAYS = 30  # under this a year is not estimated: the connections say too little about a year
+ANNUAL_MEASURED_DAYS = 360  # from this the connections cover a year and the figure is the last year, not an estimate
+DEFAULT_DEPARTURE_SECONDS = 7 * 3600  # with Fill up the car is taken to leave at 07:00 (like the planner assumes)
 WHAT_IF_DAYS = (7, 365)  # the shortest, and the lowest the longest can be (see what_if_max_days: the days kept, 403 by default)
 WHAT_IF_DEFAULT_DAYS = 30
 DAY_SELECTIONS = ("all", "work_plan", "monday_friday", "weekend")
@@ -33,7 +41,7 @@ def _round(value: Any, digits: int) -> float | None:
 
 
 class WhatIf:
-    """Scenario A: daily smart charging to the maximum recommended battery level."""
+    """Scenario A: what CJP actually charged (its stored record per connection) against Smart and charging at once (replayed)."""
 
     # ------------------------------------------------------------------ #
     # settings
@@ -51,8 +59,8 @@ class WhatIf:
         return int(min(max(value, WHAT_IF_DAYS[0]), self.what_if_max_days()))
 
     def what_if_target(self) -> tuple[float, str]:
-        """The target battery level: the temporary override, else the live maximum recommended level."""
-        override = self.setting("what_if_target_battery_level", 0.0)
+        """The target battery level: the What-if maximum recommended level (shared with the settings comparison), else the live one."""
+        override = self.setting("what_if_max_recommended_battery_level", 0.0)
         if isinstance(override, (int, float)) and not isinstance(override, bool) and math.isfinite(override) and override > 0:
             return float(min(override, 100.0)), "override"
         return float(self.get_max_recommended_charge_limit_battery_level()), "live_setting"
@@ -81,15 +89,18 @@ class WhatIf:
         """The replay input for the period and what the data covered (shared by prepare and run)."""
         target, target_source = self.what_if_target()
         data, coverage, sessions = self._what_if_inputs(
-            period_start, period_end, start_soc, source, target, self.what_if_smart_weekdays()
+            period_start, period_end, start_soc, source, target, self.what_if_smart_weekdays(), recorded=True
         )
         return data, coverage, target, target_source, sessions
 
     def _what_if_inputs(
         self, period_start: float, period_end: float, start_soc: float | None, source: str,
-        target: float, smart_weekdays: frozenset[int] | None,
+        target: float, smart_weekdays: frozenset[int] | None, recorded: bool = False,
     ):
-        """The replay input and coverage for a target and day selection (Scenarios A and B)."""
+        """The replay input and coverage for a target and day selection (Scenarios A and B).
+
+        recorded (scenario A): only the measured connections CJP has a complete record of its own charging for, as the
+        newest unbroken stretch of them, each with what CJP charged (ReplayInput.recorded) and the planned departure."""
         battery = self.config["ev_car"].get("battery_size")
         max_kw = float(self.max_kwh_charging)
         kws = {round(watt / 1000.0, 3) for watt in self.charging_power_dict()} | {round(max_kw, 3)}
@@ -99,7 +110,7 @@ class WhatIf:
                 loss_table[kw] = float(self.charging_loss_factor(kw))
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("What-if: no charging loss at %s kW: %s", kw, err)
-        model = self.soc_power_model if self.soc_power_learning_enabled() else None
+        model = deepcopy(self.soc_power_model) if self.soc_power_learning_enabled() else None
         sessions = self._economy_sessions()
         public = [{"ts": s["ts"], "kwh": s["public_kwh"]} for s in sessions if s["public"] and s["public_kwh"] > 0]
         stored = self.economy_db.get("prices", {})
@@ -111,32 +122,119 @@ class WhatIf:
             float(ts): price for ts, price in self.economy_db.get("prices_history", {}).items()
             if ts not in stored and ts not in copies and isinstance(price, (int, float)) and math.isfinite(price)
         }
-        data, coverage = build_replay_input(
-            windows=self.economy_db["windows"],
-            prices={**history, **copies, **stored},
-            history_hours=list(history),
-            refund=self._solar_refund() or 0.0,
-            derived=self.economy_db.get("derived_windows"),
-            work_plan=self.what_if_work_plan(),
-            drives=self.analysis_db.get("drives", []),
-            public_sessions=public,
-            period_start=period_start,
-            period_end=period_end,
-            battery_kwh=float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else math.nan,
-            max_kw=max_kw,
-            phases=int(self.config["charger"]["charging_phases"]),
-            start_soc=start_soc,
-            target_soc=target,
-            loss_factor=loss_factor_from_table(loss_table),
-            power_cap=power_cap_from_model(model, planning_power_cap),
-            prices_averaged_since=self.economy_db.get("prices_averaged_since"),
-            start_soc_source=source,
-            tz=self._snap.tz,
-            smart_weekdays=smart_weekdays,
-            drive_history_limit=self.drive_history_limit(),
-            dst_copied_hours=list(copies),
-        )
+        def build(windows):
+            return build_replay_input(
+                windows=windows,
+                prices={**history, **copies, **stored},
+                history_hours=list(history),
+                refund=self._solar_refund() or 0.0,
+                # scenario A uses CJP's own recorded connections only: no estimated or modelled older ones
+                derived=None if recorded else self.economy_db.get("derived_windows"),
+                work_plan=None if recorded else self.what_if_work_plan(),
+                drives=self.analysis_db.get("drives", []),
+                public_sessions=public,
+                period_start=period_start,
+                period_end=period_end,
+                battery_kwh=float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else math.nan,
+                max_kw=max_kw,
+                phases=int(self.config["charger"]["charging_phases"]),
+                start_soc=start_soc,
+                target_soc=target,
+                loss_factor=loss_factor_from_table(loss_table),
+                power_cap=power_cap_from_model(model, planning_power_cap),
+                prices_averaged_since=self.economy_db.get("prices_averaged_since"),
+                start_soc_source=source,
+                tz=self._snap.tz,
+                smart_weekdays=smart_weekdays,
+                drive_history_limit=self.drive_history_limit(),
+                dst_copied_hours=list(copies),
+            )
+
+        if recorded:
+            # a connection that has settled since the daily economy update has no record yet: make it now, from the prices
+            # this calculation uses (the history is combined per day after a week, so it can only be done in time)
+            self._economy_store_records(self.economy_db["windows"], {**history, **copies, **stored}, self._economy_ts(self.now()))
+        data, coverage = build(self.economy_db["windows"])
+        if recorded:
+            data, coverage = self._what_if_with_recorded(data, coverage, build)
         return data, coverage, sessions
+
+    # ------------------------------------------------------------------ #
+    # scenario A: what CJP itself charged
+    # ------------------------------------------------------------------ #
+
+    def _what_if_with_recorded(self, data: Any, coverage: dict[str, Any], build) -> tuple[Any, dict[str, Any]]:
+        """Keep the newest unbroken stretch of connections that CJP has a complete record of its own charging for, give
+        each what CJP charged (priced hour by hour) and the planned departure, and build the input again for just those."""
+        all_windows = list(data.windows)
+        records, reasons = self._what_if_recorded_charging(all_windows)
+        # the newest connections that are not settled yet are left aside: they do not break the stretch, the next run has them
+        newest = len(all_windows)
+        while newest and reasons.get(all_windows[newest - 1].start) == "not_settled":
+            newest -= 1
+        stretch: list[Any] = []
+        for window in reversed(all_windows[:newest]):
+            if window.start not in records:
+                break
+            stretch.append(window)
+        stretch.reverse()
+        left_out = newest - len(stretch)
+        # why the stretch stops: the reason of the newest connection before it that has no record
+        reason = reasons.get(all_windows[newest - len(stretch) - 1].start) if left_out else None
+        if not stretch:
+            return replace(data, windows=(), recorded={}), {
+                **coverage, "windows": 0, "first_window": None, "last_window": None, "recorded_candidates": len(all_windows),
+                "recorded_windows": 0, "recorded_left_out": left_out, "recorded_reason": reason,
+            }
+        data, coverage = build([{"start": w.start, "end": w.end} for w in stretch])
+        windows = tuple(replace(w, deadline=self._what_if_deadline(w)) for w in data.windows)
+        warnings = (*data.warnings, "windows_before_recorded_gap_left_out") if left_out else data.warnings
+        coverage = {
+            **coverage, "recorded_candidates": len(all_windows), "recorded_windows": len(windows),
+            "recorded_left_out": left_out, "recorded_reason": reason,
+        }
+        return replace(data, windows=windows, warnings=warnings, recorded={w.start: records[w.start] for w in windows}), coverage
+
+    def _what_if_recorded_charging(self, windows: list[Any]) -> tuple[dict[float, Recorded], dict[float, str]]:
+        """What CJP charged in each connection: the record stored with it when it was settled (engine/economy.py, priced hour
+        by hour; the charging history itself is combined per day after a week and has lost the hours by then). A connection
+        without a stored record is not in the first dict and says why in the second: it is never given one."""
+        stored = {w["start"]: w for w in self.economy_db["windows"]}
+        now = self._economy_ts(self.now())
+        records: dict[float, Recorded] = {}
+        reasons: dict[float, str] = {}
+        for window in windows:
+            record = (stored.get(window.start) or {}).get("record")
+            if now - window.end < ECONOMY_WINDOW_SETTLE:
+                reasons[window.start] = "not_settled"  # the last hour may still change
+            elif not isinstance(record, dict):
+                reasons[window.start] = "no_stored_record"  # settled before the record existed, or its charging could not be priced
+            elif any(not isinstance(record.get(name), (int, float)) or isinstance(record.get(name), bool) or not math.isfinite(record[name]) or record[name] < 0 for name in ("kwh", "percent", "local_kwh", "cost")):
+                reasons[window.start] = "invalid_record"
+            else:
+                booked = record.get("booked_cost")
+                records[window.start] = Recorded(
+                    kwh=float(record["kwh"]), percent=float(record["percent"]), cost=float(record["cost"]),
+                    local_kwh=float(record["local_kwh"]), recorded_cost=float(booked) if isinstance(booked, (int, float)) and not isinstance(booked, bool) else None,
+                )
+        return records, reasons
+
+    def _what_if_deadline(self, window: Any) -> float | None:
+        """The planned departure inside a connection, for the charger "smart" stands for: the work plan's departure of the
+        day the car leaves when that is a workday, else 07:00 with Fill up on. None: it is told no departure (or the car came
+        after it, or it leaves at the real unplug first) and may use the whole connection."""
+        tz = self._snap.tz
+        end = datetime.datetime.fromtimestamp(window.end, tz)
+        plan = (self.what_if_work_plan() or {}).get("days", {}).get(end.weekday())
+        seconds = None
+        if plan and plan.get("workday") and "departure" in plan:
+            seconds = plan["departure"]
+        elif self.switch_state("fill_up", error_state="off") == "on":
+            seconds = DEFAULT_DEPARTURE_SECONDS
+        if seconds is None:
+            return None
+        deadline = (datetime.datetime.combine(end.date(), datetime.time(0), tzinfo=tz) + datetime.timedelta(seconds=seconds)).timestamp()
+        return deadline if window.start < deadline < window.end else None
 
     def what_if_work_plan(self) -> dict[str, Any] | None:
         """The work plan as it is set now, per weekday (Monday = 0): workday or not, the departure and homecoming time in seconds
@@ -180,7 +278,8 @@ class WhatIf:
         manual = float(manual) if isinstance(manual, (int, float)) and not isinstance(manual, bool) and math.isfinite(manual) and manual > 0 else None
         self._what_if_attempt("running")
         return {
-            "first_window_start": coverage["first_window"], "manual_start_soc": manual, "period": [period_start, period_end],
+            "first_window_start": coverage["first_window"], "last_window_end": coverage["last_window"],
+            "manual_start_soc": manual, "period": [period_start, period_end],
         }
 
     # ------------------------------------------------------------------ #
@@ -189,7 +288,18 @@ class WhatIf:
 
     def what_if_run(self, start: dict[str, Any]) -> dict[str, Any]:
         """start: {"soc": percent | None, "source": text, and from what_if_prepare "period" and
-        "first_window_start"}. Returns the result and publishes it."""
+        "first_window_start"}. Returns the result and publishes it.
+
+        The three steps run one after the other here; the coordinator runs the middle one (the replay) on its own
+        thread so the charger control is never held up by it."""
+        prepared = self.what_if_collect(start)
+        result = prepared["result"] if prepared["result"] is not None else replay(prepared["calculation"])
+        return self.what_if_finish(prepared, result)
+
+    def what_if_collect(self, start: dict[str, Any]) -> dict[str, Any]:
+        """Step 1 (a quick job): the replay input, or why there is nothing to replay.
+
+        Nothing in the returned data refers to the live engine, so the replay can run on another thread."""
         now = self._economy_ts(self.now())
         prepared_period = start.get("period")
         period_start, period_end = (float(prepared_period[0]), float(prepared_period[1])) if prepared_period else self.what_if_period()
@@ -198,21 +308,41 @@ class WhatIf:
         )
         weekdays = self.what_if_smart_weekdays()
         reason = None
-        if "first_window_start" in start and coverage["first_window"] != start["first_window_start"]:
-            reason = "start_level_stale"  # a connection ended meanwhile: the level read belongs to another first connection
+        if ("first_window_start" in start and coverage["first_window"] != start["first_window_start"]) or (
+            "last_window_end" in start and coverage["last_window"] != start["last_window_end"]
+        ):
+            reason = "start_level_stale"  # a connection ended meanwhile: a level read belongs to another first or last connection
+        elif not data.recorded and coverage.get("recorded_candidates"):
+            reason = "no_recorded_charging"  # CJP has no complete record of its own charging for any connection of the period
         elif weekdays is not None and not weekdays:
             reason = "no_days_selected"
         elif coverage["windows"] > 1 and coverage["drives_in_gaps"] == 0:
             reason = "no_drives"  # without a drive that can be applied the demand is unknown, not zero
+        result = calculation = None
         if reason is not None:
             result = ReplayResult(
                 status="unavailable", reason=reason, windows_total=coverage["windows"], provenance=dict(data.provenance),
                 warnings=data.warnings,
             )
         else:
-            result = replay(data)
-        published = self._what_if_result(result, coverage, now, period_start, period_end, target, target_source, sessions)
-        self._what_if_add_current(published, data, result)
+            end_soc = start.get("end_soc")
+            end_soc = float(end_soc) if isinstance(end_soc, (int, float)) and not isinstance(end_soc, bool) and 0.0 <= end_soc <= 100.0 else None
+            data.provenance["end_soc"] = str(start.get("end_source") or "unavailable") if end_soc is not None else "unavailable"
+            if "statistics_hour_mean" in (start.get("source"), start.get("end_source")):
+                # the mean of the hour of a plug-in or unplug holds the driving next to it: the energy balance rests on it
+                data = replace(data, warnings=(*data.warnings, "levels_approximate"))
+            calculation = replace(data, end_soc=end_soc, arrival_reserve=float(self.get_min_daily_battery_level()))
+        return {
+            "now": now, "period_start": period_start, "period_end": period_end, "data": data, "coverage": coverage,
+            "target": target, "target_source": target_source, "sessions": sessions, "result": result, "calculation": calculation,
+        }
+
+    def what_if_finish(self, prepared: dict[str, Any], result: ReplayResult) -> dict[str, Any]:
+        """Step 3 (a quick job): the published result, saved and shown on the sensor."""
+        published = self._what_if_result(
+            result, prepared["coverage"], prepared["now"], prepared["period_start"], prepared["period_end"], prepared["target"],
+            prepared["target_source"], prepared["sessions"],
+        )
         self._what_if_attempt(result.status, result.reason)
         if result.status in ("ok", "partial"):
             # only a successful calculation replaces the saved one
@@ -221,67 +351,16 @@ class WhatIf:
         self.publish_what_if(published if result.status in ("ok", "partial") else None)
         return published
 
+    def what_if_progress(self, done: int, total: int) -> None:
+        """job: the replay has finished `done` of `total` connections. Shown on the sensor only, never saved."""
+        attempt = self.economy_db.get("what_if_attempt")
+        if not isinstance(attempt, dict) or attempt.get("status") != "running":
+            return
+        self.set_attr("what_if", "attempt", {**attempt, "progress": {"done": int(done), "total": int(total)}})
+
     # ------------------------------------------------------------------ #
     # result
     # ------------------------------------------------------------------ #
-
-    def _what_if_add_current(self, published: dict[str, Any], data: Any, result: ReplayResult) -> None:
-        """The third column of the table: your current daily reserve and maximum recommended level replayed over the same
-        period (the planned grid-only charging of Scenario B/D, shared replay). It leaves out the last connection (the next
-        drive's need is not known), so it covers one connection less. Never changes anything live; a failure only leaves
-        the column out, and the reason is kept."""
-        published["settings"] = None
-        published["current"] = None
-        published["current_reason"] = None
-        if result.status not in ("ok", "partial"):
-            return
-        try:
-            live, _, _ = self.what_if_settings_values()
-            published["settings"] = {"reserve": live.reserve, "maximum": live.maximum}
-            plan = replay_plan(data, live)
-            if plan.status == "ok":
-                published["current"] = {
-                    **self._plan_policy(plan), "windows_replayed": plan.windows_replayed, "estimated_windows": plan.estimated_windows,
-                }
-                self._what_if_same_span(published, plan.plan, result)
-            else:
-                published["current_reason"] = plan.reason
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("What-if: the current settings column could not be calculated: %s", err)
-            published["current_reason"] = "internal_error"
-
-    def _what_if_same_span(self, published: dict[str, Any], current: PolicyResult | None, result: ReplayResult) -> None:
-        """The differences against the current settings over the connections all three cover: the current settings leave out
-        the last connection, so a difference of the plain totals would hold one connection more for smart and immediate
-        charging. Totals and per month; the month rows keep their plain numbers too."""
-        if current is None or result.smart is None or result.asap is None:
-            return
-        count = min(len(current.windows), len(result.smart.windows), len(result.asap.windows))
-        if count == 0:
-            return
-        pairs = list(zip(current.windows[:count], result.smart.windows[:count], result.asap.windows[:count]))
-        total = {"windows": count}
-        for name, index in (("current", 0), ("smart", 1), ("asap", 2)):
-            rows = [p[index] for p in pairs]
-            total[f"{name}_cost"] = _round(sum(w.cost for w in rows), 3)
-            total[f"{name}_grid_kwh"] = _round(sum(w.grid_kwh for w in rows), 3)
-            total[f"{name}_loss_kwh"] = _round(sum(w.loss_kwh for w in rows), 3)
-        published["current"]["same"] = total
-        months: dict[str, dict[str, float]] = {}
-        for cur, smart, asap in pairs:
-            month = months.setdefault(
-                self._economy_local(smart.end).strftime("%Y-%m"), {"windows": 0, "current": 0.0, "smart": 0.0, "asap": 0.0}
-            )
-            month["windows"] += 1
-            month["current"] += cur.cost
-            month["smart"] += smart.cost
-            month["asap"] += asap.cost
-        for row in published.get("months") or []:
-            same = months.get(row["month"])
-            row["current_cost"] = _round(same["current"], 3) if same else None
-            row["same_windows"] = int(same["windows"]) if same else 0
-            row["same_smart_cost"] = _round(same["smart"], 3) if same else None
-            row["same_asap_cost"] = _round(same["asap"], 3) if same else None
 
     def _policy(self, policy: PolicyResult | None) -> dict[str, Any] | None:
         if policy is None:
@@ -321,62 +400,128 @@ class WhatIf:
             "provenance": dict(result.provenance),
             "ignored_events": result.ignored_events,
             "conservation_error_kwh": _round(result.max_conservation_error_kwh, 9),
+            "cjp": self._policy(result.cjp),
             "smart": self._policy(result.smart),
             "asap": self._policy(result.asap),
             "average_price": _round(result.average_price, 4),
-            "difference": {key: _round(value, 3) for key, value in result.difference.items()} if result.difference else None,
+            "difference": self._differences_rounded(result.difference),
+            "differences": {key: self._differences_rounded(value) for key, value in result.differences.items()} if result.differences else None,
+            "energy": {key: _round(value, 2) for key, value in result.energy.items()} if result.energy else None,
+            "unit_prices": {key: _round(value, 4) for key, value in result.unit_prices.items()} if result.unit_prices else None,
+            "annual": None,
             "months": [],
             "rows": [],
             "recorded_reference": None,
             "derived": None,
-            "settings": None,
-            "current": None,
-            "current_reason": None,
         }
-        if result.smart is None or result.asap is None:
+        if result.smart is None or result.asap is None or result.cjp is None:
             return published
 
         months: dict[str, dict[str, Any]] = {}
+        levels_by_month: dict[str, dict[str, list[float]]] = {}
         rows = []
-        for smart, asap in zip(result.smart.windows, result.asap.windows):
+        for cjp, smart, asap in zip(result.cjp.windows, result.smart.windows, result.asap.windows):
             key = self._economy_local(smart.end).strftime("%Y-%m")
-            month = months.setdefault(key, {"month": key, "windows": 0, "derived_windows": 0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0})
+            month = months.setdefault(key, {
+                "month": key, "windows": 0, "cjp_cost": 0.0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0,
+                "smart_grid_kwh": 0.0, "asap_grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0,
+            })
             month["windows"] += 1
-            month["derived_windows"] += 1 if smart.derived else 0
+            for name, window in (("cjp", cjp), ("smart", smart), ("asap", asap)):
+                levels = levels_by_month.setdefault(key, {}).setdefault(name, [window.soc_in, window.soc_out])
+                levels[1] = window.soc_out  # the first level in the month stays, the last one follows
+            month["cjp_cost"] += cjp.cost
             month["smart_cost"] += smart.cost
             month["asap_cost"] += asap.cost
-            month["grid_kwh"] += smart.grid_kwh
-            month["targets_met"] += 1 if smart.unmet_target_kwh <= 1e-6 else 0
-            month["unmet_target_kwh"] += smart.unmet_target_kwh
+            month["grid_kwh"] += cjp.grid_kwh
+            month["smart_grid_kwh"] += smart.grid_kwh
+            month["asap_grid_kwh"] += asap.grid_kwh
+            month["targets_met"] += 1 if cjp.unmet_target_kwh <= 1e-6 else 0
+            month["unmet_target_kwh"] += cjp.unmet_target_kwh
             rows.append({
-                "start": smart.start, "end": smart.end, "soc_in": _round(smart.soc_in, 1), "soc_out": _round(smart.soc_out, 1),
-                "smart_cost": _round(smart.cost, 2), "asap_cost": _round(asap.cost, 2), "kwh": _round(smart.grid_kwh, 2),
-                "unmet_kwh": _round(smart.unmet_target_kwh, 2),
+                "start": smart.start, "end": smart.end, "soc_in": _round(cjp.soc_in, 1), "soc_out": _round(cjp.soc_out, 1),
+                "cjp_cost": _round(cjp.cost, 2), "smart_cost": _round(smart.cost, 2), "asap_cost": _round(asap.cost, 2),
+                "kwh": _round(cjp.grid_kwh, 2), "unmet_kwh": _round(cjp.unmet_target_kwh, 2),
             })
+        # A month's cost is not comparable between the three: they end it at different battery levels. The difference of two
+        # is therefore adjusted the way the difference of the whole period is: the change of the battery level in the month
+        # is valued at what the one that holds more energy paid per kWh, so the months of a pair add up to its adjusted
+        # difference. Without the end level of the period nothing is adjusted: no values.
+        policies = {"cjp": result.cjp, "smart": result.smart, "asap": result.asap}
+        balanced = bool(result.differences and result.differences["cjp_asap"].get("adjusted_cost") is not None)
+        for first_name, second_name in (("cjp", "smart"), ("cjp", "asap"), ("smart", "asap")):
+            first_policy, second_policy = policies[first_name], policies[second_name]
+            charged = first_policy.charged_kwh + second_policy.charged_kwh
+            ratio = (first_policy.grid_kwh + second_policy.grid_kwh) / charged if charged > 1e-9 else 1.0
+            holder = first_policy if first_policy.final_soc >= second_policy.final_soc else second_policy
+            paid = holder.cost / holder.grid_kwh if holder.grid_kwh > 1e-9 else result.average_price
+            per_percent = float(self.config["ev_car"]["battery_size"]) / 100.0 * ratio * paid if paid is not None else None
+            for key, month in months.items():
+                (first_in, first_out), (second_in, second_out) = levels_by_month[key][first_name], levels_by_month[key][second_name]
+                month[f"{first_name}_vs_{second_name}_adjusted"] = (
+                    month[f"{first_name}_cost"] - month[f"{second_name}_cost"] - ((first_out - first_in) - (second_out - second_in)) * per_percent
+                    if balanced and per_percent is not None else None
+                )
+        # When the three do not deliver the same only an indication is shown (like the price per kWh of the whole period): the
+        # kWh CJP bought in the month at the month's price per kWh of the other, and what CJP paid minus that. Nothing when
+        # one of them bought no energy in the month.
+        for month in months.values():
+            for other in ("smart", "asap"):
+                other_kwh = month[f"{other}_grid_kwh"]
+                month[f"cjp_vs_{other}_unit"] = (
+                    month["cjp_cost"] - month[f"{other}_cost"] / other_kwh * month["grid_kwh"] if other_kwh > 1e-9 and month["grid_kwh"] > 1e-9 else None
+                )
         published["months"] = [
-            {k: (_round(v, 3) if isinstance(v, float) else v) for k, v in month.items()} for _, month in sorted(months.items())
+            {k: (_round(v, 3) if isinstance(v, float) or v is None else v) for k, v in month.items()} for _, month in sorted(months.items())
         ]
         published["rows"] = rows[-WHAT_IF_WINDOW_ROWS:]
-        # the connections estimated from the battery level statistics, apart from the measured ones
-        older = [(s, a) for s, a in zip(result.smart.windows, result.asap.windows) if s.derived]
-        published["derived"] = {
-            "windows": len(older),
-            "modelled": sum(1 for s, _ in older if s.modelled),
-            "smart_cost": _round(sum(s.cost for s, _ in older), 2),
-            "asap_cost": _round(sum(a.cost for _, a in older), 2),
-            "difference": _round(sum(s.cost - a.cost for s, a in older), 3),
-            "grid_kwh": _round(sum(s.grid_kwh for s, _ in older), 3),
-        } if older else None
+        published["annual"] = self._what_if_annual(result, coverage, months)
 
-        # what CJP recorded in the same span: a reference only, never subtracted (see TODO_WHAT_IF.md)
+        # what CJP booked itself in the same span: one price per session and solar at CJP's own value, so a reference only
         first, last = result.smart.windows[0].start, result.smart.windows[-1].end
-        inside = [s for s in sessions if first <= s["ts"] < last]
+        # (from the record stored with each connection: the charging history itself is combined per day after a week)
+        inside = [
+            w["record"] for w in self.economy_db["windows"]
+            if isinstance(w.get("record"), dict) and first <= w["start"] and w["end"] is not None and w["end"] <= last
+        ]
+        booked = [r.get("booked_cost") for r in inside]
         published["recorded_reference"] = {
-            "kwh": _round(sum(s["kwh"] for s in inside), 3),
-            "cost": _round(sum(s["cost"] for s in inside), 2) if inside and all(s["cost_valid"] for s in inside) else None,
+            "kwh": _round(sum(r["kwh"] for r in inside), 3),
+            "cost": _round(sum(booked), 2) if inside and all(isinstance(b, (int, float)) and not isinstance(b, bool) for b in booked) else None,
             "sessions": len(inside),
         }
         return published
+
+    @staticmethod
+    def _differences_rounded(difference: dict[str, float | None] | None) -> dict[str, float | None] | None:
+        return {key: _round(value, 3) for key, value in difference.items()} if difference else None
+
+    def _what_if_annual(self, result: ReplayResult, coverage: dict, months: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+        """What the differences between the three would be per year, from the connections the comparison covers.
+
+        Only the adjusted differences are scaled: the raw costs end at different battery levels, and scaling that difference
+        by 365 / the days would multiply it. A year or more of connections is the last year (scaled to exactly 365 days);
+        less is an ESTIMATE that scales by the days the connections span and says nothing about the seasons the data does
+        not cover. Without the end level there is no adjusted difference and no estimate."""
+        first, last = coverage.get("first_window"), coverage.get("last_window")
+        if not first or not last or result.cjp is None or not result.comparable or not result.differences:
+            return None
+        if result.windows_replayed < result.windows_total:
+            return None  # a partial result: the days of the whole stretch do not belong to the differences
+        days = (float(last) - float(first)) / 86400.0
+        if days < ANNUAL_MIN_DAYS:
+            return {"available": False, "basis_days": round(days, 1), "minimum_days": ANNUAL_MIN_DAYS}
+        scale = 365.0 / days
+        adjusted = {key: value.get("adjusted_cost") for key, value in result.differences.items()}
+        if any(value is None for value in adjusted.values()):
+            return {"available": False, "basis_days": round(days, 1), "minimum_days": ANNUAL_MIN_DAYS, "reason": "not_balanced"}
+        return {
+            "available": True,
+            "method": "measured" if days >= ANNUAL_MEASURED_DAYS else "estimated",
+            "basis_days": round(days, 1), "scale": round(scale, 3), "months_covered": len(months),
+            "cjp_vs_asap": _round(adjusted["cjp_asap"] * scale, 0), "cjp_vs_smart": _round(adjusted["cjp_smart"] * scale, 0),
+            "smart_vs_asap": _round(adjusted["smart_asap"] * scale, 0),
+        }
 
     # ------------------------------------------------------------------ #
     # publishing
@@ -397,6 +542,11 @@ class WhatIf:
         saved = self.economy_db.get("what_if")
         if not isinstance(saved, dict):
             self.economy_db.pop("what_if", None)
+        elif not isinstance(saved.get("model_version"), int) or saved["model_version"] < REPLAY_MODEL_VERSION:
+            # a result of an earlier model would be shown under the labels of this one: it is dropped, and the card asks for
+            # a new calculation
+            self.economy_db.pop("what_if", None)
+            self.mark_dirty("economy")
         attempt = self.economy_db.get("what_if_attempt")
         if isinstance(attempt, dict) and attempt.get("status") == "running":
             self.economy_db["what_if_attempt"] = {**attempt, "status": "unavailable", "reason": "interrupted"}

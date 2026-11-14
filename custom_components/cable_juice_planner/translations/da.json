@@ -989,9 +989,6 @@
       "what_if_days": {
         "name": "What-if-periode"
       },
-      "what_if_target_battery_level": {
-        "name": "What-if-mål for batteriniveau"
-      },
       "what_if_start_battery_level": {
         "name": "What-if-batteriniveau ved første tilslutning"
       },
@@ -999,7 +996,7 @@
         "name": "What-if alternativ daglig hjemkomst batteri niveau"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternativ elbilens maks anbefalet ladingsprocent"
+        "name": "What-if elbilens maks anbefalet ladingsprocent"
       }
     },
     "select": {
@@ -1007,7 +1004,7 @@
         "name": "Vælg prognose type"
       },
       "what_if_day_selection": {
-        "name": "What-if-dage med smart opladning",
+        "name": "What-if Smart-dage",
         "state": {
           "all": "Alle dage",
           "work_plan": "Arbejdsplanens dage",

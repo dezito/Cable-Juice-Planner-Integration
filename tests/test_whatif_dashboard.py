@@ -40,44 +40,97 @@ async def _render(hass: HomeAssistant, language: str, attributes: dict) -> str:
     return Template(content, hass).async_render(parse_result=False, strict=True)  # like the frontend: an undefined attribute is an error
 
 
-async def test_a_result_is_shown_with_both_columns_months_and_assumptions(hass: HomeAssistant) -> None:
+async def test_a_result_is_shown_with_the_three_columns_months_and_assumptions(hass: HomeAssistant) -> None:
     attributes = _result()
     out = await _render(hass, "da", attributes)
     for expected in (
-        "Seneste resultat", "Smart", "Opladning med det samme", "Justeret forskel", "Ladeomkostning", "Mål nået", "Pr. måned",
-        "Dækning", "5 / 5", "Bagklogskab", "Sol er ikke modelleret", "indtastet",
+        "Seneste resultat", "CJP (registreret)", "Smart", "Opladning med det samme", "Justeret forskel", "Ladeomkostning", "Mål nået",
+        "Pr. måned", "Dækning", "5 / 5", "bagklogskab", "Sol er ikke modelleret", "indtastet", "For få dage", "Energi",
+        "batteriniveau ved sidste frakobling",
     ):
         assert expected in out, expected
     assert "None" not in out and "Undefined" not in out and "@@" not in out
     r = attributes["result"]
-    assert str(r["smart"]["cost"]) in out and str(r["asap"]["cost"]) in out
-    assert str(r["difference"]["adjusted_cost"]) in out
-    assert r["months"][0]["month"] in out
-    assert "Kun til reference" in out and "1 sessioner" in out  # CJP's own recorded cost: a labelled reference only
+    assert all(str(r[name]["cost"]) in out for name in ("cjp", "smart", "asap"))
+    assert f'{0 - r["difference"]["adjusted_cost"]:.2f}' in out and r["months"][0]["month"] in out
+    assert "Kun til reference" in out and "5 tilslutninger" in out  # what CJP booked itself: a labelled reference only
 
 
-async def test_the_table_has_a_current_settings_column_and_the_settings_rows(hass: HomeAssistant) -> None:
+async def test_the_table_has_the_three_calculations_the_differences_and_what_targets_met_means(hass: HomeAssistant) -> None:
     attributes = _result()
     r = attributes["result"]
     out = await _render(hass, "en", attributes)
-    # the third column replays the current reserve and maximum; the rows show what was used and what is set now
-    # the current settings come first, as the reference; smart and immediate charging each have a difference against it
-    assert "| Current settings | Smart | Immediate charging | Smart vs current settings | Immediate vs current settings |" in out
-    assert str(r["current"]["cost"]) in out and str(r["current"]["lowest_soc"]) in out
-    same = r["current"]["same"]
-    assert f"{round(same['smart_cost'] - same['current_cost'], 2)} " in out and f"{round(same['asap_cost'] - same['current_cost'], 2)} " in out
-    # the same per month, and the smart - immediate difference (with the battery level adjustment) below the table
-    month = r["months"][0]
-    assert month["current_cost"] is not None and str(r["difference"]["adjusted_cost"]) in out
-    assert f"{round(month['same_smart_cost'] - month['current_cost'], 2)} " in out
-    assert "Target battery level" in out and "Smart charging days" in out and "Daily arrival battery level" in out
-    assert f"{round(r['settings']['reserve'])} %" in out and "one connection less" in out
-    # a saved result from before the column existed (or a replay that could not be made) shows dashes, never "None"
-    old = copy.deepcopy(attributes)
-    old["result"]["current"] = None
-    old["result"]["settings"] = None
-    out = await _render(hass, "en", old)
-    assert "None" not in out and "Undefined" not in out and "one connection less" not in out and "&ndash;" in out.replace("–", "&ndash;")
+    assert "| CJP (recorded) | Smart | Charging at once |" in out
+    for name in ("cjp", "smart", "asap"):
+        assert f"{r[name]['cost']} " in out and f"{r[name]['final_soc']} %" in out
+    assert "Maximum recommended level" not in out and "Level charged to" in out and "Days with Smart" in out
+    # what "targets met" means differs, and the card says so right under the table
+    assert "Targets met: for CJP the car came home with at least the daily minimum level" in out
+    # the three differences, each with the battery level adjustment
+    for label in ("Charging at once &minus; CJP (recorded)", "Smart &minus; CJP (recorded)", "Smart &minus; Charging at once"):
+        assert f"**{label}:**" in out, label
+    assert f'{0 - r["differences"]["cjp_asap"]["adjusted_cost"]:.2f}' in out and f'{0 - r["differences"]["cjp_smart"]["adjusted_cost"]:.2f}' in out  # money with two decimals, the other minus CJP
+    # the energy balance and the levels at both ends
+    assert "**Energy:** CJP charged 100.0 %" in out and "battery level at the last unplug 70 %" in out
+    # no "None" and no raw "Undefined": the frontend renders strictly
+
+
+async def test_the_price_per_kwh_is_a_row_and_cjps_kwh_at_the_price_of_the_others_is_a_line(hass: HomeAssistant) -> None:
+    attributes = _result()
+    unit = attributes["result"]["unit_prices"]
+    out = await _render(hass, "en", attributes)
+    assert "| Price per kWh | " in out and f"{unit['cjp']:.2f} $/kWh" in out
+    row = next(item for item in out.splitlines() if item.startswith("| Price per kWh |"))
+    assert row.endswith(f"| {unit['smart'] - unit['cjp']:.2f} $/kWh | {unit['asap'] - unit['cjp']:.2f} $/kWh |")  # each minus CJP: positive, CJP bought cheaper
+    line = next(item for item in out.splitlines() if item.startswith("**CJP kWh at the price per kWh of Smart and charging at once"))
+    assert f"({unit['cjp_kwh']:.1f} kWh)" in line and f"CJP actually paid {unit['cjp_cost']:.2f}" in line  # kWh with one decimal
+    assert f"Smart vs CJP {0 - unit['cjp_vs_smart']:.2f} $" in line and f"Charging at once vs CJP {0 - unit['cjp_vs_asap']:.2f} $" in line
+    assert "The price per kWh says when the energy was bought, not how much" in out
+    # a calculation that bought nothing has no price: dashes, never "None"
+    none = copy.deepcopy(attributes)
+    none["result"]["unit_prices"].update(cjp=None, smart=None, smart_at_cjp_kwh=None, cjp_vs_smart=None)
+    out = await _render(hass, "en", none)
+    assert "None" not in out and "Undefined" not in out
+
+
+async def test_the_estimate_per_year_is_labelled_an_estimate_with_its_basis_and_refused_when_too_short(hass: HomeAssistant) -> None:
+    attributes = _result()  # five connections: far too few days for a year
+    out = await _render(hass, "en", attributes)
+    assert "Too few days of connections to estimate a year" in out and "ESTIMATE" not in out
+    estimated = copy.deepcopy(attributes)
+    estimated["result"]["annual"] = {
+        "available": True, "method": "estimated", "basis_days": 90.0, "scale": 4.056, "months_covered": 3,
+        "cjp_vs_asap": -490.0, "cjp_vs_smart": -198.0, "smart_vs_asap": -292.0,
+    }
+    out = await _render(hass, "en", estimated)
+    # only the adjusted differences are shown per year: the costs of the three end at different battery levels
+    lines = out.splitlines()
+    row = next(line for line in lines if line.startswith("| Per year (ESTIMATE)"))
+    assert lines[lines.index(row) - 1].startswith("| ")  # a row of the table, not loose text after a blank line
+    assert row.endswith("| 198.00 $ | 490.00 $ |")  # two decimals for money, in the columns of the two differences: the other minus CJP, positive when CJP was cheaper
+    assert "This is an ESTIMATE" in out and "90.0 days, 3 months" in out  # the basis and the caveat are right there
+    measured = copy.deepcopy(estimated)
+    measured["result"]["annual"]["method"] = "measured"
+    out = await _render(hass, "en", measured)
+    assert "| Per year (a year or more of data) |" in out and "This is an ESTIMATE" not in out
+    for language in ("da", "de", "pl", "uk", "en-GB"):  # the word that says it is an estimate is in every language
+        rendered = await _render(hass, language, estimated)
+        assert "ESTIMATE" in rendered or "ESTIMAT" in rendered or "SCHÄTZUNG" in rendered or "SZACUNEK" in rendered or "ОЦІНКА" in rendered, language
+
+
+async def test_without_the_end_level_the_adjusted_difference_is_dashes_and_the_card_says_why(hass: HomeAssistant) -> None:
+    attributes = _result()
+    r = attributes["result"]
+    for key in ("cjp_asap", "cjp_smart", "smart_asap"):
+        r["differences"][key]["adjusted_cost"] = None
+        r["differences"][key]["terminal_adjustment"] = None
+    r["difference"] = r["differences"]["cjp_asap"]
+    r["warnings"] = [*r["warnings"], "energy_not_balanced"]
+    r["energy"].update(gap_percent=None, end_soc=None)
+    r["provenance"]["end_soc"] = "unavailable"
+    out = await _render(hass, "en", attributes)
+    assert "None" not in out and "Undefined" not in out and "&ndash;" in out.replace("–", "&ndash;")
+    assert "could not be read, so the three are not known to deliver the same energy" in out and "battery level at the last unplug unknown" in out
 
 
 async def test_the_heading_says_how_many_days_the_data_covers_not_only_the_period_asked_for(hass: HomeAssistant) -> None:
@@ -89,28 +142,11 @@ async def test_the_heading_says_how_many_days_the_data_covers_not_only_the_perio
     # the period asked for (30 days) and, after it, the dates and days the connections used really cover
     assert f"({r['period']['days']} days)" in heading and "data used:" in heading and f"({days} days)" in heading
     assert heading.index("data used:") > heading.index(f"({r['period']['days']} days)")
-    # a result from before the field existed has no data span: the period alone
     old = copy.deepcopy(attributes)
     old["result"]["coverage"].pop("first_window")
     old["result"]["coverage"].pop("last_window")
     heading = next(line for line in (await _render(hass, "en", old)).splitlines() if line.startswith("**Latest result**"))
     assert "data used:" not in heading
-
-
-async def test_a_result_saved_before_the_current_settings_column_still_renders(hass: HomeAssistant) -> None:
-    """The result is saved: after an update the card first shows the one from the earlier version, without the new fields
-    (current, settings, derived, the month fields of the current settings). The frontend renders strictly."""
-    attributes = _result()
-    old = copy.deepcopy(attributes)
-    for key in ("current", "current_reason", "settings", "derived"):
-        del old["result"][key]
-    for month in old["result"]["months"]:
-        for key in ("current_cost", "same_windows", "same_smart_cost", "same_asap_cost", "derived_windows"):
-            month.pop(key, None)
-    for language in ("da", "en"):
-        out = await _render(hass, language, old)
-        assert "None" not in out and "Undefined" not in out and str(old["result"]["smart"]["cost"]) in out, language
-        assert "&ndash;" in out.replace("–", "&ndash;")  # the current settings column is shown with dashes
 
 
 async def test_the_month_rows_form_one_markdown_table_without_blank_lines_between_them(hass: HomeAssistant) -> None:
@@ -123,23 +159,41 @@ async def test_the_month_rows_form_one_markdown_table_without_blank_lines_betwee
     # header, separator and every row follow each other directly (a blank line would end the table)
     assert "\n\n" not in block and block.count("\n") == len(rows) + 1
     assert all(line.count("|") == block.splitlines()[0].count("|") for line in block.splitlines())
-    # the month that holds the last connection has one connection less for the current settings: marked with an asterisk
-    last = next(m for m in attributes["result"]["months"] if m["same_windows"] != m["windows"])
-    assert any(line.startswith(f"| **{last['month']}**") and "*" in line.split("**", 2)[2] for line in rows)
+    assert "Smart vs CJP" in block and "Charging at once vs CJP" in block
 
 
-async def test_the_note_and_the_smart_minus_immediate_line_are_paragraphs_below_the_table_not_table_rows(hass: HomeAssistant) -> None:
+async def test_the_notes_and_the_differences_are_paragraphs_below_the_table_not_table_rows(hass: HomeAssistant) -> None:
     """Directly under the last row of a Markdown table a line is one more row: narrow, in the first column. A blank line
-    ends the table, so the two lines use the whole width (a phone)."""
+    ends the table, so the lines use the whole width (a phone)."""
     out = await _render(hass, "en", _result())
     lines = out.splitlines()
-    table = [i for i, line in enumerate(lines) if line.startswith("| ") and "Current settings" in line][0]
+    table = [i for i, line in enumerate(lines) if line.startswith("| ") and "CJP (recorded)" in line][0]
     last = max(i for i, line in enumerate(lines) if line.startswith("|") and i > table and "Final battery level" in line)
-    assert lines[last + 1] == ""  # the table ends
-    note = next(i for i, line in enumerate(lines) if "one connection less" in line)
-    difference = next(i for i, line in enumerate(lines) if line.startswith("**Smart &minus; Immediate charging:**"))
-    assert note > last and difference > note and not lines[note].startswith("|") and not lines[difference].startswith("|")
-    assert lines[note - 1] == "" and lines[difference - 1] == ""
+    differences = [i for i, line in enumerate(lines) if line.startswith("**Charging at once &minus; CJP (recorded):**")]
+    assert differences and differences[0] > last
+    note = next(i for i, line in enumerate(lines) if line.startswith("Targets met:"))
+    assert note > last and not lines[note].startswith("|") and lines[note - 1] == ""
+    for index in (i for i, line in enumerate(lines) if "&minus;" in line and line.startswith("**")):
+        assert lines[index - 1] == "" and not lines[index].startswith("|")
+
+
+def test_the_charts_of_the_differences_are_hidden_when_the_three_are_not_comparable() -> None:
+    """Not comparable: the sensor state is unknown and there is nothing adjusted to draw, so the two charts are not shown at all."""
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    view = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing))["views"][3]
+    wrapped = {
+        c["card"]["card"]["header"]["title"]: c["conditions"]
+        for c in _cards(view)
+        if c.get("type") == "conditional" and c["card"].get("type") == "custom:config-template-card"
+    }
+    assert sorted(wrapped) == [
+        "Cumulative saving of CJP per month", "Difference per month: Smart and charging at once against CJP (positive: CJP cheaper)"
+    ]
+    for conditions in wrapped.values():
+        assert conditions == [
+            {"condition": "state", "entity": "sensor.cjp_tesla_what_if", "state_not": "unknown"},
+            {"condition": "state", "entity": "sensor.cjp_tesla_what_if", "state_not": "unavailable"},
+        ]
 
 
 def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> None:
@@ -151,9 +205,9 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
     what_if, settings, no_solar, solar = (f"sensor.cjp_tesla_what_if{suffix}" for suffix in ("", "_settings", "_no_solar", "_solar"))
     # (title, type, series entities, series names) in the order of the view: the scenarios in turn
     assert [(c["header"]["title"], c["all_series_config"]["type"], {s["entity"] for s in c["series"]}, [s["name"] for s in c["series"]]) for c in charts] == [
-        ("Cost per month", "column", {what_if}, ["Current settings", "Smart", "Immediate charging"]),
-        ("Difference against the current settings per month", "column", {what_if}, ["Smart vs current settings", "Immediate vs current settings"]),
-        ("Cumulative saving of smart against immediate charging per month", "line", {what_if}, ["Saving"]),
+        ("Cost per month", "column", {what_if}, ["CJP (recorded)", "Smart", "Charging at once"]),
+        ("Difference per month: Smart and charging at once against CJP (positive: CJP cheaper)", "column", {what_if}, ["Smart vs CJP", "Charging at once vs CJP"]),
+        ("Cumulative saving of CJP per month", "line", {what_if}, ["Saving of CJP vs Charging at once", "Saving of CJP vs Smart"]),
         ("Current and alternative settings: cost per month", "column", {settings}, ["Current settings", "Alternative"]),
         ("Cumulative difference per month (alternative - current)", "line", {settings}, ["Difference"]),
         ("Without solar and recorded: cost per month", "column", {no_solar}, ["Current settings, from the grid (no solar)", "Recorded (with solar)"]),
@@ -165,6 +219,7 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
     ]
     wrappers = [c for c in _cards(view) if c.get("type") == "custom:config-template-card" and c["card"].get("type") == "custom:apexcharts-card"]
     assert [w["card"] for w in wrappers] == charts
+    hidden_by = {id(c["card"]): c for c in _cards(view) if c.get("type") == "conditional"}  # the charts that can be hidden
     for wrapper in wrappers:
         # the time axis follows the months of the result of the chart's own sensor, from the first month to the end of this one
         chart = wrapper["card"]
@@ -175,7 +230,7 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
         assert f"states['{entity}']" in script and "(s && s.attributes) || {}" in script and "return 62" in script and "Math.max(" in script
         assert ("a.result" in script) == (entity != "sensor.cjp_tesla_economy")
         assert script.count("{") == script.count("}") and script.count("(") == script.count(")") and script.count("[") == script.count("]")
-        assert "grid_options" in wrapper and "grid_options" not in chart
+        assert ("grid_options" in wrapper or "grid_options" in hidden_by[id(wrapper)]) and "grid_options" not in chart
     for chart in charts:
         # a chart reads the saved result of its sensor and shows nothing without one; never a point without a value
         assert chart["now"] == {"show": False}
@@ -186,7 +241,7 @@ def test_the_what_if_view_has_monthly_charts_read_from_the_result_sensors() -> N
             assert code.count("{") == code.count("}") and code.count("(") == code.count(")") and code.count("[") == code.count("]")
     # a chart for each month field the result sensors publish
     fields = {name for c in charts for s in c["series"] for name in re.findall(r"m\.(\w+_cost)", s["data_generator"])}
-    assert {"current_cost", "smart_cost", "asap_cost", "same_smart_cost", "same_asap_cost", "baseline_cost", "alternative_cost", "planned_cost", "recorded_cost"} <= fields
+    assert {"cjp_cost", "smart_cost", "asap_cost", "baseline_cost", "alternative_cost", "planned_cost", "recorded_cost"} <= fields
 
 
 def test_a_chart_whose_sensor_is_missing_is_removed_with_its_wrapper() -> None:
@@ -212,10 +267,25 @@ async def test_every_language_renders_the_card_without_missing_texts(hass: HomeA
 async def test_not_comparable_shows_no_difference_and_why(hass: HomeAssistant) -> None:
     attributes = _result()
     result = copy.deepcopy(attributes["result"])
-    result.update(comparable=False, comparable_reason="unmet_target_differs", difference=None)
+    result.update(comparable=False, comparable_reason="unmet_driving_differs", difference=None, differences=None, annual=None)
+    result["months"][0].update(cjp_vs_smart_unit=1.234, cjp_vs_asap_unit=None)
     out = await _render(hass, "en", {**attributes, "result": result})
-    assert "No difference is shown" in out and "misses the target by a different amount" in out
-    assert "Adjusted difference" not in out
+    month_row = next(line for line in out.splitlines() if line.startswith(f"| **{result['months'][0]['month']}** |"))
+    assert "| &asymp; -1.23 $ | &ndash; |" in month_row  # per month too: the indication marked, and a dash where there is none
+    assert out.count("The three calculations do not deliver the same, so the cost differences marked ≈ are only an indication") == 2  # the warning is under the month table as well
+    assert "*The three calculations do not deliver the same" in out
+    assert "The three calculations do not deliver the same, so the cost differences marked ≈ are only an indication" in out
+    assert "different amount of driving" in out  # and why, right there
+    assert "The ≈ values are the CJP kWh at the price per kWh of Smart and of charging at once" in out
+    assert "CJP kWh at the price per kWh of Smart and charging at once" in out
+    unit = result["unit_prices"]
+    lines = out.splitlines()
+    cost = next(line for line in lines if line.startswith("| Charging cost |"))
+    # the cost differences are the CJP kWh at the price per kWh of each, against what CJP paid: marked as an indication only
+    assert cost.endswith(f"| &asymp; {0 - unit['cjp_vs_smart']:.2f} $ | &asymp; {0 - unit['cjp_vs_asap']:.2f} $ |")
+    grid = next(line for line in lines if line.startswith("| Energy from the charger |"))
+    assert grid.endswith(f"| {result['smart']['grid_kwh'] - result['cjp']['grid_kwh']:.1f} kWh | {result['asap']['grid_kwh'] - result['cjp']['grid_kwh']:.1f} kWh |")
+    assert "| Adjusted difference |" not in out and "Per year" not in out  # no adjusted difference and no year without a comparison
     assert str(result["smart"]["cost"]) in out
 
 
@@ -235,7 +305,11 @@ async def test_a_saved_result_from_when_public_charges_were_replayed_still_rende
 async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
     attributes = _result()
     running = await _render(hass, "en", {**attributes, "attempt": {"status": "running", "reason": None, "at": 1.0}})
-    assert "Calculating..." in running
+    assert "Calculating..." in running and "connections</ha-alert>" not in running  # no progress is known yet
+    progress = await _render(hass, "en", {**attributes, "attempt": {"status": "running", "reason": None, "at": 1.0, "progress": {"done": 3, "total": 9}}})
+    assert "Calculating... &middot; 3 / 9 connections" in progress
+    stopped = await _render(hass, "en", {**attributes, "attempt": {"status": "unavailable", "reason": "stopped", "at": 1.0}})
+    assert "The calculation was stopped" in stopped and "Latest result" in stopped  # the previous result stays visible
     failed = await _render(
         hass, "en", {**attributes, "attempt": {"status": "unavailable", "reason": "no_start_soc", "at": 1.0}}
     )
@@ -249,8 +323,13 @@ async def test_running_failed_and_empty_states(hass: HomeAssistant) -> None:
 
 async def test_what_if_card_assumptions_list_everything_not_modelled(hass: HomeAssistant) -> None:
     out = await _render(hass, "en", _result())
-    for text in ("Hindsight", "House and site limits are not replayed", "Solar is not modelled", "Standby drain", "departure buffer"):
+    for text in (
+        "CJP column: what CJP actually charged", "priced at the grid buy price", "Smart charges in the cheapest hours before the planned departure",
+        "Smart knows every price of the connection in advance (hindsight)", "added as driving in all three", "Solar is not modelled",
+        "House and site limits are not replayed",
+    ):
         assert text in out, text
+    assert "planner" not in out.split("<details>")[-1]  # the planner replay is not part of this card
 
 
 async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeAssistant) -> None:
@@ -260,7 +339,7 @@ async def test_every_warning_and_reason_has_a_text_in_every_language(hass: HomeA
     reasons = ["no_battery_capacity", "no_charging_power", "no_start_soc", "invalid_target", "no_windows", "invalid_window",
                "overlapping_windows", "prices_not_hourly", "invalid_event", "invalid_loss_model", "invalid_power_model",
                "energy_conservation", "missing_prices", "invalid_day_selection", "interrupted", "internal_error",
-               "no_drives", "no_days_selected", "start_level_stale"]
+               "no_drives", "no_days_selected", "start_level_stale", "stopped"]
     for language in ("da", "de", "en", "en-GB", "pl", "uk"):
         result = copy.deepcopy(attributes["result"])
         result["warnings"] = warnings

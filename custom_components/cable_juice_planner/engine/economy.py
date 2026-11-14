@@ -28,6 +28,7 @@ from typing import Any
 
 from ..const import WEEKDAYS
 from .analysis.helpers import ANALYSIS_DRIVES
+from .whatif.recorded import RECORD_BACKFILL_DAYS, raw_sessions, window_record
 from ..prices.intervals import hourly_price_averages
 
 _LOGGER = logging.getLogger(__name__)
@@ -371,6 +372,7 @@ class Economy:
                 kwh=round(kwh, 3), achieved=round(sum(s["cost"] for s in inside), 3),
                 average=round(average * kwh, 3), daily=round(daily, 3), lowest=round(lowest, 3),
             )
+        self._economy_store_records(windows, prices, now)
         # windows older than the charging history kept are of no use
         oldest = min((s["ts"] for s in sessions), default=now) - 86400
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
@@ -386,6 +388,33 @@ class Economy:
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("The What-if solar statistics could not be stored: %s %s", err, type(err))
         self.publish_what_if_solar()
+
+    def _economy_store_records(self, windows: list[dict], prices: dict[float, float], now: float) -> None:
+        """What CJP charged in each settled connection (see whatif/recorded.py), stored with it for the What-if comparison.
+
+        Made once, from the sessions as they were recorded: the charging history is combined per day after a week, and the hour
+        of the charging is lost then. A connection that is not recorded within RECORD_BACKFILL_DAYS of unplugging (for example one
+        from before this record existed) has none and is never given one; one that could not be priced yet (the statistics of
+        the price sensor are read once a day) is tried again until then."""
+        pending = [
+            w for w in windows
+            if "record" not in w and w.get("end") is not None and now - w["end"] >= ECONOMY_WINDOW_SETTLE
+            and now - w["end"] <= RECORD_BACKFILL_DAYS * 86400
+        ]
+        if not pending:
+            return
+        rows = raw_sessions(self.charging_history_db, self._economy_ts)
+        refund = self._solar_refund() or 0.0
+        # a night without a session is "CJP charged nothing" only where the history reaches back to it: with no history, or
+        # a connection that ended before its first session, nothing is known (never a favourable zero)
+        oldest = min((row["ts"] for row in rows), default=None)
+        for window in pending:
+            if oldest is None or window["end"] < oldest:
+                continue
+            record, _ = window_record(rows, window["start"], window["end"], prices, refund)
+            if record is not None:
+                window["record"] = record
+                self.mark_dirty("economy")
 
     def _economy_sessions(self) -> list[dict]:
         sessions = []

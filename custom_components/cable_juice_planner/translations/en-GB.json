@@ -989,9 +989,6 @@
       "what_if_days": {
         "name": "What-if period"
       },
-      "what_if_target_battery_level": {
-        "name": "What-if target battery level"
-      },
       "what_if_start_battery_level": {
         "name": "What-if battery level at first plug-in"
       },
@@ -999,7 +996,7 @@
         "name": "What-if alternative daily return battery level"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if alternative EV max recommended charging limit"
+        "name": "What-if EV max recommended charging limit"
       }
     },
     "select": {
@@ -1007,7 +1004,7 @@
         "name": "Select forecast type"
       },
       "what_if_day_selection": {
-        "name": "What-if smart charging days",
+        "name": "What-if Smart days",
         "state": {
           "all": "All days",
           "work_plan": "Work plan days",

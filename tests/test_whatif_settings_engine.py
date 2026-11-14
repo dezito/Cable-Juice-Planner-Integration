@@ -2,7 +2,13 @@
 from __future__ import annotations
 
 from .test_economy import _engine
-from .test_whatif_engine import _seed, snapshot_with
+from .test_whatif_engine import _seed as _seed_connections
+from .test_whatif_engine import snapshot_with
+
+
+def _seed(engine, **kwargs):
+    """The connections, prices and drives, without the charging CJP did (scenario A's record): this scenario replays a model."""
+    return _seed_connections(engine, charge=False, **kwargs)
 
 
 def _run(engine, snap, start=None):
@@ -102,7 +108,7 @@ def test_a_connection_without_prices_is_estimated_and_labelled() -> None:
 
 def test_scenario_a_and_b_keep_their_own_results() -> None:
     engine, snap = _engine()
-    _seed(engine)
+    _seed_connections(engine)  # with what CJP charged: scenario A compares it
     snap = snapshot_with(snap, {"what_if_min_daily_battery_level": 50.0})
     engine.run_job(snap, engine.what_if_prepare)
     a = engine.run_job(snap, engine.what_if_run, {"soc": 50.0, "source": "entered"})
