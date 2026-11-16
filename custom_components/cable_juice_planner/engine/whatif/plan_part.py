@@ -14,10 +14,12 @@ It shares the period, the starting battery level and the input data with Scenari
 from __future__ import annotations
 
 import math
+from collections import Counter
 from typing import Any
 
 from .engine_part import _round
-from .replay import CjpSettings, PlanResult, replay_plan
+from .charts import points_no_solar
+from .replay import CjpSettings, PlanResult, drop_removed_codes, replay_plan
 
 
 class WhatIfNoSolar:
@@ -61,7 +63,7 @@ class WhatIfNoSolar:
             )
         else:
             result = replay_plan(data, settings)
-        published = self._what_if_no_solar_result(result, coverage, now, period_start, period_end, settings, sessions)
+        published = self._what_if_no_solar_result(result, coverage, now, period_start, period_end, settings, sessions, data)
         self._what_if_no_solar_attempt(result.status, result.reason)
         if result.status == "ok":
             self.economy_db["what_if_no_solar"] = published  # only a calculation with a result replaces the saved one
@@ -75,21 +77,18 @@ class WhatIfNoSolar:
 
     @staticmethod
     def _plan_policy(result: PlanResult) -> dict[str, Any] | None:
-        policy, readiness = result.plan, result.readiness
-        if policy is None or readiness is None:
+        policy = result.plan
+        if policy is None:
             return None
         return {
-            "cost": _round(policy.cost, 2), "grid_kwh": _round(policy.grid_kwh, 3), "charged_kwh": _round(policy.charged_kwh, 3),
-            "loss_kwh": _round(policy.loss_kwh, 3), "unmet_driving_kwh": _round(policy.unmet_driving_kwh, 3),
+            "cost": _round(policy.cost, 2), "kwh": _round(policy.grid_kwh, 3),
             "unit": _round(policy.cost / policy.grid_kwh, 3) if policy.grid_kwh > 1e-9 else None,
             "estimated_cost": _round(policy.estimated_cost, 2), "start_soc": _round(policy.start_soc, 1),
-            "final_soc": _round(policy.final_soc, 1), "lowest_soc": _round(policy.lowest_soc, 1), "arrivals": readiness.arrivals,
-            "arrivals_below_reserve": readiness.arrivals_below_reserve, "lowest_arrival": _round(readiness.lowest_arrival, 1),
         }
 
     def _what_if_no_solar_result(
         self, result: PlanResult, coverage: dict, now: float, period_start: float, period_end: float, settings: CjpSettings,
-        sessions: list[dict],
+        sessions: list[dict], data: Any,
     ) -> dict[str, Any]:
         published: dict[str, Any] = {
             "model_version": result.model_version,
@@ -132,7 +131,7 @@ class WhatIfNoSolar:
         measured_cost = sum(w.cost for w in measured_rows)
         measured_unit = _round(measured_cost / measured_grid, 3) if measured_grid > 1e-9 else None
         # the same span as the recorded charging it is compared with (the plan over the whole period is in "plan")
-        published["plan_measured"] = {"cost": _round(measured_cost, 2), "grid_kwh": _round(measured_grid, 3), "unit": measured_unit}
+        published["plan_measured"] = {"cost": _round(measured_cost, 2), "kwh": _round(measured_grid, 3), "unit": measured_unit}
         published["windows"]["derived"] = sum(1 for w in result.plan.windows if w.derived)
         inside = [s for s in sessions if first <= s["ts"] < last and not s["public"]]
         kwh = sum(s["kwh"] for s in inside)
@@ -161,17 +160,51 @@ class WhatIfNoSolar:
                 "difference_vs_plan": _round(recorded_cost - at_plan_price, 2), "kwh": _round(kwh, 3), "unit": measured_unit,
             }
 
+        # CJP before its own records: what the car charged in the connections that were estimated from the battery level
+        # statistics, from the hourly statistics of the charger and the solar production (the same estimate as Scenario A). A month
+        # only gets a CJP figure when every connection of it has one: the plan covers all of them, and a partial month would make a
+        # large, false difference.
+        history_start = min((s["ts"] for s in sessions), default=None)
+        before = [w for w in result.plan.windows if w.derived and history_start is not None and w.end <= history_start]
+        estimates, refused, outside, assumed_hours = self._what_if_booking_estimates(data, before, list(result.plan.windows))
+        if before:
+            published["recorded_estimated"] = {
+                "connections": len(estimates), "left_out": dict(Counter(refused.values())),
+                "kwh": _round(sum(e["kwh"] for e in estimates.values()), 3),
+                "solar_kwh": _round(sum(e["local_kwh"] for e in estimates.values()), 3),
+                "cost": _round(sum(e["cost"] for e in estimates.values()), 2),
+                "outside_kwh": _round(outside, 3), "assumed_production_hours": assumed_hours,
+            }
+        else:
+            published["recorded_estimated"] = None
+
         months: dict[str, dict[str, Any]] = {}
 
         def month_of(key: str) -> dict[str, Any]:
-            return months.setdefault(key, {"month": key, "windows": 0, "planned_kwh": 0.0, "planned_cost": 0.0, "recorded_kwh": 0.0, "recorded_cost": 0.0, "recorded_valid": None})
+            return months.setdefault(key, {
+                "month": key, "windows": 0, "planned_kwh": 0.0, "planned_cost": 0.0, "recorded_kwh": 0.0, "recorded_cost": 0.0,
+                "recorded_valid": None, "recorded_estimated": 0, "recorded_missing": 0, "estimated_connections": 0,
+            })
 
         # both sides by the start of the connection / the session
         for row in result.plan.windows:
             month = month_of(self._economy_local(row.start).strftime("%Y-%m"))
             month["windows"] += 1
+            month["estimated_connections"] += 1 if row.derived or row.estimated else 0  # (the connection or a price in it is an estimate)
             month["planned_kwh"] += row.grid_kwh
             month["planned_cost"] += row.cost
+        # (every connection before the first measured one that the recorded sessions count from: an estimated one that straddles the
+        # start of the history, or one without an estimate, leaves its month without a CJP figure; the calibrating one charges nothing)
+        for window in (w for w in result.plan.windows if w.start < first and not w.calibrated):
+            month = month_of(self._economy_local(window.start).strftime("%Y-%m"))
+            estimate = estimates.get(window.start)
+            if estimate is None:
+                month["recorded_missing"] += 1
+                continue
+            month["recorded_kwh"] += estimate["kwh"]
+            month["recorded_cost"] += estimate["cost"]
+            month["recorded_estimated"] += 1
+            month["recorded_valid"] = month["recorded_valid"] is not False
         for session in inside:
             month = month_of(self._economy_local(session["ts"]).strftime("%Y-%m"))
             month["recorded_kwh"] += session["kwh"]
@@ -179,8 +212,10 @@ class WhatIfNoSolar:
             month["recorded_valid"] = month["recorded_valid"] is not False and session["cost_valid"]  # None: no session yet
         published["months"] = [
             {
-                "month": m["month"], "windows": m["windows"], "planned_kwh": _round(m["planned_kwh"], 2), "planned_cost": _round(m["planned_cost"], 2),
-                "recorded_kwh": _round(m["recorded_kwh"], 2), "recorded_cost": _round(m["recorded_cost"], 2) if m["recorded_valid"] else None,
+                "month": m["month"], "windows": m["windows"], "estimated_connections": m["estimated_connections"], "planned_kwh": _round(m["planned_kwh"], 2), "planned_cost": _round(m["planned_cost"], 2),
+                "recorded_kwh": None if m["recorded_missing"] else _round(m["recorded_kwh"], 2),
+                "recorded_cost": None if m["recorded_missing"] or not m["recorded_valid"] else _round(m["recorded_cost"], 2),
+                "recorded_estimated": m["recorded_estimated"], "recorded_missing": m["recorded_missing"],
             }
             for _, m in sorted(months.items())
         ]
@@ -206,6 +241,8 @@ class WhatIfNoSolar:
             self.economy_db.pop("what_if_no_solar", None)
         else:
             self._what_if_no_solar_migrate(self.economy_db["what_if_no_solar"])
+            if drop_removed_codes(self.economy_db["what_if_no_solar"]):
+                self.mark_dirty("economy")
         attempt = self.economy_db.get("what_if_no_solar_attempt")
         if isinstance(attempt, dict) and attempt.get("status") == "running":
             self.economy_db["what_if_no_solar_attempt"] = {**attempt, "status": "unavailable", "reason": "interrupted"}
@@ -236,4 +273,6 @@ class WhatIfNoSolar:
         estimate = (result or {}).get("estimate")
         self.set_state("what_if_no_solar", estimate.get("difference_vs_plan") if isinstance(estimate, dict) else None)
         self.set_attr("what_if_no_solar", "result", result)
+        for key, points in points_no_solar(result).items():
+            self.set_attr("what_if_no_solar", key, points)  # (the dashboard hides a chart that has no points)
         self.set_attr("what_if_no_solar", "attempt", self.economy_db.get("what_if_no_solar_attempt"))

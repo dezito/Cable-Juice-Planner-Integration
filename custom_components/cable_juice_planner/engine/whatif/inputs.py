@@ -404,22 +404,12 @@ def build_replay_input(
         "loss_model": "configured_or_measured_table",
     }
     warnings = []
-    if legacy:
-        warnings.append("prices_legacy_unverified")  # may be the last quarter of an hour
-    if from_history:
-        warnings.append("prices_from_price_history")  # the price sensor's recorded hourly statistics, not CJP's own stored hour
-    if copied:
-        warnings.append("prices_dst_hour_copied")  # the repeated autumn hour has the first hour's price
     if invalid_prices or invalid_drives or invalid_public or left_out["invalid"]:
         warnings.append("invalid_input_entries_left_out")  # a dropped drive means demand is understated
-    if public_without_drive:
-        warnings.append("public_charge_without_drive")  # the battery level gain of that charge is unknown
     if gaps and gaps_without_drive / len(gaps) > MANY_WITHOUT_DRIVE:
         warnings.append("many_connections_without_drive")  # the demand is probably understated a lot
     if left_out["before_drive_history"]:
         warnings.append("connections_before_drive_history_left_out")
-    if derived_chosen:
-        warnings.append("connections_estimated_from_battery_statistics")  # older connections: when the car was parked, not plugged in
     if unpriced_left_out:
         warnings.append("estimated_connections_without_prices_left_out")  # no price is estimated for a connection that is itself an estimate
     if modelled_chosen:

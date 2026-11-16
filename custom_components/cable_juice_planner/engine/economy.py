@@ -28,6 +28,7 @@ from typing import Any
 
 from ..const import WEEKDAYS
 from .analysis.helpers import ANALYSIS_DRIVES
+from .whatif.charts import points_subscription
 from ..prices.intervals import hourly_price_averages
 
 _LOGGER = logging.getLogger(__name__)
@@ -147,13 +148,14 @@ class Economy:
         # Sessions that started before this did not record their solar energy as energy (see
         # engine/energy/solar.py calc_local_energy_kwh), so the What-if solar comparison does not use them
         self.economy_db.setdefault("solar_energy_since", self._economy_ts(self.now()))
+        for key in ("price_sources", "sell_tariff_unknown_hours", "sell_prices_since"):
+            self.economy_db.pop(key, None)  # (no longer collected: a database written by an earlier version still holds them)
         if not isinstance(self.economy_db.get("derived_windows"), dict):
             self.economy_db.pop("derived_windows", None)
         if self.economy_db.get("sell_prices_history_version") != SELL_PRICES_HISTORY_VERSION:
             # converted with one day's tariffs for every hour: never kept, the hours are converted again where the
             # tariffs of their own day are known (also when an older backup is restored)
             self.economy_db.pop("sell_prices_history", None)
-            self.economy_db.pop("sell_tariff_unknown_hours", None)
             self.economy_db["sell_prices_history_version"] = SELL_PRICES_HISTORY_VERSION
         if not isinstance(self.economy_db.get("sell_tariff_days"), dict):
             self.economy_db.pop("sell_tariff_days", None)
@@ -307,7 +309,6 @@ class Economy:
                     # production price (or a refreshed price vector that still holds this hour) never rewrites it
                     stored[ts] = round(price, 4)
                     fixed[ts] = production
-        self.economy_db.setdefault("sell_prices_since", self._economy_ts(now))
         oldest = self._economy_ts(now) - self.economy_keep_days() * 86400
         for table in (stored, fixed):
             for ts in [ts for ts in table if ts < oldest]:
@@ -325,12 +326,6 @@ class Economy:
         windows.sort(key=lambda w: w["start"])
         # the price sensor's history (statistics or raw), the plan's own prices win
         prices = {float(ts): float(price) for ts, price in (data.get("prices") or {}).items()}
-        # what each price entity gave (hours from the statistics and from the recorder states, and the span): the What-if shows it
-        if isinstance(data.get("price_sources"), dict):
-            self.economy_db["price_sources"] = {
-                str(entity): {key: value for key, value in info.items() if key in ("statistics", "states", "first", "last")}
-                for entity, info in data["price_sources"].items() if isinstance(info, dict)
-            }
         # keep the statistics prices CJP did not store itself: the What-if replays use them for hours without a stored price
         history = self.economy_db.setdefault("prices_history", {})
         stored_prices = self.economy_db.get("prices", {})
@@ -481,6 +476,7 @@ class Economy:
         current = result[-1] if result else {}
         self.set_state("economy", current.get("saving_daily"))
         self.set_attr("economy", "months", result)
+        self.set_attr("economy", "subscription_chart_points", points_subscription(result))  # (the dashboard hides a chart without points)
         totals = {key: round(sum(r[key] or 0.0 for r in result), 2) for key in ("kwh", "achieved", "daily", "lowest", "average", "compared_kwh")}
         totals["cost"] = None if any(row["cost"] is None for row in result) else round(
             sum(row["cost"] for row in result), 2)

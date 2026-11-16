@@ -38,7 +38,6 @@ MIN_PRECISION = 0.7  # share of the estimated connections (in the measured perio
 MAX_END_ERROR = 2 * HOUR  # median error of the estimated departure time
 MIN_USED_PERCENT = 0.05  # a smaller net battery use between two connections counts as no use
 
-REASONS = ("no_statistics", "too_few_measured", "not_validated", "no_older_connections")
 
 
 @dataclass(frozen=True)

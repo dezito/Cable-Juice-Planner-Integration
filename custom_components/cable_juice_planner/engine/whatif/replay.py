@@ -51,26 +51,40 @@ COMPARE_TOLERANCE_KWH = 0.01  # unmet energy that may differ before two policies
 MIN_PRICED_SHARE = 0.5  # the share of the connections that must have every price for an estimate (like BattMind's what-if)
 GAP_TOLERANCE = 15 * 60.0  # s : a drive recorded this long before the unplug still belongs after the window
 
-NOTES = (
-    "hindsight",
-    "site_limits_not_replayed",
-    "solar_not_modelled",
-    "grid_buy_price_only",
-    "standby_not_modelled",
-    "departure_buffer_not_modelled",
-)
-
 # Scenario A with CJP's own recorded charging: three calculations over the same connections, drives and prices.
 RECORDED_NOTES = (
-    "recorded_charging",
     "booked_cost",
-    "smart_planned_departure",
     "smart_hindsight_prices",
     "energy_balanced_to_cjp",
-    "site_limits_not_replayed",
 )
+# Warnings and notes that no calculation gives any more: a result saved before that still carries them, and no card has a text for them.
+REMOVED_WARNINGS = frozenset({
+    "prices_legacy_unverified", "prices_from_price_history", "prices_dst_hour_copied", "public_charge_without_drive",
+    "connections_estimated_from_battery_statistics", "events_inside_windows", "prices_estimated_windows", "levels_approximate",
+    "recorded_energy_short", "recorded_solar_share", "recorded_days_split", "recorded_prices_estimated_lean_cjp",
+    "recorded_path_short", "recorded_path_cut", "recorded_sessions_outside_connections",
+})
+
+
+REMOVED_NOTES = frozenset({
+    "hindsight", "recorded_charging", "site_limits_not_replayed", "standby_not_modelled", "smart_planned_departure",
+    "demand_from_recorded_drives", "extra_top_ups_not_modelled", "forced_low_battery_charging_not_modelled", "solar_not_modelled",
+    "grid_buy_price_only", "grid_only_no_solar",
+})
+
+
+def drop_removed_codes(saved: dict[str, Any]) -> bool:
+    """Take the warnings, notes and fields that no longer exist out of a saved result. True when something was taken out."""
+    changed = saved.pop("price_sources", None) is not None  # (what each price entity gave: no longer published)
+    for key, removed in (("warnings", REMOVED_WARNINGS), ("notes", REMOVED_NOTES)):
+        values = saved.get(key)
+        if isinstance(values, list) and removed.intersection(values):
+            saved[key] = [value for value in values if value not in removed]
+            changed = True
+    return changed
+
+
 ENERGY_GAP_TOLERANCE = 0.05  # battery percent: a smaller difference between the recorded energy and the driving is rounding
-CLAMP_TOLERANCE = 0.5  # battery percent of the recorded charging that had to be cut at 100 % before it is said
 
 LossFactor = Callable[[float], float]
 """kWh from the charger = kWh into the battery * (1 + factor(kw))."""
@@ -263,7 +277,7 @@ class ReplayResult:
     stopped_at: float | None = None
     average_price: float | None = None
     max_conservation_error_kwh: float = 0.0
-    notes: tuple[str, ...] = NOTES
+    notes: tuple[str, ...] = RECORDED_NOTES
     warnings: tuple[str, ...] = ()
     provenance: Mapping[str, str] = field(default_factory=dict)
     ignored_events: int = 0  # drives that were not replayed (see warnings)
@@ -648,12 +662,15 @@ def _conservation(data: ReplayInput, policy: PolicyResult) -> float:
 
 
 def replay(data: ReplayInput) -> ReplayResult:
-    """Replay both policies over the same demand. Never raises for bad data: it reports why."""
+    """Scenario A over one stretch of connections: both policies replayed over the same demand, next to what CJP charged
+    (`data.recorded`; without it there is nothing to compare with). Never raises for bad data: it reports why."""
     reason = _validate(data)
     ordered = sorted(data.windows, key=lambda w: w.start)
     provenance = dict(data.provenance)
     if reason is None and data.start_soc is None and len(ordered) < 2:
         reason = "too_few_windows"  # the only connection would be the one that calibrates: nothing is replayed
+    if reason is None and data.recorded is None:
+        reason = "no_recorded_charging"  # the comparison is with what CJP charged: without it there is nothing to compare
     if reason is not None:
         return ReplayResult(status="unavailable", reason=reason, windows_total=len(ordered), provenance=provenance)
     try:
@@ -670,77 +687,7 @@ def _replay(data: ReplayInput, ordered: list[Window], provenance: dict[str, str]
             status="unavailable", reason="missing_prices", windows_total=len(ordered), provenance=provenance,
             warnings=measured.warnings,
         )
-    if data.recorded is not None:
-        return _replay_recorded(data, ordered, provenance, measured, price_fill)
-    calibrate_to = measured.target_soc
-    smart, smart_stop, smart_at, smart_n = _run(data, "smart", ordered, calibrate_to=calibrate_to)
-    asap, asap_stop, asap_at, asap_n = _run(data, "asap", ordered, calibrate_to=calibrate_to)
-
-    # both policies must cover the same windows or the comparison would not be like for like
-    count = min(smart_n, asap_n)
-    stop, stopped = (smart_stop, smart_at) if smart_n <= asap_n else (asap_stop, asap_at)
-    if count == 0:
-        return ReplayResult(
-            status="unavailable", reason=stop or "no_windows", windows_total=len(ordered), provenance=provenance,
-        )
-    if count < len(ordered):
-        # run again over exactly the compared windows: no drive after the
-        # last one counts towards the lowest SOC, the energy balance or the unmet demand
-        smart, _, _, _ = _run(data, "smart", ordered[:count], calibrate_to=calibrate_to)
-        asap, _, _, _ = _run(data, "asap", ordered[:count], calibrate_to=calibrate_to)
-
-    compared = ordered[:count]
-    weighted = [(slot.price, slot.hours) for w in compared for slot in _slots(w, measured.prices) if slot.price is not None]
-    hours = sum(h for _, h in weighted)
-    average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
-
-    applied = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared[:-1])))
-    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
-    estimated_windows = smart.estimated_windows
-    calibrated = smart.calibrated
-    warnings = (
-        *data.warnings, *(("events_inside_windows",) if inside else ()),
-        *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
-    )
-
-    error = max(_conservation(data, smart), _conservation(data, asap))
-    complete = count == len(ordered)
-    result = ReplayResult(
-        status="ok" if complete else "partial",
-        reason=None if complete else stop,
-        smart=smart,
-        asap=asap,
-        windows_total=len(ordered),
-        windows_replayed=count,
-        stopped_at=None if complete else stopped,
-        average_price=average,
-        max_conservation_error_kwh=error,
-        warnings=warnings,
-        provenance=provenance,
-        ignored_events=len(data.events) - applied,
-        method="estimated" if estimated_windows or calibrated else "strict",
-        estimated_windows=estimated_windows,
-        price_estimate=price_fill,
-        calibrated_start=calibrated,
-        notes=NOTES,
-    )
-    if not error <= CONSERVATION_TOLERANCE_KWH:
-        return ReplayResult(
-            status="unavailable", reason="energy_conservation", windows_total=len(ordered), provenance=provenance,
-            max_conservation_error_kwh=error,
-        )
-
-    # an infeasible policy must not win by delivering less
-    if abs(smart.unmet_target_kwh - asap.unmet_target_kwh) > COMPARE_TOLERANCE_KWH:
-        result.comparable_reason = "unmet_target_differs"
-    elif abs(smart.unmet_driving_kwh - asap.unmet_driving_kwh) > COMPARE_TOLERANCE_KWH:
-        result.comparable_reason = "unmet_driving_differs"
-    elif average is None:
-        result.comparable_reason = "no_prices"
-    else:
-        result.comparable = True
-        result.difference = _difference(data, smart, asap, average)
-    return result
+    return _replay_recorded(data, ordered, provenance, measured, price_fill)
 
 
 def _difference(
@@ -759,8 +706,6 @@ def _difference(
         "terminal_energy_kwh": terminal_kwh,
         "terminal_adjustment": adjustment if adjust else None,
         "adjusted_cost": first.cost - second.cost - adjustment if adjust else None,
-        "grid_kwh": first.grid_kwh - second.grid_kwh,
-        "loss_kwh": first.loss_kwh - second.loss_kwh,
     }
 
 
@@ -827,8 +772,7 @@ def _replay_recorded(
         data = replace(data, events=(*data.events, *(Event(w.end + 1.0, "drive", share) for w in ordered[:-1])))
     elif gap > ENERGY_GAP_TOLERANCE:
         warnings.append("energy_not_balanced")  # one connection only: there is no gap between connections to put the driving in
-    elif gap < -ENERGY_GAP_TOLERANCE:
-        warnings.append("recorded_energy_short")  # the car holds more than the record and the drives explain: charging CJP did not record
+    energy_short = gap is not None and gap < -ENERGY_GAP_TOLERANCE  # the car holds more than the record and the drives explain
     smart, smart_stop, smart_at, smart_n = _run(data, "smart", ordered, calibrate_to=calibrate_to)
     asap, asap_stop, asap_at, asap_n = _run(data, "asap", ordered, calibrate_to=calibrate_to)
     count = min(smart_n, asap_n)
@@ -850,25 +794,12 @@ def _replay_recorded(
     hours = sum(h for _, h in weighted)
     average = sum(p * h for p, h in weighted) / hours if hours > 0 else None
     applied = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared[:-1])))
-    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
     estimated_windows = smart.estimated_windows
-    if inside:
-        warnings.append("events_inside_windows")
-    if estimated_windows:
-        warnings.append("prices_estimated_windows")
-        # Smart and charging at once get one flat price in such a connection and cannot choose cheap hours, CJP keeps what it booked
-        warnings.append("recorded_prices_estimated_lean_cjp")
-    if path_short > COMPARE_TOLERANCE_KWH:
-        warnings.append("recorded_path_short")
-    if cut / max(charged, EPS) * 100.0 > CLAMP_TOLERANCE or cut > CLAMP_TOLERANCE:
-        warnings.append("recorded_path_cut")  # the record charged past 100 %: the drives and the record do not fit together
     counted = compared[1:] if cjp.calibrated else compared  # (the connection that only calibrates is not counted)
     local = sum(data.recorded[w.start].local_kwh for w in counted)
     total_kwh = sum(data.recorded[w.start].kwh for w in counted)
     if cjp.calibrated:
         warnings.append("start_level_unknown_calibrated")
-    if total_kwh > EPS and local / total_kwh >= 0.05:
-        warnings.append("recorded_solar_share")  # CJP's cost values solar / home battery energy at CJP's own value, the others are grid only
     error = max(_conservation(data, smart), _conservation(data, asap))
     if not error <= CONSERVATION_TOLERANCE_KWH:
         return ReplayResult(
@@ -901,7 +832,7 @@ def _replay_recorded(
         # Without the end level, with charging CJP did not record (the energy is missing: it would be valued at the holder's
         # price, not at what it cost) or with a gap that could not be put anywhere, the energy bought is not known to be the
         # same, and no value is put on the end levels.
-        balanced = "energy_not_balanced" not in warnings and "recorded_energy_short" not in warnings
+        balanced = "energy_not_balanced" not in warnings and not energy_short
 
         def pair(first: PolicyResult, second: PolicyResult) -> dict[str, float | None]:
             holder = first if first.final_soc >= second.final_soc else second
@@ -917,7 +848,7 @@ def _replay_recorded(
 # Scenario A over a history with gaps: the stretches without a gap are replayed one by one and added up
 # ---------------------------------------------------------------------------- #
 
-_DIFFERENCE_FIELDS = ("cost", "measured_cost", "terminal_energy_kwh", "terminal_adjustment", "adjusted_cost", "grid_kwh", "loss_kwh")
+_DIFFERENCE_FIELDS = ("cost", "measured_cost", "terminal_energy_kwh", "terminal_adjustment", "adjusted_cost")
 _SKIPPABLE = ("too_few_windows", "missing_prices")  # why a stretch may be left out while the others are compared
 _ENERGY_SUMS = ("charged_percent", "driven_percent", "cut_percent", "local_kwh", "kwh", "path_shortfall_kwh")
 
@@ -1038,17 +969,9 @@ def merge_results(results: list[ReplayResult]) -> ReplayResult:
 SETTINGS_MODEL_VERSION = 2
 
 SETTINGS_NOTES = (
-    "hindsight",
     "modelled_policy",
-    "demand_from_recorded_drives",
     "settings_history_not_stored",
     "last_connection_left_out",
-    "extra_top_ups_not_modelled",
-    "forced_low_battery_charging_not_modelled",
-    "site_limits_not_replayed",
-    "solar_not_modelled",
-    "grid_buy_price_only",
-    "standby_not_modelled",
 )
 
 
@@ -1069,15 +992,6 @@ def settings_target(need: float, settings: CjpSettings) -> float:
 
 
 @dataclass
-class Readiness:
-    """The levels the car came home with, judged against one common reserve for both settings."""
-
-    arrivals: int = 0
-    arrivals_below_reserve: int = 0
-    lowest_arrival: float | None = None
-
-
-@dataclass
 class SettingsResult:
     status: str  # ok | partial | unavailable
     reason: str | None
@@ -1086,8 +1000,6 @@ class SettingsResult:
     alternative: PolicyResult | None = None
     baseline_settings: CjpSettings | None = None
     alternative_settings: CjpSettings | None = None
-    baseline_readiness: Readiness | None = None
-    alternative_readiness: Readiness | None = None
     targets: dict[str, list[float]] = field(default_factory=dict)
     windows_total: int = 0
     windows_replayed: int = 0
@@ -1132,16 +1044,6 @@ def _gap_needs(data: ReplayInput, ordered: list[Window]) -> list[float]:
                     need += event.soc_percent
         needs.append(need)
     return needs
-
-
-def _readiness(policy: PolicyResult, reserve: float) -> Readiness:
-    # the level when the car came back to each following plug-in (the last one after the last applied drive)
-    arrivals = [row.soc_in for row in policy.windows[1:]] + [policy.end_soc]
-    return Readiness(
-        arrivals=len(arrivals),
-        arrivals_below_reserve=sum(1 for level in arrivals if level < reserve - 1e-6),
-        lowest_arrival=min(arrivals) if arrivals else None,
-    )
 
 
 def replay_settings(data: ReplayInput, baseline: CjpSettings, alternative: CjpSettings) -> SettingsResult:
@@ -1199,13 +1101,9 @@ def _replay_settings(
 
     # the drives of every compared gap are used (the last one as the need only); the rest are not
     used = sum(1 for e in data.events if any(_in_gap(e, w, ordered[i + 1].start) for i, w in enumerate(compared)))
-    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
     estimated_windows = base.estimated_windows
     calibrated = base.calibrated
-    warnings = (
-        *data.warnings, *(("events_inside_windows",) if inside else ()),
-        *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
-    )
+    warnings = (*data.warnings, *(("start_level_unknown_calibrated",) if calibrated else ()))
 
     error = max(_conservation(data, base), _conservation(data, alt))
     complete = count == len(candidates)
@@ -1216,8 +1114,6 @@ def _replay_settings(
         alternative=alt,
         baseline_settings=baseline,
         alternative_settings=alternative,
-        baseline_readiness=_readiness(base, baseline.reserve),
-        alternative_readiness=_readiness(alt, baseline.reserve),
         targets={"baseline": base_targets[:count], "alternative": alt_targets[:count]},
         windows_total=len(ordered),
         windows_replayed=count,
@@ -1266,15 +1162,8 @@ def _replay_settings(
 # the other replays (an estimated price, a calibrating first connection).
 
 PLAN_NOTES = (
-    "grid_only_no_solar",
-    "hindsight",
     "modelled_policy",
-    "demand_from_recorded_drives",
     "last_connection_left_out",
-    "extra_top_ups_not_modelled",
-    "forced_low_battery_charging_not_modelled",
-    "site_limits_not_replayed",
-    "standby_not_modelled",
 )
 
 
@@ -1285,7 +1174,6 @@ class PlanResult:
     model_version: int = SETTINGS_MODEL_VERSION
     plan: PolicyResult | None = None
     settings: CjpSettings | None = None
-    readiness: Readiness | None = None
     targets: list[float] = field(default_factory=list)
     windows_total: int = 0
     windows_replayed: int = 0
@@ -1339,22 +1227,17 @@ def _replay_plan(data: ReplayInput, ordered: list[Window], settings: CjpSettings
             status="unavailable", reason="energy_conservation", windows_total=len(ordered), provenance=provenance, max_conservation_error_kwh=error,
         )
     estimated_windows, calibrated = plan.estimated_windows, plan.calibrated
-    inside = sum(1 for e in data.events if any(w.start <= e.ts < w.end - GAP_TOLERANCE for w in compared))
     return PlanResult(
         status="ok",
         reason=None,
         plan=plan,
         settings=settings,
-        readiness=_readiness(plan, settings.reserve),
         targets=targets[:count],
         windows_total=len(ordered),
         windows_replayed=count,
         average_price=average,
         max_conservation_error_kwh=error,
-        warnings=(
-            *data.warnings, *(("events_inside_windows",) if inside else ()),
-            *(("prices_estimated_windows",) if estimated_windows else ()), *(("start_level_unknown_calibrated",) if calibrated else ()),
-        ),
+        warnings=(*data.warnings, *(("start_level_unknown_calibrated",) if calibrated else ())),
         provenance=provenance,
         method="estimated" if estimated_windows or calibrated else "strict",
         estimated_windows=estimated_windows,

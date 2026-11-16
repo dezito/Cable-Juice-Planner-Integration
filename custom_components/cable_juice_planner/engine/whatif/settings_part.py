@@ -15,7 +15,8 @@ import math
 from typing import Any
 
 from .engine_part import WHAT_IF_WINDOW_ROWS, _round
-from .replay import CjpSettings, PolicyResult, Readiness, SettingsResult, replay_settings
+from .charts import points_settings
+from .replay import CjpSettings, PolicyResult, SettingsResult, drop_removed_codes, replay_settings
 
 
 def _positive(value: Any) -> float | None:
@@ -102,16 +103,12 @@ class WhatIfSettings:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _settings_policy(policy: PolicyResult | None, readiness: Readiness | None) -> dict[str, Any] | None:
-        if policy is None or readiness is None:
+    def _settings_policy(policy: PolicyResult | None) -> dict[str, Any] | None:
+        if policy is None:
             return None
         return {
-            "cost": _round(policy.cost, 2), "grid_kwh": _round(policy.grid_kwh, 3), "charged_kwh": _round(policy.charged_kwh, 3),
-            "loss_kwh": _round(policy.loss_kwh, 3), "unmet_target_kwh": _round(policy.unmet_target_kwh, 3),
-            "unmet_driving_kwh": _round(policy.unmet_driving_kwh, 3), "targets_met": policy.targets_met,
-            "windows": len(policy.windows), "start_soc": _round(policy.start_soc, 1), "final_soc": _round(policy.final_soc, 1),
-            "lowest_soc": _round(policy.lowest_soc, 1), "arrivals": readiness.arrivals,
-            "arrivals_below_reserve": readiness.arrivals_below_reserve, "lowest_arrival": _round(readiness.lowest_arrival, 1),
+            "cost": _round(policy.cost, 2), "kwh": _round(policy.grid_kwh, 3), "windows": len(policy.windows),
+            "start_soc": _round(policy.start_soc, 1),
         }
 
     def _what_if_settings_result(
@@ -143,8 +140,8 @@ class WhatIfSettings:
             "provenance": dict(result.provenance),
             "ignored_events": result.ignored_events,
             "conservation_error_kwh": _round(result.max_conservation_error_kwh, 9),
-            "baseline": self._settings_policy(result.baseline, result.baseline_readiness),
-            "alternative": self._settings_policy(result.alternative, result.alternative_readiness),
+            "baseline": self._settings_policy(result.baseline),
+            "alternative": self._settings_policy(result.alternative),
             "average_price": _round(result.average_price, 4),
             "difference": {key: _round(value, 3) for key, value in result.difference.items()} if result.difference else None,
             "months": [],
@@ -157,12 +154,10 @@ class WhatIfSettings:
         rows = []
         for index, (base, alt) in enumerate(zip(result.baseline.windows, result.alternative.windows)):
             key = self._economy_local(base.end).strftime("%Y-%m")
-            month = months.setdefault(key, {"month": key, "windows": 0, "baseline_cost": 0.0, "alternative_cost": 0.0, "baseline_kwh": 0.0, "alternative_kwh": 0.0})
+            month = months.setdefault(key, {"month": key, "windows": 0, "baseline_cost": 0.0, "alternative_cost": 0.0})
             month["windows"] += 1
             month["baseline_cost"] += base.cost
             month["alternative_cost"] += alt.cost
-            month["baseline_kwh"] += base.grid_kwh
-            month["alternative_kwh"] += alt.grid_kwh
             rows.append({
                 "start": base.start, "end": base.end,
                 "baseline_target": _round(result.targets["baseline"][index], 1), "alternative_target": _round(result.targets["alternative"][index], 1),
@@ -194,6 +189,8 @@ class WhatIfSettings:
         saved = self.economy_db.get("what_if_settings")
         if not isinstance(saved, dict):
             self.economy_db.pop("what_if_settings", None)
+        elif drop_removed_codes(saved):
+            self.mark_dirty("economy")
         attempt = self.economy_db.get("what_if_settings_attempt")
         if isinstance(attempt, dict) and attempt.get("status") == "running":
             self.economy_db["what_if_settings_attempt"] = {**attempt, "status": "unavailable", "reason": "interrupted"}
@@ -209,4 +206,6 @@ class WhatIfSettings:
         difference = (result or {}).get("difference") if complete else None
         self.set_state("what_if_settings", difference.get("adjusted_cost") if difference else None)
         self.set_attr("what_if_settings", "result", result)
+        for key, points in points_settings(result).items():
+            self.set_attr("what_if_settings", key, points)  # (the dashboard hides a chart that has no points)
         self.set_attr("what_if_settings", "attempt", self.economy_db.get("what_if_settings_attempt"))

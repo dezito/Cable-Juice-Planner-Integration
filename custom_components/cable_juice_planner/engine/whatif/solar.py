@@ -45,16 +45,6 @@ SOLAR_MODEL_VERSION = 2
 HOUR = 3600.0
 MIN_SPAN = 60.0  # s : a session shorter than this is priced at the hour it started in
 
-NOTES = (
-    "ev_solar_exported_instead",
-    "solar_spread_evenly_over_session",
-    "home_battery_kept_as_recorded",
-    "no_whole_house_result",
-    "replanned_without_solar_not_modelled",
-    "no_solar_production_not_modelled",
-    "recorded_sessions_only",
-)
-
 # every reason a session can be left out (all are counted and shown)
 LEFT_OUT = (
     "public", "still_charging", "invalid", "without_solar", "before_energy_fix", "missing_buy_price", "missing_sell_price",
@@ -225,9 +215,9 @@ def summarize(
         status, reason = "unavailable", "no_buy_prices"
     else:
         status, reason = "unavailable", "no_solar_sessions"
-    notes = list(NOTES)
+    notes: list[str] = []
     if hours:
-        notes += ["solar_from_power_history", "hourly_solar_upper_bound"]
+        notes += ["solar_from_power_history"]
     return {
         "model_version": SOLAR_MODEL_VERSION,
         "status": status,
@@ -254,41 +244,28 @@ def summarize(
     }
 
 
-def solar_comparison(
-    sessions: Iterable[Mapping[str, Any]],
-    buy: Mapping[float, float],
-    sell: Mapping[float, float],
-    production: Mapping[float, float],
-    refund: float,
-    solar_energy_since: float | None,
-    current_month: str,
-    month_of: Callable[[float], str],
-) -> dict[str, Any]:
-    """Price and sum the sessions in one go (a session with a missing price is left out at once).
-
-    The engine prices each session once and keeps the result (see solar_part.py); this is the same
-    calculation without the ledger.
-    """
-    entries: list[dict[str, Any]] = []
-    still_charging = 0
-    for session in sessions:
-        result = evaluate_session(session, buy, sell, production, refund, solar_energy_since)
-        if result["outcome"] == "live":
-            still_charging += 1
-            continue
-        if result["outcome"] == "pending":
-            result = {"outcome": "left_out", "reason": result["reason"]}
-        entries.append({**result, "month": month_of(float(session["start"])) if _finite(session.get("start")) else ""})
-    summary = summarize(entries, current_month, {"still_charging": still_charging})
-    return {**summary, "solar_energy_since": solar_energy_since}
-
-
 MIN_EV_KWH = 0.05  # an hour in which the EV charged less than this is not a charging hour
 
 
 def _overlaps_any(spans: Iterable[tuple[float, float]], start: float, end: float) -> bool:
     """[start, end) shares time with a span [s, e) (a span without length counts as one second)."""
     return any(s < end and start < max(e, s + 1.0) for s, e in spans)
+
+
+def hour_energy(values: Any) -> tuple[float, float] | None:
+    """(the EV's kWh, the kWh of it that could be solar) of one hour of the recorder's statistics, or None when the hour has no
+    complete reading. values: [solar production W, house consumption W (the EV included), charger power W], the hourly means.
+
+    The one rule for every scenario (CJP's own formula, local_energy_available): the solar the EV can use is what the production
+    leaves after the rest of the house, never more than the EV charged. It is an UPPER BOUND on hourly means (see
+    power_hour_entries). An hour with less than MIN_EV_KWH is not a charging hour: (0, 0)."""
+    if not isinstance(values, (list, tuple)) or len(values) != 3 or not all(_finite(v) for v in values):
+        return None
+    solar_w, house_w, ev_w = (float(v) for v in values)
+    ev_kwh = ev_w / 1000.0
+    if ev_kwh < MIN_EV_KWH:
+        return 0.0, 0.0
+    return ev_kwh, min(ev_kwh, max(solar_w - max(house_w - ev_w, 0.0), 0.0) / 1000.0)
 
 
 def power_hour_entries(
@@ -324,17 +301,13 @@ def power_hour_entries(
     entries: list[dict[str, Any]] = []
     assumed = 0
     for ts in sorted(power_hours):
-        values = power_hours[ts]
-        if ts > last_hour or not isinstance(values, (list, tuple)) or len(values) != 3 or not all(_finite(v) for v in values):
-            continue
-        solar_w, house_w, ev_w = (float(v) for v in values)
-        ev_kwh = ev_w / 1000.0
-        if ev_kwh < MIN_EV_KWH:
+        energy = hour_energy(power_hours[ts])
+        if ts > last_hour or energy is None or energy[0] < MIN_EV_KWH:
             continue
         if _overlaps_any(spans, ts, ts + HOUR):
             left_out["covered_by_sessions"] += 1  # the recorded session is used for this time instead
             continue
-        energy = min(ev_kwh, max(solar_w - max(house_w - ev_w, 0.0), 0.0) / 1000.0)
+        energy = energy[1]
         if energy <= 1e-9:
             continue  # no solar in this charging hour: nothing to replace
         if not _finite(buy.get(ts)):
