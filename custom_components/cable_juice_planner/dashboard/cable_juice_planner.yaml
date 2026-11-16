@@ -3181,14 +3181,14 @@ views:
         {% set a = states.sensor.cjp_what_if.attributes %}
         {% set r = a.result %}
         {% set at = a.attempt %}
-        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'stopped': '@@what_if_reason_stopped@@', 'no_recorded_charging': '@@what_if_reason_no_recorded_charging@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@', 'connections_estimated_from_battery_statistics': '@@what_if_warning_connections_estimated_from_battery_statistics@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@', 'energy_not_balanced': '@@what_if_warning_energy_not_balanced@@', 'recorded_energy_short': '@@what_if_warning_recorded_energy_short@@', 'recorded_path_cut': '@@what_if_warning_recorded_path_cut@@', 'recorded_solar_share': '@@what_if_warning_recorded_solar_share@@', 'recorded_path_short': '@@what_if_warning_recorded_path_short@@', 'recorded_segments': '@@what_if_warning_recorded_segments@@', 'recorded_stretches_left_out': '@@what_if_warning_recorded_stretches_left_out@@', 'recorded_prices_estimated_lean_cjp': '@@what_if_warning_recorded_prices_estimated_lean_cjp@@', 'recorded_days_split': '@@what_if_warning_recorded_days_split@@', 'recorded_sessions_outside_connections': '@@what_if_warning_recorded_sessions_outside_connections@@', 'levels_approximate': '@@what_if_warning_levels_approximate@@', 'windows_before_recorded_gap_left_out': '@@what_if_warning_windows_before_recorded_gap_left_out@@'} %}
-        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@', 'departure_buffer_not_modelled': '@@what_if_note_departure_buffer_not_modelled@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'recorded_charging': '@@what_if_note_recorded_charging@@', 'booked_cost': '@@what_if_note_booked_cost@@', 'smart_planned_departure': '@@what_if_note_smart_planned_departure@@', 'smart_hindsight_prices': '@@what_if_note_smart_hindsight_prices@@', 'energy_balanced_to_cjp': '@@what_if_note_energy_balanced_to_cjp@@'} %}
-        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'battery_statistics': '@@what_if_source_battery_statistics@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'stopped': '@@what_if_reason_stopped@@', 'no_recorded_charging': '@@what_if_reason_no_recorded_charging@@'} %}
+        {% set warnings = {'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@', 'energy_not_balanced': '@@what_if_warning_energy_not_balanced@@', 'recorded_segments': '@@what_if_warning_recorded_segments@@', 'recorded_stretches_left_out': '@@what_if_warning_recorded_stretches_left_out@@', 'windows_before_recorded_gap_left_out': '@@what_if_warning_windows_before_recorded_gap_left_out@@'} %}
+        {% set notes = {'booked_cost': '@@what_if_note_booked_cost@@', 'smart_hindsight_prices': '@@what_if_note_smart_hindsight_prices@@', 'energy_balanced_to_cjp': '@@what_if_note_energy_balanced_to_cjp@@'} %}
         {% set day_selections = {'all': '@@what_if_day_selection_all@@', 'work_plan': '@@what_if_day_selection_work_plan@@', 'monday_friday': '@@what_if_day_selection_monday_friday@@', 'weekend': '@@what_if_day_selection_weekend@@', 'selected': '@@what_if_day_selection_selected@@'} %}
         {% set stop_reasons = {'before_history': '@@what_if_a_stop_before_history@@', 'invalid_history': '@@what_if_a_stop_invalid_history@@', 'not_settled': '@@what_if_a_stop_not_settled@@', 'no_prices': '@@what_if_a_stop_no_prices@@'} %}
-        {% set estimate_notes = {'none_available': '@@what_if_a_estimates_none_available@@', 'no_record': '@@what_if_a_estimates_no_record@@', 'outside_charging': '@@what_if_a_estimates_outside_charging@@', 'not_stable': '@@what_if_a_estimates_not_stable@@', 'no_prices': '@@what_if_a_estimates_no_prices@@'} %}
+        {% set estimate_notes = {'none_available': '@@what_if_a_estimates_none_available@@', 'no_record': '@@what_if_a_estimates_no_record@@', 'outside_charging': '@@what_if_a_estimates_outside_charging@@', 'no_prices': '@@what_if_a_estimates_no_prices@@'} %}
         {% set estimate_reasons = {'no_statistics': '@@what_if_estimate_reason_no_statistics@@', 'too_few_measured': '@@what_if_estimate_reason_too_few_measured@@', 'not_validated': '@@what_if_estimate_reason_not_validated@@', 'no_older_connections': '@@what_if_estimate_reason_no_older_connections@@', 'anchor_mismatch': '@@what_if_estimate_reason_anchor_mismatch@@', 'no_plan': '@@what_if_estimate_reason_no_plan@@', 'no_workdays': '@@what_if_estimate_reason_no_workdays@@', 'too_few_drives': '@@what_if_estimate_reason_too_few_drives@@', 'no_modelled_connections': '@@what_if_estimate_reason_no_modelled_connections@@'} %}
+        {% set booking_reasons = {'no_power_history': '@@what_if_a_booking_no_power_history@@', 'no_prices': '@@what_if_a_booking_no_prices@@', 'no_sell_prices': '@@what_if_a_booking_no_sell_prices@@', 'no_levels': '@@what_if_a_booking_no_levels@@', 'implausible': '@@what_if_a_booking_implausible@@', 'outside_charging': '@@what_if_a_booking_outside_charging@@'} %}
         {% if at and at.status == 'running' -%}
         <ha-alert alert-type="info">@@what_if_running@@{% if at.get('progress') %} &middot; {{ at.progress.done }} / {{ at.progress.total }} @@what_if_connections@@{% endif %}</ha-alert>
         {%- elif at and at.status == 'unavailable' -%}
@@ -3197,12 +3197,15 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ (((r.get('coverage') or {}).get('covered_days') or ((d1 - d0) / 86400)) | round(0) | int) }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} % &middot; @@what_if_start_soc@@ {{ r.cjp.start_soc ~ ' % ' if (r.cjp and not r.get('calibrated_start')) else '' }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }}) &middot; @@what_if_end_soc@@ {% if r.energy and r.energy.end_soc is not none %}{{ r.energy.end_soc | round(0) }} % ({{ sources.get(r.provenance.end_soc, r.provenance.end_soc) }}){% else %}@@what_if_source_unavailable@@{% endif %}
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; @@what_if_target@@ {{ r.target.battery_level | round(0) }} %{% if r.cjp and not r.get('calibrated_start') %} &middot; @@what_if_start_soc@@ {{ r.cjp.start_soc }} %{% endif %}{% if r.energy and r.energy.end_soc is not none %} &middot; @@what_if_end_soc@@ {{ r.energy.end_soc | round(0) }} %{% endif %}
 
         {% set cv = r.get('coverage') or {} %}
         {% if cv.get('recorded_estimated_windows') -%}
         <ha-alert alert-type="info">@@what_if_a_estimated_alert@@ ({{ cv.recorded_estimated_windows }} / {{ r.windows.total }} @@what_if_connections@@{% if cv.get('recorded_measured_from') %} &middot; @@what_if_a_measured_from@@ {{ cv.recorded_measured_from | timestamp_custom('%Y-%m-%d', true) }}{% endif %})</ha-alert>
+        {%- endif %}
+        {% if cv.get('recorded_estimated_booked') or cv.get('recorded_estimated_booking_refused') -%}
+        {% set rb = cv.get('recorded_estimated_booking_refused') or {} %}
+        <ha-alert alert-type="info">@@what_if_a_estimated_booking@@ ({{ cv.get('recorded_estimated_booked', 0) }} @@what_if_connections@@ &middot; {{ '%.1f' | format(cv.get('recorded_estimated_booked_kwh', 0)) }} kWh &middot; @@what_if_ns_row_solar@@ {{ '%.1f' | format(cv.get('recorded_estimated_booked_local_kwh', 0)) }} kWh{% if rb %}; @@what_if_a_booking_left_out@@: {% for reason, count in rb.items() %}{{ count }} {{ booking_reasons.get(reason, reason) }}{{ '; ' if not loop.last else '' }}{% endfor %}{% endif %})</ha-alert>
         {%- endif %}
         {% if cv.get('recorded_skipped') -%}
         <ha-alert alert-type="info">@@what_if_a_skipped_title@@: {% for reason, count in cv.recorded_skipped.items() %}{{ count }} @@what_if_connections@@ ({{ stop_reasons.get(reason, reason) }}){{ '; ' if not loop.last else '' }}{% endfor %}{% if r.get('segments') and r.segments > 1 %} &middot; {{ r.segments }} @@what_if_a_stretches@@{% endif %}</ha-alert>
@@ -3234,62 +3237,36 @@ views:
         {% set uva = u.get('cjp_vs_asap') if u else none %}
         | | @@what_if_col_cjp@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_cjp@@ | @@what_if_col_immediate_vs_cjp@@ |
         |:---|---:|---:|---:|---:|---:|
-        | @@what_if_a_row_target@@ | &ndash; | {{ r.target.battery_level | round(0) }} % ({{ '@@what_if_b_source_override@@' if r.target.source == 'override' else '@@what_if_b_source_live_setting@@' }}) | {{ r.target.battery_level | round(0) }} % | | |
+        | @@what_if_a_row_target@@ | &ndash; | {{ r.target.battery_level | round(0) }} % | {{ r.target.battery_level | round(0) }} % | | |
         | @@what_if_a_row_days@@ | @@what_if_a_every_day@@ | {{ day_selections.get(r.day_selection, r.day_selection) }} | @@what_if_a_every_day@@ | | |
+        | @@what_if_row_kwh@@ | {{ ('%.1f' | format(r.cjp.get('kwh')) ~ ' kWh') if r.cjp.get('kwh') is not none else '&ndash;' }} | {{ ('%.1f' | format(r.smart.get('kwh')) ~ ' kWh') if r.smart.get('kwh') is not none else '&ndash;' }} | {{ ('%.1f' | format(r.asap.get('kwh')) ~ ' kWh') if r.asap.get('kwh') is not none else '&ndash;' }} | | |
         | @@what_if_row_cost@@ | {{ '%.2f' | format((r.cjp.cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((r.smart.cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((r.asap.cost) | round(2) + 0.0) }} @@valuta@@ | {{ ((('&asymp; ' if cs.adjusted_cost is none else '') ~ '%.2f' | format((0 - cs.cost) | round(2) + 0.0) ~ ' @@valuta@@') if cs else (('&asymp; ' ~ '%.2f' | format((0 - uvs) | round(2) + 0.0) ~ ' @@valuta@@') if uvs is not none else '&ndash;')) }} | {{ ((('&asymp; ' if ca.adjusted_cost is none else '') ~ '%.2f' | format((0 - ca.cost) | round(2) + 0.0) ~ ' @@valuta@@') if ca else (('&asymp; ' ~ '%.2f' | format((0 - uva) | round(2) + 0.0) ~ ' @@valuta@@') if uva is not none else '&ndash;')) }} |
-        | @@what_if_row_grid@@ | {{ '%.1f' | format((r.cjp.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.grid_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((0 - cs.grid_kwh if cs else r.smart.grid_kwh - r.cjp.grid_kwh) | round(1) + 0.0) ~ ' kWh' }} | {{ '%.1f' | format((0 - ca.grid_kwh if ca else r.asap.grid_kwh - r.cjp.grid_kwh) | round(1) + 0.0) ~ ' kWh' }} |
-        | @@what_if_row_loss@@ | {{ '%.1f' | format((r.cjp.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.loss_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((0 - cs.loss_kwh if cs else r.smart.loss_kwh - r.cjp.loss_kwh) | round(1) + 0.0) ~ ' kWh' }} | {{ '%.1f' | format((0 - ca.loss_kwh if ca else r.asap.loss_kwh - r.cjp.loss_kwh) | round(1) + 0.0) ~ ' kWh' }} |
         {% if cs %}| @@what_if_row_adjusted@@ | | | | {{ (('%.2f' | format((0 - cs.adjusted_cost) | round(2) + 0.0) ~ ' @@valuta@@') if cs and cs.adjusted_cost is not none else '&ndash;') }} | {{ (('%.2f' | format((0 - ca.adjusted_cost) | round(2) + 0.0) ~ ' @@valuta@@') if ca and ca.adjusted_cost is not none else '&ndash;') }} |
-        {% endif %}| @@what_if_row_targets@@ | {{ r.cjp.targets_met }} / {{ r.cjp.windows }} | {{ r.smart.targets_met }} / {{ r.smart.windows }} | {{ r.asap.targets_met }} / {{ r.asap.windows }} | | |
-        | @@what_if_row_unmet_target@@ | {{ '%.1f' | format((r.cjp.unmet_target_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.unmet_target_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.unmet_target_kwh) | round(1) + 0.0) }} kWh | | |
-        | @@what_if_row_unmet_driving@@ | {{ '%.1f' | format((r.cjp.unmet_driving_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.smart.unmet_driving_kwh) | round(1) + 0.0) }} kWh | {{ '%.1f' | format((r.asap.unmet_driving_kwh) | round(1) + 0.0) }} kWh | | |
-        | @@what_if_row_lowest@@ | {{ r.cjp.lowest_soc }} % | {{ r.smart.lowest_soc }} % | {{ r.asap.lowest_soc }} % | | |
-        | @@what_if_row_final@@ | {{ r.cjp.final_soc }} % | {{ r.smart.final_soc }} % | {{ r.asap.final_soc }} % | | |
-        {% if u %}| @@what_if_row_unit@@ | {{ ('%.2f' | format((u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.asap is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.asap is not none else '&ndash;' }} |
+        {% endif %}{% if u %}| @@what_if_row_unit@@ | {{ ('%.2f' | format((u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.asap is not none else '&ndash;' }} | {{ ('%.2f' | format((u.smart - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.smart is not none else '&ndash;' }} | {{ ('%.2f' | format((u.asap - u.cjp) | round(2) + 0.0) ~ ' @@valuta@@/kWh') if u.cjp is not none and u.asap is not none else '&ndash;' }} |
         {% endif %}{% if an and an.available %}| @@what_if_annual_row@@ ({{ '@@what_if_annual_measured@@' if an.method == 'measured' else '@@what_if_annual_estimate@@' }}) | &ndash; | &ndash; | &ndash; | {{ '%.2f' | format((0 - an.cjp_vs_smart) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((0 - an.cjp_vs_asap) | round(2) + 0.0) }} @@valuta@@ |
         {% endif %}
-        @@what_if_a_targets_note@@
         {% if an and an.available and an.method != 'measured' %}
         <ha-alert alert-type="warning">@@what_if_annual_caveat@@ ({{ an.basis_days }} @@what_if_days_unit@@, {{ an.months_covered }} @@what_if_annual_months@@)</ha-alert>
         {%- elif an and not an.available and not an.get('reason') %}
         @@what_if_annual_too_short@@ ({{ an.basis_days }} @@what_if_days_unit@@)
         {%- endif %}
-        {% if e %}
-
-        **@@what_if_energy@@:** @@what_if_energy_charged@@ {{ e.charged_percent }} % &middot; @@what_if_energy_driven@@ {{ e.driven_percent }} % &middot; @@what_if_energy_gap@@ {{ (e.gap_percent ~ ' %') if e.gap_percent is not none else '&ndash;' }}{% if e.local_kwh %} &middot; @@what_if_energy_local@@ {{ '%.1f' | format((e.local_kwh) | round(1) + 0.0) }} / {{ '%.1f' | format((e.kwh) | round(1) + 0.0) }} kWh{% endif %}
-        {%- endif %}
         {% if ds and r.comparable %}
         {% for key, label, sg in [('cjp_asap', '@@what_if_col_immediate@@ &minus; @@what_if_col_cjp@@', -1), ('cjp_smart', '@@what_if_col_smart@@ &minus; @@what_if_col_cjp@@', -1), ('smart_asap', '@@what_if_col_smart@@ &minus; @@what_if_col_immediate@@', 1)] -%}
         {%- set x = ds.get(key) %}
 
-        **{{ label }}:** @@what_if_row_cost@@ {{ '%.2f' | format(((sg * x.cost) + 0.0) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_row_terminal@@ {{ ('%.2f' | format(((sg * x.terminal_adjustment) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@ (' ~ '%.1f' | format(((sg * x.terminal_energy_kwh) + 0.0) | round(1) + 0.0) ~ ' kWh)') if x.terminal_adjustment is not none else '&ndash;' }} &middot; **@@what_if_row_adjusted@@ {{ ('%.2f' | format(((sg * x.adjusted_cost) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@') if x.adjusted_cost is not none else '&ndash;' }}** &middot; @@what_if_row_grid@@ {{ '%.1f' | format(((sg * x.grid_kwh) + 0.0) | round(1) + 0.0) }} kWh &middot; @@what_if_row_loss@@ {{ '%.1f' | format(((sg * x.loss_kwh) + 0.0) | round(1) + 0.0) }} kWh
+        **{{ label }}:** @@what_if_row_cost@@ {{ '%.2f' | format(((sg * x.cost) + 0.0) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_row_terminal@@ {{ ('%.2f' | format(((sg * x.terminal_adjustment) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@ (' ~ '%.1f' | format(((sg * x.terminal_energy_kwh) + 0.0) | round(1) + 0.0) ~ ' kWh)') if x.terminal_adjustment is not none else '&ndash;' }} &middot; **@@what_if_row_adjusted@@ {{ ('%.2f' | format(((sg * x.adjusted_cost) + 0.0) | round(2) + 0.0) ~ ' @@valuta@@') if x.adjusted_cost is not none else '&ndash;' }}**
         {% endfor %}
         {%- endif %}
-        {% if u %}
-
-        **@@what_if_unit_title@@ ({{ '%.1f' | format((u.cjp_kwh) | round(1) + 0.0) }} kWh):** @@what_if_col_smart@@ {{ ('%.2f' | format((u.smart_at_cjp_kwh) | round(2) + 0.0) ~ ' @@valuta@@') if u.smart_at_cjp_kwh is not none else '&ndash;' }} &middot; @@what_if_col_immediate@@ {{ ('%.2f' | format((u.asap_at_cjp_kwh) | round(2) + 0.0) ~ ' @@valuta@@') if u.asap_at_cjp_kwh is not none else '&ndash;' }} &middot; @@what_if_unit_cjp_paid@@ {{ '%.2f' | format((u.cjp_cost) | round(2) + 0.0) }} @@valuta@@ &middot; @@what_if_col_smart_vs_cjp@@ {{ ('%.2f' | format((0 - u.cjp_vs_smart) | round(2) + 0.0) ~ ' @@valuta@@') if u.cjp_vs_smart is not none else '&ndash;' }} &middot; @@what_if_col_immediate_vs_cjp@@ {{ ('%.2f' | format((0 - u.cjp_vs_asap) | round(2) + 0.0) ~ ' @@valuta@@') if u.cjp_vs_asap is not none else '&ndash;' }}
-
-        *@@what_if_unit_caveat@@*
-        {%- endif %}
-
         {% if r.months -%}
         **@@what_if_months@@**
 
-        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_col_cjp@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_cjp@@ | @@what_if_col_immediate_vs_cjp@@ | @@what_if_row_targets@@ |
-        |:---|---:|---:|---:|---:|---:|---:|---:|
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_col_cjp@@ | @@what_if_col_smart@@ | @@what_if_col_immediate@@ | @@what_if_col_smart_vs_cjp@@ | @@what_if_col_immediate_vs_cjp@@ |
+        |:---|---:|---:|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        | **{{ m.month }}** | {{ m.windows }}{% if m.get('estimated_connections') %} ({{ m.estimated_connections }} @@what_if_annual_estimate@@){% endif %} | {{ '%.2f' | format((m.cjp_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.smart_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.asap_cost) | round(2) + 0.0) }} @@valuta@@ | {{ (('%.2f' | format((0 - m.cjp_vs_smart_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_smart_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_smart_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_smart_unit') is not none else '&ndash;') }} | {{ (('%.2f' | format((0 - m.cjp_vs_asap_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_asap_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_asap_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_asap_unit') is not none else '&ndash;') }} | {{ m.targets_met }} / {{ m.windows }} |
+        | **{{ m.month }}** | {{ m.windows }}{% if m.get('estimated_connections') %} ({{ m.estimated_connections }} @@what_if_annual_estimate@@){% endif %} | {{ '%.2f' | format((m.cjp_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.smart_cost) | round(2) + 0.0) }} @@valuta@@ | {{ '%.2f' | format((m.asap_cost) | round(2) + 0.0) }} @@valuta@@ | {{ (('%.2f' | format((0 - m.cjp_vs_smart_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_smart_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_smart_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_smart_unit') is not none else '&ndash;') }} | {{ (('%.2f' | format((0 - m.cjp_vs_asap_adjusted) | round(2) + 0.0) ~ ' @@valuta@@') if m.cjp_vs_asap_adjusted is not none else '&ndash;') if r.comparable else (('&asymp; ' ~ '%.2f' | format((0 - m.cjp_vs_asap_unit) | round(2) + 0.0) ~ ' @@valuta@@') if m.get('cjp_vs_asap_unit') is not none else '&ndash;') }} |
         {% endfor %}
-        {% if not r.comparable %}
-
-        *@@what_if_a_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}. @@what_if_unit_only@@*
-        {% endif %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
-        {% if r.get('price_sources') -%}
-
-        **@@what_if_price_sources@@:** {% for entity, source in r.price_sources.items() %}{{ entity }}: {{ source.statistics }} @@what_if_price_from_statistics@@ + {{ source.states }} @@what_if_price_from_states@@{% if source.get('first') %} ({{ source.first | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ source.last | timestamp_custom('%Y-%m-%d', true) }}){% endif %}{{ ' &middot; ' if not loop.last else '' }}{% endfor %}
-        {%- endif %}
         {% set dv = r.get('derived') %}
         {% if dv -%}
 
@@ -3314,6 +3291,7 @@ views:
       entities:
       - sensor.cjp_what_if
       variables:
+        points: "states['sensor.cjp_what_if'] ? Number(states['sensor.cjp_what_if'].attributes.chart_cost_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if'];
@@ -3328,84 +3306,82 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_cost_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' @@valuta@@'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_col_cjp@@'
-          color: '#1baf7a'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.cjp_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.cjp_cost]; });
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_col_smart@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.smart_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.smart_cost]; });
-        - entity: sensor.cjp_what_if
-          name: '@@what_if_col_immediate@@'
-          color: '#eb6834'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.asap_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.asap_cost]; });
-    - type: conditional
-      conditions:
-      - condition: state
-        entity: sensor.cjp_what_if
-        state_not: unknown
-      - condition: state
-        entity: sensor.cjp_what_if
-        state_not: unavailable
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_cost_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: column
+            unit: ' @@valuta@@'
+            float_precision: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_col_cjp@@'
+            color: '#1baf7a'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.cjp_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.cjp_cost]; });
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_col_smart@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.smart_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.smart_cost]; });
+          - entity: sensor.cjp_what_if
+            name: '@@what_if_col_immediate@@'
+            color: '#eb6834'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.asap_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.asap_cost]; });
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if
+      variables:
+        points: "states['sensor.cjp_what_if'] ? Number(states['sensor.cjp_what_if'].attributes.chart_difference_points) : 0"
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
       card:
-        type: custom:config-template-card
-        entities:
-        - sensor.cjp_what_if
-        variables:
-          span_days: |
-            (() => {
-              const s = states['sensor.cjp_what_if'];
-              const a = (s && s.attributes) || {};
-              const months = (a.result || {}).months || [];
-              const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
-              if (!keys.length) return 62;
-              const now = new Date();
-              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-              const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
-              return Math.max(Math.round((end - first) / 86400000), 62);
-            })()
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if', state: '__no_points__'}]}"
         card:
           type: custom:apexcharts-card
           header:
@@ -3418,11 +3394,11 @@ views:
           now:
             show: false
           yaxis:
-          - decimals: 0
+          - decimals: 2
           all_series_config:
             type: column
             unit: ' @@valuta@@'
-            float_precision: 0
+            float_precision: 2
             show:
               legend_value: false
               in_header: false
@@ -3454,32 +3430,27 @@ views:
               if (!r || !r.comparable) return [];
               const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
               return ((r && r.months) || []).filter(m => num(m.cjp_vs_asap_adjusted)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), Math.round(-m.cjp_vs_asap_adjusted * 100) / 100 + 0]; });
-    - type: conditional
-      conditions:
-      - condition: state
-        entity: sensor.cjp_what_if
-        state_not: unknown
-      - condition: state
-        entity: sensor.cjp_what_if
-        state_not: unavailable
+    - type: custom:config-template-card
+      entities:
+      - sensor.cjp_what_if
+      variables:
+        points: "states['sensor.cjp_what_if'] ? Number(states['sensor.cjp_what_if'].attributes.chart_difference_points) : 0"
+        span_days: |
+          (() => {
+            const s = states['sensor.cjp_what_if'];
+            const a = (s && s.attributes) || {};
+            const months = (a.result || {}).months || [];
+            const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
+            if (!keys.length) return 62;
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
+            return Math.max(Math.round((end - first) / 86400000), 62);
+          })()
       grid_options: *id001
       card:
-        type: custom:config-template-card
-        entities:
-        - sensor.cjp_what_if
-        variables:
-          span_days: |
-            (() => {
-              const s = states['sensor.cjp_what_if'];
-              const a = (s && s.attributes) || {};
-              const months = (a.result || {}).months || [];
-              const keys = months.map(m => String(m && m.month)).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
-              if (!keys.length) return 62;
-              const now = new Date();
-              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-              const first = new Date(Number(keys[0].slice(0, 4)), Number(keys[0].slice(5, 7)) - 1, 1);
-              return Math.max(Math.round((end - first) / 86400000), 62);
-            })()
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if', state: '__no_points__'}]}"
         card:
           type: custom:apexcharts-card
           header:
@@ -3492,11 +3463,11 @@ views:
           now:
             show: false
           yaxis:
-          - decimals: 0
+          - decimals: 2
           all_series_config:
             type: line
             unit: ' @@valuta@@'
-            float_precision: 0
+            float_precision: 2
             stroke_width: 2
             show:
               legend_value: false
@@ -3581,10 +3552,9 @@ views:
         {% set a = states.sensor.cjp_what_if_settings.attributes %}
         {% set r = a.result %}
         {% set at = a.attempt %}
-        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@', 'connections_estimated_from_battery_statistics': '@@what_if_warning_connections_estimated_from_battery_statistics@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@'} %}
-        {% set notes = {'hindsight': '@@what_if_note_hindsight@@', 'modelled_policy': '@@what_if_note_modelled_policy@@', 'demand_from_recorded_drives': '@@what_if_note_demand_from_recorded_drives@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@', 'extra_top_ups_not_modelled': '@@what_if_note_extra_top_ups_not_modelled@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'solar_not_modelled': '@@what_if_note_solar_not_modelled@@', 'grid_buy_price_only': '@@what_if_note_grid_buy_price_only@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@'} %}
-        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'battery_statistics': '@@what_if_source_battery_statistics@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
+        {% set warnings = {'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@'} %}
+        {% set notes = {'modelled_policy': '@@what_if_note_modelled_policy@@', 'settings_history_not_stored': '@@what_if_note_settings_history_not_stored@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@' } %}
         {% if at and at.status == 'running' -%}
         <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
         {%- elif at and at.status == 'unavailable' -%}
@@ -3593,33 +3563,26 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_no_result@@</ha-alert>
         {%- else -%}
-        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.baseline.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@){% if not r.calibrated_start %} &middot; @@what_if_start_soc@@ {{ r.baseline.start_soc }} %{% endif %}
 
         {% if r.status == 'partial' -%}
         <ha-alert alert-type="warning">@@what_if_partial@@ {{ r.windows.stopped_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}: {{ reasons.get(r.reason, r.reason) }} ({{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@)</ha-alert>
         {%- endif %}
         {% if not r.comparable -%}
-        <ha-alert alert-type="warning">@@what_if_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}</ha-alert>
+        <ha-alert alert-type="warning">@@what_if_not_comparable@@ {{ reasons.get(r.comparable_reason, r.comparable_reason) }}{% if not r.difference %}. @@what_if_b_unit_only@@{% endif %}</ha-alert>
         {%- endif %}
         {% set d = r.difference %}
         {% set s = r.settings %}
         | | @@what_if_b_col_current@@ | @@what_if_b_col_alternative@@ | @@what_if_col_difference@@ |
         |:---|---:|---:|---:|
-        | @@what_if_b_reserve@@ | {{ s.baseline.reserve | round(0) }} % | {{ s.alternative.reserve | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.reserve == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
-        | @@what_if_b_maximum@@ | {{ s.baseline.maximum | round(0) }} % | {{ s.alternative.maximum | round(0) }} % ({{ '@@what_if_b_source_override@@' if s.alternative.sources.maximum == 'override' else '@@what_if_b_source_live_setting@@' }}) | |
-        | @@what_if_row_cost@@ | {{ '%.2f' | format(r.baseline.cost) }} @@valuta@@ | {{ '%.2f' | format(r.alternative.cost) }} @@valuta@@ | {{ ('%.2f' | format(d.cost) ~ ' @@valuta@@') if d else '&ndash;' }} |
+        | @@what_if_b_reserve@@ | {{ s.baseline.reserve | round(0) }} % | {{ s.alternative.reserve | round(0) }} % | |
+        | @@what_if_b_maximum@@ | {{ s.baseline.maximum | round(0) }} % | {{ s.alternative.maximum | round(0) }} % | |
+        | @@what_if_row_kwh@@ | {{ ('%.1f' | format(r.baseline.get('kwh')) ~ ' kWh') if r.baseline.get('kwh') is not none else '&ndash;' }} | {{ ('%.1f' | format(r.alternative.get('kwh')) ~ ' kWh') if r.alternative.get('kwh') is not none else '&ndash;' }} | {{ ('%.1f' | format(r.alternative.kwh - r.baseline.kwh) ~ ' kWh') if d and r.baseline.get('kwh') is not none and r.alternative.get('kwh') is not none else '&ndash;' }} |
+        | @@what_if_row_cost@@ | {{ '%.2f' | format(r.baseline.cost) }} @@valuta@@ | {{ '%.2f' | format(r.alternative.cost) }} @@valuta@@ | {{ ('%.2f' | format(d.cost) ~ ' @@valuta@@') if d else ('&asymp; ' ~ '%.2f' | format(r.alternative.cost - r.baseline.cost) ~ ' @@valuta@@') }} |
         {% if d and d.adjusted_cost is not none -%}
         | @@what_if_row_terminal@@ | | | {{ '%.2f' | format(d.terminal_adjustment) }} @@valuta@@ ({{ '%.1f' | format(d.terminal_energy_kwh) }} kWh) |
         | **@@what_if_row_adjusted@@** | | | **{{ '%.2f' | format(d.adjusted_cost) }} @@valuta@@** |
         {% endif -%}
-        | @@what_if_row_grid@@ | {{ '%.1f' | format(r.baseline.grid_kwh) }} kWh | {{ '%.1f' | format(r.alternative.grid_kwh) }} kWh | {{ ('%.1f' | format(d.grid_kwh) ~ ' kWh') if d else '&ndash;' }} |
-        | @@what_if_row_loss@@ | {{ '%.1f' | format(r.baseline.loss_kwh) }} kWh | {{ '%.1f' | format(r.alternative.loss_kwh) }} kWh | {{ ('%.1f' | format(d.loss_kwh) ~ ' kWh') if d else '&ndash;' }} |
-        | @@what_if_row_unmet_driving@@ | {{ '%.1f' | format(r.baseline.unmet_driving_kwh) }} kWh | {{ '%.1f' | format(r.alternative.unmet_driving_kwh) }} kWh | |
-        | @@what_if_row_lowest@@ | {{ r.baseline.lowest_soc }} % | {{ r.alternative.lowest_soc }} % | |
-        | @@what_if_b_row_arrivals_below@@ | {{ r.baseline.arrivals_below_reserve }} / {{ r.baseline.arrivals }} | {{ r.alternative.arrivals_below_reserve }} / {{ r.alternative.arrivals }} | |
-        | @@what_if_b_row_lowest_arrival@@ | {{ r.baseline.lowest_arrival }} % | {{ r.alternative.lowest_arrival }} % | |
-        | @@what_if_row_final@@ | {{ r.baseline.final_soc }} % | {{ r.alternative.final_soc }} % | |
 
         {% if r.months -%}
         **@@what_if_months@@**
@@ -3627,7 +3590,7 @@ views:
         | @@economy_month@@ | @@what_if_connections@@ | @@what_if_b_col_current@@ | @@what_if_b_col_alternative@@ | @@what_if_col_difference@@ |
         |:---|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        | **{{ m.month }}** | {{ m.windows }} | {{ '%.2f' | format(m.baseline_cost) }} @@valuta@@ | {{ '%.2f' | format(m.alternative_cost) }} @@valuta@@ | {{ (('%.2f' | format(m.alternative_cost - m.baseline_cost) ~ ' @@valuta@@') if r.comparable else '&ndash;') }} |
+        | **{{ m.month }}** | {{ m.windows }} | {{ '%.2f' | format(m.baseline_cost) }} @@valuta@@ | {{ '%.2f' | format(m.alternative_cost) }} @@valuta@@ | {{ ('' if r.comparable else '&asymp; ') ~ '%.2f' | format(m.alternative_cost - m.baseline_cost) ~ ' @@valuta@@' }} |
         {% endfor %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.public_charges }} @@what_if_public@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
@@ -3650,6 +3613,7 @@ views:
       entities:
       - sensor.cjp_what_if_settings
       variables:
+        points: "states['sensor.cjp_what_if_settings'] ? Number(states['sensor.cjp_what_if_settings'].attributes.chart_cost_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_settings'];
@@ -3664,55 +3628,59 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_settings_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' @@valuta@@'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_settings
-          name: '@@what_if_b_col_current@@'
-          color: '#7a7a85'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.baseline_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.baseline_cost]; });
-        - entity: sensor.cjp_what_if_settings
-          name: '@@what_if_b_col_alternative@@'
-          color: '#1baf7a'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.alternative_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.alternative_cost]; });
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_settings', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_settings', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_settings_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: column
+            unit: ' @@valuta@@'
+            float_precision: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_settings
+            name: '@@what_if_b_col_current@@'
+            color: '#7a7a85'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.baseline_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.baseline_cost]; });
+          - entity: sensor.cjp_what_if_settings
+            name: '@@what_if_b_col_alternative@@'
+            color: '#1baf7a'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.alternative_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.alternative_cost]; });
     - type: custom:config-template-card
       entities:
       - sensor.cjp_what_if_settings
       variables:
+        points: "states['sensor.cjp_what_if_settings'] ? Number(states['sensor.cjp_what_if_settings'].attributes.chart_difference_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_settings'];
@@ -3727,48 +3695,51 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_cumulative_diff_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: line
-          unit: ' @@valuta@@'
-          float_precision: 0
-          stroke_width: 2
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          markers:
-            size: 3
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_settings
-          name: '@@what_if_col_difference@@'
-          color: '#1baf7a'
-          data_generator: |
-            const r = entity.attributes.result;
-            if (!r || !r.comparable) return [];
-            let sum = 0;
-            return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.alternative_cost) - Number(m.baseline_cost)))).map(m => { sum += Number(Number(m.alternative_cost) - Number(m.baseline_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_settings', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_settings', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_cumulative_diff_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: line
+            unit: ' @@valuta@@'
+            float_precision: 2
+            stroke_width: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            markers:
+              size: 3
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_settings
+            name: '@@what_if_col_difference@@'
+            color: '#1baf7a'
+            data_generator: |
+              const r = entity.attributes.result;
+              if (!r || !r.comparable) return [];
+              let sum = 0;
+              return ((r && r.months) || []).filter(m => Number.isFinite(Number(Number(m.alternative_cost) - Number(m.baseline_cost)))).map(m => { sum += Number(Number(m.alternative_cost) - Number(m.baseline_cost)); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   # Scenario D: the planned charging with the grid only, no solar, over the selected period (engine/whatif/plan_part.py)
   - type: grid
     column_span: 2
@@ -3813,10 +3784,9 @@ views:
         {% set a = states.sensor.cjp_what_if_no_solar.attributes %}
         {% set r = a.result %}
         {% set at = a.attempt %}
-        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_target_differs': '@@what_if_reason_unmet_target_differs@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
-        {% set warnings = {'events_inside_windows': '@@what_if_warning_events_inside_windows@@', 'prices_legacy_unverified': '@@what_if_warning_prices_legacy_unverified@@', 'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'public_charge_without_drive': '@@what_if_warning_public_charge_without_drive@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'prices_dst_hour_copied': '@@what_if_warning_prices_dst_hour_copied@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'prices_estimated_windows': '@@what_if_warning_prices_estimated_windows@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'prices_from_price_history': '@@what_if_warning_prices_from_price_history@@', 'connections_estimated_from_battery_statistics': '@@what_if_warning_connections_estimated_from_battery_statistics@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@'} %}
-        {% set notes = {'grid_only_no_solar': '@@what_if_ns_note_grid_only@@', 'hindsight': '@@what_if_note_hindsight@@', 'modelled_policy': '@@what_if_note_modelled_policy@@', 'demand_from_recorded_drives': '@@what_if_note_demand_from_recorded_drives@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@', 'extra_top_ups_not_modelled': '@@what_if_note_extra_top_ups_not_modelled@@', 'forced_low_battery_charging_not_modelled': '@@what_if_note_forced_low_battery_charging_not_modelled@@', 'site_limits_not_replayed': '@@what_if_note_site_limits_not_replayed@@', 'standby_not_modelled': '@@what_if_note_standby_not_modelled@@'} %}
-        {% set sources = {'entered': '@@what_if_source_entered@@', 'recorded_state': '@@what_if_source_recorded_state@@', 'statistics_hour_mean': '@@what_if_source_statistics_hour_mean@@', 'battery_statistics': '@@what_if_source_battery_statistics@@', 'unavailable': '@@what_if_source_unavailable@@'} %}
+        {% set reasons = {'no_battery_capacity': '@@what_if_reason_no_battery_capacity@@', 'no_charging_power': '@@what_if_reason_no_charging_power@@', 'no_start_soc': '@@what_if_reason_no_start_soc@@', 'invalid_target': '@@what_if_reason_invalid_target@@', 'no_windows': '@@what_if_reason_no_windows@@', 'invalid_window': '@@what_if_reason_invalid_window@@', 'overlapping_windows': '@@what_if_reason_overlapping_windows@@', 'prices_not_hourly': '@@what_if_reason_prices_not_hourly@@', 'invalid_event': '@@what_if_reason_invalid_event@@', 'invalid_loss_model': '@@what_if_reason_invalid_loss_model@@', 'invalid_power_model': '@@what_if_reason_invalid_power_model@@', 'energy_conservation': '@@what_if_reason_energy_conservation@@', 'missing_prices': '@@what_if_reason_missing_prices@@', 'invalid_day_selection': '@@what_if_reason_invalid_day_selection@@', 'interrupted': '@@what_if_reason_interrupted@@', 'internal_error': '@@what_if_reason_internal_error@@', 'no_drives': '@@what_if_reason_no_drives@@', 'no_days_selected': '@@what_if_reason_no_days_selected@@', 'start_level_stale': '@@what_if_reason_start_level_stale@@', 'unmet_driving_differs': '@@what_if_reason_unmet_driving_differs@@', 'no_prices': '@@what_if_reason_no_prices@@', 'no_change': '@@what_if_reason_no_change@@', 'invalid_settings': '@@what_if_reason_invalid_settings@@', 'too_few_windows': '@@what_if_reason_too_few_windows@@'} %}
+        {% set warnings = {'invalid_input_entries_left_out': '@@what_if_warning_invalid_input_entries_left_out@@', 'many_connections_without_drive': '@@what_if_warning_many_connections_without_drive@@', 'connections_before_drive_history_left_out': '@@what_if_warning_connections_before_drive_history_left_out@@', 'start_level_unknown_calibrated': '@@what_if_warning_start_level_unknown_calibrated@@', 'older_connections_not_validated': '@@what_if_warning_older_connections_not_validated@@', 'estimated_connections_without_prices_left_out': '@@what_if_warning_estimated_connections_without_prices_left_out@@', 'connections_modelled_from_work_plan': '@@what_if_warning_connections_modelled_from_work_plan@@', 'work_plan_model_not_validated': '@@what_if_warning_work_plan_model_not_validated@@'} %}
+        {% set notes = {'modelled_policy': '@@what_if_note_modelled_policy@@', 'last_connection_left_out': '@@what_if_note_last_connection_left_out@@' } %}
         {% if at and at.status == 'running' -%}
         <ha-alert alert-type="info">@@what_if_running@@</ha-alert>
         {%- elif at and at.status == 'unavailable' -%}
@@ -3825,32 +3795,26 @@ views:
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_ns_no_result@@</ha-alert>
         {%- else -%}
-        {%- set d0 = (r.get('coverage') or {}).get('first_window') -%}{%- set d1 = (r.get('coverage') or {}).get('last_window') -%}
-        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@) &middot; {% if d0 and d1 %}@@what_if_data_span@@ {{ d0 | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ d1 | timestamp_custom('%Y-%m-%d', true) }} ({{ ((d1 - d0) / 86400) | round(0) | int }} @@what_if_days_unit@@){% endif %} &middot; @@what_if_start_soc@@ {{ '' if r.calibrated_start else (r.plan.start_soc ~ ' % ') }}({{ sources.get(r.provenance.start_soc, r.provenance.start_soc) }})
+        **@@what_if_result_title@@** ({{ r.computed_at | timestamp_custom('%Y-%m-%d %H:%M', true) }}): {{ r.period.start | timestamp_custom('%Y-%m-%d', true) }} &ndash; {{ r.period.end | timestamp_custom('%Y-%m-%d', true) }} ({{ r.period.days }} @@what_if_days_unit@@){% if not r.calibrated_start %} &middot; @@what_if_start_soc@@ {{ r.plan.start_soc }} %{% endif %}
 
         {% if r.method == 'estimated' -%}
         <ha-alert alert-type="info">@@what_if_ns_method_estimated@@</ha-alert>
         {%- endif %}
+        {% set booking_reasons = {'no_power_history': '@@what_if_a_booking_no_power_history@@', 'no_prices': '@@what_if_a_booking_no_prices@@', 'no_sell_prices': '@@what_if_a_booking_no_sell_prices@@', 'no_levels': '@@what_if_a_booking_no_levels@@', 'implausible': '@@what_if_a_booking_implausible@@', 'outside_charging': '@@what_if_a_booking_outside_charging@@'} %}
         {% set p = r.plan %}
         {% set rec = r.recorded %}
         {% set pm = r.get('plan_measured') or r.plan %}
-        | | @@what_if_ns_col_planned@@ | @@what_if_ns_col_recorded@@ | @@what_if_ns_col_difference@@ |
+        | | @@what_if_ns_col_planned@@ | @@what_if_col_cjp@@ | @@what_if_ns_col_difference@@ |
         |:---|---:|---:|---:|
         | @@what_if_b_reserve@@ | {{ r.settings.reserve | round(0) }} % | | |
         | @@what_if_b_maximum@@ | {{ r.settings.maximum | round(0) }} % | | |
-        | @@what_if_row_cost@@ | {{ pm.cost }} @@valuta@@ | {{ (rec.cost ~ ' @@valuta@@') if rec and rec.cost is not none else '&ndash;' }} | {{ (((pm.cost - rec.cost) | round(2) ~ ' @@valuta@@') if rec and rec.cost is not none else '&ndash;') }} |
-        | @@what_if_row_grid@@ | {{ pm.grid_kwh }} kWh | {{ (rec.kwh ~ ' kWh') if rec and rec.sessions else '&ndash;' }} | {{ (((pm.grid_kwh - rec.kwh) | round(2) ~ ' kWh') if rec and rec.sessions else '&ndash;') }} |
-        | @@what_if_ns_row_unit@@ | {{ (pm.unit ~ ' @@valuta@@') if pm.unit is not none else '&ndash;' }} | {{ (rec.unit ~ ' @@valuta@@') if rec and rec.unit is not none else '&ndash;' }} | {{ (((pm.unit - rec.unit) | round(3) ~ ' @@valuta@@') if pm.unit is not none and rec and rec.unit is not none else '&ndash;') }} |
-        | @@what_if_ns_row_solar@@ | 0 kWh | {{ (rec.solar_kwh ~ ' kWh') if rec and rec.sessions else '&ndash;' }} | {{ (((0 - rec.solar_kwh) | round(2) ~ ' kWh') if rec and rec.sessions else '&ndash;') }} |
-        | @@what_if_row_loss@@ | {{ p.loss_kwh }} kWh | | |
-        | @@what_if_row_unmet_driving@@ | {{ p.unmet_driving_kwh }} kWh | | |
-        | @@what_if_row_lowest@@ | {{ p.lowest_soc }} % | | |
-        | @@what_if_b_row_arrivals_below@@ | {{ p.arrivals_below_reserve }} / {{ p.arrivals }} | | |
-        | @@what_if_b_row_lowest_arrival@@ | {{ p.lowest_arrival }} % | | |
-        | @@what_if_row_final@@ | {{ p.final_soc }} % | | |
+        | @@what_if_row_kwh@@ | {{ ('%.1f' | format(pm.kwh) ~ ' kWh') if pm.get('kwh') is not none else '&ndash;' }} | {{ ('%.1f' | format(rec.kwh) ~ ' kWh') if rec and rec.sessions else '&ndash;' }} | {{ (('%.1f' | format(pm.kwh - rec.kwh) ~ ' kWh') if pm.get('kwh') is not none and rec and rec.sessions else '&ndash;') }} |
+        | @@what_if_row_cost@@ | {{ '%.2f' | format(pm.cost) }} @@valuta@@ | {{ ('%.2f' | format(rec.cost) ~ ' @@valuta@@') if rec and rec.cost is not none else '&ndash;' }} | {{ (('%.2f' | format(pm.cost - rec.cost) ~ ' @@valuta@@') if rec and rec.cost is not none else '&ndash;') }} |
+        | @@what_if_row_unit@@ | {{ ('%.2f' | format(pm.unit) ~ ' @@valuta_kwh@@') if pm.unit is not none else '&ndash;' }} | {{ ('%.2f' | format(rec.unit) ~ ' @@valuta_kwh@@') if rec and rec.unit is not none else '&ndash;' }} | {{ (('%.2f' | format(pm.unit - rec.unit) ~ ' @@valuta_kwh@@') if pm.unit is not none and rec and rec.unit is not none else '&ndash;') }} |
+        | @@what_if_ns_row_solar@@ | 0.0 kWh | {{ ('%.1f' | format(rec.solar_kwh) ~ ' kWh') if rec and rec.sessions else '&ndash;' }} | {{ (('%.1f' | format(0 - rec.solar_kwh) ~ ' kWh') if rec and rec.sessions else '&ndash;') }} |
 
         {% if r.estimate and r.estimate.get('difference_vs_plan') is not none -%}
-        **@@what_if_ns_estimate@@:** @@what_if_ns_at_plan_price@@ {{ r.estimate.get('cost_at_plan_price') }} @@valuta@@ ({{ r.estimate.kwh }} kWh &times; {{ r.estimate.unit }}) &middot; @@what_if_ns_col_recorded@@ {{ r.estimate.recorded_cost }} @@valuta@@ &middot; **@@what_if_ns_difference_vs_plan@@ {{ r.estimate.get('difference_vs_plan') }} @@valuta@@**
+        **@@what_if_ns_estimate@@:** @@what_if_ns_at_plan_price@@ {{ '%.2f' | format(r.estimate.get('cost_at_plan_price')) }} @@valuta@@ ({{ '%.1f' | format(r.estimate.kwh) }} kWh &times; {{ '%.2f' | format(r.estimate.unit) }} @@valuta_kwh@@) &middot; @@what_if_col_cjp@@ {{ '%.2f' | format(r.estimate.recorded_cost) }} @@valuta@@ &middot; **@@what_if_ns_difference_vs_plan@@ {{ '%.2f' | format(r.estimate.get('difference_vs_plan')) }} @@valuta@@**
 
         *@@what_if_ns_difference_vs_plan_note@@*
         {%- elif not rec or not rec.sessions -%}
@@ -3858,20 +3822,27 @@ views:
         {%- endif %}
         {% if rec and rec.get('powerwall_kwh') -%}
 
-        @@what_if_d_powerwall@@: {{ rec.powerwall_kwh }} kWh
+        @@what_if_d_powerwall@@: {{ '%.1f' | format(rec.powerwall_kwh) }} kWh
+        {%- endif %}
+        {% set re = r.get('recorded_estimated') %}
+        {% if re -%}
+
+        @@what_if_ns_estimated_recorded@@ (**@@what_if_annual_estimate@@**): {{ re.connections }} @@what_if_connections@@ &middot; {{ '%.1f' | format(re.kwh) }} kWh &middot; {{ '%.2f' | format(re.cost) }} @@valuta@@{% if re.left_out %} &middot; @@what_if_a_booking_left_out@@: {% for reason, count in re.left_out.items() %}{{ count }} {{ booking_reasons.get(reason, reason) }}{{ '; ' if not loop.last else '' }}{% endfor %}{% endif %}
+
+        *@@what_if_a_estimated_booking@@*
         {%- endif %}
         {% if r.estimated_windows and r.price_estimate is not none -%}
 
-        @@what_if_price_estimate@@: {{ r.price_estimate }} @@valuta@@
+        @@what_if_price_estimate@@: {{ '%.2f' | format(r.price_estimate) }} @@valuta_kwh@@
         {%- endif %}
         {% if r.months -%}
 
         **@@what_if_months@@**
 
-        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_ns_col_planned@@ | @@what_if_ns_col_recorded@@ | @@what_if_ns_col_difference@@ |
+        | @@economy_month@@ | @@what_if_connections@@ | @@what_if_ns_col_planned@@ | @@what_if_col_cjp@@ | @@what_if_ns_col_difference@@ |
         |:---|---:|---:|---:|---:|
         {% for m in r.months | reverse -%}
-        | **{{ m.month }}** | {{ m.windows }} | {{ m.planned_kwh }} kWh / {{ m.planned_cost }} @@valuta@@ | {{ m.recorded_kwh }} kWh / {{ (m.recorded_cost ~ ' @@valuta@@') if m.recorded_cost is not none else '&ndash;' }} | {{ (((m.planned_cost - m.recorded_cost) | round(2) ~ ' @@valuta@@') if m.recorded_cost is not none and m.recorded_kwh else '&ndash;') }} |
+        | **{{ m.month }}** | {{ m.windows }}{% if m.get('estimated_connections') %} ({{ m.estimated_connections }} @@what_if_annual_estimate@@){% endif %} | {{ '%.1f' | format(m.planned_kwh) }} kWh / {{ '%.2f' | format(m.planned_cost) }} @@valuta@@ | {{ (('%.1f' | format(m.recorded_kwh) ~ ' kWh / ' ~ (('%.2f' | format(m.recorded_cost) ~ ' @@valuta@@') if m.recorded_cost is not none else '&ndash;')) if m.recorded_kwh is not none else '&ndash;') ~ ((' (' ~ m.recorded_estimated ~ ' @@what_if_annual_estimate@@)') if m.get('recorded_estimated') else '') }} | {{ (('%.2f' | format(m.planned_cost - m.recorded_cost) ~ ' @@valuta@@') if m.recorded_cost is not none and m.recorded_kwh else '&ndash;') }} |
         {% endfor %}
         {%- endif %}
         **@@what_if_coverage@@:** {{ r.windows.replayed }} / {{ r.windows.total }} @@what_if_connections@@ &middot; {{ r.coverage.drives }} @@what_if_drives@@ &middot; {{ r.coverage.price_hours_missing }} @@what_if_missing_prices@@ ({{ r.coverage.price_hours_covered }} / {{ r.coverage.price_hours_needed }})
@@ -3894,6 +3865,7 @@ views:
       entities:
       - sensor.cjp_what_if_no_solar
       variables:
+        points: "states['sensor.cjp_what_if_no_solar'] ? Number(states['sensor.cjp_what_if_no_solar'].attributes.chart_cost_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_no_solar'];
@@ -3908,55 +3880,59 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_ns_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' @@valuta@@'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_planned@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.planned_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.planned_cost]; });
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_recorded@@'
-          color: '#eda100'
-          data_generator: |
-            const r = entity.attributes.result;
-            const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
-            return ((r && r.months) || []).filter(m => num(m.recorded_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.recorded_cost]; });
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_ns_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: column
+            unit: ' @@valuta@@'
+            float_precision: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_ns_col_planned@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.planned_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.planned_cost]; });
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_col_cjp@@'
+            color: '#eda100'
+            data_generator: |
+              const r = entity.attributes.result;
+              const num = v => v !== null && v !== undefined && Number.isFinite(Number(v));
+              return ((r && r.months) || []).filter(m => num(m.recorded_cost)).map(m => { const d = new Date(m.month + '-15T12:00:00'); return [d.getTime(), m.recorded_cost]; });
     - type: custom:config-template-card
       entities:
       - sensor.cjp_what_if_no_solar
       variables:
+        points: "states['sensor.cjp_what_if_no_solar'] ? Number(states['sensor.cjp_what_if_no_solar'].attributes.chart_unit_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_no_solar'];
@@ -3971,57 +3947,61 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_unit_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - min: 0
-          decimals: 2
-        all_series_config:
-          type: line
-          unit: ' @@valuta_kwh@@'
-          float_precision: 2
-          stroke_width: 2
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          markers:
-            size: 3
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_planned@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => m.planned_kwh > 0 && Number.isFinite(Number(m.planned_cost / m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_cost / m.planned_kwh)]);
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_recorded@@'
-          color: '#eda100'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => m.recorded_cost !== null && m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_cost / m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_cost / m.recorded_kwh)]);
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_unit_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - min: 0
+            decimals: 2
+          all_series_config:
+            type: line
+            unit: ' @@valuta_kwh@@'
+            float_precision: 2
+            stroke_width: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            markers:
+              size: 3
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_ns_col_planned@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => m.planned_kwh > 0 && Number.isFinite(Number(m.planned_cost / m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_cost / m.planned_kwh)]);
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_col_cjp@@'
+            color: '#eda100'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => m.recorded_cost !== null && m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_cost / m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_cost / m.recorded_kwh)]);
     - type: custom:config-template-card
       entities:
       - sensor.cjp_what_if_no_solar
       variables:
+        points: "states['sensor.cjp_what_if_no_solar'] ? Number(states['sensor.cjp_what_if_no_solar'].attributes.chart_energy_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_no_solar'];
@@ -4036,49 +4016,52 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_energy_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' kWh'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_planned@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_kwh)]);
-        - entity: sensor.cjp_what_if_no_solar
-          name: '@@what_if_ns_col_recorded@@'
-          color: '#eda100'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_kwh)]);
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_no_solar', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_energy_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 1
+          all_series_config:
+            type: column
+            unit: ' kWh'
+            float_precision: 1
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_ns_col_planned@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.planned_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.planned_kwh)]);
+          - entity: sensor.cjp_what_if_no_solar
+            name: '@@what_if_col_cjp@@'
+            color: '#eda100'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => m.recorded_kwh > 0 && Number.isFinite(Number(m.recorded_kwh))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.recorded_kwh)]);
   # Scenario D: the EV's solar energy replaced by grid energy at the same charging times (engine/whatif/solar.py)
   - type: grid
     column_span: 2
@@ -4112,7 +4095,7 @@ views:
         {% set total = (r.get('total') or {}) if r else {} %}
         {% set reasons = {'no_solar_configured': '@@what_if_d_reason_no_solar_configured@@', 'no_price_provider': '@@what_if_d_reason_no_price_provider@@', 'waiting_for_new_sessions': '@@what_if_d_reason_waiting_for_new_sessions@@', 'no_sell_prices': '@@what_if_d_reason_no_sell_prices@@', 'no_buy_prices': '@@what_if_d_reason_no_buy_prices@@', 'no_solar_sessions': '@@what_if_d_reason_no_solar_sessions@@', 'internal_error': '@@what_if_reason_internal_error@@'} %}
         {% set left = {'public': '@@what_if_d_left_public@@', 'still_charging': '@@what_if_d_left_still_charging@@', 'invalid': '@@what_if_d_left_invalid@@', 'without_solar': '@@what_if_d_left_without_solar@@', 'before_energy_fix': '@@what_if_d_left_before_energy_fix@@', 'missing_buy_price': '@@what_if_d_left_missing_buy_price@@', 'missing_sell_price': '@@what_if_d_left_missing_sell_price@@', 'not_captured': '@@what_if_d_left_not_captured@@'} %}
-        {% set notes = {'ev_solar_exported_instead': '@@what_if_d_note_ev_solar_exported_instead@@', 'solar_spread_evenly_over_session': '@@what_if_d_note_solar_spread_evenly_over_session@@', 'home_battery_kept_as_recorded': '@@what_if_d_note_home_battery_kept_as_recorded@@', 'no_whole_house_result': '@@what_if_d_note_no_whole_house_result@@', 'replanned_without_solar_not_modelled': '@@what_if_d_note_replanned_without_solar_not_modelled@@', 'no_solar_production_not_modelled': '@@what_if_d_note_no_solar_production_not_modelled@@', 'recorded_sessions_only': '@@what_if_d_note_recorded_sessions_only@@', 'solar_from_power_history': '@@what_if_d_note_solar_from_power_history@@', 'production_price_assumed_current': '@@what_if_d_note_production_price_assumed_current@@', 'hourly_solar_upper_bound': '@@what_if_d_note_hourly_solar_upper_bound@@'} %}
+        {% set notes = {'solar_from_power_history': '@@what_if_d_note_solar_from_power_history@@', 'production_price_assumed_current': '@@what_if_d_note_production_price_assumed_current@@'} %}
         {% if not r -%}
         <ha-alert alert-type="info">@@what_if_d_reason_no_solar_sessions@@</ha-alert>
         {%- else -%}
@@ -4127,23 +4110,20 @@ views:
         {% set count = (m.sessions ~ ' / ' ~ m.get('hours', 0)) if src == 'mixed' else (m.get('hours', 0) if src == 'power_history' else m.sessions) -%}
         {% set mark = '&#42;' if m.get('upper_bound') else '' -%}
         {% if m.status == 'completed' -%}
-        | **{{ m.month }}** | {{ count }} | {{ m.solar_kwh }} kWh{{ mark }} | {{ m.grid_cost }} @@valuta@@ | {{ m.sell_value }} @@valuta@@ | {{ m.advantage }} @@valuta@@{{ mark }} |
+        | **{{ m.month }}** | {{ count }} | {{ '%.1f' | format(m.solar_kwh) }} kWh{{ mark }} | {{ '%.2f' | format(m.grid_cost) }} @@valuta@@ | {{ '%.2f' | format(m.sell_value) }} @@valuta@@ | {{ '%.2f' | format(m.advantage) }} @@valuta@@{{ mark }} |
         {% else -%}
-        | **{{ m.month }}** | {{ count }} | {{ m.solar_kwh }} kWh{{ mark }} | {{ m.grid_cost }} @@valuta@@ | {{ m.sell_value }} @@valuta@@ | *@@economy_subscription_current@@* |
+        | **{{ m.month }}** | {{ count }} | {{ '%.1f' | format(m.solar_kwh) }} kWh{{ mark }} | {{ '%.2f' | format(m.grid_cost) }} @@valuta@@ | {{ '%.2f' | format(m.sell_value) }} @@valuta@@ | *@@economy_subscription_current@@* |
         {% endif -%}
         {% endfor %}
         {% if total.get('months') -%}
         {% set mark = '&#42;' if total.get('upper_bound') else '' -%}
-        **@@what_if_d_total@@ ({{ total.get('months') }}):** {{ total.solar_kwh }} kWh{{ mark }} &middot; {{ total.grid_cost }} @@valuta@@ &rarr; {{ total.sell_value }} @@valuta@@ &middot; @@what_if_d_col_advantage@@ **{{ total.advantage }} @@valuta@@**{{ mark }}
+        **@@what_if_d_total@@ ({{ total.get('months') }}):** {{ '%.1f' | format(total.solar_kwh) }} kWh{{ mark }} &middot; {{ '%.2f' | format(total.grid_cost) }} @@valuta@@ &rarr; {{ '%.2f' | format(total.sell_value) }} @@valuta@@ &middot; @@what_if_d_col_advantage@@ **{{ '%.2f' | format(total.advantage) }} @@valuta@@**{{ mark }}
         {% endif -%}
         {%- endif %}
         {% if r.get('upper_bound') -%}
-        {% set led = r.get('ledger') or {} -%}
-        {% set est = r.get('estimated') or {} %}
 
         <ha-alert alert-type="warning">&#42; @@what_if_d_upper_bound@@</ha-alert>
 
-        **@@what_if_d_from_sessions@@:** @@what_if_d_col_sessions@@ {{ led.get('sessions', 0) }} &middot; {{ led.get('solar_kwh', 0) }} kWh &middot; **@@what_if_d_estimated_hours@@:** @@what_if_d_col_hours@@ {{ est.get('hours', 0) }} &middot; {{ est.get('solar_kwh', 0) }} kWh
         {%- endif %}
         {% set items = (r.get('left_out') or {}).items() | selectattr('1', 'gt', 0) | list %}
         {% if items -%}
@@ -4155,17 +4135,9 @@ views:
 
         **@@what_if_d_hours_left_out@@:** {% for item in hours_left %}{{ left.get(item[0], item[0]) }} ({{ item[1] }}){{ ' &middot; ' if not loop.last }}{% endfor %}
         {%- endif %}
-        {% if r.get('sell_tariff_unknown_hours') -%}
-
-        @@what_if_d_sell_tariff_unknown@@: {{ r.get('sell_tariff_unknown_hours') }}
-        {%- endif %}
         {% if r.get('powerwall_kwh') -%}
 
-        @@what_if_d_powerwall@@: {{ r.get('powerwall_kwh') }} kWh
-        {%- endif %}
-        {% if r.get('solar_energy_since') or r.get('sell_prices_since') -%}
-
-        {% if r.get('solar_energy_since') %}@@what_if_d_since@@ {{ r.get('solar_energy_since') | timestamp_custom('%Y-%m-%d', true) }}{% endif %}{% if r.get('solar_energy_since') and r.get('sell_prices_since') %} &middot; {% endif %}{% if r.get('sell_prices_since') %}@@what_if_d_sell_since@@ {{ r.get('sell_prices_since') | timestamp_custom('%Y-%m-%d', true) }}{% endif %}
+        @@what_if_d_powerwall@@: {{ '%.1f' | format(r.get('powerwall_kwh')) }} kWh
         {%- endif %}
         {% if r.get('notes') -%}
 
@@ -4183,6 +4155,7 @@ views:
       entities:
       - sensor.cjp_what_if_solar
       variables:
+        points: "states['sensor.cjp_what_if_solar'] ? Number(states['sensor.cjp_what_if_solar'].attributes.chart_value_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_solar'];
@@ -4197,53 +4170,57 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_solar_value_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: column
-          unit: ' @@valuta@@'
-          float_precision: 0
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_solar
-          name: '@@what_if_d_col_grid@@'
-          color: '#eb6834'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.grid_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.grid_cost)]);
-        - entity: sensor.cjp_what_if_solar
-          name: '@@what_if_d_col_sell@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes.result;
-            return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.sell_value))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.sell_value)]);
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_solar', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_solar', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_solar_value_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: column
+            unit: ' @@valuta@@'
+            float_precision: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_solar
+            name: '@@what_if_d_col_grid@@'
+            color: '#eb6834'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.grid_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.grid_cost)]);
+          - entity: sensor.cjp_what_if_solar
+            name: '@@what_if_d_col_sell@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes.result;
+              return ((r && r.months) || []).filter(m => true && Number.isFinite(Number(m.sell_value))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.sell_value)]);
     - type: custom:config-template-card
       entities:
       - sensor.cjp_what_if_solar
       variables:
+        points: "states['sensor.cjp_what_if_solar'] ? Number(states['sensor.cjp_what_if_solar'].attributes.chart_cumulative_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_what_if_solar'];
@@ -4258,47 +4235,50 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_solar_cumulative_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: line
-          unit: ' @@valuta@@'
-          float_precision: 0
-          stroke_width: 2
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          markers:
-            size: 3
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_what_if_solar
-          name: '@@what_if_d_col_advantage@@'
-          color: '#1baf7a'
-          data_generator: |
-            const r = entity.attributes.result;
-            let sum = 0;
-            return ((r && r.months) || []).filter(m => m.status === 'completed' && Number.isFinite(Number(m.advantage))).map(m => { sum += Number(m.advantage); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_what_if_solar', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_what_if_solar', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_solar_cumulative_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: line
+            unit: ' @@valuta@@'
+            float_precision: 2
+            stroke_width: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            markers:
+              size: 3
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_what_if_solar
+            name: '@@what_if_d_col_advantage@@'
+            color: '#1baf7a'
+            data_generator: |
+              const r = entity.attributes.result;
+              let sum = 0;
+              return ((r && r.months) || []).filter(m => m.status === 'completed' && Number.isFinite(Number(m.advantage))).map(m => { sum += Number(m.advantage); return [new Date(m.month + '-15T12:00:00').getTime(), Math.round(sum * 100) / 100]; });
   - type: grid
     column_span: 2
     cards:
@@ -4345,21 +4325,22 @@ views:
         |:---|---:|---:|---:|
         {% for m in e.months | reverse -%}
         {% if m.subscription_status == 'recorded' -%}
-        | **{{ m.month }}** | {{ m.subscription_recorded_cost | round(0) }} @@valuta@@ | {{ m.subscription_price | round(0) }} @@valuta@@ | {{ m.subscription_saving | round(0) }} @@valuta@@ |
+        | **{{ m.month }}** | {{ '%.2f' | format(m.subscription_recorded_cost) }} @@valuta@@ | {{ '%.2f' | format(m.subscription_price) }} @@valuta@@ | {{ '%.2f' | format(m.subscription_saving) }} @@valuta@@ |
         {% elif m.subscription_status == 'current' -%}
-        | **{{ m.month }}** | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '&ndash;' }} | &ndash; | *@@economy_subscription_current@@* |
+        | **{{ m.month }}** | {{ ('%.2f' | format(m.cost) ~ ' @@valuta@@') if m.cost is not none else '&ndash;' }} | &ndash; | *@@economy_subscription_current@@* |
         {% elif m.subscription_status == 'incomplete' -%}
         | **{{ m.month }}** | &ndash; | &ndash; | *@@economy_subscription_incomplete@@* |
         {% endif -%}
         {% endfor %}
 
-        {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ sub.recorded_cost | round(0) }} @@valuta@@ &rarr; {{ sub.price | round(0) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ sub.saving | round(0) }} @@valuta@@{% endif %}
+        {% if sub.comparable_months %}**@@economy_subscription_total@@ ({{ sub.comparable_months }}):** {{ '%.2f' | format(sub.recorded_cost) }} @@valuta@@ &rarr; {{ '%.2f' | format(sub.price) }} @@valuta@@ &middot; @@economy_subscription_difference@@ {{ '%.2f' | format(sub.saving) }} @@valuta@@{% endif %}
         {%- endif %}
       grid_options: *id001
     - type: custom:config-template-card
       entities:
       - sensor.cjp_economy
       variables:
+        points: "states['sensor.cjp_economy'] ? Number(states['sensor.cjp_economy'].attributes.subscription_chart_points) : 0"
         span_days: |
           (() => {
             const s = states['sensor.cjp_economy'];
@@ -4374,49 +4355,52 @@ views:
           })()
       grid_options: *id001
       card:
-        type: custom:apexcharts-card
-        header:
-          show: true
-          title: '@@what_if_chart_subscription_title@@'
-          show_states: false
-        graph_span: ${vars.span_days + "d"}
-        span:
-          end: month
-        now:
-          show: false
-        yaxis:
-        - decimals: 0
-        all_series_config:
-          type: line
-          unit: ' @@valuta@@'
-          float_precision: 0
-          stroke_width: 2
-          show:
-            legend_value: false
-            in_header: false
-        apex_config:
-          tooltip:
-            shared: true
-            intersect: false
-          chart:
-            height: 280px
-          dataLabels:
-            enabled: false
-          markers:
-            size: 3
-          xaxis:
-            labels:
-              format: MMM yy
-        series:
-        - entity: sensor.cjp_economy
-          name: '@@economy_subscription_recorded@@'
-          color: '#eda100'
-          data_generator: |
-            const r = entity.attributes;
-            return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_recorded_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_recorded_cost)]);
-        - entity: sensor.cjp_economy
-          name: '@@economy_subscription_price@@'
-          color: '#2a78d6'
-          data_generator: |
-            const r = entity.attributes;
-            return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_price))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_price)]);
+        type: conditional
+        conditions: "${points > 0 ? [{condition: 'state', entity: 'sensor.cjp_economy', state_not: '__no_points__'}] : [{condition: 'state', entity: 'sensor.cjp_economy', state: '__no_points__'}]}"
+        card:
+          type: custom:apexcharts-card
+          header:
+            show: true
+            title: '@@what_if_chart_subscription_title@@'
+            show_states: false
+          graph_span: ${vars.span_days + "d"}
+          span:
+            end: month
+          now:
+            show: false
+          yaxis:
+          - decimals: 2
+          all_series_config:
+            type: line
+            unit: ' @@valuta@@'
+            float_precision: 2
+            stroke_width: 2
+            show:
+              legend_value: false
+              in_header: false
+          apex_config:
+            tooltip:
+              shared: true
+              intersect: false
+            chart:
+              height: 280px
+            dataLabels:
+              enabled: false
+            markers:
+              size: 3
+            xaxis:
+              labels:
+                format: MMM yy
+          series:
+          - entity: sensor.cjp_economy
+            name: '@@economy_subscription_recorded@@'
+            color: '#eda100'
+            data_generator: |
+              const r = entity.attributes;
+              return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_recorded_cost))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_recorded_cost)]);
+          - entity: sensor.cjp_economy
+            name: '@@economy_subscription_price@@'
+            color: '#2a78d6'
+            data_generator: |
+              const r = entity.attributes;
+              return ((r && r.months) || []).filter(m => m.subscription_status === 'recorded' && Number.isFinite(Number(m.subscription_price))).map(m => [new Date(m.month + '-15T12:00:00').getTime(), Number(m.subscription_price)]);

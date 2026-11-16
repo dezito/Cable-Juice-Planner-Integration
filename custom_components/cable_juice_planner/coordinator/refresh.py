@@ -287,7 +287,6 @@ class CoordinatorRefresh:
                     statistics_during_period, self.hass, first, end, set(price_ids), "hour", None, {"mean", "state"}
                 )
                 recorded = {}
-                sources = {}
                 for price_id in price_ids:
                     hourly = {}
                     for row in stats.get(price_id, []):
@@ -295,17 +294,11 @@ class CoordinatorRefresh:
                         if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
                             hourly[stat_ts(row)] = float(value)
                     recorded[price_id] = hourly
-                from_statistics = {price_id: len(hourly) for price_id, hourly in recorded.items()}
                 filled = await self._async_fill_hours(instance, {pid: set(h) for pid, h in recorded.items()}, first, end, keep_days)
                 for price_id, hourly in recorded.items():
                     for hour, row in filled[price_id].items():
                         hourly.setdefault(hour, row[0])  # a statistic always wins
-                    sources[price_id] = {
-                        "statistics": from_statistics[price_id], "states": len(hourly) - from_statistics[price_id],
-                        "first": min(hourly, default=None), "last": max(hourly, default=None),
-                    }
                 data["prices"] = provider.combine_history(recorded)
-                data["price_sources"] = sources
             await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts, keep_days)
             await self._async_economy_ev_statistics(instance, data, end, stat_ts, keep_days)
             if odometer_id:

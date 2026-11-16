@@ -238,12 +238,18 @@ private agent memory). Update or remove a note when it stops being true.
   outside them (a lost kWh makes CJP look cheaper, so it is never dropped
   silently). Sessions of the same calendar day are merged
   (`engine/history/combine.py`) and have lost their hours, so a merged day that
-  spans two connections is split between them by time and flagged; the booked
+  spans two connections is split between them by time; the booked
   price is one per session (the price when it was booked), and grid energy
   booked at 0 is a missing price, not a free night.
+  Before the first history entry, what CJP charged in an estimated connection is
+  estimated from the recorder's hourly statistics of solar, house and charger
+  power (`engine/whatif/estimated_booking.py`; only available when all three
+  entities are set). Nothing is filled in: a connection with a missing reading,
+  price or battery level, or whose energy does not match its battery levels, is
+  left out with a reason.
   The comparison covers the whole period asked for: a connection that cannot be
-  read (history does not reach it, an invalid entry, an estimated connection
-  without a stored price) is a gap, never the end. The connections form
+  read (an invalid entry, an estimated connection without a stored price, one
+  before the history without an estimate) is a gap, never the end. The connections form
   stretches without a gap, each replayed on its own (`replay_segments`) from its
   own battery level at the start and at the end, read from the history; a level
   is never carried over a gap, and a stretch without a known start level
@@ -521,8 +527,13 @@ The seed data and simulator entities are in `../ha-dev/devcontainer/seed.py`
 Run the suite with `../ha-dev/run_tests_windows.ps1 cjp
 [pytest args]`. The first run installs Python 3.14 and the test requirements
 in `%LOCALAPPDATA%\ha-dev-tests\venv`; the shims in `../ha-dev/windows`
-(fcntl, resource, a pytest plugin that disables the socket guard) must be on
-`PYTHONPATH` when calling that venv directly. The system Python 3.11 lacks
+(fcntl, resource, a pytest plugin that disables the socket guard and linecache's
+file-staleness check) must be on `PYTHONPATH` when calling that venv directly.
+The runner executes the suite in parallel with pytest-xdist; pass `'-n' '0'`
+(quoted, otherwise PowerShell reads it as a script parameter) to debug in one
+process with `-x`, `-s` or `--pdb`. Tests must not depend on the run being slow:
+wait for real conditions or real time, not a fixed number of `sleep(0)` yields.
+The system Python 3.11 lacks
 HA/astral. Do not create the venv on a network drive; it installs extremely
 slowly. The Docker run `../ha-dev/dev.ps1 test cjp [pytest args]` is the
 reference. The dev HA runs locally in Docker Desktop, not on a remote server;

@@ -26,12 +26,16 @@ from ..soc_power import planning_power_cap
 from .derive import derive_windows
 from .inputs import build_replay_input, loss_factor_from_table, power_cap_from_model
 from .recorded import TOLERANCE, allocate, history_rows, outside_kwh
-from .replay import GAP_TOLERANCE, REPLAY_MODEL_VERSION, PolicyResult, Recorded, ReplayResult, replay_segments
+from .charts import points_cjp_against_smart
+from .estimated_booking import charging_outside, estimate_booking
+from .replay import GAP_TOLERANCE, REPLAY_MODEL_VERSION, PolicyResult, Recorded, ReplayResult, drop_removed_codes, replay_segments
 
 _LOGGER = logging.getLogger(__name__)
 
-OUTSIDE_KWH_TOLERANCE = 1.0  # kWh of CJP charging that lies outside every connection before the card says so
+OUTSIDE_KWH_TOLERANCE = 1.0  # kWh of CJP charging that lies outside the connections before the estimates of CJP's charging are dropped
 OUTSIDE_SHARE = 0.1  # of the kWh CJP charged during the estimated connections: more than this outside them and they are not used
+ENERGY_SHOWN = ("start_soc", "end_soc")  # (the rest of the energy balance stays in the replay, not on the sensor)
+UNIT_PRICES_NOT_PUBLISHED = ("smart_at_cjp_kwh", "asap_at_cjp_kwh")
 ESTIMATE_COVERAGE_KEYS = ("derived_status", "derived_reason", "modelled_status", "modelled_reason")
 
 
@@ -45,7 +49,6 @@ ANNUAL_MEASURED_DAYS = 360  # from this the connections cover a year and the fig
 DEFAULT_DEPARTURE_SECONDS = 7 * 3600  # with Fill up the car is taken to leave at 07:00 (like the planner assumes)
 WHAT_IF_DAYS = (7, 365)  # the shortest, and the lowest the longest can be (see what_if_max_days: the days kept, 403 by default)
 WHAT_IF_DEFAULT_DAYS = 30
-DAY_SELECTIONS = ("all", "work_plan", "monday_friday", "weekend")
 WHAT_IF_WINDOW_ROWS = 60  # the newest connection windows kept in the result for the dashboard
 
 
@@ -199,6 +202,11 @@ class WhatIf:
                 "estimated_unpriced_left_out": selected_coverage["estimated_unpriced_left_out"],
                 "estimated_unpriced_until": selected_coverage["estimated_unpriced_until"],
                 "recorded_estimated_outside_kwh": selected_coverage["recorded_estimated_outside_kwh"],
+                # (what could not be estimated for CJP's side is said, also when the estimates are not used: nothing was booked)
+                "recorded_estimated_booked": 0, "recorded_estimated_booked_kwh": 0.0, "recorded_estimated_booked_local_kwh": 0.0,
+                "recorded_estimated_booking_refused": selected_coverage.get("recorded_estimated_booking_refused") or {},
+                "recorded_estimated_booking_outside_kwh": selected_coverage.get("recorded_estimated_booking_outside_kwh", 0.0),
+                "recorded_estimated_booking_assumed_hours": 0,
                 **(
                     {"recorded_reason": selected_coverage["recorded_reason"], "recorded_stop_at": selected_coverage["recorded_stop_at"]}
                     if reason == "no_record" else {}
@@ -219,7 +227,10 @@ class WhatIf:
         left out are counted with their reason."""
         windows = list(data.windows)
         estimated = {w.start for w in windows if w.derived}
-        records, reasons, split, outside = self._what_if_recorded_charging(windows, estimated)
+        records, reasons, split, outside, history_start = self._what_if_recorded_charging(windows, estimated)
+        # the estimated connections from before the history: what CJP charged in them, from the hourly statistics
+        booked, refused, booking_outside, booking_assumed = self._what_if_estimated_booking(data, windows, records, reasons, history_start)
+        records = {**records, **booked}
         # an estimated connection is not priced by estimate: no price is made up for something that is itself an estimate
         unpriced = {w.start for w in windows if w.derived and any(h not in data.prices for h in _hours_of(w))}
         skipped: dict[float, str] = {}
@@ -248,6 +259,10 @@ class WhatIf:
             "estimated_unpriced_until": max((w.end for w in windows if w.start in unpriced), default=None),
             "recorded_candidates": len(windows), "recorded_windows": len(readable), "recorded_left_out": left_out,
             "recorded_skipped": counts, "recorded_estimated_outside_kwh": 0.0, "recorded_estimated_kwh": 0.0,
+            "recorded_estimated_booked": len(booked), "recorded_estimated_booked_kwh": round(sum(r.kwh for r in booked.values()), 3),
+            "recorded_estimated_booked_local_kwh": round(sum(r.local_kwh for r in booked.values()), 3),
+            "recorded_estimated_booking_refused": refused, "recorded_estimated_booking_outside_kwh": round(booking_outside, 3),
+            "recorded_estimated_booking_assumed_hours": booking_assumed,
         }
         if not readable:
             reason_window = next((w for w in reversed(windows) if w.start in skipped), newest)
@@ -265,8 +280,6 @@ class WhatIf:
         for flag, wanted in (
             ("windows_before_recorded_gap_left_out", bool(left_out)),
             ("estimated_connections_without_prices_left_out", bool(unpriced)),
-            ("recorded_sessions_outside_connections", outside_total > OUTSIDE_KWH_TOLERANCE),
-            ("recorded_days_split", bool(split_days)),
             ("recorded_segments", len(segments) > 1),
         ):
             if wanted and flag not in warnings:
@@ -295,9 +308,74 @@ class WhatIf:
             data, windows=tuple(readable), warnings=tuple(warnings), recorded={w.start: records[w.start] for w in readable}
         ), coverage
 
+    def _what_if_estimated_booking(
+        self, data: Any, windows: list[Any], records: dict[float, Recorded], reasons: dict[float, str], history_start: float | None,
+    ) -> tuple[dict[float, Recorded], dict[str, int], float, int]:
+        """What CJP charged in the estimated connections that end before its charging history begins (Scenario A), from the
+        recorder's hourly statistics. Returns (what was booked per connection, the connections left out by reason, the charger
+        kWh outside every connection, the hours whose production price was assumed). A connection that straddles the start of
+        the history is not estimated: its booked entries are used."""
+        candidates = [
+            w for w in windows
+            if w.derived and not w.modelled and w.start not in records and reasons.get(w.start) == "before_history"
+            and history_start is not None and w.end <= history_start
+        ]
+        estimates, refused, outside, assumed = self._what_if_booking_estimates(data, candidates, windows)
+        booked = {
+            start: Recorded(kwh=e["kwh"], percent=e["percent"], cost=e["cost"], local_kwh=e["local_kwh"]) for start, e in estimates.items()
+        }
+        return booked, dict(Counter(refused.values())), outside, assumed
+
+    def _what_if_booking_estimates(
+        self, data: Any, candidates: list[Any], windows: list[Any]
+    ) -> tuple[dict[float, dict[str, Any]], dict[float, str], float, int]:
+        """The estimate of what CJP charged (engine/whatif/estimated_booking.py: the charger kWh of the hourly statistics, the solar
+        share of it valued the way CJP values it, the rest at the grid price) in each of the candidate connections, with why the
+        others have none. Used by Scenario A and by the one without solar, so both give the same figures. Nothing is filled in:
+        a connection without an hour of statistics, a price, a sell price or a battery level is left out (a connection modelled
+        from the work plan has no statistics at all). When charging the connections do not cover is large, no connection is
+        estimated: the CJP side would miss it and look cheaper than it was.
+        Returns (estimates by start, why not by start, the charger kWh outside every connection, the assumed production hours)."""
+        if not candidates:
+            return {}, {}, 0.0, 0
+        power_hours, sell, production, assumed = self._solar_hour_tables()
+        battery = self.config["ev_car"].get("battery_size")
+        try:
+            loss = float(data.loss_factor(float(data.max_kw)))
+            battery = float(battery)
+            if not (math.isfinite(loss) and loss >= 0.0 and math.isfinite(battery) and battery > 0.0):
+                raise ValueError("no loss or battery size")
+        except Exception:  # noqa: BLE001
+            return {}, {w.start: "implausible" for w in candidates}, 0.0, 0
+        estimates: dict[float, dict[str, Any]] = {}
+        refused: dict[float, str] = {}
+        assumed_hours = 0
+        for window in candidates:
+            if getattr(window, "modelled", False):
+                refused[window.start] = "no_power_history"
+                continue
+            result = estimate_booking(
+                window.start, window.end, data.start_levels.get(window.start), data.end_levels.get(window.start),
+                power_hours, data.prices, sell, production, assumed, battery, loss,
+            )
+            if isinstance(result, str):
+                refused[window.start] = result
+            else:
+                estimates[window.start] = result
+                assumed_hours += result["assumed_hours"]
+        if not estimates:
+            return {}, refused, 0.0, 0
+        outside = charging_outside(
+            power_hours, [(w.start, w.end) for w in windows], min(w.start for w in candidates), max(w.end for w in candidates),
+        )
+        kwh = sum(e["kwh"] for e in estimates.values())
+        if outside > OUTSIDE_KWH_TOLERANCE and outside > OUTSIDE_SHARE * (kwh + outside):
+            return {}, {**refused, **{start: "outside_charging" for start in estimates}}, outside, 0
+        return estimates, refused, outside, assumed_hours
+
     def _what_if_recorded_charging(
         self, windows: list[Any], estimated: Collection[float] = ()
-    ) -> tuple[dict[float, Recorded], dict[float, str], Callable[[float, float], int], Callable[[float, float], float]]:
+    ) -> tuple[dict[float, Recorded], dict[float, str], Callable[[float, float], int], Callable[[float, float], float], float | None]:
         """What CJP charged in each connection, from its charging history (engine/whatif/recorded.py: every entry laid over the
         connections by overlap in time, public charging taken out). A connection that cannot be read is not in the first dict
         and says why in the second (not settled, invalid history, before the history). The last two are the number of merged
@@ -326,7 +404,8 @@ class WhatIf:
         def split(first: float, last: float) -> int:
             return sum(1 for row, shares in zip(rows, weights) if len(shares) > 1 and first - TOLERANCE <= row["ts"] <= last)
 
-        return records, allocation["reasons"], split, lambda first, last: outside_kwh(rows, weights, first, last)
+        history_start = min((row["ts"] for row in rows), default=None)
+        return records, allocation["reasons"], split, lambda first, last: outside_kwh(rows, weights, first, last), history_start
 
     def _what_if_deadline(self, window: Any) -> float | None:
         """The planned departure inside a connection, for the charger "smart" stands for: the work plan's departure of the
@@ -487,12 +566,8 @@ class WhatIf:
             else:
                 end_soc = number(level.get("end_soc"))
                 end_source = str(level.get("end_source") or "unavailable") if end_soc is not None else "unavailable"
-            warnings = data.warnings
-            if "statistics_hour_mean" in (source, end_source) and "levels_approximate" not in warnings:
-                # the mean of the hour of a plug-in or unplug holds the driving next to it: the energy balance rests on it
-                warnings = (*warnings, "levels_approximate")
             calculations.append(replace(
-                data, windows=windows, events=events, start_soc=soc, end_soc=end_soc, arrival_reserve=arrival, warnings=warnings,
+                data, windows=windows, events=events, start_soc=soc, end_soc=end_soc, arrival_reserve=arrival,
                 recorded={w.start: data.recorded[w.start] for w in windows}, may_calibrate=index > 0,
                 provenance={**data.provenance, "start_soc": source, "end_soc": end_source},
             ))
@@ -527,11 +602,8 @@ class WhatIf:
         if policy is None:
             return None
         return {
-            "cost": _round(policy.cost, 2), "grid_kwh": _round(policy.grid_kwh, 3), "charged_kwh": _round(policy.charged_kwh, 3),
-            "loss_kwh": _round(policy.loss_kwh, 3), "unmet_target_kwh": _round(policy.unmet_target_kwh, 3),
-            "unmet_driving_kwh": _round(policy.unmet_driving_kwh, 3), "targets_met": policy.targets_met,
-            "windows": len(policy.windows), "start_soc": _round(policy.start_soc, 1), "final_soc": _round(policy.final_soc, 1),
-            "lowest_soc": _round(policy.lowest_soc, 1),
+            "cost": _round(policy.cost, 2), "kwh": _round(policy.grid_kwh, 3), "windows": len(policy.windows),
+            "start_soc": _round(policy.start_soc, 1),
         }
 
     def _what_if_result(
@@ -556,8 +628,7 @@ class WhatIf:
             "estimated_windows": result.estimated_windows,
             "price_estimate": _round(result.price_estimate, 4),
             "calibrated_start": result.calibrated_start,
-            # (hours from the price entity's recorded history are an ordinary source here, as in BattMind: no warning for them)
-            "warnings": [w for w in result.warnings if w != "prices_from_price_history"],
+            "warnings": list(result.warnings),
             "notes": list(result.notes),
             "provenance": dict(result.provenance),
             "ignored_events": result.ignored_events,
@@ -568,13 +639,14 @@ class WhatIf:
             "average_price": _round(result.average_price, 4),
             "difference": self._differences_rounded(result.difference),
             "differences": {key: self._differences_rounded(value) for key, value in result.differences.items()} if result.differences else None,
-            "energy": {key: _round(value, 2) for key, value in result.energy.items()} if result.energy else None,
-            "unit_prices": {key: _round(value, 4) for key, value in result.unit_prices.items()} if result.unit_prices else None,
+            "energy": {key: _round(result.energy.get(key), 2) for key in ENERGY_SHOWN} if result.energy else None,
+            "unit_prices": {
+                key: _round(value, 4) for key, value in result.unit_prices.items() if key not in UNIT_PRICES_NOT_PUBLISHED
+            } if result.unit_prices else None,
             "annual": None,
             "months": [],
             "rows": [],
             "derived": None,
-            "price_sources": self.economy_db.get("price_sources") or None,
         }
         if result.smart is None or result.asap is None or result.cjp is None:
             return published
@@ -587,7 +659,7 @@ class WhatIf:
             key = self._economy_local(smart.end).strftime("%Y-%m")
             month = months.setdefault(key, {
                 "month": key, "windows": 0, "estimated_connections": 0, "cjp_cost": 0.0, "smart_cost": 0.0, "asap_cost": 0.0, "grid_kwh": 0.0,
-                "smart_grid_kwh": 0.0, "asap_grid_kwh": 0.0, "targets_met": 0, "unmet_target_kwh": 0.0,
+                "smart_grid_kwh": 0.0, "asap_grid_kwh": 0.0,
             })
             month["windows"] += 1
             month["estimated_connections"] += 1 if cjp.derived else 0  # (the connection itself is an estimate, not its prices)
@@ -601,12 +673,10 @@ class WhatIf:
             month["grid_kwh"] += cjp.grid_kwh
             month["smart_grid_kwh"] += smart.grid_kwh
             month["asap_grid_kwh"] += asap.grid_kwh
-            month["targets_met"] += 1 if cjp.unmet_target_kwh <= 1e-6 else 0
-            month["unmet_target_kwh"] += cjp.unmet_target_kwh
             rows.append({
                 "start": smart.start, "end": smart.end, "soc_in": _round(cjp.soc_in, 1), "soc_out": _round(cjp.soc_out, 1),
                 "cjp_cost": _round(cjp.cost, 2), "smart_cost": _round(smart.cost, 2), "asap_cost": _round(asap.cost, 2),
-                "kwh": _round(cjp.grid_kwh, 2), "unmet_kwh": _round(cjp.unmet_target_kwh, 2),
+                "kwh": _round(cjp.grid_kwh, 2),
                 "estimated": cjp.derived, "modelled": cjp.modelled,
             })
         # A month's cost is not comparable between the three: they end it at different battery levels. The difference of two
@@ -743,6 +813,8 @@ class WhatIf:
             # a new calculation
             self.economy_db.pop("what_if", None)
             self.mark_dirty("economy")
+        elif drop_removed_codes(saved):
+            self.mark_dirty("economy")
         attempt = self.economy_db.get("what_if_attempt")
         if isinstance(attempt, dict) and attempt.get("status") == "running":
             self.economy_db["what_if_attempt"] = {**attempt, "status": "unavailable", "reason": "interrupted"}
@@ -758,4 +830,6 @@ class WhatIf:
         difference = (result or {}).get("difference") if complete else None
         self.set_state("what_if", difference.get("adjusted_cost") if difference else None)
         self.set_attr("what_if", "result", result)
+        for key, points in points_cjp_against_smart(result).items():
+            self.set_attr("what_if", key, points)  # (the dashboard hides a chart that has no points)
         self.set_attr("what_if", "attempt", self.economy_db.get("what_if_attempt"))
