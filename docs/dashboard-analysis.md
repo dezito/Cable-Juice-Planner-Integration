@@ -711,7 +711,7 @@ Without those statistics (an entity or its history is missing) only CJP's own re
 
 A session whose span lacks a stored buy or sell price for any hour is left out and counted; no price is ever
 filled in (the buy price may come from the price sensor's recorded statistics). The card shows how many sessions were left out and why (public charging, still charging, an
-unreadable data such as an end time, no solar energy, recorded before the solar energy was stored as energy, not
+unreadable data such as an end time, no solar energy, no stored solar energy (an older session, recorded before the solar energy was stored as energy), not
 priced in time, a missing buy or sell price). Because sessions and prices are only recorded from the first run, an
 existing installation shows no result at first: it fills as new solar sessions are recorded. It is an estimate,
 not a guaranteed or actual saving.

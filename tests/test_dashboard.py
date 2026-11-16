@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from types import SimpleNamespace
 
+import pytest
 import yaml
 from jinja2 import Environment
 from homeassistant.components.lovelace.const import LOVELACE_DATA
@@ -450,6 +451,16 @@ def test_entity_help_uses_spaced_bold_italic_labels() -> None:
     assert load_texts("da")["dashboard.economy_explain"].startswith("**Gns.**:")
     assert "***Solcelleproduktion til rådighed***\n" in load_texts("da")["entity_help.solar_charging"]
     assert "***Batteriniveau og ladegrænse***\n" in load_texts("da")["dashboard.history_explain"]
+
+
+@pytest.mark.parametrize("language", ["da", "de", "en", "en-GB", "pl", "uk"])
+def test_learned_distance_explanation_keeps_its_labels_in_every_language(language: str) -> None:
+    """The semicolons of the text must not split a label or lower its case: each label is its own bold-italic line."""
+    texts = load_texts(language, "GBP", "km")
+    lines = format_analysis_help_text(texts["dashboard.learn_distance_explain"]).split("\n")
+    for key in ("learn_distance_entered", "learn_distance_learned", "learn_distance_days"):
+        label = texts[f"dashboard.{key}"].split(" (")[0]
+        assert f"***{label}***" in lines, (language, label, lines)
 
 
 def test_entity_help_uses_current_number_states(hass: HomeAssistant) -> None:
