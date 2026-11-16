@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import re
 from dataclasses import replace
 from unittest.mock import patch
@@ -19,6 +20,7 @@ from .conftest import OBJECT_PREFIX
 from .test_dashboard import OPTIONS, _cards, _own
 from .test_economy import _engine, _ts
 from .test_engine import DAY
+from .test_whatif_dashboard import assert_decimals
 from .test_whatif_coordinator import _seed as _seed_coordinator
 from .test_whatif_engine import _seed as _seed_connections
 from .test_whatif_engine import snapshot_with
@@ -42,13 +44,12 @@ BUTTON = f"button.{OBJECT_PREFIX}_run_what_if_no_solar"
 def test_the_plan_buys_all_energy_from_the_grid_in_the_cheapest_hours_to_the_need_plus_the_reserve() -> None:
     prices = {n: (0.2 if 2 <= n % 24 <= 4 else 1.0) for n in range(60)}
     result = replay_plan(three_days(prices), LIVE)
-    assert result.status == "ok" and result.method == "strict" and "grid_only_no_solar" in result.notes
+    assert result.status == "ok" and result.method == "strict" and "modelled_policy" in result.notes and "grid_only_no_solar" not in result.notes
     assert result.windows_replayed == 2 and len(result.targets) == 2
     plan = result.plan
     assert plan.grid_kwh == pytest.approx(plan.charged_kwh * (1.0 + LOSS))  # the loss is on the charger side
     assert plan.cost / plan.grid_kwh < result.average_price  # the cheap hours were used
     assert result.max_conservation_error_kwh < 1e-6
-    assert result.readiness.arrivals == 2 and result.readiness.arrivals_below_reserve == 0
 
 
 def test_the_plan_estimates_missing_prices_and_calibrates_an_unknown_start_and_says_so() -> None:
@@ -57,7 +58,7 @@ def test_the_plan_estimates_missing_prices_and_calibrates_an_unknown_start_and_s
         del prices[i]
     result = replay_plan(replace(three_days(prices), start_soc=None), LIVE)
     assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1 and result.calibrated_start
-    assert result.price_estimate == pytest.approx(1.0) and {"prices_estimated_windows", "start_level_unknown_calibrated"} <= set(result.warnings)
+    assert result.price_estimate == pytest.approx(1.0) and "start_level_unknown_calibrated" in result.warnings
     assert result.plan.windows[0].calibrated and result.plan.windows[0].cost == 0.0
 
 
@@ -108,7 +109,7 @@ def test_the_plan_replays_the_period_and_compares_it_with_the_recorded_charging(
     assert estimate["cost_at_plan_price"] == pytest.approx(20.0 * r["plan_measured"]["unit"], abs=0.01)
     assert estimate["difference_vs_plan"] == pytest.approx(18.0 - estimate["cost_at_plan_price"], abs=0.011)
     assert result.states["what_if_no_solar"] == estimate["difference_vs_plan"]
-    assert "grid_only_no_solar" in r["notes"] and engine.economy_db["what_if_no_solar"]["computed_at"] == r["computed_at"]
+    assert "modelled_policy" in r["notes"] and "grid_only_no_solar" not in r["notes"] and engine.economy_db["what_if_no_solar"]["computed_at"] == r["computed_at"]
     assert r["months"] and r["months"][0]["recorded_kwh"] > 0
     assert "what_if" not in engine.economy_db and "what_if_settings" not in engine.economy_db  # the other scenarios keep their own
 
@@ -164,6 +165,7 @@ def test_no_recorded_drive_means_unknown_demand() -> None:
 # --------------------------------------------------------------------------- dashboard
 
 
+@functools.cache  # building the whole dashboard once per language: the tests render the card for many attributes
 def _content(language: str) -> str:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
@@ -191,15 +193,41 @@ async def test_the_card_shows_the_plan_the_recorded_charging_the_estimate_and_th
     attributes = _attributes()
     out = await _render(hass, "en", attributes)
     for expected in (
-        "Latest result", "Current settings, from the grid (no solar)", "Recorded (with solar)", "Difference (without solar - recorded)", "Price per kWh", "Of which solar energy", "Estimate for the recorded energy",
-        "Difference vs plan (recorded - at the plan's price)", "This is not the value of the solar energy", "Per month", "Coverage", "Estimate: part of the data was missing", "first connection is only used to bring the car",
-        "All energy is bought from the grid", "Assumptions and what is not included", "Homecomings below the current reserve",
+        "Latest result", "Current settings, from the grid (no solar)", "CJP", "Difference (without solar - CJP)", "Price per kWh", "Of which solar energy", "Estimate for CJP's energy",
+        "Difference vs plan (CJP - at the plan's price)", "This is not the value of the solar energy", "Per month", "Coverage", "Estimate: part of the data was missing", "first connection is only used to bring the car",
+        "Assumptions and what is not included",
     ):
         assert expected in out, expected
+    for gone in ("Energy from the charger", "Charging loss", "Driving that could not be covered", "Lowest battery level", "Final battery level", "Homecomings below", "Lowest homecoming"):
+        assert f"| {gone}" not in out, gone
     assert "None" not in out and "Undefined" not in out and "@@" not in out
     r = attributes["result"]
     assert str(r["plan"]["cost"]) in out and str(r["estimate"]["difference_vs_plan"]) in out and str(r["recorded"]["cost"]) in out
     assert "Solar advantage" not in out
+
+
+async def test_the_table_has_the_energy_charged_by_the_plan_and_by_cjp_and_an_old_result_without_it_shows_a_dash(hass: HomeAssistant) -> None:
+    attributes = _attributes()
+    r = attributes["result"]
+    row = next(line for line in (await _render(hass, "en", attributes)).splitlines() if line.startswith("| Charged (kWh) |"))
+    assert r["plan_measured"]["kwh"] > 0 and f"{r['plan_measured']['kwh']:.1f} kWh" in row and f"{r['recorded']['kwh']:.1f} kWh" in row
+    old = {**attributes, "result": {**r, "plan_measured": {k: v for k, v in r["plan_measured"].items() if k != "kwh"}, "plan": {k: v for k, v in r["plan"].items() if k != "kwh"}}}
+    row = next(line for line in (await _render(hass, "en", old)).splitlines() if line.startswith("| Charged (kWh) |"))
+    assert row.split("|")[2].strip() == "&ndash;"
+
+
+async def test_a_month_with_estimated_connections_says_how_many_and_a_measured_or_older_result_says_nothing(hass: HomeAssistant) -> None:
+    attributes = _attributes()
+    r = attributes["result"]
+    assert all(m["estimated_connections"] == 0 for m in r["months"])  # measured data only in the seed
+    month = r["months"][0]["month"]
+    marked = {**r, "months": [{**r["months"][0], "estimated_connections": 2}, *r["months"][1:]]}
+    older = {**r, "months": [{k: v for k, v in m.items() if k != "estimated_connections"} for m in r["months"]]}
+    rows = {}
+    for name, result in (("measured", r), ("marked", marked), ("older", older)):
+        out = await _render(hass, "en", {**attributes, "result": result})
+        rows[name] = next(line for line in out.splitlines() if line.startswith(f"| **{month}**"))
+    assert "(2 ESTIMATE)" in rows["marked"] and "ESTIMATE" not in rows["measured"] and "ESTIMATE" not in rows["older"]
 
 
 async def test_a_result_saved_before_the_difference_and_measured_span_fields_still_renders(hass: HomeAssistant) -> None:
@@ -212,7 +240,7 @@ async def test_a_result_saved_before_the_difference_and_measured_span_fields_sti
 
 async def test_every_language_renders_without_missing_texts_and_every_warning_and_reason_is_translated(hass: HomeAssistant) -> None:
     attributes = _attributes()
-    warnings = ["prices_estimated_windows", "start_level_unknown_calibrated", "prices_from_price_history", "events_inside_windows"]
+    warnings = ["start_level_unknown_calibrated"]
     for language in LANGUAGES:
         result = {**attributes["result"], "warnings": warnings}
         out = await _render(hass, language, {**attributes, "result": result})
@@ -230,7 +258,7 @@ async def test_without_a_recorded_comparison_the_card_says_so(hass: HomeAssistan
     attributes = _attributes()
     result = {**attributes["result"], "estimate": None, "recorded": {"sessions": 0, "kwh": 0.0, "cost": None, "solar_kwh": 0.0, "unit": None}}
     out = await _render(hass, "en", {**attributes, "result": result})
-    assert "No recorded private charging in the period to compare with." in out and "Difference vs plan" not in out
+    assert "No private charging by CJP in the period to compare with." in out and "Difference vs plan" not in out
 
 
 async def test_a_result_saved_with_the_older_estimate_keys_still_renders_and_is_migrated_on_load(hass: HomeAssistant) -> None:
@@ -261,13 +289,13 @@ async def test_running_and_empty_states(hass: HomeAssistant) -> None:
 def test_the_read_more_covers_what_the_section_shows() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     view = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing))["views"][3]
-    explain = next(c["content"] for c in _cards(view) if "Takes the solar charging out completely" in c.get("content", ""))
+    explain = next(c["content"] for c in _cards(view) if "Takes the solar charging out and plans the period again" in c.get("content", ""))
     assert "what the solar was worth" not in explain and "value of the solar energy." not in explain
     for phrase in (
-        "period", "battery level at the first plug-in", "Run what-if without solar", "nothing changes in the plan", "planned grid-only charging", "price per kWh",
-        "estimate", "table per month", "price sensor history", "estimated price", "calibrates", "fewer than half", "latest connection is left out",
-        "fold-out", "result sensor", "house limits", "standby", "difference vs plan", "positive number means the recorded charging cost more",
-        "not the value of the solar energy", "charging times and price choices", "after the solar energy was stored as energy",
+        "period", "battery level at the first plug-in", "Run what-if without solar", "nothing changes in the plan", "grid-only charging", "price per kWh",
+        "estimate", "table per month", "price history", "estimated price", "common level", "fewer than half", "latest connection is left out",
+        "assumptions", "house limits", "standby", "difference vs plan", "positive means CJP's charging cost more",
+        "not the value of the solar energy", "charging times and price choices", "after solar energy was stored as energy",
     ):
         assert phrase.lower() in explain.lower(), phrase
 
@@ -346,7 +374,7 @@ def test_the_plan_uses_the_prices_net_of_the_refund_like_the_recorded_cost() -> 
     gross = _run(engine, snap)[1].value["plan"]
     engine.price_provider.refund = 0.25
     net = _run(engine, snap)[1].value["plan"]
-    assert net["unit"] == pytest.approx(gross["unit"] - 0.25, abs=0.01) and net["grid_kwh"] == gross["grid_kwh"]
+    assert net["unit"] == pytest.approx(gross["unit"] - 0.25, abs=0.01) and net["cost"] < gross["cost"]
     engine.price_provider.refund = 0.0
 
 
@@ -361,3 +389,9 @@ def test_the_recorded_span_starts_after_a_calibrating_first_connection() -> None
     assert windows
     r = _run(engine, snap, {"soc": None, "source": "unavailable"})[1].value
     assert r["calibrated_start"] and r["recorded"]["sessions"] == 0  # the session in the calibrating connection is not compared
+
+
+async def test_money_has_two_decimals_and_energy_one_decimal(hass: HomeAssistant) -> None:
+    out = await _render(hass, "en", _attributes())
+    assert "kWh" in out
+    assert_decimals(out)

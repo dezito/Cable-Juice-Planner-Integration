@@ -1,6 +1,7 @@
 """The What-if Scenario D card rendered by Home Assistant's own template engine."""
 from __future__ import annotations
 
+import functools
 import re
 
 import yaml
@@ -11,6 +12,7 @@ from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
 
 from .test_dashboard import OPTIONS, _cards, _own
+from .test_whatif_dashboard import assert_decimals
 from .test_whatif_solar import compare, hour, session
 
 LANGUAGES = ("da", "de", "en", "en-GB", "pl", "uk")
@@ -24,6 +26,7 @@ def _view(language: str) -> dict:
     return yaml.safe_load(text)["views"][3]
 
 
+@functools.cache  # building the whole dashboard once per language: the tests render the card for many attributes
 def _content(language: str) -> str:
     return next(c["content"] for c in _cards(_view(language)) if c.get("type") == "markdown" and SOLAR_CARD in c.get("content", ""))
 
@@ -32,7 +35,7 @@ def _result(**kwargs) -> dict:
     months = {hour(10): "2026-01", hour(30): "2026-02"}
     sessions = [session(hour(10), hour(11), 2.0, powerwall=1.5), session(hour(30), hour(31), 3.0), {**session(hour(40), hour(41), 1.0), "public": True}]
     result = compare(sessions, month_of=lambda ts: months.get(ts, "2026-02"), current="2026-02", since=hour(-5), **kwargs)
-    return {**result, "computed_at": hour(50), "sell_prices_since": hour(0)}
+    return {**result, "computed_at": hour(50)}
 
 
 async def _render(hass: HomeAssistant, language: str, result: dict | None) -> str:
@@ -50,13 +53,13 @@ def test_the_view_has_a_scenario_d_section_that_asks_for_nothing_and_reads_its_o
     explain = next(c["content"] for c in _cards(view) if "the same kWh are priced twice" in c.get("content", ""))
     # the Read more covers every element of the card
     for phrase in (
-        "never changes the plan", "estimate", "refund", "never treated as free", "positive means", "per month", "completed months",
-        "not added", "evenly", "recorded cost", "left out", "public charging", "still charging", "unreadable", "no solar energy",
-        "recorded before", "missing stored buy or sell price", "home battery", "since when", "no price is ever filled in",
-        "existing history gives no result", "not physically no solar production", "replanned", "no whole-house result",
-        "priced once", "not priced in time", "fold-out with the assumptions", "marked incomplete",
-        "no recorded session covers", "upper bound", "asterisk", "recorded sessions and what was estimated", "left out for a missing price",
-        "sessions, charging hours, or both",
+        "never changes anything", "estimate", "refund", "never treated as free", "positive means", "per month", "only completed months",
+        "time-weighted", "left out", "public charging", "still charging", "no solar energy",
+        "missing stored price", "home battery", "no price is ever filled in",
+        "fills as new solar sessions are recorded", "not physically no solar production", "no whole-house result",
+        "the assumptions", "marked incomplete",
+        "no recorded session covers", "upper bound", "asterisk", "left out for a missing price",
+        "charging hours",
     ):
         assert phrase.lower() in explain.lower(), phrase
 
@@ -67,8 +70,7 @@ async def test_a_result_shows_months_the_total_what_was_left_out_and_the_assumpt
     for expected in (
         "Month", "Sessions", "Solar energy", "At the grid price", "Sale it replaced", "Solar advantage", "2026-01", "2026-02",
         "Completed months (1)", "The current month is incomplete", "Left out", "public charging (1)", "Home battery energy in these sessions",
-        "1.5 kWh", "Solar energy usable since", "Sell prices stored since", "Assumptions and what is not included",
-        "Charging replanned without solar is not modelled", "No whole-house result is claimed",
+        "1.5 kWh",
     ):
         assert expected in out, expected
     assert "None" not in out and "Undefined" not in out and "@@" not in out
@@ -117,7 +119,7 @@ def _mixed_result() -> dict:
         power, {hour(10): 1.0, hour(20): 1.0}, dict.fromkeys(power, 0.4), {}, -1.0, 0.0, hour(100), "2026-02", lambda ts: "2026-01", [entry],
     )
     assert result["source"] == "mixed" and result["upper_bound"]
-    return {**result, "computed_at": hour(50), "sell_prices_since": hour(0), "solar_energy_since": hour(-5)}
+    return {**result, "computed_at": hour(50), "solar_energy_since": hour(-5)}
 
 
 async def test_estimated_hours_are_marked_as_an_upper_bound_with_the_split_and_the_hours_left_out(hass: HomeAssistant) -> None:
@@ -125,9 +127,7 @@ async def test_estimated_hours_are_marked_as_an_upper_bound_with_the_split_and_t
     out = await _render(hass, "en", result)
     for expected in (
         "Sessions / Charging hours", "| 1 / 1 |", "3.5 kWh&#42;", "&#42; Includes charging hours that no recorded session covers",
-        "upper bound", "From recorded sessions:", "Sessions 1", "1.5 kWh", "Estimated from hourly averages (upper bound):",
-        "Charging hours 1", "2.0 kWh", "Charging hours left out:", "missing buy price (1)",
-        "Hours that no recorded session covers are estimated from the hourly averages",
+        "upper bound", "Charging hours left out:", "missing buy price (1)",
     ):
         assert expected in out, expected
     assert "covered_by_sessions" not in out and "None" not in out and "Undefined" not in out
@@ -148,3 +148,9 @@ async def test_every_language_marks_the_estimated_hours_without_missing_texts(ha
 async def test_no_result_at_all_shows_that_nothing_has_been_recorded_yet(hass: HomeAssistant) -> None:
     out = await _render(hass, "en", None)
     assert "No finished charging session with solar energy has been recorded" in out and "Press" not in out
+
+
+async def test_money_has_two_decimals_and_energy_one_decimal(hass: HomeAssistant) -> None:
+    out = await _render(hass, "en", _result())
+    assert "kWh" in out
+    assert_decimals(out)

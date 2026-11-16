@@ -32,10 +32,9 @@ def test_a_higher_reserve_is_replayed_against_the_current_settings() -> None:
         "alternative": {"reserve": 50.0, "maximum": 90.0, "sources": {"reserve": "override", "maximum": "live_setting"}},
     }
     assert r["windows"] == {"total": 5, "replayed": 4, "stopped_at": None}  # the last connection's next drive is unknown
-    assert r["alternative"]["grid_kwh"] > r["baseline"]["grid_kwh"] and r["difference"]["cost"] > 0
-    assert r["alternative"]["final_soc"] > r["baseline"]["final_soc"]
-    assert r["difference"]["terminal_energy_kwh"] > 0 and r["difference"]["adjusted_cost"] < r["difference"]["cost"]
-    assert r["baseline"]["unmet_driving_kwh"] == 0 and r["alternative"]["unmet_driving_kwh"] == 0
+    assert r["difference"]["cost"] > 0 and set(r["baseline"]) == {"cost", "kwh", "windows", "start_soc"}  # what the card shows, nothing more
+    assert r["baseline"]["kwh"] > 0 and r["alternative"]["kwh"] > r["baseline"]["kwh"]  # the higher reserve charges more energy
+    assert r["difference"]["terminal_energy_kwh"] > 0 and r["difference"]["adjusted_cost"] < r["difference"]["cost"]  # the higher reserve ends higher
     assert "modelled_policy" in r["notes"] and "settings_history_not_stored" in r["notes"] and r["conservation_error_kwh"] < 1e-6
     assert [m["windows"] for m in r["months"]] == [4] and len(r["rows"]) == 4
     assert r["rows"][0]["baseline_target"] == 50.0 and r["rows"][0]["alternative_target"] == 70.0

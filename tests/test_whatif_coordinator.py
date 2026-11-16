@@ -104,8 +104,10 @@ async def test_the_button_reads_the_levels_replays_and_publishes(hass: HomeAssis
         await _press(hass)
     state = hass.states.get(SENSOR)
     result = state.attributes["result"]
+    # the sensor entity carries the points of its charts: the view hides a chart that has none
+    assert state.attributes["chart_cost_points"] == len(result["months"]) > 0 and state.attributes["chart_difference_points"] > 0
     assert result["status"] == "ok" and result["provenance"]["start_soc"] == "recorded_state" and result["provenance"]["end_soc"] == "recorded_state"
-    assert result["cjp"]["start_soc"] == 55.0 and result["cjp"]["final_soc"] == 70.0 and result["windows"]["replayed"] == 3
+    assert result["cjp"]["start_soc"] == 55.0 and result["energy"]["end_soc"] == 70.0 and result["windows"]["replayed"] == 3
     assert result["cjp"]["cost"] < result["asap"]["cost"]
     assert state.state == str(result["difference"]["adjusted_cost"])
     assert state.attributes["attempt"]["status"] == "ok"

@@ -78,7 +78,6 @@ def test_the_history_is_laid_over_the_estimated_connections_before_the_measured_
     assert prepared["first_window_start"] == coverage["first_window"] == _evening(max(OLDER_BACKS))[0]
     # the level at the first estimated connection is the statistics', not the entered one (that belongs to a measured connection)
     assert r["provenance"]["start_soc"] == "battery_statistics" and r["provenance"]["windows"] == "measured_and_estimated_from_battery_statistics"
-    assert "connections_estimated_from_battery_statistics" in r["warnings"]
     # every connection is CJP's 20 % at 0.3: the estimated ones are not left without what CJP charged
     assert r["cjp"]["cost"] == pytest.approx((len(OLDER_BACKS) + len(MEASURED_BACKS)) * _kwh(engine) * 0.3, abs=0.01)
     # marked: rows, months and the estimated part on its own
@@ -209,7 +208,7 @@ def test_connections_modelled_from_the_work_plan_have_no_start_level_so_the_firs
     assert r["provenance"]["start_soc"] == "unavailable" and r["calibrated_start"] is True and r["method"] == "estimated"
     # the first connection only brings all three to the same level: nothing CJP charged in it is counted anywhere
     total = r["windows"]["total"]
-    assert r["energy"]["charged_percent"] == pytest.approx(20.0 * (total - 1)) and r["energy"]["start_soc"] == r["target"]["battery_level"]
+    assert r["energy"]["start_soc"] == r["target"]["battery_level"]
     assert r["cjp"]["cost"] == pytest.approx((total - 1) * _kwh(engine) * 0.3, abs=0.01)
     assert r["rows"][0]["estimated"] is True and r["rows"][0]["modelled"] is True and r["rows"][-1]["modelled"] is False
     assert r["annual"] is None or r["annual"]["method"] == "estimated"

@@ -752,7 +752,7 @@ def test_what_if_subscription_template_branches() -> None:
             {"month": "2026-09", "cost": None, "subscription_status": "incomplete"},
         ],
     })
-    assert re.search(r"\| \*\*2026-10\*\* \| 150(\.0)? kr \| 100(\.0)? kr \| 50(\.0)? kr \|", full)
+    assert re.search(r"\| \*\*2026-10\*\* \| 150\.00 kr \| 100\.00 kr \| 50\.00 kr \|", full)  # money has two decimals
     assert "Ufuldstændig ladehistorik" in full
     assert "Sammenlignelige måneder (1):" in full
 

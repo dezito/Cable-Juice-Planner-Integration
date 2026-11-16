@@ -869,9 +869,7 @@ async def test_economy_fills_the_hours_the_statistics_lack_from_the_recorder_sta
     prices = captured["prices"]
     assert prices[(hour - datetime.timedelta(hours=10)).timestamp()] == 2.0  # a statistic always wins
     assert prices[(hour - datetime.timedelta(hours=100)).timestamp()] == pytest.approx(1.0 + 100 // 24)  # older: from the states
-    info = captured["price_sources"][PRICE]
-    assert info["statistics"] == 48 and info["states"] > 150 and info["first"] < info["last"]
-    assert coordinator.engine.economy_db["price_sources"][PRICE]["statistics"] == 48
+    assert "price_sources" not in captured and "price_sources" not in coordinator.engine.economy_db
 
 
 async def test_economy_does_not_read_the_recorder_states_when_the_statistics_cover_the_period(hass: HomeAssistant, loaded_entry) -> None:

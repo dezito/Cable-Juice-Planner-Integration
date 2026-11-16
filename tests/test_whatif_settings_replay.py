@@ -9,11 +9,11 @@ import pytest
 from custom_components.cable_juice_planner.engine.whatif.replay import (
     CjpSettings,
     Event,
-    replay,
     replay_settings,
     settings_target,
 )
 
+from .planner_replay import replay
 from .test_whatif_replay import LOSS, flat, hour, make
 
 LIVE = CjpSettings(reserve=30.0, maximum=90.0)
@@ -87,7 +87,7 @@ def test_the_reserve_has_no_effect_when_the_maximum_already_decides_the_level() 
     assert result.comparable
     assert result.targets["baseline"] == result.targets["alternative"] == [80.0, 80.0]
     assert result.difference["cost"] == pytest.approx(0.0)
-    assert result.difference["grid_kwh"] == pytest.approx(0.0)
+    assert result.alternative.grid_kwh == pytest.approx(result.baseline.grid_kwh)
 
 
 def test_both_settings_are_replayed_by_the_same_charging_physics_and_prices() -> None:
@@ -108,15 +108,6 @@ def test_the_last_connection_is_left_out_because_its_next_drive_is_unknown() -> 
 def test_a_single_connection_is_not_enough() -> None:
     result = replay_settings(make([(0, 8)], flat(10), start=50.0), LIVE, CjpSettings(50.0, 90.0))
     assert result.status == "unavailable" and result.reason == "too_few_windows"
-
-
-def test_the_two_settings_are_judged_against_one_reserve() -> None:
-    # the baseline reserve (30) is the yardstick for both: the lower reserve arrives below it
-    data = make([(0, 8), (20, 28), (40, 48)], flat(50), events=[drive(12, 20.0), drive(30, 20.0)], start=40.0)
-    result = replay_settings(data, LIVE, CjpSettings(reserve=10.0, maximum=90.0))
-    assert result.baseline_readiness.arrivals_below_reserve == 0
-    assert result.alternative_readiness.arrivals_below_reserve == 2
-    assert result.alternative_readiness.lowest_arrival == pytest.approx(10.0)  # also the level after the last drive
 
 
 # --------------------------------------------------------------------------- honesty gates
@@ -175,7 +166,7 @@ def test_a_connection_without_prices_is_priced_at_one_flat_price_for_both_settin
         del prices[i]  # connection 2 has no price
     result = replay_settings(three_days(prices), LIVE, CjpSettings(reserve=50.0, maximum=90.0))
     assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1
-    assert result.windows_replayed == 2 and "prices_estimated_windows" in result.warnings
+    assert result.windows_replayed == 2 and result.estimated_windows
     base, alt = result.baseline.windows[1], result.alternative.windows[1]
     assert base.estimated and alt.estimated
     # both settings pay the same estimated price per kWh: the one that charges more does not get its energy for free

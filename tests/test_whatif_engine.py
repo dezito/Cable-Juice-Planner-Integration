@@ -75,14 +75,14 @@ def test_scenario_a_compares_what_cjp_charged_with_smart_and_asap_and_publishes_
     assert r["target"] == {"battery_level": 90.0, "source": "live_setting"}
     assert r["provenance"]["start_soc"] == "entered" and r["provenance"]["end_soc"] == "recorded_state"
     # CJP charged 20 % in the cheap hours every night; smart and asap fill up to the target from the level the car came home with
-    assert r["cjp"]["final_soc"] == pytest.approx(70.0) and r["smart"]["final_soc"] == pytest.approx(90.0) and r["asap"]["final_soc"] == pytest.approx(90.0)
     assert r["cjp"]["cost"] < r["smart"]["cost"] < r["asap"]["cost"]
-    # the same driving: the recorded 20 % after four connections, and nothing more to balance (the record fits the drives)
-    assert r["energy"]["gap_percent"] == pytest.approx(0.0, abs=0.01) and r["energy"]["charged_percent"] == pytest.approx(100.0)
-    assert r["energy"]["driven_percent"] == pytest.approx(80.0)
+    # the same driving, and nothing more to balance (the record fits the drives): the three are balanced and adjusted
+    assert r["energy"] == {"start_soc": 50.0, "end_soc": 70.0}
+    assert "energy_not_balanced" not in r["warnings"] and r["difference"]["adjusted_cost"] is not None
     assert r["coverage"]["drives"] == 4 and r["coverage"]["recorded_windows"] == 5 and r["coverage"]["recorded_left_out"] == 0
     assert r["warnings"] == [] and r["conservation_error_kwh"] < 1e-6
-    assert {"recorded_charging", "booked_cost", "smart_planned_departure", "energy_balanced_to_cjp"} <= set(r["notes"])
+    assert {"booked_cost", "smart_hindsight_prices", "energy_balanced_to_cjp"} <= set(r["notes"])
+    assert not {"recorded_charging", "site_limits_not_replayed", "standby_not_modelled", "smart_planned_departure"} & set(r["notes"])
     assert [m["windows"] for m in r["months"]] == [5] and r["months"][0]["cjp_cost"] == pytest.approx(r["cjp"]["cost"], abs=0.01)
     # three differences, the headline one is CJP against charging at once, valued with what the one that holds more energy paid
     assert set(r["differences"]) == {"cjp_asap", "cjp_smart", "smart_asap"} and r["difference"] == r["differences"]["cjp_asap"]
@@ -90,11 +90,12 @@ def test_scenario_a_compares_what_cjp_charged_with_smart_and_asap_and_publishes_
     # the price per kWh of each: CJP and Smart buy in the cheap hours (0.3), charging at once from the plug-in (1.0)
     unit = r["unit_prices"]
     assert unit["cjp"] == pytest.approx(0.3, abs=0.01) and unit["asap"] == pytest.approx(1.0, abs=0.01) and unit["smart"] < unit["asap"]
-    assert unit["cjp_kwh"] == pytest.approx(r["cjp"]["grid_kwh"], abs=0.01) and unit["cjp_vs_asap"] < 0
+    assert unit["cjp_kwh"] == pytest.approx(r["months"][0]["grid_kwh"], abs=0.01) and unit["cjp_vs_asap"] < 0
     # the same indication per month (one month here: it is the figure of the whole period)
     month = r["months"][0]
     assert month["cjp_vs_asap_unit"] == pytest.approx(unit["cjp_vs_asap"], abs=0.01) and month["cjp_vs_smart_unit"] == pytest.approx(unit["cjp_vs_smart"], abs=0.01)
-    assert month["smart_grid_kwh"] == pytest.approx(r["smart"]["grid_kwh"], abs=0.01) and month["asap_grid_kwh"] == pytest.approx(r["asap"]["grid_kwh"], abs=0.01)
+    assert unit["smart"] * month["smart_grid_kwh"] == pytest.approx(r["smart"]["cost"], abs=0.05)  # the energy of the month at its price per kWh is its cost
+    assert unit["asap"] * month["asap_grid_kwh"] == pytest.approx(r["asap"]["cost"], abs=0.05)
     # published on the sensor and saved for the next restart
     assert result.attributes["what_if"]["result"]["difference"] == r["difference"]
     assert result.states["what_if"] == r["difference"]["adjusted_cost"]
@@ -211,7 +212,7 @@ def test_every_stretch_has_its_own_levels_and_the_months_add_up_to_the_adjusted_
     level = {"soc": 50.0, "source": "entered", "end_soc": 70.0, "end_source": "recorded_state"}
     r = _run(engine, snap, {**level, "levels": [level, level]})[1].value
     assert r["status"] == "ok" and r["segments"] == 2 and "start_level_unknown_calibrated" not in r["warnings"]
-    assert r["energy"]["gap_percent"] == pytest.approx(0.0, abs=0.01)
+    assert "energy_not_balanced" not in r["warnings"]
     for key, pair in (("cjp_vs_asap_adjusted", "cjp_asap"), ("cjp_vs_smart_adjusted", "cjp_smart"), ("smart_vs_asap_adjusted", "smart_asap")):
         assert sum(m[key] for m in r["months"]) == pytest.approx(r["differences"][pair]["adjusted_cost"], abs=0.01), key
 
@@ -235,7 +236,7 @@ def test_a_neighbour_outside_the_period_keeps_its_share_of_a_merged_day() -> Non
     assert r["status"] == "ok" and r["windows"]["total"] == 7
     # the 7th connection gets only its share of the merged day (by time), not the whole of it: the neighbour that is not compared
     # keeps what belongs to it (all of it would be 9 x kWh)
-    assert 7.0 * kwh < r["cjp"]["grid_kwh"] < 8.5 * kwh
+    assert 7.0 * kwh < r["unit_prices"]["cjp_kwh"] < 8.5 * kwh
 
 
 def test_a_shortfall_in_the_reconstructed_path_of_cjp_is_said_and_does_not_make_the_three_not_comparable() -> None:
@@ -244,11 +245,10 @@ def test_a_shortfall_in_the_reconstructed_path_of_cjp_is_said_and_does_not_make_
     del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=4), datetime.time(2))]  # nothing charged in the first connection ...
     r = _run(engine, snap, {"soc": 15.0, "source": "entered", "end_soc": 70.0, "end_source": "recorded_state"})[1].value
     # ... so a drive of 20 % after it empties the reconstructed level (15 % + 0 - 20 %): the car was driven, the path is wrong
-    assert "recorded_path_short" in r["warnings"] and r["energy"]["path_shortfall_kwh"] > 0.5
-    assert r["cjp"]["unmet_driving_kwh"] == 0.0 and r["comparable"] is True
-    # CJP's reconstructed level was held at 0 % in the first gap, so the clamped path would end at 20 %: its end level is the path
-    # without that (15 + 80 - 80), so no energy that was never in the battery is valued in the adjusted difference
-    assert r["cjp"]["final_soc"] == pytest.approx(15.0, abs=0.5)
+    assert r["comparable"] is True
+    # (CJP's reconstructed level is the path itself, not held at 0 %: its end level is 15 + 80 - 80, so no energy that was never
+    # in the battery is valued in the adjusted difference; the replay tests hold the levels themselves)
+    assert r["difference"]["cost"] is not None
 
 
 def test_the_months_add_up_to_the_adjusted_difference_also_when_the_path_of_cjp_goes_below_zero() -> None:
@@ -256,8 +256,7 @@ def test_the_months_add_up_to_the_adjusted_difference_also_when_the_path_of_cjp_
     _seed(engine, public=False)
     del engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=4), datetime.time(2))]  # nothing charged in the first connection
     r = _run(engine, snap, {"soc": 15.0, "source": "entered", "end_soc": 15.0, "end_source": "recorded_state"})[1].value
-    assert "recorded_path_short" in r["warnings"] and r["cjp"]["lowest_soc"] < 0.0  # the path itself, not held at 0 %
-    assert r["cjp"]["final_soc"] == pytest.approx(15.0, abs=0.5) and r["energy"]["gap_percent"] == pytest.approx(0.0, abs=0.5)
+    assert "energy_not_balanced" not in r["warnings"]
     for key, pair in (("cjp_vs_asap_adjusted", "cjp_asap"), ("cjp_vs_smart_adjusted", "cjp_smart"), ("smart_vs_asap_adjusted", "smart_asap")):
         assert sum(m[key] for m in r["months"]) == pytest.approx(r["differences"][pair]["adjusted_cost"], abs=0.01), key
 
@@ -271,7 +270,6 @@ def test_cjp_is_what_it_booked_and_the_solar_share_is_said() -> None:
         entry["cost"] = 1.0  # what CJP booked for it: solar at CJP's own value, one price for the session
     r = _run(engine, snap)[1].value
     assert r["cjp"]["cost"] == pytest.approx(5.0)  # what CJP booked, not a re-priced kWh
-    assert "recorded_solar_share" in r["warnings"] and r["energy"]["local_kwh"] == pytest.approx(r["energy"]["kwh"] / 2, abs=0.05)
 
 
 def test_public_charging_inside_a_merged_day_is_taken_out() -> None:
@@ -286,7 +284,7 @@ def test_public_charging_inside_a_merged_day_is_taken_out() -> None:
     entry["percentage"] += 10.0 / battery * 100.0
     r = _run(engine, snap)[1].value
     plain = _run(*_plain_engine())[1].value
-    assert r["cjp"]["grid_kwh"] == pytest.approx(plain["cjp"]["grid_kwh"], abs=0.01)
+    assert r["unit_prices"]["cjp_kwh"] == pytest.approx(plain["unit_prices"]["cjp_kwh"], abs=0.01)
     assert r["cjp"]["cost"] == pytest.approx(plain["cjp"]["cost"], abs=0.01)
 
 
@@ -309,18 +307,18 @@ def test_a_merged_day_that_reaches_into_two_connections_is_split_between_them_an
     del engine.charging_history_db[key_second]
     engine.charging_history_db[key_first] = {**first, **merged, "kWh_from_local_energy": 0.0, "ended": "23:30"}
     r = _run(engine, snap)[1].value
-    assert r["status"] == "ok" and r["coverage"]["recorded_split_entries"] >= 1 and "recorded_days_split" in r["warnings"]
-    assert r["cjp"]["grid_kwh"] == pytest.approx(5 * first["kWh"], abs=0.05)  # nothing is lost by the split
+    assert r["status"] == "ok" and r["coverage"]["recorded_split_entries"] >= 1
+    assert r["unit_prices"]["cjp_kwh"] == pytest.approx(5 * first["kWh"], abs=0.05)  # nothing is lost by the split
 
 
-def test_charging_that_no_connection_holds_is_counted_and_said() -> None:
+def test_charging_that_no_connection_holds_is_counted_in_the_coverage_and_not_warned_about() -> None:
     engine, snap = _engine(PLAN)
     _seed(engine, public=False)
     engine.charging_history_db[datetime.datetime.combine(DAY - datetime.timedelta(days=2), datetime.time(12))] = {
         "kWh": 6.0, "kWh_from_grid": 6.0, "kWh_from_local_energy": 0.0, "percentage": 8.0, "cost": 2.0, "ended": "13:00", "charging_type": ["planned"],
     }
     r = _run(engine, snap)[1].value
-    assert r["coverage"]["recorded_outside_kwh"] == pytest.approx(6.0) and "recorded_sessions_outside_connections" in r["warnings"]
+    assert r["coverage"]["recorded_outside_kwh"] == pytest.approx(6.0) and "recorded_sessions_outside_connections" not in r["warnings"]  # no warning for it any more
 
 
 def test_without_the_level_at_the_end_the_three_are_not_known_to_be_balanced() -> None:
@@ -328,7 +326,7 @@ def test_without_the_level_at_the_end_the_three_are_not_known_to_be_balanced() -
     _seed(engine)
     r = _run(engine, snap, {"soc": 50.0, "source": "entered"})[1].value
     assert r["status"] == "ok" and "energy_not_balanced" in r["warnings"] and r["provenance"]["end_soc"] == "unavailable"
-    assert r["energy"]["gap_percent"] is None and r["difference"]["cost"] is not None
+    assert r["energy"]["end_soc"] is None and r["difference"]["cost"] is not None
     assert r["difference"]["adjusted_cost"] is None and r["differences"]["cjp_smart"]["adjusted_cost"] is None
     assert _run(engine, snap, {"soc": 50.0, "source": "entered"})[1].states["what_if"] is None  # no headline figure without it
 
@@ -338,9 +336,8 @@ def test_the_energy_cjp_bought_that_no_drive_explains_is_driving_in_all_three() 
     _seed(engine)
     # the car has 50 % at the end where the record and the drives give 70 %: 20 % went on small trips and standby drain
     r = _run(engine, snap, {"soc": 50.0, "source": "entered", "end_soc": 50.0, "end_source": "recorded_state"})[1].value
-    assert r["energy"]["gap_percent"] == pytest.approx(20.0)
-    assert r["cjp"]["final_soc"] == pytest.approx(50.0)
-    assert "energy_not_balanced" not in r["warnings"] and r["status"] == "ok"
+    assert r["energy"]["end_soc"] == 50.0
+    assert "energy_not_balanced" not in r["warnings"] and r["status"] == "ok" and r["difference"]["adjusted_cost"] is not None
 
 
 def test_the_planned_departure_is_the_work_plan_or_seven_with_fill_up_and_never_after_the_real_unplug() -> None:
@@ -386,6 +383,22 @@ def test_a_year_is_estimated_from_less_and_said_so_and_not_from_too_little() -> 
     _seed(engine, days=range(1, 381), public=False)  # more than a year: the last year as it was
     long = _run(engine, snap, {"soc": 50.0, "source": "entered", "end_soc": 70.0, "end_source": "recorded_state"})[1].value
     assert long["annual"]["method"] == "measured" and long["annual"]["basis_days"] >= 360
+
+
+def test_warnings_and_notes_that_no_calculation_gives_any_more_are_taken_out_of_the_saved_results() -> None:
+    engine, snap = _engine(PLAN)
+    old = ["prices_legacy_unverified", "prices_estimated_windows", "recorded_path_short", "levels_approximate", "recorded_solar_share", "recorded_sessions_outside_connections"]
+    kept = ["energy_not_balanced", "start_level_unknown_calibrated"]
+    for key, loader in (("what_if", engine.load_what_if), ("what_if_settings", engine.load_what_if_settings), ("what_if_no_solar", engine.load_what_if_no_solar)):
+        engine.economy_db[key] = {
+            "status": "ok", "model_version": 99, "warnings": [*old[:2], kept[0], *old[2:], kept[1]], "notes": ["hindsight", "recorded_charging", "modelled_policy", "site_limits_not_replayed", "standby_not_modelled"],
+        }
+        loaded = engine.run_job(snap, loader)
+        assert engine.economy_db[key]["warnings"] == kept, key  # taken out, not hidden: nothing is shown under a raw code
+        assert engine.economy_db[key]["notes"] == ["modelled_policy"], key
+        assert "economy" in loaded.db_saves, key
+        engine.run_job(snap, loader)
+        assert engine.economy_db[key]["warnings"] == kept, key
 
 
 def test_a_saved_result_of_an_earlier_model_is_not_shown_under_the_new_labels() -> None:
@@ -453,9 +466,8 @@ def test_a_connection_with_an_hour_without_a_price_is_estimated_for_smart_and_as
     r = result.value
     assert r["status"] == "ok" and r["method"] == "estimated" and r["estimated_windows"] == 1
     assert r["windows"]["replayed"] == r["windows"]["total"] == 5 and r["price_estimate"] is not None
-    assert "prices_estimated_windows" in r["warnings"] and r["coverage"]["price_hours_missing"] > 0
+    assert r["coverage"]["price_hours_missing"] > 0
     assert r["coverage"]["recorded_left_out"] == 0  # what CJP booked needs no price in that hour
-    assert "recorded_prices_estimated_lean_cjp" in r["warnings"]  # Smart and charging at once cannot choose cheap hours there: said to lean CJP's way
 
 
 def test_the_months_are_adjusted_for_the_change_of_the_battery_level() -> None:
@@ -470,15 +482,6 @@ def test_the_months_are_adjusted_for_the_change_of_the_battery_level() -> None:
     # without the level at the last unplug nothing is adjusted
     unbalanced = _run(engine, snap, {"soc": 50.0, "source": "entered"})[1].value["months"][0]
     assert unbalanced["cjp_vs_asap_adjusted"] is None and unbalanced["cjp_vs_smart_adjusted"] is None and unbalanced["smart_vs_asap_adjusted"] is None
-
-
-def test_a_level_from_the_statistics_mean_is_said_to_be_approximate() -> None:
-    engine, snap = _engine(PLAN)
-    _seed(engine)
-    exact = _run(engine, snap)[1].value
-    assert "levels_approximate" not in exact["warnings"]
-    approx = _run(engine, snap, {"soc": 50.0, "source": "statistics_hour_mean", "end_soc": 70.0, "end_source": "recorded_state"})[1].value
-    assert "levels_approximate" in approx["warnings"]
 
 
 def test_a_level_read_before_a_connection_ended_meanwhile_is_not_used_at_the_end() -> None:
@@ -497,7 +500,7 @@ def test_prices_from_the_price_sensor_history_fill_hours_cjp_did_not_store() -> 
     _, result = _run(engine, snap)
     r = result.value
     assert r["status"] == "ok" and r["method"] == "strict" and r["estimated_windows"] == 0
-    assert r["coverage"]["price_hours_from_history"] > 0 and "prices_from_price_history" not in r["warnings"]  # an ordinary source, as in BattMind
+    assert r["coverage"]["price_hours_from_history"] > 0  # an ordinary source, as in BattMind
     assert r["provenance"]["prices"] == "measured_partly_unverified"
     # a price CJP stored itself always wins over the history
     engine.economy_db["prices_history"] = {ts: 99.0 for ts in engine.economy_db["prices"]}
@@ -648,7 +651,7 @@ def test_the_repeated_autumn_hour_reaches_the_replay_flagged_and_never_beats_a_r
     _, result = _run(engine, snap)
     r = result.value
     assert r["coverage"]["price_hours_dst_copied"] == 1  # only the hour without a real price counts as copied
-    assert "prices_dst_hour_copied" in r["warnings"] and r["provenance"]["prices"] == "measured_partly_unverified"
+    assert r["provenance"]["prices"] == "measured_partly_unverified"
     assert stored[start + 7200.0] != 9.99  # the real price was not replaced by its copy
 
 

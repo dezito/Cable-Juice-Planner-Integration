@@ -13,7 +13,7 @@ from custom_components.cable_juice_planner.engine.whatif.inputs import (
     loss_factor_from_table,
     power_cap_from_model,
 )
-from custom_components.cable_juice_planner.engine.whatif.replay import replay
+from .planner_replay import replay
 
 H = 3600.0
 T0 = 1_700_000_000 - 1_700_000_000 % 3600
@@ -167,7 +167,7 @@ def test_everything_left_out_is_counted_and_warned_about() -> None:
     assert coverage["price_entries_invalid"] == 3
     assert coverage["drives"] == 1 and coverage["drives_invalid"] == 2 and coverage["drives_outside_replay"] == 1
     assert coverage["public_charges"] == 1 and coverage["public_charges_invalid"] == 1
-    assert set(data.warnings) == {"prices_legacy_unverified", "invalid_input_entries_left_out"}
+    assert set(data.warnings) == {"invalid_input_entries_left_out"}
     assert set(replay(data).warnings) >= set(data.warnings)
 
 
@@ -186,12 +186,11 @@ def test_a_public_charge_is_never_added_to_the_battery_level_a_second_time() -> 
     result = replay(data)
     assert result.status == "ok" and result.smart.windows[1].soc_in == pytest.approx(60.0)
     assert coverage["public_charges"] == 1 and coverage["public_charges_without_drive"] == 0
-    assert "public_charge_without_drive" not in data.warnings
 
 
 def test_a_public_charge_without_a_recorded_drive_is_flagged() -> None:
     data, coverage = build(drives=[], public_sessions=[{"ts": hour(10), "kwh": 20.0}])
-    assert coverage["public_charges_without_drive"] == 1 and "public_charge_without_drive" in data.warnings
+    assert coverage["public_charges_without_drive"] == 1
     assert coverage["connection_gaps"] == 1 and coverage["connection_gaps_without_drive"] == 1
     assert "many_connections_without_drive" in data.warnings
 
@@ -209,7 +208,7 @@ def test_a_full_drive_history_leaves_out_connections_before_it() -> None:
 
 def test_a_copied_autumn_hour_is_flagged() -> None:
     data, coverage = build(dst_copied_hours=[hour(3), hour(500)])
-    assert coverage["price_hours_dst_copied"] == 1 and "prices_dst_hour_copied" in data.warnings
+    assert coverage["price_hours_dst_copied"] == 1
     assert data.provenance["prices"] == "measured_partly_unverified"
 
 
@@ -233,5 +232,5 @@ def test_the_refund_is_subtracted_from_every_price_like_cjp_prices_its_own_grid_
 
 def test_hours_from_the_price_sensor_history_are_counted_and_flagged() -> None:
     data, coverage = build(history_hours=[hour(2), hour(3), hour(500)])
-    assert coverage["price_hours_from_history"] == 2 and "prices_from_price_history" in data.warnings
+    assert coverage["price_hours_from_history"] == 2
     assert data.provenance["prices"] == "measured_partly_unverified"

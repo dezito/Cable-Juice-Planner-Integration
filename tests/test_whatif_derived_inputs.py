@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from custom_components.cable_juice_planner.engine.whatif.inputs import build_replay_input
-from custom_components.cable_juice_planner.engine.whatif.replay import replay
+from .planner_replay import replay
 
 H = 3600.0
 T0 = 1_700_000_000 - 1_700_000_000 % 3600
@@ -57,7 +57,6 @@ def test_older_connections_come_first_with_the_level_and_the_net_use_between_the
     ]
     assert coverage["windows"] == 5 and coverage["windows_measured"] == 2 and coverage["windows_derived"] == 3
     assert coverage["derived_drives"] == 3 and coverage["first_window"] == hour(0)
-    assert "connections_estimated_from_battery_statistics" in data.warnings
     result = replay(data)
     assert result.status == "ok" and result.windows_replayed == 5
     assert [w.derived for w in result.smart.windows] == [True, True, True, False, False]
@@ -71,7 +70,7 @@ def test_estimated_connections_without_a_price_are_left_out_so_they_cannot_cost_
     data, coverage = build(prices=prices)
     assert [(w.start, w.derived) for w in data.windows] == [(hour(48), True), (hour(100), False), (hour(120), False)]
     assert coverage["estimated_unpriced_left_out"] == 2 and coverage["windows_derived"] == 1
-    assert "estimated_connections_without_prices_left_out" in data.warnings and "connections_estimated_from_battery_statistics" in data.warnings
+    assert "estimated_connections_without_prices_left_out" in data.warnings
     # the level and the use come from the kept ones only: the start is the level at the first kept one, the use before the first measured one stays
     assert data.start_soc == 60.0 and [(e.ts, e.soc_percent) for e in data.events if e.ts < hour(100)] == [(hour(78), 15.0)]
     result = replay(data)
@@ -122,7 +121,6 @@ def test_estimates_that_were_not_validated_are_not_used_and_the_entered_level_st
     assert [w.derived for w in data.windows] == [False, False] and data.start_soc == 40.0 and data.provenance["start_soc"] == "entered"
     assert coverage["windows_derived"] == 0 and coverage["derived_reason"] == "not_validated"
     assert "older_connections_not_validated" in data.warnings
-    assert "connections_estimated_from_battery_statistics" not in data.warnings
     # nothing stored at all: no change to the measured replay
     plain, plain_coverage = build(derived=None)
     assert plain.start_soc == 40.0 and plain_coverage["windows_derived"] == 0 and plain_coverage["derived_status"] is None
@@ -134,7 +132,6 @@ def test_an_anchor_for_another_first_connection_or_without_a_level_means_no_esti
         data, coverage = build(derived={**DERIVED, "anchor": anchor})
         assert [w.derived for w in data.windows] == [False, False] and data.start_soc == 40.0
         assert coverage["windows_derived"] == 0 and coverage["derived_reason"] == "anchor_mismatch"
-        assert "connections_estimated_from_battery_statistics" not in data.warnings
     # a first measured connection that was left out (the drive history is full) is another first connection
     data, coverage = build(windows=[{"start": hour(100), "end": hour(106)}, {"start": hour(120), "end": hour(126)}], period_start=hour(110))
     assert coverage["windows_derived"] == 0 and coverage["windows_measured"] == 1

@@ -36,7 +36,7 @@ async def test_the_button_replays_the_alternative_and_publishes_it(hass: HomeAss
     result = state.attributes["result"]
     assert result["status"] == "ok" and result["provenance"]["start_soc"] == "recorded_state"
     assert result["settings"]["alternative"]["reserve"] == 55.0 and result["windows"]["replayed"] == 2
-    assert result["alternative"]["grid_kwh"] > result["baseline"]["grid_kwh"]
+    assert result["difference"]["terminal_energy_kwh"] > 0  # the higher reserve ends higher
     assert state.state == str(result["difference"]["adjusted_cost"])
     assert state.attributes["attempt"]["status"] == "ok"
     # Scenario A's sensor was not touched and the live settings are unchanged
