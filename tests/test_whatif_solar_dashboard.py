@@ -56,7 +56,7 @@ def test_the_view_has_a_scenario_d_section_that_asks_for_nothing_and_reads_its_o
         "never changes anything", "estimate", "refund", "never treated as free", "positive means", "per month", "only completed months",
         "time-weighted", "left out", "public charging", "still charging", "no solar energy",
         "missing stored price", "home battery", "no price is ever filled in",
-        "fills as new solar sessions are recorded", "not physically no solar production", "no whole-house result",
+        "fills as new solar sessions are recorded", "does not mean there was no solar production", "no whole-house result",
         "the assumptions", "marked incomplete",
         "no recorded session covers", "upper bound", "asterisk", "left out for a missing price",
         "charging hours",
@@ -104,8 +104,8 @@ async def test_waiting_for_new_sessions_says_so_and_lists_what_was_left_out(hass
     result = compare([session(hour(10), hour(11), 1.0)], since=hour(20))
     assert result["reason"] == "waiting_for_new_sessions"
     out = await _render(hass, "en", {**result, "solar_energy_since": hour(20)})
-    assert "this fills as new solar sessions are recorded" in out
-    assert "recorded before solar energy was stored as energy (1)" in out
+    assert "fills in as they are recorded" in out
+    assert "no stored solar energy (older session) (1)" in out
     assert "Month" not in out and "Completed months" not in out  # nothing is invented while there is no result
 
 

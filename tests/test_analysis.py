@@ -181,11 +181,12 @@ def test_price_forecast_is_corrected_with_its_bias() -> None:
             "3": {"n": 24, "abs": 48.0, "bias": -48.0},
             **({"2": {"n": 24, "abs": 2.4, "bias": 2.4}} if back <= 3 else {}),
         }
-    assert engine.price_forecast_corrections() == {1: -0.2, 3: 0.5}
+    # (inside a job, so that "today" is the snapshot's day and the 30 days are counted from it, not from the real clock)
+    assert engine.run_job(snap, engine.price_forecast_corrections).value == {1: -0.2, 3: 0.5}
 
     assert engine.run_job(snap, engine.update_grid_prices).error is None
     provider = engine.price_provider.buy_prices
-    prices = engine.get_grid_prices()
+    prices = engine.run_job(snap, engine.get_grid_prices).value
     hour = datetime.datetime.combine(tomorrow, datetime.time(5))
     later = hour + datetime.timedelta(days=1)
     today = datetime.datetime.combine(DAY, datetime.time(15))

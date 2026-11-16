@@ -295,7 +295,7 @@ def test_the_read_more_covers_what_the_section_shows() -> None:
         "period", "battery level at the first plug-in", "Run what-if without solar", "nothing changes in the plan", "grid-only charging", "price per kWh",
         "estimate", "table per month", "price history", "estimated price", "common level", "fewer than half", "latest connection is left out",
         "assumptions", "house limits", "standby", "difference vs plan", "positive means CJP's charging cost more",
-        "not the value of the solar energy", "charging times and price choices", "after solar energy was stored as energy",
+        "not the value of the solar energy", "charging times and price choices", "before CJP stored it",
     ):
         assert phrase.lower() in explain.lower(), phrase
 
