@@ -131,9 +131,7 @@ async def test_car_waits_for_the_charger(hass: HomeAssistant, calls: list[str]) 
     calls.clear()
 
     _set_action(hass, "charge")
-    # async_block_till_done would sit out the real delay
-    for _ in range(50):
-        await asyncio.sleep(0)
+    await _run_loop(hass)
     assert calls == ["enable", "fail_amps", "charger_start"]
 
     await async_advance(hass, 21)
@@ -141,9 +139,16 @@ async def test_car_waits_for_the_charger(hass: HomeAssistant, calls: list[str]) 
 
 
 async def _run_loop(hass: HomeAssistant) -> None:
-    """Let the automation run until it waits (async_block_till_done would sit out the real delay)."""
-    for _ in range(50):
-        await asyncio.sleep(0)
+    """Let the automation run until it waits (async_block_till_done would sit out the real delay).
+
+    Plain loop yields (sleep(0)) do not wait for the work the automation hands to other threads, so
+    a fixed number of them only passed while the test run was slow. A few short real sleeps give
+    that work time to finish, however fast the run is.
+    """
+    for _ in range(10):
+        await asyncio.sleep(0.01)
+        for _ in range(10):
+            await asyncio.sleep(0)
 
 
 async def test_charger_commands_wait_for_each_other(hass: HomeAssistant, calls: list[str]) -> None:

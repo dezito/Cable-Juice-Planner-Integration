@@ -33,6 +33,10 @@ async def test_the_economy_update_and_the_hourly_store_both_publish_the_solar_co
         assert result.error is None and calls == ["published"]
         result = await coordinator.async_run_job("economy_store_prices")
         assert result.error is None and calls == ["published", "published"]
+    await hass.async_block_till_done()
+    # the entities carry the points of their charts (none here: the view hides those charts)
+    assert hass.states.get(f"sensor.{OBJECT_PREFIX}_what_if_solar").attributes["chart_value_points"] == 0
+    assert hass.states.get(f"sensor.{OBJECT_PREFIX}_economy").attributes["subscription_chart_points"] == 0
 
 
 class _FakeRecorder:

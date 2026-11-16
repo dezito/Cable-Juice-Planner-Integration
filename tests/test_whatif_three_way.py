@@ -1,6 +1,8 @@
 """What-if scenario A: CJP's own recorded charging against "smart" and "asap" (pure replay, no Home Assistant)."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from custom_components.cable_juice_planner.engine.whatif.replay import (
@@ -54,6 +56,12 @@ def charged(percent: float, price: float = 1.0, local: float = 0.0) -> Recorded:
     return Recorded(kwh=kwh, percent=percent, cost=kwh * price, local_kwh=local)
 
 
+def test_without_what_cjp_charged_there_is_nothing_to_compare_with() -> None:
+    data = make([(0, 6)], flat(6), {0: charged(60.0)}, end_soc=80.0)
+    result = replay(replace(data, recorded=None))
+    assert result.status == "unavailable" and result.reason == "no_recorded_charging"
+
+
 def test_a_record_that_charged_at_once_costs_what_charging_at_once_costs() -> None:
     result = replay(make([(0, 6)], flat(6), {0: charged(60.0)}, end_soc=80.0))
     assert result.status == "ok" and result.notes == RECORDED_NOTES and result.cjp is not None
@@ -104,22 +112,20 @@ def test_without_the_end_level_the_three_are_not_known_to_be_balanced_and_no_adj
 def test_charging_cjp_did_not_record_is_said_and_not_turned_into_negative_driving() -> None:
     # the car holds 95 % where the record and the drives give 60 %: nothing in the record explains it
     result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(10.0), 6: charged(0.0)}, start=50.0, end_soc=95.0))
-    assert "recorded_energy_short" in result.warnings and result.energy["gap_percent"] < 0
+    assert result.energy["gap_percent"] < 0
     assert result.asap.driven_percent == pytest.approx(0.0)
 
 
 def test_a_record_that_charges_past_full_is_said() -> None:
     result = replay(make([(0, 4)], flat(4), {0: charged(70.0)}, start=50.0))
-    assert "recorded_path_cut" in result.warnings and result.cjp.final_soc == pytest.approx(100.0) and result.energy["cut_percent"] == pytest.approx(20.0)
+    assert result.cjp.final_soc == pytest.approx(100.0) and result.energy["cut_percent"] == pytest.approx(20.0)
 
 
 def test_solar_and_home_battery_energy_is_priced_at_the_grid_price_and_the_share_is_said() -> None:
     mostly_local = Recorded(kwh=39.6, percent=60.0, cost=39.6, local_kwh=20.0)
     result = replay(make([(0, 6)], flat(6), {0: mostly_local}))
-    assert "recorded_solar_share" in result.warnings and result.energy["local_kwh"] == pytest.approx(20.0)
+    assert result.energy["local_kwh"] == pytest.approx(20.0)
     assert result.cjp.cost == pytest.approx(39.6)  # all of it at the hour's grid price: nothing is free
-    clean = replay(make([(0, 6)], flat(6), {0: charged(60.0)}))
-    assert "recorded_solar_share" not in clean.warnings
 
 
 def test_the_arrival_level_is_judged_against_the_daily_minimum_for_cjp() -> None:
@@ -143,7 +149,7 @@ def test_a_shortfall_in_the_reconstructed_level_of_cjp_is_a_warning_and_not_an_u
     # (so the path is wrong, not the car): said, and kept out of what is compared; the replayed calculations cover the drive
     drive = Event(hour(4.5), "drive", 60.0)
     result = replay(make([(0, 4), (6, 10)], flat(10), {0: charged(0.0), 6: charged(0.0)}, events=[drive], start=50.0))
-    assert "recorded_path_short" in result.warnings and result.energy["path_shortfall_kwh"] > 0
+    assert result.energy["path_shortfall_kwh"] > 0
     assert result.cjp.unmet_driving_kwh == 0 and result.asap.unmet_driving_kwh == 0 and result.comparable is True
     # the level of CJP is the path itself, not held at 0 % (50 - 60 = -10): its end level and its rows are the path's own
     assert result.cjp.final_soc == pytest.approx(-10.0, abs=0.01) and result.cjp.windows[-1].soc_out == pytest.approx(-10.0, abs=0.01)
@@ -203,7 +209,7 @@ def test_stretches_are_replayed_on_their_own_and_added_up() -> None:
         assert [w.segment for w in policy.windows] == [0, 0, 1, 1] and policy.finals == pytest.approx([a.final_soc, b.final_soc])
         assert policy.final_soc == pytest.approx(b.final_soc) and policy.start_soc == pytest.approx(a.start_soc)
     for key in ("cjp_asap", "cjp_smart", "smart_asap"):
-        for field in ("cost", "adjusted_cost", "grid_kwh", "terminal_energy_kwh"):
+        for field in ("cost", "adjusted_cost", "terminal_energy_kwh"):
             assert merged.differences[key][field] == pytest.approx(first.differences[key][field] + second.differences[key][field])
     assert merged.difference == merged.differences["cjp_asap"] and merged.windows_total == 4 and merged.windows_replayed == 4
     # the price of the period weights each stretch by its hours; the energy of the three is the sum

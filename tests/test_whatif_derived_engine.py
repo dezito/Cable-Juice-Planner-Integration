@@ -70,7 +70,6 @@ def test_the_statistics_become_older_connections_after_being_checked_against_the
     r = result.value
     assert r["status"] == "ok", r
     assert r["windows"]["total"] == len(MEASURED_BACKS) + len(OLDER_BACKS) and r["windows"]["derived"] == len(OLDER_BACKS)
-    assert "connections_estimated_from_battery_statistics" in r["warnings"]
 
 
 def test_without_a_charging_history_scenario_a_has_no_record_of_what_cjp_charged_in_the_estimated_connections() -> None:

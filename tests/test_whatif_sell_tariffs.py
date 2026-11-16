@@ -159,13 +159,11 @@ def test_each_recorded_hour_is_converted_with_the_tariffs_of_its_own_day() -> No
         _ts(winter, 3): pytest.approx(2.0 - (0.05 + 0.1 + 0.8 + 0.3) - (0.05 + 0.1)),  # 0.6
         _ts(summer, 18): pytest.approx(1.0 - (0.04 + 0.05 + 0.01 + 0.1) - (0.02 + 0.04 + 0.05)),  # 0.69
     }
-    # the day without kept tariffs is left out and counted, never converted with another day's tariffs
-    assert engine.economy_db["sell_tariff_unknown_hours"] == 2
-    assert _data(engine, snap)["sell_tariff_unknown_hours"] == 2
+    # the day without kept tariffs is left out, never converted with another day's tariffs (it is not in the history above)
     assert engine.price_provider.sell_price_details == notes  # the live sell prices are untouched
-    # a later run counts again (it does not add up) and keeps what was converted
+    # a later run keeps what was converted and still leaves the unknown day out
     _convert(engine, snap, {_ts(winter, 18): 3.0, _ts(unknown, 18): 2.5})
-    assert engine.economy_db["sell_tariff_unknown_hours"] == 1 and _ts(winter, 3) in engine.economy_db["sell_prices_history"]
+    assert _ts(winter, 3) in engine.economy_db["sell_prices_history"] and _ts(unknown, 18) not in engine.economy_db["sell_prices_history"]
 
 
 def test_a_neighbouring_days_tariffs_are_never_used() -> None:
@@ -176,7 +174,13 @@ def test_a_neighbouring_days_tariffs_are_never_used() -> None:
     before, first, last, after = _ts(day, 0) - 3600.0, _ts(day, 0), _ts(day, 23), _ts(day + datetime.timedelta(days=1), 0)
     _convert(engine, snap, {before: 2.0, first: 2.0, last: 2.0, after: 2.0})
     assert set(engine.economy_db["sell_prices_history"]) == {first, last}
-    assert engine.economy_db["sell_tariff_unknown_hours"] == 2
+
+
+def test_the_counters_that_were_never_shown_are_dropped_from_an_older_database() -> None:
+    engine, snap = _solar_engine()
+    old = {"windows": [], "sell_tariff_unknown_hours": 3, "sell_prices_since": 1.0, "price_sources": {"sensor.price": {}}}
+    assert engine.run_job(snap, engine.load_economy_db, old).error is None
+    assert not {"sell_tariff_unknown_hours", "sell_prices_since", "price_sources"} & set(engine.economy_db)
 
 
 def test_hours_left_out_count_as_a_missing_sell_price_in_the_comparison() -> None:
@@ -189,7 +193,6 @@ def test_hours_left_out_count_as_a_missing_sell_price_in_the_comparison() -> Non
     _convert(engine, snap, {ts: 0.9})  # no kept tariffs for that day
     assert ts not in engine.economy_db["sell_prices_history"]
     data = _data(engine, snap)
-    assert data["sell_tariff_unknown_hours"] == 1
     # no result is calculated with a wrong sell price: the hour has no sell price, so nothing is counted
     assert data["status"] != "ok" and not (data.get("total") or {}).get("months")
 

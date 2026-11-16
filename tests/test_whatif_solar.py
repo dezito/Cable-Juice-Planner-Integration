@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import datetime
+import math
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any
 
 import pytest
 
-from custom_components.cable_juice_planner.engine.whatif.solar import sell_value, solar_comparison
+from custom_components.cable_juice_planner.engine.whatif.solar import evaluate_session, sell_value, summarize
 
 from .test_economy import _engine, _ts
 from .test_engine import DAY
@@ -23,6 +26,31 @@ def session(start: float, end: float | None, solar: float, *, kwh: float | None 
         "start": start, "end": end, "public": False, "kwh": kwh if kwh is not None else solar + 2.0, "local": kwargs.get("local", solar),
         "solar": solar, "powerwall": kwargs.get("powerwall", 0.0), **{k: v for k, v in kwargs.items() if k in ("public",)},
     }
+
+
+def solar_comparison(
+    sessions: Iterable[Mapping[str, Any]],
+    buy: Mapping[float, float],
+    sell: Mapping[float, float],
+    production: Mapping[float, float],
+    refund: float,
+    solar_energy_since: float | None,
+    current_month: str,
+    month_of: Callable[[float], str],
+) -> dict[str, Any]:
+    """Price and sum the sessions in one go (a session with a missing price is left out at once): the calculation of the engine without the ledger."""
+    entries: list[dict[str, Any]] = []
+    still_charging = 0
+    for session in sessions:
+        result = evaluate_session(session, buy, sell, production, refund, solar_energy_since)
+        if result["outcome"] == "live":
+            still_charging += 1
+            continue
+        if result["outcome"] == "pending":
+            result = {"outcome": "left_out", "reason": result["reason"]}
+        entries.append({**result, "month": month_of(float(session["start"])) if isinstance(session.get("start"), (int, float)) and math.isfinite(session["start"]) else ""})
+    summary = summarize(entries, current_month, {"still_charging": still_charging})
+    return {**summary, "solar_energy_since": solar_energy_since}
 
 
 def compare(sessions, buy=None, sell=None, production=None, refund=0.0, since=0.0, month_of=lambda ts: "2026-01", current="2026-02"):
@@ -137,8 +165,7 @@ def test_the_home_battery_is_kept_as_recorded_and_never_replaced_or_valued() -> 
     result = compare([session(hour(10), hour(11), 2.0, powerwall=3.0)])
     assert result["powerwall_kwh"] == 3.0
     assert result["months"][0]["solar_kwh"] == 2.0 and result["months"][0]["grid_cost"] == pytest.approx(2.0)
-    assert "home_battery_kept_as_recorded" in result["notes"] and "no_whole_house_result" in result["notes"]
-    assert "replanned_without_solar_not_modelled" in result["notes"] and "no_solar_production_not_modelled" in result["notes"]
+    assert result["notes"] == []  # sessions only: nothing to assume besides what the sessions say
 
 
 def test_no_sessions_at_all_is_unavailable_not_zero() -> None:
@@ -209,7 +236,7 @@ def test_a_session_is_priced_once_when_it_has_ended_and_kept_in_the_ledger() -> 
     data = result.attributes["what_if_solar"]["result"]
     month = data["months"][0]
     assert data["status"] == "ok" and month["status"] == ("current" if RECENT.strftime("%Y-%m") == DAY.strftime("%Y-%m") else "completed")
-    assert month["advantage"] == pytest.approx(4.0 * (0.8 - 0.4)) and "recorded_sessions_only" in data["notes"]
+    assert month["advantage"] == pytest.approx(4.0 * (0.8 - 0.4)) and "recorded_sessions_only" not in data["notes"]
     if month["status"] == "current":
         assert result.states["what_if_solar"] is None and data["total"]["months"] == 0
 
@@ -407,7 +434,7 @@ def test_hourly_sell_prices_are_stored_once_with_the_production_price_in_effect(
     assert engine.run_job(snap, engine.economy_store_prices).error is None
     assert engine.economy_db["sell_prices"][_ts(day, 10)] == 0.5
     assert engine.economy_db["sell_production_price"][_ts(day, 10)] == 0.75
-    assert engine.economy_db["sell_prices_since"] > 0
+    assert "sell_prices_since" not in engine.economy_db
     # a later change of the production price never rewrites an hour that was stored
     engine.config["solar"]["production_price"] = -1.0
     _sell_source(engine, day, range(24), price=0.9)
@@ -659,7 +686,7 @@ def test_without_sessions_the_hours_are_used_as_before_but_flagged_as_an_upper_b
     assert result["total"]["upper_bound"] and result["total"]["estimated_kwh"] == 2.0 and result["total"]["hours"] == 1
     assert result["estimated"] | {"left_out": None} == {"hours": 1, "solar_kwh": 2.0, "months": 1, "left_out": None}
     assert result["ledger"] == {"sessions": 0, "solar_kwh": 0.0, "months": 0}
-    assert "hourly_solar_upper_bound" in result["notes"] and "solar_from_power_history" in result["notes"]
+    assert "hourly_solar_upper_bound" not in result["notes"] and "solar_from_power_history" in result["notes"]
 
 
 def test_a_short_burst_reads_as_more_solar_than_it_can_have_been_which_is_why_it_is_an_upper_bound() -> None:
@@ -729,7 +756,7 @@ def test_the_engine_keeps_the_sessions_where_they_cover_the_time_and_flags_the_e
     month = data["months"][0]
     assert (month["sessions"], month["hours"], month["solar_kwh"], month["estimated_kwh"]) == (1, 2, 5.0, 4.0)
     assert result.states["what_if_solar"] == data["total"]["advantage"] and data["total"]["upper_bound"]
-    assert "hourly_solar_upper_bound" in data["notes"]
+    assert "hourly_solar_upper_bound" not in data["notes"]
 
 
 def test_the_hours_of_a_session_still_charging_are_left_to_it() -> None:

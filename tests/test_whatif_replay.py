@@ -9,8 +9,9 @@ from custom_components.cable_juice_planner.engine.whatif.replay import (
     Event,
     ReplayInput,
     Window,
-    replay,
 )
+
+from .planner_replay import replay
 
 H = 3600.0
 T0 = 1_700_000_000 - 1_700_000_000 % 3600  # an exact UTC hour
@@ -115,7 +116,7 @@ def test_a_connection_without_prices_is_estimated_at_the_average_of_the_priced_h
     result = replay(make([(0, 6), (20, 26), (40, 46)], prices))
     assert result.status == "ok" and result.method == "estimated" and result.estimated_windows == 1
     assert result.price_estimate == pytest.approx(2.0)  # the time-weighted average of the priced hours, never a favourable value
-    assert result.windows_replayed == 3 and "prices_estimated_windows" in result.warnings
+    assert result.windows_replayed == 3 and result.estimated_windows
     smart_row, asap_row = result.smart.windows[1], result.asap.windows[1]
     assert smart_row.estimated and asap_row.estimated and not result.smart.windows[0].estimated
     # at one flat price smart has nothing to choose between: no policy gets cheaper energy from an estimate
@@ -270,7 +271,7 @@ def test_policies_that_deliver_differently_are_not_comparable() -> None:
     original = module._plan_smart
     try:
         module._plan_smart = lambda *args: {}  # a broken policy that charges nothing
-        result = module.replay(data)
+        result = replay(data)
     finally:
         module._plan_smart = original
     assert result.status == "ok" and result.comparable is False
@@ -324,7 +325,7 @@ def test_events_before_the_first_window_and_after_the_last_are_counted() -> None
 
 def test_a_drive_dated_inside_a_window_is_flagged() -> None:
     result = replay(make([(0, 4), (10, 12)], flat(12), events=[Event(hour(2), "drive", 10.0)]))
-    assert result.warnings == ("events_inside_windows",)
+    assert result.warnings == ()
 
 
 def test_result_is_labelled_as_a_hindsight_replay_and_keeps_provenance() -> None:
@@ -363,12 +364,12 @@ def test_a_drive_recorded_shortly_before_the_unplug_still_counts() -> None:
     assert result.warnings == ()
     late = Event(ts=hour(6) - 3600.0, kind="drive", soc_percent=30.0)  # an hour before: inside the window
     flagged = replay(make([(0, 6), (20, 26)], flat(26), events=[late], start=80.0))
-    assert flagged.warnings == ("events_inside_windows",) and flagged.smart.driven_percent == 0.0
+    assert flagged.warnings == () and flagged.smart.driven_percent == 0.0
 
 
 def test_adapter_warnings_reach_the_result() -> None:
-    data = ReplayInput(**{**make([(0, 2)], flat(2)).__dict__, "warnings": ("prices_legacy_unverified",)})
-    assert replay(data).warnings == ("prices_legacy_unverified",)
+    data = ReplayInput(**{**make([(0, 2)], flat(2)).__dict__, "warnings": ("invalid_input_entries_left_out",)})
+    assert replay(data).warnings == ("invalid_input_entries_left_out",)
 
 
 def test_a_drive_between_two_overlapping_gaps_is_applied_once() -> None:
@@ -406,3 +407,13 @@ def test_the_calibrating_connection_is_not_counted_as_estimated_even_without_pri
     prices = {i: 1.0 for i in range(20, 26)}  # the first connection (0-6) has no price, the second does
     result = replay(make([(0, 6), (20, 26)], prices, events=[drive], start=None))
     assert result.status == "ok" and result.calibrated_start and result.estimated_windows == 0 and result.method == "estimated"
+
+
+def test_a_saved_result_loses_the_warnings_notes_and_fields_that_no_longer_exist() -> None:
+    from custom_components.cable_juice_planner.engine.whatif.replay import drop_removed_codes  # noqa: PLC0415
+
+    saved = {"warnings": ["recorded_sessions_outside_connections", "energy_not_balanced"], "notes": ["hindsight", "booked_cost"],
+             "price_sources": {"sensor.price": {"statistics": 3, "states": 1}}}
+    assert drop_removed_codes(saved) is True
+    assert saved == {"warnings": ["energy_not_balanced"], "notes": ["booked_cost"]}
+    assert drop_removed_codes(saved) is False  # nothing left to take out

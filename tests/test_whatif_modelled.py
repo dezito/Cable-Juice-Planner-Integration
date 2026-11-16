@@ -9,7 +9,7 @@ import pytest
 from custom_components.cable_juice_planner.engine.whatif.derive import derive_windows
 from custom_components.cable_juice_planner.engine.whatif.inputs import build_replay_input
 from custom_components.cable_juice_planner.engine.whatif.modelled import gap_use, model_connections, model_windows, percent_per_km
-from custom_components.cable_juice_planner.engine.whatif.replay import replay
+from .planner_replay import replay
 
 TZ = zoneinfo.ZoneInfo("Europe/Copenhagen")
 HOUR = 3600.0
