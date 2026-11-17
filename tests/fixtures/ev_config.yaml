@@ -83,4 +83,4 @@ solar:
   max_to_current_hour: false
   production_price: -1.0
   solarpower_use_before_minutes: 15
-testing_mode: false
+testing_mode: true

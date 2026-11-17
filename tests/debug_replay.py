@@ -30,7 +30,7 @@ from custom_components.cable_juice_planner.engine import CJPEngine, JobResult, S
 from custom_components.cable_juice_planner.utils.formatting import load_texts
 
 # engine attributes that are rebuilt from the configuration instead of the export
-_REBUILT = {"name", "title", "testing", "charger_configured", "solar_configured", "price_provider"}
+_REBUILT = {"name", "title", "charger_configured", "solar_configured", "price_provider"}
 
 
 def load_export(path: str) -> dict[str, Any]:

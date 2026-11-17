@@ -26,7 +26,7 @@ class Diagnostics:
         extra = extra or {}
         sections = {
             "System Status": (
-                {"PREHEATING": self.preheating, "TESTING": self.testing, "PUBLIC_CHARGING_SESSION": self.public_charging_sessions, **extra.get("status", {})},
+                {"PREHEATING": self.preheating, "PUBLIC_CHARGING_SESSION": self.public_charging_sessions, **extra.get("status", {})},
                 None,
             ),
             "System Configuration": (

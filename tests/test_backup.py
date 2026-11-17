@@ -177,3 +177,20 @@ async def test_options_flow_export_and_import(hass: HomeAssistant, config_dir: P
     await _settle(hass)
     await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
     assert hass.states.get(TIME).state == exported != "05:05:00"
+
+
+async def test_restoring_an_old_backup_does_not_bring_back_the_removed_testing_mode(hass: HomeAssistant, config_dir: Path, loaded_entry) -> None:
+    """The configuration of a backup from before the removal may hold testing_mode; it is not restored."""
+    response = await hass.services.async_call(DOMAIN, "export_data", {}, blocking=True, return_response=True)
+    path = config_dir.parent / next(iter(response["files"].values()))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(data["options"], dict)
+    data["options"]["testing_mode"] = True
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    old_coordinator = loaded_entry.runtime_data
+    await backup.async_import(hass, loaded_entry, path.name, restore_configuration=True)
+    await _settle(hass)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+    assert loaded_entry.state is ConfigEntryState.LOADED
+    assert "testing_mode" not in loaded_entry.options

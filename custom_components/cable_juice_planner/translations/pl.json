@@ -274,14 +274,12 @@
         "data": {
           "cron_interval": "Interwał",
           "dashboard": "Panel na pasku bocznym",
-          "enable_diagnostic_file_log": "Diagnostyczny plik logu",
-          "testing_mode": "Tryb testowy"
+          "enable_diagnostic_file_log": "Diagnostyczny plik logu"
         },
         "data_description": {
           "cron_interval": "Minuty między kontrolami planu i ładowania.",
           "dashboard": "Dodaje gotowy panel Cable Juice Planner do paska bocznego dla tej instancji. Wymaga kart HACS mushroom, apexcharts-card, config-template-card i card-mod (opcjonalnie). Powiadomienie wymienia brakujące karty.",
-          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje).",
-          "testing_mode": "Oznacza regułę ładowania symbolem 🧪 i pomija kontrolę ładowania, podgrzewanie i inne akcje."
+          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje)."
         }
       },
       "database": {
@@ -682,14 +680,12 @@
         "data": {
           "cron_interval": "Interwał",
           "dashboard": "Panel na pasku bocznym",
-          "enable_diagnostic_file_log": "Diagnostyczny plik logu",
-          "testing_mode": "Tryb testowy"
+          "enable_diagnostic_file_log": "Diagnostyczny plik logu"
         },
         "data_description": {
           "cron_interval": "Minuty między kontrolami planu i ładowania.",
           "dashboard": "Dodaje gotowy panel Cable Juice Planner do paska bocznego dla tej instancji. Wymaga kart HACS mushroom, apexcharts-card, config-template-card i card-mod (opcjonalnie). Powiadomienie wymienia brakujące karty.",
-          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje).",
-          "testing_mode": "Oznacza regułę ładowania symbolem 🧪 i pomija kontrolę ładowania, podgrzewanie i inne akcje."
+          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje)."
         }
       },
       "database": {

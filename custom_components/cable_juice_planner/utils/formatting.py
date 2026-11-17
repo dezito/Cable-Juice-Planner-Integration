@@ -120,10 +120,9 @@ def get_list_values(data) -> list:
     return float_list
 
 
-def format_charging_rule(text: str, testing: bool, extra: str = "") -> str:
-    """🧪 around every line in testing mode, plus extra status lines (🚧 ...)."""
-    marker = "🧪" if testing else ""
-    text = "\n".join(f"{marker}{line.strip()}{marker}" for line in str(text).split("\n") if isinstance(line, str) and line.strip())
+def format_charging_rule(text: str, extra: str = "") -> str:
+    """The rule text without empty lines, plus extra status lines (🚧 ...)."""
+    text = "\n".join(line.strip() for line in str(text).split("\n") if isinstance(line, str) and line.strip())
     return f"{text}{extra}"
 
 

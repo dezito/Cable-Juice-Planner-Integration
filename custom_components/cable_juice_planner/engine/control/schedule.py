@@ -92,10 +92,6 @@ class ControlSchedule:
             self.restarting_charger = False
             self.restarting_charger_count = 0
 
-        if self.testing:
-            _LOGGER.debug("Not checking if is charging TESTMODE")
-            return None
-
         charger_enabled = self.get_state(charger["enabled_entity_id"], error_state="off")
         charger_status = self.get_state(charger["status_entity_id"], error_state="unavailable")
         data = {"ttl": 0, "priority": "high", "channel": "alarm_stream"} if self.restarting_charger_count == 3 else {}
@@ -181,8 +177,6 @@ class ControlSchedule:
 
     def charging_without_rule(self) -> bool | None:
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
-        if self.testing:
-            return False
         now = self.now()
         past = now - datetime.timedelta(minutes=minutes)
         # just stopped (e.g. a planned hour ended): the charger may still give power until the

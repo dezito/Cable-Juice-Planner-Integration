@@ -181,8 +181,6 @@ class ControlEvents:
             self.analysis_check_departure()
         self.set_estimated_range()
         self.publish_simulated_battery_level()
-        if var_name == "enforce_planning" and self.testing:
-            self.debug_info()
 
     def recalculate(self) -> None:
         """A setting changed: recalculate the plan (forced, the plan hash ignores most settings)."""

@@ -143,7 +143,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "powerwall_discharging_power": 5000.0,
         "enable_selling_during_expensive_hours": True,
     },
-    "testing_mode": False,
     # load balancing with the other cars of the site (only used when a site entry exists)
     "site": {
         "priority": 1,
@@ -239,7 +238,6 @@ OPTION_PATHS: dict[str, str] = {
     "dashboard": "dashboard",
     "dashboard_icon": "dashboard_icon",
     "enable_diagnostic_file_log": "enable_diagnostic_file_log",
-    "testing_mode": "testing_mode",
     "site_priority": "site.priority",
     "site_phase_order": "site.phase_order",
     "power_values_db_data_to_save": "database.power_values_db_data_to_save",
@@ -319,7 +317,7 @@ FLOW_STEPS: dict[str, list[str]] = {
     ],
     "weather": ["hourly_service_entity_id", "daily_service_entity_id", "outdoor_temp_entity_id"],
     "notifications": ["notify_list", "efficiency_on_cable_plug_in", "preheating"],
-    "advanced": ["cron_interval", "dashboard", "enable_diagnostic_file_log", "testing_mode"],
+    "advanced": ["cron_interval", "dashboard", "enable_diagnostic_file_log"],
     "database": [
         "power_values_db_data_to_save",
         "solar_available_db_data_to_save",
@@ -358,6 +356,15 @@ ENTITY_OPTION_KEYS = {key for key, path in OPTION_PATHS.items() if ".entity_ids.
 def default_options() -> dict[str, Any]:
     """Flat option dict with the default value for every config flow key."""
     return {key: deepcopy(get_dict_value_with_path(DEFAULT_CONFIG, path)) for key, path in OPTION_PATHS.items()}
+
+
+# Options that no longer exist; old backups and stored options may still hold them
+REMOVED_OPTION_KEYS = ("testing_mode",)
+
+
+def strip_removed_options(options: dict[str, Any]) -> dict[str, Any]:
+    """The options without the keys of removed settings (they are never read, so they would only linger)."""
+    return {key: value for key, value in options.items() if key not in REMOVED_OPTION_KEYS}
 
 
 def build_config(options: dict[str, Any]) -> dict[str, Any]:

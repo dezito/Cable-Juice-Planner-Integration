@@ -209,13 +209,7 @@ class HistoryEfficiency:
                 return
             key = "drive_efficiency_last_battery_level"
             if "last_drive_efficiency_data" not in self.own_attr(key, error_state={}):
-                if not self.testing:
-                    return
-                self.last_drive_efficiency_data = {
-                    "timestamp": self.now(), "distance": 100.0, "usedkWh": 20.0, "usedBattery": 30.0,
-                    "cost": 15.0, "efficiency": 90.0, "distancePerkWh": 5.0, "wh_km": 175.0,
-                }
-                self.set_attr(key, "last_drive_efficiency_data", self.last_drive_efficiency_data)
+                return
             attributes = self.own_attr(key)["last_drive_efficiency_data"]
             for name in ("timestamp", "distance", "usedkWh", "usedBattery", "cost", "efficiency", "distancePerkWh", "wh_km", "reported"):
                 if name not in attributes:

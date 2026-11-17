@@ -274,14 +274,12 @@
         "data": {
           "cron_interval": "Interval",
           "dashboard": "Dashboard i sidepanelet",
-          "enable_diagnostic_file_log": "Diagnostisk fil-log",
-          "testing_mode": "Testtilstand"
+          "enable_diagnostic_file_log": "Diagnostisk fil-log"
         },
         "data_description": {
           "cron_interval": "Minutter mellem hver kontrol af planen og ladningen.",
           "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, apexcharts-card, config-template-card og card-mod (valgfrit). En notifikation viser manglende kort.",
-          "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer).",
-          "testing_mode": "Markerer ladereglen med 🧪, og kontrollen af om bilen lader, forvarmning og andre handlinger springes over."
+          "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer)."
         }
       },
       "database": {
@@ -682,14 +680,12 @@
         "data": {
           "cron_interval": "Interval",
           "dashboard": "Dashboard i sidepanelet",
-          "enable_diagnostic_file_log": "Diagnostisk fil-log",
-          "testing_mode": "Testtilstand"
+          "enable_diagnostic_file_log": "Diagnostisk fil-log"
         },
         "data_description": {
           "cron_interval": "Minutter mellem hver kontrol af planen og ladningen.",
           "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, apexcharts-card, config-template-card og card-mod (valgfrit). En notifikation viser manglende kort.",
-          "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer).",
-          "testing_mode": "Markerer ladereglen med 🧪, og kontrollen af om bilen lader, forvarmning og andre handlinger springes over."
+          "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer)."
         }
       },
       "database": {

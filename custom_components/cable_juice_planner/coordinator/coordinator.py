@@ -66,7 +66,6 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self.object_prefix: str = object_prefix(self.prefix)
         self.car_name: str = (entry.data.get(CONF_CAR_NAME) or "").strip()
         self.config = build_config({**default_options(), **entry.options})
-        self.testing = bool(self.config.get("testing_mode"))
         self.ev_configured = is_ev_configured(self.config)
         self.solar_configured = is_solar_configured(self.config)
         self.texts: dict[str, str] = {}
