@@ -157,7 +157,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.",
+        "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.\n\nStrømligning schaltet seine Sensoren ohne MwSt. standardmäßig aus, und ein deaktivierter Sensor kann hier nicht gewählt werden: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*). Die Preisprognosen brauchen außerdem *Include price forecasts for the next week?* in den Strømligning-Optionen.\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Kaufpreis",
           "stromligning_buy_tomorrow_available": "Kaufpreis morgen",
@@ -177,7 +177,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - Tarife beim Verkauf",
-        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.",
+        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.\n\nDie Tarifsensoren können in Strømligning deaktiviert sein und lassen sich dann hier nicht wählen: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*).\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Netzentgelt",
           "stromligning_sell_electricity_tax": "Stromsteuer",
@@ -206,7 +206,7 @@
       },
       "solar": {
         "title": "Solaranlage (optional)",
-        "description": "Ausfüllen, wenn du eine Solaranlage hast.",
+        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solarproduktion",
           "forecast_entity_id": "Solarprognose (Solcast)",
@@ -565,7 +565,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.",
+        "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.\n\nStrømligning schaltet seine Sensoren ohne MwSt. standardmäßig aus, und ein deaktivierter Sensor kann hier nicht gewählt werden: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*). Die Preisprognosen brauchen außerdem *Include price forecasts for the next week?* in den Strømligning-Optionen.\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Kaufpreis",
           "stromligning_buy_tomorrow_available": "Kaufpreis morgen",
@@ -585,7 +585,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - Tarife beim Verkauf",
-        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.",
+        "description": "Beim Verkauf werden Tarife und Steuern im Preis abgezogen, danach die Verkaufsgebühr sowie Netz- und Systemtarif. Leer lassen, um 0 zu verwenden.\n\nDie Tarifsensoren können in Strømligning deaktiviert sein und lassen sich dann hier nicht wählen: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*).\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Netzentgelt",
           "stromligning_sell_electricity_tax": "Stromsteuer",
@@ -614,7 +614,7 @@
       },
       "solar": {
         "title": "Solaranlage (optional)",
-        "description": "Ausfüllen, wenn du eine Solaranlage hast.",
+        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solarproduktion",
           "forecast_entity_id": "Solarprognose (Solcast)",
@@ -1375,6 +1375,14 @@
           }
         }
       }
+    },
+    "stromligning_entities": {
+      "title": "Strømligning-Sensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) nutzt Strømligning-Sensoren, die deaktiviert sind oder die Strømligning nicht liefert. Ein fehlender Verkaufstarif zählt als 0, wodurch der berechnete Verkaufspreis zu hoch wird; ohne die Preissensoren werden die gespeicherten Preise genutzt.\n\nIn Home Assistant deaktiviert (Strømligning deaktiviert seine Sensoren ohne MwSt. standardmäßig – aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** mit *Deaktivierte Entitäten anzeigen*):\n{disabled}\n\nNicht von Strømligning geliefert (z. B. sind die Preisprognosen in dessen Optionen ausgeschaltet):\n{not_provided}\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren wieder funktionieren."
+    },
+    "solcast_entities": {
+      "title": "Solcast-Prognosesensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) kann nicht alle benötigten Solcast-Prognosesensoren nutzen; die Tage ohne Sensor werden stattdessen aus der Wettervorhersage und dem gespeicherten Solarverlauf geplant. Solcast deaktiviert die Prognosesensoren ab Tag 3 standardmäßig.\n\nIn Home Assistant deaktiviert (aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** mit *Deaktivierte Entitäten anzeigen*):\n{disabled}\n\nNicht so benannt, wie Cable Juice Planner es erwartet (die Entity-ID muss auf _today, _tomorrow oder _day_3 … enden):\n{renamed}\n\nOhne Stundendetails (schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein):\n{no_detail}\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren korrigiert sind."
     }
   }
 }

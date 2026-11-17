@@ -157,7 +157,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Cena zakupu",
           "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
@@ -177,7 +177,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\nWyłączone teraz w Strømligning: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",
@@ -206,7 +206,7 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
           "forecast_entity_id": "Prognoza słoneczna (Solcast)",
@@ -565,7 +565,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Cena zakupu",
           "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
@@ -585,7 +585,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\nWyłączone teraz w Strømligning: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",
@@ -614,7 +614,7 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
           "forecast_entity_id": "Prognoza słoneczna (Solcast)",
@@ -1375,6 +1375,14 @@
           }
         }
       }
+    },
+    "stromligning_entities": {
+      "title": "Czujniki Strømligning potrzebne dla Cable Juice Planner są niedostępne ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) używa czujników Strømligning, które są wyłączone lub których Strømligning nie udostępnia. Brakująca taryfa sprzedaży liczy się jako 0, przez co obliczona cena sprzedaży jest za wysoka, a bez czujników cen używane są zapisane ceny.\n\nWyłączone w Home Assistant (Strømligning domyślnie wyłącza czujniki bez VAT – włącz je w **Ustawienia → Urządzenia i usługi → Encje** z opcją *Pokaż wyłączone encje*):\n{disabled}\n\nNiedostarczane przez Strømligning (np. prognozy cen są wyłączone w jego opcjach):\n{not_provided}\n\nTa naprawa zniknie sama, gdy czujniki znów będą działać."
+    },
+    "solcast_entities": {
+      "title": "Czujniki prognozy Solcast potrzebne dla Cable Juice Planner są niedostępne ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) nie może użyć wszystkich potrzebnych czujników prognozy Solcast, więc dni bez nich są planowane na podstawie prognozy pogody i zapisanej historii produkcji słonecznej. Solcast domyślnie wyłącza czujniki prognozy od dnia 3.\n\nWyłączone w Home Assistant (włącz je w **Ustawienia → Urządzenia i usługi → Encje** z opcją *Pokaż wyłączone encje*):\n{disabled}\n\nNazwane inaczej, niż oczekuje Cable Juice Planner (identyfikator encji musi kończyć się na _today, _tomorrow lub _day_3 …):\n{renamed}\n\nBez szczegółów godzinowych (włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast):\n{no_detail}\n\nTa naprawa zniknie sama po poprawieniu czujników."
     }
   }
 }

@@ -34,6 +34,7 @@ from .coordinator import CJPCoordinator
 from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix, strip_removed_options, upgrade_options
 from .management.blueprint_install import async_install_blueprints
 from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
+from .management.dependency_checks import remove_issues
 from .management.dashboard_cards import async_dismiss_card_notification
 from .management.debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
 from .utils.helpers import float_or_none
@@ -316,6 +317,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None
     from .management.storage import CJPStorage  # noqa: PLC0415
 
     async_dismiss_card_notification(hass, entry)
+    remove_issues(hass, entry.entry_id)
     # the data can be imported again (config flow of a new instance, or import_data)
     try:
         await async_export(hass, entry, "deleted")

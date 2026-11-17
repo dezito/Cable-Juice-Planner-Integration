@@ -99,10 +99,22 @@ hour it has one, and Energi Data Service fills the gaps (also in the economy sta
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
 
+Strømligning switches its sensors excl. VAT (which the sell sensors and the tariffs use) off by default, and a
+disabled sensor can't be selected: enable them first under **Settings → Devices & services → Entities** (*Show
+disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options. If a
+sensor CJP uses is disabled later, or Strømligning stops providing it, a **repair** names it. Until it is fixed a
+missing tariff counts as 0, which makes the sell price too high.
+
 ### Solar panels, solar charging and weather (optional)
 
 Only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
 details, and [Fixed solar sell price](rules/solar.md#fixed-solar-sell-price) if your agreement pays a fixed price.
+
+With Solcast, select e.g. `sensor.solcast_pv_forecast_forecast_today`; the other days are found automatically.
+Solcast switches the forecast sensors of day 3 and on off by default: enable `…_forecast_day_3` and on
+(**Settings → Devices & services → Entities**, *Show disabled entities*), and keep *Hourly detail* on under *Forecast attributes breakdown* in the
+Solcast options. A **repair** lists the sensors that are disabled, named differently or without hourly detail;
+the days without Solcast use the weather forecast and the stored solar history.
 
 ### Notifications and advanced
 

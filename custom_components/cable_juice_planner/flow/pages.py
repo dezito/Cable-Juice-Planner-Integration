@@ -12,7 +12,9 @@ from homeassistant.helpers import selector
 
 from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, object_prefix
 from ..site import charger_devices, circuit_of, update_circuits
+from ..management.dependency_checks import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, disabled_sensors
 from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
+from ..utils.solcast import SOLCAST_PLATFORM
 from .schema import ENERGIDATASERVICE_URL, PRICE_PROVIDERS, build_schema, normalize_input, validate_step
 
 
@@ -94,6 +96,9 @@ class CJPFlowPages:
                 "eds_url": ENERGIDATASERVICE_URL,
                 # the chargers of the cars with a lower priority that are left out of the house consumption by themselves (the house page)
                 "cjp_chargers": self._other_chargers_text(),
+                # the sensors of Strømligning and Solcast that are disabled (the entity picker can't offer them)
+                "stromligning_disabled": disabled_sensors(self.hass, STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES),  # type: ignore[attr-defined]
+                "solcast_disabled": disabled_sensors(self.hass, SOLCAST_PLATFORM, "total_kwh_forecast"),  # type: ignore[attr-defined]
             },
         )
 

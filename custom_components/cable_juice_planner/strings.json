@@ -157,7 +157,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Buy price",
           "stromligning_buy_tomorrow_available": "Buy price tomorrow",
@@ -177,7 +177,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\nDisabled in Strømligning now: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
@@ -206,7 +206,7 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
           "forecast_entity_id": "Solar forecast (Solcast)",
@@ -565,7 +565,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Buy price",
           "stromligning_buy_tomorrow_available": "Buy price tomorrow",
@@ -585,7 +585,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\nDisabled in Strømligning now: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
@@ -614,7 +614,7 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
           "forecast_entity_id": "Solar forecast (Solcast)",
@@ -1375,6 +1375,14 @@
           }
         }
       }
+    },
+    "stromligning_entities": {
+      "title": "Strømligning sensors that Cable Juice Planner needs are not available ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) uses Strømligning sensors that are disabled or that Strømligning does not provide. A missing sell tariff counts as 0, which makes the calculated sell price too high, and without the price sensors the stored prices are used.\n\nDisabled in Home Assistant (Strømligning disables its excl. VAT sensors by default – enable them under **Settings → Devices & services → Entities**, with *Show disabled entities*):\n{disabled}\n\nNot provided by Strømligning (e.g. the price forecasts are off in its options):\n{not_provided}\n\nThis repair disappears by itself when the sensors work again."
+    },
+    "solcast_entities": {
+      "title": "Solcast forecast sensors that Cable Juice Planner needs are not available ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) can't use all the Solcast forecast sensors it needs, so the days without one are planned from the weather forecast and the stored solar history instead. Solcast disables the forecast sensors of day 3 and on by default.\n\nDisabled in Home Assistant (enable them under **Settings → Devices & services → Entities**, with *Show disabled entities*):\n{disabled}\n\nNot named the way Cable Juice Planner expects (the entity id must end in _today, _tomorrow or _day_3 …):\n{renamed}\n\nWithout hourly detail (turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options):\n{no_detail}\n\nThis repair disappears by itself when the sensors are fixed."
     }
   }
 }

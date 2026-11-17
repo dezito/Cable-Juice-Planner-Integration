@@ -5,6 +5,7 @@ import datetime
 import logging
 
 from ...const import WEATHER_CONDITION_DICT
+from ...utils.solcast import SOLCAST_ENDINGS
 from ...utils.helpers import (
     average,
     day_of_week_text,
@@ -17,9 +18,6 @@ from ...utils.helpers import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-
-SOLCAST_ENDINGS = ["today", "tomorrow", "day_3", "day_4", "day_5", "day_6", "day_7"]
 
 
 def weather_values() -> list:
