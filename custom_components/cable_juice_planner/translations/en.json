@@ -877,7 +877,7 @@
         "name": "Learn driving distance"
       },
       "learn_soc_charge_power": {
-        "name": "Learn charge power by SOC"
+        "name": "Learn charge power by battery level"
       },
       "use_measured_charging_loss": {
         "name": "Use measured charging loss"
@@ -1188,7 +1188,7 @@
         "name": "Last full charge"
       },
       "soc_charging_power_model": {
-        "name": "SOC-dependent charging power"
+        "name": "Charging power by battery level"
       },
       "charging_loss_model": {
         "name": "Measured charging loss"

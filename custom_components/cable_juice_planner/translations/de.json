@@ -68,10 +68,10 @@
       },
       "ev": {
         "title": "E-Auto - Sensoren (optional)",
-        "description": "Sensoren der Auto-Integration. Ohne Auto-Integration leer lassen: dann wird ein virtueller Batteriestand verwendet. Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt oder alle leer sein.",
+        "description": "Sensoren der Auto-Integration. Ohne Auto-Integration leer lassen: dann wird ein virtueller Akkustand verwendet. Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt oder alle leer sein.",
         "data": {
-          "usable_battery_level_entity_id": "Batteriestand",
-          "simulate_battery_level_while_charging": "Batteriestand beim Laden simulieren",
+          "usable_battery_level_entity_id": "Akkustand",
+          "simulate_battery_level_while_charging": "Akkustand beim Laden simulieren",
           "estimated_battery_range_entity_id": "Reichweite",
           "odometer_entity_id": "Kilometerzähler",
           "charge_port_door_entity_id": "Ladeklappe",
@@ -82,26 +82,26 @@
           "climate_entity_id": "Klima / Vorheizen"
         },
         "data_description": {
-          "usable_battery_level_entity_id": "Muss exakter Batteriestand (%) sein",
-          "simulate_battery_level_while_charging": "Einschalten, wenn die Auto-Integration den Batteriestand nur langsam aktualisiert (z. B. nur alle 30–60 Minuten). Beim Laden lässt CJP zwischen den Aktualisierungen des Autos den Batteriestand anhand des kWh-Zählers des Ladegeräts steigen, abzüglich Ladeverlust. Jedes Mal, wenn das Auto einen neuen Batteriestand meldet (oder eine neue Zeit in Letzte Aktualisierung), korrigiert CJP die Simulation auf den Wert des Autos und steigt von dort weiter. Plan und Ladeaktionen verwenden den simulierten Stand; Verlauf, Fahreffizienz und die Messung des Ladeverlusts verwenden den Wert des Autos. Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, sodass das Auto selbst bestätigt, dass das Ziel erreicht ist. Der simulierte Stand wird in Simulierter Batteriestand angezeigt, wo du auch selbst den richtigen Wert des Autos eingeben kannst, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Beim Anstecken fragt eine Benachrichtigung, ob er mit der Anzeige im Auto übereinstimmt. Erfordert eine Auto-Integration. Ausgeschaltet lassen, wenn das Auto den Batteriestand laufend aktualisiert.",
+          "usable_battery_level_entity_id": "Muss exakter Akkustand (%) sein",
+          "simulate_battery_level_while_charging": "Einschalten, wenn die Auto-Integration den Akkustand nur langsam aktualisiert (z. B. nur alle 30–60 Minuten). Beim Laden lässt CJP zwischen den Aktualisierungen des Autos den Akkustand anhand des kWh-Zählers des Ladegeräts steigen, abzüglich Ladeverlust. Jedes Mal, wenn das Auto einen neuen Akkustand meldet (oder eine neue Zeit in Letzte Aktualisierung), korrigiert CJP die Simulation auf den Wert des Autos und steigt von dort weiter. Plan und Ladeaktionen verwenden den simulierten Stand; Verlauf, Fahreffizienz und die Messung des Ladeverlusts verwenden den Wert des Autos. Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, sodass das Auto selbst bestätigt, dass das Ziel erreicht ist. Der simulierte Stand wird in Simulierter Akkustand angezeigt, wo du auch selbst den richtigen Wert des Autos eingeben kannst, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Beim Anstecken fragt eine Benachrichtigung, ob er mit der Anzeige im Auto übereinstimmt. Erfordert eine Auto-Integration. Ausgeschaltet lassen, wenn das Auto den Akkustand laufend aktualisiert.",
           "estimated_battery_range_entity_id": "Muss exakte Reichweite sein",
           "charge_port_door_entity_id": "Ladeport offen/geschlossen (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Fahrzeug mit Lader verbunden (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Batteriestand erreicht höchstens 1 % darunter.",
+          "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Akkustand erreicht höchstens 1 % darunter.",
           "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs. Öffentliche Ladevorgänge werden nur mit bekanntem Standort erkannt",
-          "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Batteriestand.",
+          "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Akkustand.",
           "climate_entity_id": "Optional: die Klima-Entität des Autos. Ihr Zustand zeigt, ob das Vorheizen läuft; Start/Stopp werden als Ereignisse auf ev_request ausgelöst."
         }
       },
       "ev_specs": {
-        "title": "E-Auto - Batterie",
-        "description": "Die Batterie des Autos und wie früh das Laden vor der Abfahrt fertig sein muss.",
+        "title": "E-Auto - Akku",
+        "description": "Der Akku des Autos und wie früh das Laden vor der Abfahrt fertig sein muss.",
         "data": {
-          "battery_size": "Nutzbare Batteriekapazität",
+          "battery_size": "Nutzbare Akkukapazität",
           "last_charging_hour_before_departure_buffer": "Laden fertig vor Abfahrt"
         },
         "data_description": {
-          "battery_size": "Nutzbare Batteriekapazität; per OBD2 verifizieren",
+          "battery_size": "Nutzbare Akkukapazität; per OBD2 verifizieren",
           "last_charging_hour_before_departure_buffer": "Stunden vor der Abfahrt, zu denen das Laden abgeschlossen sein muss. Fehlt Energie, wird zusätzliche Ladung geplant."
         }
       },
@@ -382,8 +382,8 @@
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
-      "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
-      "simulation_needs_ev": "Die Simulation des Batteriestands erfordert Batteriestand, Reichweite und Kilometerzähler des Autos.",
+      "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
+      "simulation_needs_ev": "Die Simulation des Akkustands erfordert Akkustand, Reichweite und Kilometerzähler des Autos.",
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
@@ -476,10 +476,10 @@
       },
       "ev": {
         "title": "E-Auto - Sensoren (optional)",
-        "description": "Sensoren der Auto-Integration. Ohne Auto-Integration leer lassen: dann wird ein virtueller Batteriestand verwendet. Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt oder alle leer sein.",
+        "description": "Sensoren der Auto-Integration. Ohne Auto-Integration leer lassen: dann wird ein virtueller Akkustand verwendet. Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt oder alle leer sein.",
         "data": {
-          "usable_battery_level_entity_id": "Batteriestand",
-          "simulate_battery_level_while_charging": "Batteriestand beim Laden simulieren",
+          "usable_battery_level_entity_id": "Akkustand",
+          "simulate_battery_level_while_charging": "Akkustand beim Laden simulieren",
           "estimated_battery_range_entity_id": "Reichweite",
           "odometer_entity_id": "Kilometerzähler",
           "charge_port_door_entity_id": "Ladeklappe",
@@ -490,26 +490,26 @@
           "climate_entity_id": "Klima / Vorheizen"
         },
         "data_description": {
-          "usable_battery_level_entity_id": "Muss exakter Batteriestand (%) sein",
-          "simulate_battery_level_while_charging": "Einschalten, wenn die Auto-Integration den Batteriestand nur langsam aktualisiert (z. B. nur alle 30–60 Minuten). Beim Laden lässt CJP zwischen den Aktualisierungen des Autos den Batteriestand anhand des kWh-Zählers des Ladegeräts steigen, abzüglich Ladeverlust. Jedes Mal, wenn das Auto einen neuen Batteriestand meldet (oder eine neue Zeit in Letzte Aktualisierung), korrigiert CJP die Simulation auf den Wert des Autos und steigt von dort weiter. Plan und Ladeaktionen verwenden den simulierten Stand; Verlauf, Fahreffizienz und die Messung des Ladeverlusts verwenden den Wert des Autos. Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, sodass das Auto selbst bestätigt, dass das Ziel erreicht ist. Der simulierte Stand wird in Simulierter Batteriestand angezeigt, wo du auch selbst den richtigen Wert des Autos eingeben kannst, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Beim Anstecken fragt eine Benachrichtigung, ob er mit der Anzeige im Auto übereinstimmt. Erfordert eine Auto-Integration. Ausgeschaltet lassen, wenn das Auto den Batteriestand laufend aktualisiert.",
+          "usable_battery_level_entity_id": "Muss exakter Akkustand (%) sein",
+          "simulate_battery_level_while_charging": "Einschalten, wenn die Auto-Integration den Akkustand nur langsam aktualisiert (z. B. nur alle 30–60 Minuten). Beim Laden lässt CJP zwischen den Aktualisierungen des Autos den Akkustand anhand des kWh-Zählers des Ladegeräts steigen, abzüglich Ladeverlust. Jedes Mal, wenn das Auto einen neuen Akkustand meldet (oder eine neue Zeit in Letzte Aktualisierung), korrigiert CJP die Simulation auf den Wert des Autos und steigt von dort weiter. Plan und Ladeaktionen verwenden den simulierten Stand; Verlauf, Fahreffizienz und die Messung des Ladeverlusts verwenden den Wert des Autos. Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, sodass das Auto selbst bestätigt, dass das Ziel erreicht ist. Der simulierte Stand wird in Simulierter Akkustand angezeigt, wo du auch selbst den richtigen Wert des Autos eingeben kannst, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Beim Anstecken fragt eine Benachrichtigung, ob er mit der Anzeige im Auto übereinstimmt. Erfordert eine Auto-Integration. Ausgeschaltet lassen, wenn das Auto den Akkustand laufend aktualisiert.",
           "estimated_battery_range_entity_id": "Muss exakte Reichweite sein",
           "charge_port_door_entity_id": "Ladeport offen/geschlossen (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
           "charge_cable_entity_id": "Fahrzeug mit Lader verbunden (Unterstützte Zustände: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
-          "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Batteriestand erreicht höchstens 1 % darunter.",
+          "charging_limit_entity_id": "Optional: das aktuelle Ladelimit des Autos. Für die Ladeverlust-Berechnung und Rundung (Kia/Cupra). Das gewünschte Limit wird als Sensor charging_limit veröffentlicht. Der simulierte Akkustand erreicht höchstens 1 % darunter.",
           "location_entity_id": "Falls nicht gesetzt, Rückfall auf charger.entity_ids.status_entity_id für Zuhause/Unterwegs. Öffentliche Ladevorgänge werden nur mit bekanntem Standort erkannt",
-          "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Batteriestand.",
+          "last_update_entity_id": "Optional: Zeit der letzten Aktualisierung des Autos. Kein wake_up-Ereignis, wenn das Auto innerhalb von 14 Minuten aktualisiert wurde. Eine neue Zeit korrigiert auch den simulierten Akkustand.",
           "climate_entity_id": "Optional: die Klima-Entität des Autos. Ihr Zustand zeigt, ob das Vorheizen läuft; Start/Stopp werden als Ereignisse auf ev_request ausgelöst."
         }
       },
       "ev_specs": {
-        "title": "E-Auto - Batterie",
-        "description": "Die Batterie des Autos und wie früh das Laden vor der Abfahrt fertig sein muss.",
+        "title": "E-Auto - Akku",
+        "description": "Der Akku des Autos und wie früh das Laden vor der Abfahrt fertig sein muss.",
         "data": {
-          "battery_size": "Nutzbare Batteriekapazität",
+          "battery_size": "Nutzbare Akkukapazität",
           "last_charging_hour_before_departure_buffer": "Laden fertig vor Abfahrt"
         },
         "data_description": {
-          "battery_size": "Nutzbare Batteriekapazität; per OBD2 verifizieren",
+          "battery_size": "Nutzbare Akkukapazität; per OBD2 verifizieren",
           "last_charging_hour_before_departure_buffer": "Stunden vor der Abfahrt, zu denen das Laden abgeschlossen sein muss. Fehlt Energie, wird zusätzliche Ladung geplant."
         }
       },
@@ -763,8 +763,8 @@
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
-      "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
-      "simulation_needs_ev": "Die Simulation des Batteriestands erfordert Batteriestand, Reichweite und Kilometerzähler des Autos.",
+      "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
+      "simulation_needs_ev": "Die Simulation des Akkustands erfordert Akkustand, Reichweite und Kilometerzähler des Autos.",
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
@@ -877,7 +877,7 @@
         "name": "Fahrstrecke lernen"
       },
       "learn_soc_charge_power": {
-        "name": "Ladeleistung nach SOC lernen"
+        "name": "Ladeleistung nach Akkustand lernen"
       },
       "use_measured_charging_loss": {
         "name": "Gemessenen Ladeverlust nutzen"
@@ -939,10 +939,10 @@
         "name": "Sonntag Gesamtstrecke"
       },
       "min_daily_battery_level": {
-        "name": "Tägliches Heimkehr-Niveau"
+        "name": "Täglicher Akkustand bei Heimkehr"
       },
       "min_trip_battery_level": {
-        "name": "Reise-Heimkehr-Niveau"
+        "name": "Akkustand bei Heimkehr von einer Fahrt"
       },
       "min_charge_limit_battery_level": {
         "name": "Minimale Ladegrenze des EV"
@@ -957,13 +957,13 @@
         "name": "Ladeziel bei extrem günstigem Strom"
       },
       "battery_level": {
-        "name": "Virtuelles EV-Batterieniveau"
+        "name": "Virtueller EV-Akkustand"
       },
       "simulated_battery_level": {
-        "name": "Simulierter Batteriestand"
+        "name": "Simulierter Akkustand"
       },
       "completed_battery_level": {
-        "name": "EV-Laden abgeschlossen Niveau"
+        "name": "Akkustand bei abgeschlossenem Laden"
       },
       "estimated_total_range": {
         "name": "Virtuelle EV-Max-Reichweite"
@@ -993,7 +993,7 @@
         "name": "What-if-Akkustand beim ersten Anstecken"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternatives tägliches Heimkehr-Niveau"
+        "name": "What-if alternativer täglicher Akkustand bei Heimkehr"
       },
       "what_if_max_recommended_battery_level": {
         "name": "What-if max. empfohlene Ladegrenze des EV"
@@ -1155,7 +1155,7 @@
         "name": "Geschätzte Reichweite"
       },
       "drive_efficiency_last_battery_level": {
-        "name": "Batteriestand beim letzten Laden"
+        "name": "Akkustand beim letzten Laden"
       },
       "drive_efficiency_last_odometer": {
         "name": "Kilometerstand beim letzten Laden"
@@ -1188,7 +1188,7 @@
         "name": "Letzte Vollladung"
       },
       "soc_charging_power_model": {
-        "name": "Ladeleistung nach SOC"
+        "name": "Ladeleistung nach Akkustand"
       },
       "charging_loss_model": {
         "name": "Gemessener Ladeverlust"

@@ -259,7 +259,7 @@
         "description": "Hvem der får notifikationer fra Cable Juice Planner og hvilke.",
         "data": {
           "notify_list": "Notifikationer til",
-          "efficiency_on_cable_plug_in": "Køreeffektivitet ved tilslutning",
+          "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
           "preheating": "Forvarmning start/stop"
         },
         "data_description": {
@@ -291,7 +291,7 @@
           "power_values_db_data_to_save": "Effektværdier",
           "solar_available_db_data_to_save": "Solproduktion pr. vejrtype",
           "kwh_avg_prices_db_data_to_save": "Prishistorik",
-          "drive_efficiency_db_data_to_save": "Køreeffektivitet",
+          "drive_efficiency_db_data_to_save": "Kørselseffektivitet",
           "km_kwh_efficiency_db_data_to_save": "km/kWh",
           "charging_history_db_data_to_save": "Ladehistorik (måneder)"
         },
@@ -324,7 +324,7 @@
         "description": "Cable Juice Planner planlægger hvornår elbilen skal lade ud fra elpriser, kørsel, solprognose og husbatteri. Integrationen sender ingen kommandoer til laderen eller bilen: planen og handlingerne udstilles som entiteter (f.eks. `sensor.cjp_‹prefix›_charger_action` og ampere-sensorerne), som du bruger i dine egne automationer.",
         "data": {
           "name": "Bilens navn",
-          "entity_prefix": "Entity-prefix",
+          "entity_prefix": "Entitetsprefix",
           "language": "Sprog",
           "dashboard_icon": "Ikon i sidepanelet"
         },
@@ -667,7 +667,7 @@
         "description": "Hvem der får notifikationer fra Cable Juice Planner og hvilke.",
         "data": {
           "notify_list": "Notifikationer til",
-          "efficiency_on_cable_plug_in": "Køreeffektivitet ved tilslutning",
+          "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
           "preheating": "Forvarmning start/stop"
         },
         "data_description": {
@@ -699,7 +699,7 @@
           "power_values_db_data_to_save": "Effektværdier",
           "solar_available_db_data_to_save": "Solproduktion pr. vejrtype",
           "kwh_avg_prices_db_data_to_save": "Prishistorik",
-          "drive_efficiency_db_data_to_save": "Køreeffektivitet",
+          "drive_efficiency_db_data_to_save": "Kørselseffektivitet",
           "km_kwh_efficiency_db_data_to_save": "km/kWh",
           "charging_history_db_data_to_save": "Ladehistorik (måneder)"
         },
@@ -802,7 +802,7 @@
   "entity": {
     "switch": {
       "forced_charging_daily_battery_level": {
-        "name": "Tvangsladning under daglig batteri niveau"
+        "name": "Tvangsladning under dagligt batteriniveau"
       },
       "allow_manual_charging_now": {
         "name": "Tillad manuel ladning nu"
@@ -820,7 +820,7 @@
         "name": "Arbejdsplan opladning"
       },
       "trip_preheat": {
-        "name": "Tur ladning forvarm bilen"
+        "name": "Forvarm bilen før tur"
       },
       "workday_monday": {
         "name": "Mandag arbejdsdag"
@@ -877,7 +877,7 @@
         "name": "Lær kørselsafstand"
       },
       "learn_soc_charge_power": {
-        "name": "Lær ladeeffekt efter SOC"
+        "name": "Lær ladeeffekt efter batteriniveau"
       },
       "use_measured_charging_loss": {
         "name": "Brug målt ladetab"
@@ -939,37 +939,37 @@
         "name": "Søndagsafstand i alt"
       },
       "min_daily_battery_level": {
-        "name": "Daglig hjemkomst batteri niveau"
+        "name": "Daglig hjemkomst batteriniveau"
       },
       "min_trip_battery_level": {
-        "name": "Tur hjemkomst batteri niveau"
+        "name": "Tur hjemkomst batteriniveau"
       },
       "min_charge_limit_battery_level": {
-        "name": "Elbilens minimum ladingsprocent"
+        "name": "Elbilens minimale ladegrænse"
       },
       "max_recommended_charge_limit_battery_level": {
-        "name": "Elbilens maks anbefalet ladingsprocent"
+        "name": "Elbilens maks. anbefalede ladegrænse"
       },
       "very_cheap_grid_charging_max_battery_level": {
-        "name": "Ladingsprocent ved billig strøm"
+        "name": "Ladeprocent ved meget billig strøm"
       },
       "ultra_cheap_grid_charging_max_battery_level": {
-        "name": "Ladingsprocent ved meget billig strøm"
+        "name": "Ladeprocent ved ekstremt billig strøm"
       },
       "battery_level": {
-        "name": "Virtuel elbil batteri niveau"
+        "name": "Virtuel elbil batteriniveau"
       },
       "simulated_battery_level": {
         "name": "Simuleret batteriniveau"
       },
       "completed_battery_level": {
-        "name": "Elbil lading færdig batteri niveau"
+        "name": "Elbil ladning færdig batteriniveau"
       },
       "estimated_total_range": {
         "name": "Virtuel elbil max rækkevidde"
       },
       "trip_charge_procent": {
-        "name": "Tur ladning til"
+        "name": "Turladning til"
       },
       "trip_range_needed": {
         "name": "Tur {distance} forbrug"
@@ -993,15 +993,15 @@
         "name": "What-if-batteriniveau ved første tilslutning"
       },
       "what_if_min_daily_battery_level": {
-        "name": "What-if alternativ daglig hjemkomst batteri niveau"
+        "name": "What-if alternativ daglig hjemkomst batteriniveau"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if elbilens maks anbefalet ladingsprocent"
+        "name": "What-if elbilens maks. anbefalede ladegrænse"
       }
     },
     "select": {
       "forecast_type": {
-        "name": "Vælg prognose type"
+        "name": "Prognosetype"
       },
       "what_if_day_selection": {
         "name": "What-if Smart-dage",
@@ -1071,7 +1071,7 @@
         "name": "Gennemtving planlægning"
       },
       "trip_reset": {
-        "name": "Nulstil tur ladning"
+        "name": "Nulstil turladning"
       },
       "reset_dashboard": {
         "name": "Nulstil dashboard"
@@ -1097,10 +1097,10 @@
     },
     "sensor": {
       "current_charging_rule": {
-        "name": "Nuværende lade regel"
+        "name": "Nuværende laderegel"
       },
       "charger_action": {
-        "name": "Lader handling",
+        "name": "Ladehandling",
         "state": {
           "charge": "Lad",
           "stop": "Stop"
@@ -1125,7 +1125,7 @@
         "name": "Oversigt"
       },
       "charging_history": {
-        "name": "Lade historik"
+        "name": "Ladehistorik"
       },
       "emoji_description": {
         "name": "Emoji forklaring"
@@ -1140,19 +1140,19 @@
         "name": "Mål ved ekstremt billig strøm"
       },
       "solar_over_production_current_hour": {
-        "name": "Solcelle produktion tilrådighed i nuværende time"
+        "name": "Solcelleproduktion til rådighed i nuværende time"
       },
       "solar_charged_percentage": {
         "name": "Procentdel af opladning fra solceller"
       },
       "drive_efficiency": {
-        "name": "Kørsel effektivitet"
+        "name": "Kørselseffektivitet"
       },
       "km_per_kwh": {
         "name": "{distance_kwh}"
       },
       "estimated_range": {
-        "name": "Estimerede rækkevidde"
+        "name": "Estimeret rækkevidde"
       },
       "drive_efficiency_last_battery_level": {
         "name": "Batteriniveau ved sidste ladning"
@@ -1188,7 +1188,7 @@
         "name": "Sidste fulde opladning"
       },
       "soc_charging_power_model": {
-        "name": "Ladeeffekt efter SOC"
+        "name": "Ladeeffekt efter batteriniveau"
       },
       "charging_loss_model": {
         "name": "Målt ladetab"

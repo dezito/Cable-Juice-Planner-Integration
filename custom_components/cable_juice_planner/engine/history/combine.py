@@ -362,7 +362,7 @@ class HistoryCombine:
             percentage = round(total["kWh_from_public"]["total"] / total["kwh"]["total"] * 100.0, 1)
             total_public_charging = f"{total_public_cost} {round(total['kWh_from_public']['total'], 1)}kWh ({round(percentage, 1)}%)"
             history.append("---")
-            history.append(f"\n**{emoji_parse({'public_charging': True})} {t('ui.charging_history_combine_and_set.public_charing_total')} {total_public_charging}**")
+            history.append(f"\n**{emoji_parse({'public_charging': True})} {t('ui.charging_history_combine_and_set.public_charging_total')} {total_public_charging}**")
         history.append("\n</details>\n")
 
     def charging_power_to_emulated_battery_level(self) -> None:

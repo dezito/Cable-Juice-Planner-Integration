@@ -877,7 +877,7 @@
         "name": "Вивчати відстань поїздок"
       },
       "learn_soc_charge_power": {
-        "name": "Навчати потужність заряджання за SOC"
+        "name": "Навчати потужність заряджання за рівнем батареї"
       },
       "use_measured_charging_loss": {
         "name": "Використовувати виміряні втрати"
@@ -945,10 +945,10 @@
         "name": "Мін. рівень після поїздки"
       },
       "min_charge_limit_battery_level": {
-        "name": "Мінімальна межа заряджання EV"
+        "name": "Мінімальний ліміт заряджання EV"
       },
       "max_recommended_charge_limit_battery_level": {
-        "name": "Макс. рекомендована межа EV"
+        "name": "Макс. рекомендований ліміт EV"
       },
       "very_cheap_grid_charging_max_battery_level": {
         "name": "Рівень при дуже дешевій енергії"
@@ -996,7 +996,7 @@
         "name": "What-if альтернативний мін. рівень при поверненні"
       },
       "what_if_max_recommended_battery_level": {
-        "name": "What-if макс. рекомендована межа EV"
+        "name": "What-if макс. рекомендований ліміт EV"
       }
     },
     "select": {
@@ -1188,7 +1188,7 @@
         "name": "Остання повна зарядка"
       },
       "soc_charging_power_model": {
-        "name": "Потужність заряджання за SOC"
+        "name": "Потужність заряджання за рівнем батареї"
       },
       "charging_loss_model": {
         "name": "Виміряні втрати заряджання"
