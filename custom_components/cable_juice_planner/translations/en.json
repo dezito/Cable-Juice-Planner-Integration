@@ -279,7 +279,7 @@
         },
         "data_description": {
           "cron_interval": "Minutes between each check of the plan and the charging.",
-          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod.",
+          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod (optional). A notification lists missing cards.",
           "enable_diagnostic_file_log": "Writes a detailed log to cable_juice_planner_PREFIX.log in the config folder (2 MB per file, 3 rotations).",
           "testing_mode": "Marks the charging rule with 🧪 and skips the check that the car charges, preheating and other actions."
         }
@@ -687,7 +687,7 @@
         },
         "data_description": {
           "cron_interval": "Minutes between each check of the plan and the charging.",
-          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod.",
+          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod (optional). A notification lists missing cards.",
           "enable_diagnostic_file_log": "Writes a detailed log to cable_juice_planner_PREFIX.log in the config folder (2 MB per file, 3 rotations).",
           "testing_mode": "Marks the charging rule with 🧪 and skips the check that the car charges, preheating and other actions."
         }

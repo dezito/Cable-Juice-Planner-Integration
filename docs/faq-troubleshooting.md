@@ -73,6 +73,22 @@ It is only recalculated when something it depends on has changed. Press **Force 
 See [Charging loss](charging-loss.md#one-time-measurement): the charge has to add at least 30 percentage
 points, and the car has to report when it is full.
 
+## The dashboard shows errors, or a notification says cards are missing
+
+The dashboard uses HACS frontend cards (Mushroom, ApexCharts Card, Config Template Card and, for styling only,
+card-mod). When **Dashboard in the sidebar** is on, Cable Juice Planner looks at the Lovelace resources and
+the extra modules of Home Assistant, and a persistent notification lists the cards it can't find, with a link
+to GitHub and to the card in HACS.
+
+1. Install the listed cards in HACS and reload the browser page.
+2. The notification goes away by itself when the cards are found. The check runs at startup, when the
+   integration reloads and when the Lovelace resources change.
+
+If a card is loaded under a name that doesn't contain the card's name (for example a renamed file or a
+bundle), the notification can be wrong: dismiss it. It comes back when the list of missing cards changes, the integration reloads or Home Assistant restarts. The
+check only reads the resources of your Home Assistant, it never contacts HACS or GitHub. If the resources
+can't be read, nothing is reported.
+
 ## A database file was corrupt
 
 Before Cable Juice Planner saves a database, it checks the current file in `/config/.storage/` and copies it

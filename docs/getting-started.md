@@ -20,7 +20,8 @@ Optional:
 - a **home battery** (level and power)
 
 For the dashboard you need the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template-card`
-and `card-mod`.
+and `card-mod`. If Home Assistant can't find some of them, a notification lists the missing ones with links to
+install them (see [the cards are missing](faq-troubleshooting.md#the-dashboard-shows-errors-or-a-notification-says-cards-are-missing)).
 
 > [!TIP]
 > Before you start, find out how your charger and car are controlled: which services, switches or numbers

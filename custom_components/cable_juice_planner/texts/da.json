@@ -281,6 +281,12 @@
     },
     "debug": {
       "exported": "**Debug-fil oprettet**\n\n1. Download den: {download} (linket virker i {hours} timer, filen ligger også som `{file}` i config-mappen).\n2. [Opret et GitHub-issue]({issue}) - version og tidspunkt er udfyldt.\n3. Beskriv hvad der skete, hvornår det skete og hvad du forventede, og træk filen ind i feltet *Debug file*.\n\nOpret filen så hurtigt som muligt efter problemet: den indeholder de seneste beregninger og logbeskeder.\n\nFilen indeholder dine indstillinger, priser, energihistorik og planer, blueprint-automationerne samt de integrationer og enhedsmodeller, du bruger. Navne, entitetsnavne, serienumre, koordinater, notify-tjenester, adresser og nøgler er fjernet eller erstattet. Intet bliver sendt nogen steder hen - du bestemmer selv, hvad du uploader."
+    },
+    "dashboard_cards": {
+      "title": "Dashboard-kort mangler",
+      "intro": "Dashboardet i sidepanelet bruger brugerdefinerede kort fra HACS, som Home Assistant ikke kunne finde. Uden dem viser dele af dashboardet fejl eller mister deres styling:",
+      "optional": "valgfrit, kun udseende",
+      "footer": "Installér dem i HACS, og genindlæs browsersiden. Denne notifikation fjernes automatisk, når kortene er fundet, og tjekket køres igen, når integrationen genindlæses. Hvis et kort er installeret på en anden måde, kan du lukke denne notifikation."
     }
   },
   "charging_type": {

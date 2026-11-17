@@ -281,6 +281,12 @@
     },
     "debug": {
       "exported": "**Debug-Datei erstellt**\n\n1. Herunterladen: {download} (der Link gilt {hours} Stunden, die Datei liegt außerdem als `{file}` im Config-Ordner).\n2. [Ein GitHub-Issue öffnen]({issue}) - Version und Zeitpunkt sind ausgefüllt.\n3. Beschreibe, was passiert ist, wann es passiert ist und was du erwartet hast, und ziehe die Datei in das Feld *Debug file*.\n\nErstelle die Datei möglichst bald nach dem Problem: Sie enthält die letzten Berechnungen und Logmeldungen.\n\nDie Datei enthält deine Einstellungen, Preise, Energiehistorie und Pläne, die Blueprint-Automationen sowie die verwendeten Integrationen und Gerätemodelle. Namen, Entitätsnamen, Seriennummern, Koordinaten, Notify-Dienste, Adressen und Schlüssel sind entfernt oder ersetzt. Es wird nichts verschickt - du entscheidest, was du hochlädst."
+    },
+    "dashboard_cards": {
+      "title": "Dashboard-Karten fehlen",
+      "intro": "Das Seitenleisten-Dashboard verwendet benutzerdefinierte Karten aus HACS, die Home Assistant nicht finden konnte. Ohne sie zeigen Teile des Dashboards Fehler an oder verlieren ihr Styling:",
+      "optional": "optional, nur Optik",
+      "footer": "Installiere sie in HACS und lade die Browserseite neu. Diese Benachrichtigung verschwindet automatisch, sobald die Karten gefunden werden, und die Prüfung läuft erneut, wenn die Integration neu geladen wird. Wenn eine Karte auf andere Weise installiert ist, kannst du diese Benachrichtigung schließen."
     }
   },
   "charging_type": {
