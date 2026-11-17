@@ -281,6 +281,12 @@
     },
     "debug": {
       "exported": "**Utworzono plik debug**\n\n1. Pobierz go: {download} (link działa przez {hours} godz., plik jest też zapisany jako `{file}` w folderze konfiguracji).\n2. [Otwórz zgłoszenie na GitHubie]({issue}) - wersja i czas są już uzupełnione.\n3. Opisz, co się stało, kiedy to się stało i czego oczekiwałeś, a następnie przeciągnij plik do pola *Debug file*.\n\nUtwórz plik jak najszybciej po wystąpieniu problemu: zawiera ostatnie obliczenia i komunikaty logu.\n\nPlik zawiera Twoje ustawienia, ceny, historię energii i plany, automatyzacje z blueprintu oraz używane integracje i modele urządzeń. Imiona, nazwy encji, numery seryjne, współrzędne, usługi notify, adresy i klucze są usunięte lub zastąpione. Nic nie jest nigdzie wysyłane - sam decydujesz, co przesyłasz."
+    },
+    "dashboard_cards": {
+      "title": "Brakujące karty dashboardu",
+      "intro": "Dashboard na pasku bocznym używa niestandardowych kart z HACS, których Home Assistant nie znalazł. Bez nich części dashboardu pokazują błędy lub tracą stylizację:",
+      "optional": "opcjonalna, tylko wygląd",
+      "footer": "Zainstaluj je w HACS i odśwież stronę w przeglądarce. To powiadomienie zniknie automatycznie, gdy karty zostaną znalezione, a sprawdzenie zostanie powtórzone po ponownym wczytaniu integracji. Jeśli karta jest zainstalowana w inny sposób, możesz zamknąć to powiadomienie."
     }
   },
   "charging_type": {

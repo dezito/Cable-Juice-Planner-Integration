@@ -206,7 +206,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - For the dashboard (install these HACS frontend cards): [Mushroom](https://github.com/piitaya/lovelace-mushroom),
   [ApexCharts Card](https://github.com/RomRider/apexcharts-card),
   [Config Template Card](https://github.com/iantrich/config-template-card) and
-  [card-mod](https://github.com/thomasloven/lovelace-card-mod)
+  [card-mod](https://github.com/thomasloven/lovelace-card-mod) (only styling). If Home Assistant can't find
+  some of them, a persistent notification lists them with links
 
 ### Tested with
 

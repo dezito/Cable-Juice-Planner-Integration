@@ -23,6 +23,7 @@ it is reset (reset_dashboard button, or deleting the config in the raw configura
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import re
 from pathlib import Path
@@ -41,6 +42,7 @@ from homeassistant.helpers.storage import Store
 
 from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, dashboard_icon, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
+from .dashboard_cards import async_update_card_notification, async_watch_card_resources
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -393,8 +395,17 @@ def _write_if_changed(path: Path, content: str) -> bool:
     return True
 
 
-async def async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], prefix: str) -> None:
-    """Render the dashboard and add it to the sidebar until the entry unloads."""
+async def async_setup_dashboard(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    prefix: str,
+    translate: Callable[..., str] | None = None,
+) -> None:
+    """Render the dashboard and add it to the sidebar until the entry unloads.
+
+    With ``translate`` (the coordinator's ``t``) a persistent notification lists the HACS cards that are missing.
+    """
     lovelace = hass.data.get(LOVELACE_DATA)
     if lovelace is None:
         _LOGGER.warning("Lovelace is not loaded, the Cable Juice Planner dashboard is not available")
@@ -450,6 +461,13 @@ async def async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry, config:
             frontend.async_remove_panel(hass, url_path)
 
     entry.async_on_unload(_remove)
+
+    if translate is not None:
+        try:
+            await async_update_card_notification(hass, translate)
+            async_watch_card_resources(hass, entry, translate)
+        except Exception:  # noqa: BLE001 - the card check must never keep the dashboard from working
+            _LOGGER.exception("Could not check the dashboard cards")
 
 
 async def async_reset_dashboard(hass: HomeAssistant, prefix: str) -> None:

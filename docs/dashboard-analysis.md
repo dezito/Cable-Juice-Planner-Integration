@@ -8,7 +8,9 @@ haven't set up are removed. You choose the **Sidebar icon** of each car when you
 It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovelace-mushroom),
 [ApexCharts Card](https://github.com/RomRider/apexcharts-card),
 [Config Template Card](https://github.com/iantrich/config-template-card) and
-[card-mod](https://github.com/thomasloven/lovelace-card-mod).
+[card-mod](https://github.com/thomasloven/lovelace-card-mod) (only for styling). If Home Assistant can't find
+some of them, a persistent notification lists the missing cards with links to them, see
+[the cards are missing](faq-troubleshooting.md#the-dashboard-shows-errors-or-a-notification-says-cards-are-missing).
 
 ## Overview
 

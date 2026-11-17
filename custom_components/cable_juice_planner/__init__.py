@@ -34,6 +34,7 @@ from .coordinator import CJPCoordinator
 from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix
 from .management.blueprint_install import async_install_blueprints
 from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
+from .management.dashboard_cards import async_dismiss_card_notification
 from .management.debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
 from .utils.helpers import float_or_none
 from .site import CJPSite
@@ -202,9 +203,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool:
         await _async_run_after_home_assistant_started(
             hass,
             entry,
-            lambda: async_setup_dashboard(hass, entry, coordinator.config, coordinator.prefix),
+            lambda: async_setup_dashboard(hass, entry, coordinator.config, coordinator.prefix, coordinator.t),
             f"cjp_{coordinator.prefix}_dashboard_startup",
         )
+    else:
+        async_dismiss_card_notification(hass, entry)
     coordinator.async_start()
     return True
 
@@ -284,6 +287,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_unload()
+        # the panel goes away with the entry; a reload creates the notification again if cards are still missing
+        async_dismiss_card_notification(hass, entry)
     return unloaded
 
 
@@ -292,6 +297,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None
         return
     from .management.storage import CJPStorage  # noqa: PLC0415
 
+    async_dismiss_card_notification(hass, entry)
     # the data can be imported again (config flow of a new instance, or import_data)
     try:
         await async_export(hass, entry, "deleted")

@@ -279,7 +279,7 @@
         },
         "data_description": {
           "cron_interval": "Minuten zwischen den Prüfungen des Plans und des Ladens.",
-          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod.",
+          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod (optional). Eine Benachrichtigung listet fehlende Karten auf.",
           "enable_diagnostic_file_log": "Schreibt ein detailliertes Log nach cable_juice_planner_PREFIX.log im Konfigurationsordner (2 MB pro Datei, 3 Rotationen).",
           "testing_mode": "Markiert die Laderegel mit 🧪 und überspringt die Ladekontrolle, das Vorheizen und andere Aktionen."
         }
@@ -687,7 +687,7 @@
         },
         "data_description": {
           "cron_interval": "Minuten zwischen den Prüfungen des Plans und des Ladens.",
-          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod.",
+          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod (optional). Eine Benachrichtigung listet fehlende Karten auf.",
           "enable_diagnostic_file_log": "Schreibt ein detailliertes Log nach cable_juice_planner_PREFIX.log im Konfigurationsordner (2 MB pro Datei, 3 Rotationen).",
           "testing_mode": "Markiert die Laderegel mit 🧪 und überspringt die Ladekontrolle, das Vorheizen und andere Aktionen."
         }
