@@ -2048,13 +2048,13 @@ views:
         @@economy_intro@@
 
         {% if e.months -%}
-        | @@economy_month@@ | kWh | @@economy_paid@@ | @@valuta_kwh@@ | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | Score | @@valuta@@/@@distance@@ |
+        | @@economy_month@@ | kWh | @@economy_paid@@ | @@valuta_kwh@@ | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | @@economy_score@@ | @@valuta@@/@@distance@@ |
         |:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
         {% for m in e.months | reverse -%}
         | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ (m.cost | round(0) | string + ' @@valuta@@') if m.cost is not none else '–' }} | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' @@valuta@@') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
         {% endfor %}
 
-        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ (e.total.cost | round(0) | string + ' @@valuta@@') if e.total.cost is not none else '–' }}{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} @@valuta@@ @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
+        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ (e.total.cost | round(0) | string + ' @@valuta@@') if e.total.cost is not none else '–' }}{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} @@valuta@@ @@economy_vs_daily@@{% if e.total.score is not none %} · @@economy_score@@ {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
         {%- else -%}
         <ha-alert alert-type="info">@@economy_no_data@@</ha-alert>
         {%- endif %}

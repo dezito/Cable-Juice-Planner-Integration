@@ -877,7 +877,7 @@
         "name": "Ucz się dystansu jazdy"
       },
       "learn_soc_charge_power": {
-        "name": "Ucz się mocy ładowania według SOC"
+        "name": "Ucz się mocy ładowania według poziomu baterii"
       },
       "use_measured_charging_loss": {
         "name": "Użyj zmierzonej straty ładowania"
@@ -951,7 +951,7 @@
         "name": "Maksymalny zalecany limit ładowania EV"
       },
       "very_cheap_grid_charging_max_battery_level": {
-        "name": "Limit ładowania przy tanim prądzie"
+        "name": "Limit ładowania przy bardzo tanim prądzie"
       },
       "ultra_cheap_grid_charging_max_battery_level": {
         "name": "Limit ładowania przy ekstremalnie tanim prądzie"
@@ -1188,7 +1188,7 @@
         "name": "Ostatnie pełne ładowanie"
       },
       "soc_charging_power_model": {
-        "name": "Moc ładowania według SOC"
+        "name": "Moc ładowania według poziomu baterii"
       },
       "charging_loss_model": {
         "name": "Zmierzona strata ładowania"

@@ -217,9 +217,9 @@ async def test_help_leaves_out_the_min_charge_limit_without_its_entity(hass: Hom
         )
         return CJPEntity(coordinator, "number", "min_daily_battery_level").help_attributes()["help"]
 
-    assert "Minimum ladegrænse" in help_text("number.ev_charge_limit")
+    assert "minimale ladegrænse" in help_text("number.ev_charge_limit")
     without = help_text("")
-    assert "Minimum ladegrænse" not in without and "Maks. anbefalet ladegrænse" in without and "\n\n\n" not in without
+    assert "minimale ladegrænse" not in without and "maks. anbefalede ladegrænse" in without and "\n\n\n" not in without
 
 
 def test_forced_charging_shown_when_relevant() -> None:
@@ -448,7 +448,8 @@ def test_entity_help_uses_spaced_bold_italic_labels() -> None:
         "Sammenligningen findes kun i kendte perioder."
     )
     assert format_analysis_help_text("Ready; next point.") == "Ready;\nNext point."
-    assert load_texts("da")["dashboard.economy_explain"].startswith("**Gns.**:")
+    assert load_texts("da")["dashboard.economy_explain"].startswith("**Betalt**:")
+    assert "**Sparet**: " in load_texts("da")["dashboard.economy_explain"]
     assert "***Solcelleproduktion til rådighed***\n" in load_texts("da")["entity_help.solar_charging"]
     assert "***Batteriniveau og ladegrænse***\n" in load_texts("da")["dashboard.history_explain"]
 
@@ -461,6 +462,82 @@ def test_learned_distance_explanation_keeps_its_labels_in_every_language(languag
     for key in ("learn_distance_entered", "learn_distance_learned", "learn_distance_days"):
         label = texts[f"dashboard.{key}"].split(" (")[0]
         assert f"***{label}***" in lines, (language, label, lines)
+
+
+@pytest.mark.parametrize("language", ["da", "de", "en", "en-GB", "pl", "uk"])
+def test_price_forecast_explanation_covers_the_correction(language: str) -> None:
+    """The Read more of the price forecast names the Correction and Worst hour columns and the corrected series."""
+    texts = load_texts(language, "GBP", "km")
+    explain = texts["dashboard.price_forecast_explain"]
+    for key in ("correction", "worst_hour"):
+        assert texts[f"dashboard.{key}"] in explain, (language, key)
+    assert texts["dashboard.price_forecast_corrected"] in explain, language
+    assert "£/" in explain and "{valuta" not in explain, language  # the currency placeholder is filled in
+
+
+def _raw_texts(language: str) -> dict[str, str]:
+    import json
+    from pathlib import Path
+
+    path = Path(const.__file__).parent.parent / "texts" / f"{language}.json"
+    flat: dict[str, str] = {}
+
+    def walk(node: dict, prefix: str = "") -> None:
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value, f"{prefix}{key}.")
+            else:
+                flat[f"{prefix}{key}"] = value
+
+    walk(json.loads(path.read_text(encoding="utf-8")))
+    return flat
+
+
+@pytest.mark.parametrize("language", ["da", "de", "en-GB", "pl", "uk"])
+def test_texts_have_the_same_keys_and_placeholders_in_every_language(language: str) -> None:
+    english, other = _raw_texts("en"), _raw_texts(language)
+    assert set(other) == set(english), language
+    def placeholders(text: str) -> set[str]:
+        # {valuta...} and {distance...} are filled in from the unit settings, a language may write its own unit instead
+        return {name for name in re.findall(r"\{([a-z_0-9]+)\}", text) if not name.startswith(("valuta", "distance"))}
+
+    mismatched = {
+        key: (sorted(placeholders(english[key])), sorted(placeholders(other[key])))
+        for key in english
+        if placeholders(english[key]) != placeholders(other[key])
+    }
+    assert not mismatched, (language, mismatched)
+
+
+@pytest.mark.parametrize("language", ["da", "de", "en", "en-GB", "pl", "uk"])
+def test_economy_score_column_is_translated_and_explained(language: str) -> None:
+    """The Score column of the economy table is a text of its own and the Read more names it with the same word."""
+    from pathlib import Path
+
+    source = (Path(const.__file__).parent.parent / "dashboard" / "cable_juice_planner.yaml").read_text(encoding="utf-8")
+    assert "| Score |" not in source and " · Score " not in source and "@@economy_score@@" in source
+    texts = load_texts(language, "GBP", "km")
+    assert f"**{texts['dashboard.economy_score']}**:" in texts["dashboard.economy_explain"], language
+
+
+DEAD_KEYS = (
+    "ui.set_charging_rule.hour_limit", "ui.set_charging_rule.day_limit", "ui.validation_procedure.entity_ids_missing",
+    "ui.init.file_created_message", "ui.init.add_entities", "ui.init.yaml_file_created", "ui.init.restart_required",
+    "ui.init.error_loading", "ui.init.renamed_to", "ui.init.config_renamed_keys", "ui.init.entities_renamed",
+    "ui.init.deprecated_keys_title", "ui.init.deprecated_keys_in", "ui.init.remove_these_keys", "ui.init.config_updated",
+    "ui.init.entities_package_updated", "ui.init.first_run_warning", "ui.init.loading_config",
+    "ui.init.config_validation_failed", "ui.init.charger_not_configured",
+    "ui.charging_history_combine_and_set.public_charing_total", "ui.ready_to_charge.cable_connected_ev_not_updated",
+    "ui.is_charging.charger_control_restart_count", "ui.startup.almost_ready", "ui.startup.call_all_entities",
+)
+
+
+@pytest.mark.parametrize("language", ["da", "de", "en", "en-GB", "pl", "uk"])
+def test_dead_keys_are_not_reintroduced(language: str) -> None:
+    """Keys of the PyScript configuration messages and the typo key of the public charging total are gone."""
+    texts = load_texts(language)
+    assert not [key for key in DEAD_KEYS if key in texts], language
+    assert texts["ui.charging_history_combine_and_set.public_charging_total"], language
 
 
 def test_entity_help_uses_current_number_states(hass: HomeAssistant) -> None:
@@ -605,7 +682,7 @@ def test_charging_loss_section_on_analysis() -> None:
     # the loss by charging power (measurements and model) and what it is made of (fixed use + percentage loss)
     assert len(charts) == 2 and all(s["entity"] == "sensor.cjp_tesla_charging_loss_model" for c in charts for s in c["series"])
     assert [c["header"]["title"] for c in charts] == ["Tab mod ladeeffekt", "Hvad tabet består af"]
-    assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Proportionalt resttab", "Fast forbrug"]
+    assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Procentvist tab", "Fast forbrug"]
     buttons = [row["entity"] for c in _cards(analysis) if c.get("type") == "entities" for row in c["entities"]]
     assert "button.cjp_tesla_recalculate_charging_loss" in buttons
     assert "switch.cjp_tesla_calculate_charging_loss" not in buttons
@@ -624,7 +701,7 @@ def test_charging_loss_section_on_analysis() -> None:
     no_ev_config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": ""})
     no_ev = yaml.safe_load(render_dashboard(no_ev_config, "tesla", "entry1", no_ev_entities))
     assert "Ladetab pr. effekt" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
-    assert "Ladeeffekt efter SOC" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
+    assert "Ladeeffekt efter batteriniveau" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
 
 
 def test_what_if_scenarios_that_need_drives_are_left_out_without_a_car() -> None:
@@ -661,14 +738,14 @@ def test_soc_power_section_on_analysis() -> None:
     analysis = yaml.safe_load(text)["views"][2]
     section = next(
         section for section in analysis["sections"]
-        if any(card.get("heading") == "Ladeeffekt efter SOC" for card in section["cards"])
+        if any(card.get("heading") == "Ladeeffekt efter batteriniveau" for card in section["cards"])
     )
     explanation, switch, table, chart = section["cards"][1:]
 
     assert any(e["entity"] == "switch.cjp_learn_soc_charge_power" or e["entity"].endswith("learn_soc_charge_power") for e in switch["entities"])
 
     assert "Grafen og tabellen" in explanation["content"]
-    assert "styrer ikke ladeboksen" in explanation["content"]
+    assert "styrer ikke laderen" in explanation["content"]
     assert "row.sample_sessions" in table["content"]
     assert "row.sessions" in table["content"]
     assert "row.cap_kw" in table["content"]
@@ -773,7 +850,7 @@ def test_analysis_sections() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
     headings = [c["heading"] for c in _cards(yaml.safe_load(text)["views"][2]) if c.get("type") == "heading"]
-    for heading in ("Ladeeffekt efter SOC", "Kørsel og temperatur", "Klar til afgang", "Lært kørselsafstand", "Planlagt mod faktisk ladet", "Batterikapacitet"):
+    for heading in ("Ladeeffekt efter batteriniveau", "Kørsel og temperatur", "Klar til afgang", "Lært kørselsafstand", "Planlagt mod faktisk ladet", "Batterikapacitet"):
         assert heading in headings
 
 

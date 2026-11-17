@@ -67,14 +67,9 @@
       "message": "Entität '{entity}' seit {timestamp} nicht verfügbar",
       "restart_integration": "Prüfe die Integration oder lade sie neu, wenn sie nicht von selbst zurückkommt."
     },
-    "set_charging_rule": {
-      "hour_limit": "Stundenlimit erreicht",
-      "day_limit": "Tageslimit erreicht"
-    },
     "validation_procedure": {
       "entity_validation": "Entitäten werden validiert",
       "entity_missing_try_again": "Einige Entitäten fehlen\nNeuer Versuch in 2 Minuten",
-      "entity_ids_missing": "Einige Entity-IDs fehlen\n- {entity_ids}",
       "entity_unavailable_try_again": "Einige Entitäten sind nicht verfügbar\nneuer Versuch in 2 Minuten",
       "unavailable_entity_ids_title": "Einige Entity-IDs sind nicht verfügbar",
       "check_entity_ids": "Entity-IDs prüfen",
@@ -82,26 +77,9 @@
     },
     "init": {
       "script_starting": "Starte Cable Juice Planner",
-      "file_created_message": "Konfigurationsdatei erstellt: {file_path}",
-      "add_entities": "Bitte neue Entitäten in die Dashboards aufnehmen.",
-      "yaml_file_created": "YAML-Datei erstellt: {file_path}",
-      "restart_required": "Home Assistant neu starten, um Änderungen zu laden",
-      "error_loading": "Lade {file_path} in 5 Sekunden erneut; es ist ein Fehler aufgetreten",
       "created": "Erstellt",
-      "renamed_to": "umbenannt in",
-      "config_renamed_keys": "Konfigurationsschlüssel in {file_path} umbenannt",
-      "entities_renamed": "Entitäten in {file_path} umbenannt",
-      "deprecated_keys_title": "Veraltete Schlüssel",
-      "deprecated_keys_in": "Veraltete Schlüssel in {file_path}",
-      "remove_these_keys": "Diese Schlüssel entfernen",
-      "config_updated": "Konfigurationsdatei {file_path} aktualisiert",
-      "entities_package_updated": "Entitäten-Paket {file_path} aktualisiert",
-      "first_run_warning": "{file_path} first_run auf false setzen",
-      "loading_config": "Konfiguration wird geladen",
       "config_validation": "Konfiguration wird validiert",
-      "config_validation_failed": "Konfigurationsvalidierung fehlgeschlagen",
-      "charger_not_configured": "Lader nicht konfiguriert; bei fehlender Lader-Integration EV-Entitäten verwenden",
-      "script_stopped": "Skript gestoppt",
+      "script_stopped": "Gestoppt",
       "check_log": "Log prüfen für weitere Informationen"
     },
     "emoji_description": {
@@ -135,7 +113,6 @@
       "day_kwh": "Tag kWh",
       "night_kwh": "Nacht kWh",
       "public_charging_total": "Öffentliches Laden gesamt",
-      "public_charing_total": "Öffentliches Laden gesamt",
       "no_history": "Keine Ladehistorie"
     },
     "cheap_grid_charge_hours": {
@@ -147,12 +124,12 @@
         "title": "Effizienz der letzten Fahrt",
         "drive_date": "Fahrtdatum",
         "last_distance": "Distanz",
-        "used_battery": "Verbrauchte Batterie",
+        "used_battery": "Verbrauchter Akku",
         "distance_per_kwh": "Distanz pro kWh"
       },
       "battery_level_expenses": {
-        "title": "Kosten je Batteriestand",
-        "current_battery_level": "Aktueller Batteriestand",
+        "title": "Kosten je Akkustand",
+        "current_battery_level": "Aktueller Akkustand",
         "solar_share": "Solaranteil",
         "unit_price": "Einheitspreis"
       },
@@ -168,7 +145,7 @@
         "sun": "Sonne",
         "no_departure_planned": "Keine Abfahrten geplant",
         "solar": "Solar",
-        "plan_include_estimations": "Plan enthält geschätzte Netz-Kosten, {work_overview_solar_text}Batteriestände",
+        "plan_include_estimations": "Plan enthält geschätzte Netz-Kosten, {work_overview_solar_text}Akkustände",
         "estimated_daily_charging": "Tägliche Schätzung {alternative_cost}€ {alternative_per_kwh}€/kWh<br>bei {total_kwh}kWh Differenz {difference_cost}€",
         "estimated_daily_charging_plan": "Ladeübersicht (**Tägliche Ladeschätzung**)"
       },
@@ -192,7 +169,6 @@
     "ready_to_charge": {
       "cable_disconnected": "Ladekabel getrennt",
       "cable_connected_ev_not_home": "Kabel verbunden, EV nicht zuhause",
-      "cable_connected_ev_not_updated": "Kabel verbunden, EV nicht aktualisiert",
       "cable_connected_not_to_ev": "Kabel nicht mit EV verbunden\nWeckversuch läuft",
       "charge_port_closed": "Ladeport nicht geöffnet\nWeckversuch läuft",
       "ev_unavailable": "EV-Ladeport oder Kabel nicht verfügbar\nWeckversuch läuft"
@@ -206,7 +182,6 @@
       "charger_dynamic_failed": "Dynamische Strombegrenzung fehlgeschlagen",
       "charger_restart": "Lader wird neu gestartet",
       "charger_restart_count": "Neustart Lader - Versuch {count}",
-      "charger_control_restart_count": "Neustart Lade-Operator - Versuch {count}",
       "ev_not_charging": "EV lädt nicht korrekt",
       "ev_restart_count": "EV-Ladung neu starten - Versuch {count}",
       "charging_title": "Das E-Auto lädt"
@@ -226,29 +201,29 @@
       "manual_charging_solar": "Manuelles Laden (nur Solar) {watt}W",
       "planned_charging": "Laden bis {emoji}",
       "low_battery_but_expensive": "Kein Laden - Strom zu teuer",
-      "low_battery": "Laden, Batterie < {percentage}%",
-      "solar_production_but_expensive": "Solarüberschuss wird verkauft; Spotpreis teuer ({price}€)",
+      "low_battery": "Laden, Akku < {percentage}%",
+      "solar_production_but_expensive": "Solarüberschuss wird in einer teuren Stunde verkauft (Verkaufspreis {price} {valuta_kwh})",
       "solar": "Solar",
       "powerwall": "Hausbatterie",
       "local_energy_charging": "{local_energy} lädt {watt}W",
-      "local_energy_charging_not_needed": "Kein Solar-Laden, Batterie über {percentage}%",
+      "local_energy_charging_not_needed": "Kein Solar-Laden, Akku über {percentage}%",
       "not_charging": "Kein Laden",
-      "error_charging_max": "Fehler: Script deaktiviert, lädt maximal!!!"
+      "error_charging_max": "Fehler: Planung fehlgeschlagen, lädt mit Maximalleistung"
     },
     "notify_set_battery_level": {
-      "action": "Batteriestand setzen",
-      "title": "EV-Batteriestand",
-      "message": "Bitte Batteriestand des EV in Home Assistant setzen"
+      "action": "Akkustand setzen",
+      "title": "EV-Akkustand",
+      "message": "Bitte Akkustand des EV in Home Assistant setzen"
     },
     "notify_check_battery_level": {
-      "action": "Batteriestand korrigieren",
-      "title": "Batteriestand beim Anstecken",
-      "message": "Das Auto ist mit {battery_level} % angesteckt. Stimmt das mit der Anzeige im Auto überein? Sonst gib den richtigen Batteriestand ein, damit die Simulation von dort startet."
+      "action": "Akkustand korrigieren",
+      "title": "Akkustand beim Anstecken",
+      "message": "Das Auto ist mit {battery_level} % angesteckt. Stimmt das mit der Anzeige im Auto überein? Sonst gib den richtigen Akkustand ein, damit die Simulation von dort startet."
     },
     "notify_battery_under_daily_battery_level": {
       "action": "Erzwungenes Laden aktivieren",
-      "title": "EV-Batterie unter Tagesziel",
-      "message": "Batteriestand unter täglichem Ziel - erzwungenes Laden verfügbar",
+      "title": "EV-Akku unter Tagesziel",
+      "message": "Akkustand unter täglichem Ziel - erzwungenes Laden verfügbar",
       "no_charge_expensive_hours": "Kein Laden in den 3 teuersten Stunden"
     },
     "startup": {
@@ -264,14 +239,12 @@
       "setting_entities": "Entitäten werden eingerichtet",
       "loading_db": "Datenbanken werden geladen",
       "loading_history": "Ladehistorie wird geladen",
-      "almost_ready": "Fast fertig",
       "ev": {
         "range": "Reichweite",
-        "battery_level": "Batteriestand",
+        "battery_level": "Akkustand",
         "estimated_range": "Geschätzte Reichweite"
       },
       "calc_charging_plan": "Ladeplan wird berechnet",
-      "call_all_entities": "Rufen Sie den Dienst pyscript.ev_all_entities auf, um alle Entitäten anzuzeigen",
       "imported_databases": "Vorhandene Datenbanken importiert: {databases}"
     },
     "charging_amps": {
@@ -321,10 +294,10 @@
       "description": "Manuelles Laden"
     },
     "low_battery": {
-      "description": "Erzwinges Laden unter täglichem Batterieziel"
+      "description": "Erzwinges Laden unter täglichem Akkuziel"
     },
     "battery_health": {
-      "description": "Empfohlene Vollladung (Batteriepflege)"
+      "description": "Empfohlene Vollladung (Akkupflege)"
     },
     "trip": {
       "description": "Reiseladen / Abfahrt"
@@ -399,7 +372,7 @@
       "description": "Heimkehr"
     },
     "battery_usage": {
-      "description": "Batteriestand bei Abfahrt & Heimkehr"
+      "description": "Akkustand bei Abfahrt & Heimkehr"
     },
     "distance": {
       "description": "{distance} für den Tag"
@@ -434,7 +407,7 @@
     "preheat_saturday": "Fahrzeug samstags vorheizen",
     "preheat_sunday": "Fahrzeug sonntags vorheizen",
     "calculate_charging_loss": "Vollzyklus automatisieren, Verluste berechnen; speichern & benachrichtigen",
-    "powerwall_discharge_above_needed": "Über Hausbedarf hinaus ins EV entladen (erfordert solar_charging)",
+    "powerwall_discharge_above_needed": "Hausbatterie über den Hausbedarf hinaus ins EV entladen (erfordert „Solarüberschuss-Laden“)",
     "preheat_minutes_before": "Vorheizen X Minuten vor Abfahrt (falls aktiviert)",
     "typical_daily_distance": "Typische Tagesstrecke in {distance}, wird zur Ladeplanung genutzt. Wird von „Optimales Wochenladen (ohne Arbeitsplan)“ verwendet.",
     "workday_distance_needed_monday": "Zu ladende Strecke für Montag (Arbeitstag)",
@@ -445,15 +418,15 @@
     "workday_distance_needed_saturday": "Zu ladende Strecke für Samstag (Arbeitstag)",
     "workday_distance_needed_sunday": "Zu ladende Strecke für Sonntag (Arbeitstag)",
     "min_daily_battery_level": "Mindest-Akkustand (%) bei der Rückkehr von der Arbeit oder täglichen Fahrten",
-    "min_trip_battery_level": "Minimales Batterieniveau (%) bei Heimkehr von Reisen",
-    "min_charge_limit_battery_level": "Minimales Batterieniveau (%) als Ladeziel",
+    "min_trip_battery_level": "Minimaler Akkustand (%) bei Heimkehr von Reisen",
+    "min_charge_limit_battery_level": "Minimaler Akkustand (%) als Ladeziel",
     "max_recommended_charge_limit_battery_level": "Tägliches empfohlenes Ladeziel (%)",
     "very_cheap_grid_charging_max_battery_level": "Bei sehr günstigem Strom wird das Auto auf dieses Niveau in Prozent geladen. Wird von geplanten Ladestunden zu sehr günstigen Preisen genutzt und immer, wenn „Bei günstigem Strom laden“ eingeschaltet ist.",
     "ultra_cheap_grid_charging_max_battery_level": "Bei extrem günstigem Strom wird das Auto auf dieses Niveau in Prozent geladen. Wird von geplanten Ladestunden zu extrem günstigen Preisen genutzt und immer, wenn „Bei günstigem Strom laden“ eingeschaltet ist.",
-    "completed_battery_level": "Ohne Fahrzeugintegration: der Akkustand, den das Auto anzeigt, wenn es das Laden als abgeschlossen meldet. „Virtuelles EV-Batterieniveau“ wird automatisch darauf gesetzt.",
+    "completed_battery_level": "Ohne Fahrzeugintegration: der Akkustand, den das Auto anzeigt, wenn es das Laden als abgeschlossen meldet. „Virtueller EV-Akkustand“ wird automatisch darauf gesetzt.",
     "estimated_total_range": "Ohne EV-Integration: geschätzte Gesamtreichweite in {distance}",
     "trip_charge_procent": "Gewünschter Akkustand bei Abfahrt zu einer Reise. Das Auto wird auf diesen Wert geladen.",
-    "trip_range_needed": "Gewünschte Reichweite in {distance} bei Abfahrt zu einer Reise. Sie wird automatisch in einen Akkustand umgerechnet, und das Auto wird auf dieses Niveau plus „Reise-Heimkehr-Niveau“ geladen (z. B. 50 % + 30 % = 80 %).",
+    "trip_range_needed": "Gewünschte Reichweite in {distance} bei Abfahrt zu einer Reise. Sie wird automatisch in einen Akkustand umgerechnet, und das Auto wird auf dieses Niveau plus „Akkustand bei Heimkehr von einer Fahrt“ geladen (z. B. 50 % + 30 % = 80 %).",
     "full_charge_recommended": "Mindestens alle X Tage auf 100 % laden; 0 = deaktiviert",
     "ev_charge_after_powerwall_battery_level": "Solarüberschuss lädt das Auto nur, wenn der Hausbatteriestand über diesem Niveau in Prozent liegt. Die Energie der Hausbatterie wird nur oberhalb dieses Niveaus für das Auto genutzt, wenn „Hausbatterie-Überschuss ins EV“ eingeschaltet ist. Auf 0.0 setzen, um nichts für die Hausbatterie zurückzuhalten.",
     "public_charging_session_cost": "Kosten der letzten öffentlichen Ladesitzung (nicht €/kWh)",
@@ -474,10 +447,10 @@
     "what_if_max_recommended_battery_level": "Ein maximal empfohlener Akkustand nur für die What-if-Berechnungen: der Stand, auf den Smart und sofortiges Laden im Vergleich mit CJP laden, und der alternative Stand im Einstellungsvergleich; 0 verwendet die aktuelle Einstellung. Er ändert nie die aktive Einstellung.",
     "run_what_if_settings": "Berechnet das What-if für die tägliche Reserve und den maximal empfohlenen Stand aus der aufgezeichneten Historie, gegenüber den aktuellen Einstellungen. Es ändert nie den Plan, die Einstellungen, das Fahrzeug oder die Wallbox.",
     "what_if_settings": "Die bereinigte Kostendifferenz der letzten What-if-Einstellungsberechnung (alternative Einstellungen minus aktuelle Einstellungen); negativ bedeutet günstiger. Das Ergebnis steht in den Attributen.",
-    "what_if_solar": "Der Solarvorteil der abgeschlossenen Monate im What-if zur Solarenergie des Autos (Netzkosten der Solarenergie des Autos minus der ersetzte Verkauf); positiv bedeutet, die Sonne war günstiger. Aus Stundenmitteln geschätzte Ladestunden (wo kein aufgezeichneter Ladevorgang die Zeit abdeckt) sind eine Obergrenze; das Ergebnis sagt, wann sie enthalten sind (upper_bound) und wie viel sie ausmachen. Das Ergebnis steht in den Attributen.",
+    "what_if_solar": "Der Solarvorteil der abgeschlossenen Monate im What-if zur Solarenergie des Autos (Netzkosten der Solarenergie des Autos minus der ersetzte Verkauf); positiv bedeutet, die Sonne war günstiger. Aus Stundenmitteln geschätzte Ladestunden (wo kein aufgezeichneter Ladevorgang die Zeit abdeckt) sind eine Obergrenze; das Ergebnis sagt, wann sie enthalten sind und wie viel sie ausmachen. Das Ergebnis steht in den Attributen.",
     "run_what_if_no_solar": "Berechnet das nur vom Netz geplante Laden (ohne Solar) über den gewählten Zeitraum mit der aktuellen Reserve und dem Maximalstand und den aufgezeichneten Fahrten und vergleicht es mit dem, was CJP aufgezeichnet hat. Es ändert nie den Plan, die Einstellungen, das Fahrzeug oder die Wallbox.",
     "what_if_no_solar": "Die Differenz zum Plan des letzten What-if ohne Solar: die aufgezeichneten Kosten minus die aufgezeichnete Energie zum geplanten Netzpreis pro kWh; positiv bedeutet, das aufgezeichnete Laden hat mehr gekostet. Sie ist nicht der Wert der Solarenergie (sie enthält auch Ladezeiten und Preiswahl). Das Ergebnis steht in den Attributen.",
-    "forecast_type": "Prognose-Typ auswählen (EMA, Durchschnitt oder Trend)",
+    "forecast_type": "Prognosetyp auswählen: EMA (die neuesten Werte zählen am meisten), Durchschnitt (alle Werte zählen gleich) oder Trend",
     "workday_departure_monday": "Abfahrtzeit Montag (Arbeitstag) für Lade-/Vorheizplanung",
     "workday_departure_tuesday": "Abfahrtszeit Dienstag (Arbeitstag) für Lade-/Vorheizplanung",
     "workday_departure_wednesday": "Abfahrtszeit Mittwoch (Arbeitstag) für Lade-/Vorheizplanung",
@@ -510,9 +483,9 @@
     "solar_charged_percentage": "Anteil des Ladevorgangs, der aus Solarenergie stammt",
     "drive_efficiency": "Effizienz basierend auf Vorheizen, gefahrenen {distance} und Energieverbrauch",
     "km_per_kwh": "{distance_kwh}",
-    "estimated_range": "Geschätzte Reichweite basierend auf aktuellem Batteriestand und EMA",
+    "estimated_range": "Geschätzte Reichweite aus dem aktuellen Akkustand und der typischen Fahreffizienz des Autos, berechnet mit dem verwendeten Prognosetyp",
     "simulated_battery_level": "Der Akkustand, den der Plan nutzt: der letzte Wert des Autos plus das, was der kWh-Zähler des Laders seitdem gezählt hat (mit Ladeverlust). Tragen Sie hier den echten Wert des Autos ein, wenn die Angabe des Autos hinterherhinkt.",
-    "drive_efficiency_last_battery_level": "Batteriestand beim letzten Ladevorgang (%)",
+    "drive_efficiency_last_battery_level": "Akkustand beim letzten Ladevorgang (%)",
     "drive_efficiency_last_odometer": "Kilometerstand beim letzten Ladevorgang ({distance})",
     "co2_emitted": "CO₂ in kg, basierend auf Energi Data Service CO₂-Faktor",
     "kwh_charged_by_solar": "Durch Solar geladene kWh",
@@ -534,19 +507,19 @@
     "forced_charging": "Zwangsladung kann manuell eingeschaltet werden, wenn der Akkustand unter dem täglichen Minimum liegt.\n• Laden: lädt bis zum täglichen Minimum ({min_daily_battery_level} %).\n• Kostenkontrolle: kein Laden in den teuersten Stunden (siehe Attribut expensive_hours).",
     "manual_charging": "Manuelles Laden startet sofort, ohne auf den Plan zu warten.\n• Manuelles Laden jetzt erlauben: lädt mit maximalem Strom aus Netz und Solar.\n• Nur Solar: lädt nur mit dem Solarüberschuss.\nBeide werden automatisch ausgeschaltet, wenn das Auto wieder angesteckt wird.",
     "cheap_targets": "Ladeziele bei günstigen Preisen:\n• Ziel bei sehr günstigem Strom ({charge_very_cheap_battery_level} %): wenn der Preis höchstens dem Durchschnitt der günstigsten bekannten Preise der kommenden Woche entspricht.\n• Ziel bei extrem günstigem Strom ({charge_ultra_cheap_battery_level} %): wenn der Preis noch 25 % niedriger ist.\nDie Ziele folgen dem erwarteten Solarüberschuss der kommenden Woche.",
-    "trip": "Laden für eine Fahrt wird automatisch geplant, wenn:\n• Ladeprozent der Fahrt über 0 % oder Benötigte Reichweite über 0 {distance} liegt.\n• Abfahrt und Heimkehr der Fahrt in der Zukunft liegen.\nEs wird geladen, was die Fahrt braucht (aus Prozent oder Strecke). Laden zwischen {max_recommended_charge_limit_battery_level} und 100 % passiert in den letzten Stunden vor der Abfahrt (fertig mit dem Puffer vor der Abfahrt), um den Akku zu schonen. Wird das Ziel nicht erreicht, wird geladen, was im Puffer möglich ist.\nFahrt zurücksetzen löscht die Fahrt; sie wird auch 2 Stunden nach der Abfahrt automatisch zurückgesetzt.",
+    "trip": "Laden für eine Fahrt wird automatisch geplant, wenn:\n• Ladeprozent der Fahrt über 0 % oder Benötigte Reichweite über 0 {distance} liegt.\n• Abfahrt und Heimkehr der Fahrt in der Zukunft liegen.\nEs wird geladen, was die Fahrt braucht (aus Prozent oder Strecke). Laden zwischen {max_recommended_charge_limit_battery_level} und 100 % passiert in den letzten Stunden vor der Abfahrt und endet etwas vor der Abfahrt, um den Akku zu schonen. Wird das Ziel nicht erreicht, wird geladen, was vor der Abfahrt möglich ist.\nFahrt zurücksetzen löscht die Fahrt; sie wird auch 2 Stunden nach der Abfahrt automatisch zurückgesetzt.",
     "solar_charging": "Aktiv, wenn es Solarüberschuss gibt.\n• Laden: nutzt den Überschuss; wechselt je nach Überschuss zwischen 1 und 3 Phasen.\n• Bedarf: folgt dem Überschuss gegenüber dem Hausverbrauch. Maximal {max_recommended_charge_limit_battery_level} %.\n• Verfügbare Solarleistung: zeigt die in der aktuellen Stunde verfügbare Leistung in Watt.\n• Plan: der erwartete Überschuss der Woche wird vom Optimalen Wochenladen und vom Laden nach Arbeitsplan genutzt, damit das Auto so viel Solar wie möglich lädt.\n\n{charging_amps_table}",
-    "fill_up": "Optimales Wochenladen kann im Urlaub genutzt werden (ignoriert den Arbeitsplan).\n Jeden Tag: immer genug für die typische Tagesstrecke ({typical_daily_distance} {distance}) plus das tägliche Minimum ({min_daily_battery_level} %), in den günstigsten Stunden des Tages.\nDer Rest bis zum maximal empfohlenen Stand ({max_recommended_charge_limit_battery_level} %) nur in den günstigsten Stunden der Woche (die günstigsten 30 %), und nur wenn die nächsten 24 Stunden nicht deutlich günstiger sind.",
+    "fill_up": "Optimales Wochenladen kann im Urlaub genutzt werden (ignoriert den Arbeitsplan).\nJeden Tag: immer genug für die typische Tagesstrecke ({typical_daily_distance} {distance}) plus das tägliche Minimum ({min_daily_battery_level} %), in den günstigsten Stunden des Tages.\nDer Rest bis zum maximal empfohlenen Stand ({max_recommended_charge_limit_battery_level} %) nur in den günstigsten Stunden der Woche (die günstigsten 30 %), und nur wenn die nächsten 24 Stunden nicht deutlich günstiger sind.",
     "workplan": "Laden nach Arbeitsplan: einschalten, wenn du in der nächsten Woche arbeitest.\n• Laden: plant das tägliche Laden über eine Woche aus Arbeits- und freien Tagen.\n• Bedarf: nutzt Abfahrts- und Heimkehrzeit und die Strecke jedes Arbeitstags. Minimaler Akkustand bei Heimkehr {min_daily_battery_level} %, maximal {max_recommended_charge_limit_battery_level} %.\n• Plan: wählt die günstigsten verfügbaren Zeiträume bis zur Abfahrt am Arbeitstag; ob das Ziel erreicht wird, hängt von den Ladefenstern und dem Ladebedarf ab.",
     "full_charge": "Empfohlene Vollladung: bei einem LFP-Akku wird eine Vollladung mindestens alle 14 Tage oder nach Herstellerangabe empfohlen. Stelle hier die Anzahl der Tage ein; die letzte Vollladung wird automatisch erfasst.",
     "charging_loss": "Ladeverlust berechnen – das beste Ergebnis beim Laden von einem niedrigen Stand (z. B. 10 %) auf 100 %:\n1. Das Auto so weit wie möglich entladen (max. 20 %).\n2. Das gewünschte Ladelimit im Auto und das Maximal empfohlene Ladelimit setzen (jetzt {max_recommended_charge_limit_battery_level} %, mindestens 90 %).\n3. Ladeverlust berechnen einschalten und das Auto melden lassen, wenn es voll ist.\n4. Das Ergebnis wird automatisch in den Optionen gespeichert, und du bekommst eine Benachrichtigung.",
     "cheap_limits": "Ladestand bei günstigen Preisen:\n• Sehr günstig: liegt der Preis höchstens beim Durchschnitt der günstigsten bekannten Preise der kommenden Woche, wird bis {very_cheap_grid_charging_max_battery_level} % geladen.\n• Extrem günstig: ist der Preis noch 25 % niedriger, wird bis {ultra_cheap_grid_charging_max_battery_level} % geladen.\nGenutzt von geplanten Ladestunden zu diesen Preisen, und immer, wenn \"Bei günstigem Strom laden\" eingeschaltet ist.",
-    "battery_preheat": "Einstellungen für Akkustand und Vorheizen:\n• Minimaler täglicher Akkustand ({min_daily_battery_level} %): bei der Rückkehr von der Arbeit oder täglichen Fahrten.\n• Minimaler Akkustand bei Fahrten ({min_trip_battery_level} %): bei der Heimkehr von einer Fahrt.\n• Minimales Ladelimit ({min_charge_limit_battery_level} %): das niedrigste Ladelimit, das das Auto erlaubt.\n• Maximal empfohlenes Ladelimit ({max_recommended_charge_limit_battery_level} %): die Empfehlung des Herstellers.\n• Vorheizen X Min. vorher ({preheat_minutes_before} Min.): vor der Abfahrt zur Arbeit und zu Fahrten vorheizen (Vorheiz-Schalter pro Wochentag). Bei Frost verdoppelt sich die Zeit.",
+    "battery_preheat": "Einstellungen für Akkustand und Vorheizen:\n• Täglicher Akkustand bei Heimkehr ({min_daily_battery_level} %): bei der Rückkehr von der Arbeit oder täglichen Fahrten.\n• Akkustand bei Heimkehr von einer Fahrt ({min_trip_battery_level} %): bei der Heimkehr von einer Fahrt.\n• Minimale Ladegrenze des EV ({min_charge_limit_battery_level} %): das niedrigste Ladelimit, das das Auto erlaubt.\n• Max. empfohlene Ladegrenze des EV ({max_recommended_charge_limit_battery_level} %): die Empfehlung des Herstellers.\n• Vorheizen X Min vorher ({preheat_minutes_before} Min.): vor der Abfahrt zur Arbeit und zu Fahrten vorheizen (Vorheiz-Schalter pro Wochentag). Bei Frost verdoppelt sich die Zeit.",
     "powerwall": "Einstellungen für den Hausakku:\n• Der Solarüberschuss lädt das Auto erst, wenn der Hausakku über der Grenze liegt (jetzt {ev_charge_after_powerwall_battery_level} %).\n• Hausakku für das Auto nutzen: braucht eingeschaltetes Solarladen und Hausakku-Entladung über Bedarf; nur Energie über der Grenze wird genutzt.\nErstelle eine Automation, die das Entladen des Hausakkus sperrt, während das Auto lädt, und es nur erlaubt, wenn der Schalter an ist und der Akku über der Grenze liegt.",
-    "virtual_ev": "Virtuelles E-Auto (ohne Auto-Integration):\n• Akkustand: gib beim Anstecken den aktuellen Akkustand des Autos ein.\n• Akkustand bei Ende: der Stand, bei dem das Auto aufhört.\n• Geschätzte Gesamtreichweite: die realistische maximale Reichweite des Autos.",
-    "simulated_battery_level": "Simulierter Batteriestand (das Auto aktualisiert den Batteriestand langsam):\n• Batteriestand des Autos: der Wert, den das Auto zuletzt gemeldet hat.\n• Simulierter Batteriestand: der letzte Wert des Autos plus das, was der kWh-Zähler des Ladegeräts seitdem gezählt hat, abzüglich Ladeverlust. Plan und Ladeaktionen verwenden diesen.\n• Meldet das Auto einen neuen Batteriestand, wird die Simulation auf den Wert des Autos korrigiert (sie kann daher etwas springen) und steigt von dort weiter.\n• Du kannst den richtigen Batteriestand des Autos selbst in Simulierter Batteriestand eingeben, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Die Simulation steigt von dort weiter, bis das Auto einen neuen Wert meldet. Beim Anstecken fragt eine Benachrichtigung, ob der Wert stimmt.\n• Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, damit das Auto selbst bestätigt, dass das Laden fertig ist.\n• Springt sie bei jeder Korrektur stark, stimmt der Ladeverlust nicht: miss ihn unter Ladeverlust.\nEin- und ausschalten in den Optionen der Integration unter E-Auto - Sensoren.",
+    "virtual_ev": "Virtuelles E-Auto (ohne Auto-Integration):\n• Virtueller EV-Akkustand: gib beim Anstecken den aktuellen Akkustand des Autos ein.\n• Akkustand bei abgeschlossenem Laden: der Stand, bei dem das Auto aufhört.\n• Virtuelle EV-Max-Reichweite: die realistische maximale Reichweite des Autos.",
+    "simulated_battery_level": "Simulierter Akkustand (das Auto aktualisiert den Akkustand langsam):\n• Akkustand des Autos: der Wert, den das Auto zuletzt gemeldet hat.\n• Simulierter Akkustand: der letzte Wert des Autos plus das, was der kWh-Zähler des Ladegeräts seitdem gezählt hat, abzüglich Ladeverlust. Plan und Ladeaktionen verwenden diesen.\n• Meldet das Auto einen neuen Akkustand, wird die Simulation auf den Wert des Autos korrigiert (sie kann daher etwas springen) und steigt von dort weiter.\n• Du kannst den richtigen Akkustand des Autos selbst in Simulierter Akkustand eingeben, z. B. beim Anstecken, wenn der Wert des Autos hinterherhinkt. Die Simulation steigt von dort weiter, bis das Auto einen neuen Wert meldet. Beim Anstecken fragt eine Benachrichtigung, ob der Wert stimmt.\n• Die Simulation erreicht höchstens 1 % unter dem Ladelimit des Autos, damit das Auto selbst bestätigt, dass das Laden fertig ist.\n• Springt sie bei jeder Korrektur stark, stimmt der Ladeverlust nicht: miss ihn unter Ladeverlust.\nEin- und ausschalten in den Optionen der Integration unter E-Auto - Sensoren.",
     "forecast_auto": "Prognosetyp automatisch wählen: Hausverbrauch und die Strecke pro kWh des Autos nutzen jeweils den Prognosetyp, der am besten getroffen hat (der Hausverbrauch die letzten 30 Tage nach 7 Tagen Messung, die Strecke pro kWh die letzten 30 Fahrten nach 10 Fahrten), und wechseln nur, wenn ein anderer Typ mindestens 5 % weniger Fehler hat. Der gewählte Prognosetyp ist der Ausgangspunkt und wird immer für die Ersatzpreise und den Solarverlauf genutzt. Siehe *Prognosegenauigkeit* in der Analyse.",
-    "price_forecast": "Preisprognose korrigieren: der Plan korrigiert die Prognosepreise (z. B. Carnot) um ihre Abweichung der letzten 30 Tage, pro Tag voraus – nach 7 Tagen Messung, höchstens ±0,50 {valuta}. Siehe *Preisprognose* in der Analyse."
+    "price_forecast": "Preisprognose korrigieren: der Plan korrigiert die Prognosepreise (z. B. Carnot) um ihre Abweichung der letzten 30 Tage, pro Tag voraus – nach 7 Tagen Messung, höchstens ±0,50 {valuta_kwh}. Siehe *Preisprognose* in der Analyse."
   },
   "dashboard": {
     "enforce_planning": "Planung erzwingen",
@@ -560,7 +533,7 @@
     "solar_forecast": "Solarprognose",
     "debug_info": "Debug-Info",
     "section_problem": "Problem oder Fehler?",
-    "help_problem": "**Ein Absturz oder Fehler** (eine Fehlerbenachrichtigung, *Fehler* als Laderegel, Entitäten die nicht verfügbar bleiben) **oder eine falsche Entscheidung** (es wurde geladen, obwohl es nicht sollte (oder umgekehrt), zu viel oder zu wenig geladen, oder die Laderegel sieht falsch aus):\n\n1. Drücke **Debug-Info exportieren** unten **so bald wie möglich** - die Datei enthält die letzten Berechnungen und Logmeldungen, ältere werden mit der Zeit ersetzt.\n2. Eine Benachrichtigung erscheint. Lade die Datei herunter und öffne das GitHub-Issue über den Link darin (Version und Zeitpunkt sind ausgefüllt).\n3. Beschreibe, was passiert ist und **wann** (die Uhrzeit), welche Regel und Laderaktion angezeigt wurden und was du stattdessen erwartet hast. Ein Screenshot des Plans hilft.\n4. Ziehe die Datei in das Feld *Debug file*.\n\nDie Datei ist anonymisiert: keine Namen, Passwörter, API-Schlüssel, Koordinaten oder Adressen, Entitätsnamen sind ersetzt. Es wird nichts von selbst verschickt - du entscheidest, was du hochlädst.",
+    "help_problem": "**Ein Absturz oder Fehler** (eine Fehlerbenachrichtigung, *Fehler* als Laderegel, Entitäten die nicht verfügbar bleiben) **oder eine falsche Entscheidung** (es wurde geladen, obwohl es nicht sollte, oder umgekehrt, zu viel oder zu wenig geladen - oder die Laderegel sieht falsch aus):\n\n1. Drücke **Debug-Info exportieren** unten **so bald wie möglich** - die Datei enthält die letzten Berechnungen und Logmeldungen, ältere werden mit der Zeit ersetzt.\n2. Eine Benachrichtigung erscheint. Lade die Datei herunter und öffne das GitHub-Issue über den Link darin (Version und Zeitpunkt sind ausgefüllt).\n3. Beschreibe, was passiert ist und **wann** (die Uhrzeit), welche Regel und Laderaktion angezeigt wurden und was du stattdessen erwartet hast. Ein Screenshot des Plans hilft.\n4. Ziehe die Datei in das Feld *Debug file*.\n\nDie Datei ist anonymisiert: keine Namen, Passwörter, API-Schlüssel, Koordinaten oder Adressen, Entitätsnamen sind ersetzt. Es wird nichts von selbst verschickt - du entscheidest, was du hochlädst.",
     "read_more": "Mehr lesen",
     "view_overview": "Übersicht",
     "view_settings": "Einstellungen",
@@ -583,7 +556,7 @@
     "section_powerwall": "Hausakku",
     "section_charging_loss": "Ladeverlust",
     "section_virtual_ev": "Virtuelles E-Auto",
-    "section_simulated_battery": "Simulierter Batteriestand",
+    "section_simulated_battery": "Simulierter Akkustand",
     "section_advanced": "Erweitert",
     "history_battery": "Akkustand und Ladelimit",
     "history_efficiency": "Fahreffizienz",
@@ -641,6 +614,7 @@
     "economy_daily": "Täglich",
     "economy_lowest": "Niedrigster",
     "economy_saved": "Gespart",
+    "economy_score": "Bewertung",
     "economy_total": "Gesamt",
     "economy_vs_daily": "gegenüber täglichem Laden",
     "economy_no_data": "Noch kein Ladeverlauf",
@@ -677,7 +651,7 @@
     "what_if_b_unit_only": "Die Werte mit ≈ sind die reinen Differenzen zwischen den beiden Berechnungen und keine Ersparnis: Sie ignorieren die Fahrten, die nicht gedeckt werden konnten, und den Akkustand am Ende.",
     "what_if_a_not_comparable": "Die drei Berechnungen liefern nicht dasselbe, daher sind die mit ≈ markierten Kostendifferenzen nur ein Hinweis:",
     "what_if_connections": "Verbindungen",
-    "what_if_derived_line": "Davon geschätzt (Batteriestand-Statistik oder Arbeitsplan)",
+    "what_if_derived_line": "Davon geschätzt (Akkustand-Statistik oder Arbeitsplan)",
     "what_if_chart_cost_title": "Kosten pro Monat",
     "what_if_chart_diff_title": "Differenz pro Monat: Smart und sofortiges Laden gegenüber CJP (positiv: CJP günstiger)",
     "what_if_chart_settings_title": "Aktuelle und alternative Einstellungen: Kosten pro Monat",
@@ -700,7 +674,7 @@
     "what_if_day_selection_weekend": "Wochenende",
     "what_if_day_selection_selected": "ausgewählte Tage",
     "what_if_warning_connections_modelled_from_work_plan": "Verbindungen aus der Zeit vor jeder Aufzeichnung werden aus dem Arbeitsplan modelliert, wie er jetzt eingestellt ist (Heimkehr, Abfahrt und Strecke je Wochentag), nicht aufgezeichnet: Der Plan ist nicht unbedingt das, was passiert ist. Sie bleiben innerhalb der Länge der längeren gemessenen Verbindungen.",
-    "what_if_warning_work_plan_model_not_validated": "Der Arbeitsplan passte nicht gut genug zu den von CJP selbst gemessenen Verbindungen (Zeiten oder Batterieverbrauch) und wird daher nicht verwendet, um ältere Tage zu füllen.",
+    "what_if_warning_work_plan_model_not_validated": "Der Arbeitsplan passte nicht gut genug zu den von CJP selbst gemessenen Verbindungen (Zeiten oder Akkuverbrauch) und wird daher nicht verwendet, um ältere Tage zu füllen.",
     "what_if_derived_modelled": "davon aus dem Arbeitsplan modelliert",
     "what_if_a_estimated_alert": "SCHÄTZUNG: Ein Teil des Zeitraums besteht aus Verbindungen, die nicht gemessen, sondern aus der Statistik des Akkustands oder dem Arbeitsplan geschätzt wurden. Wann das Auto angeschlossen war, ist geschätzt, daher sind Smart, Sofortiges Laden und die Unterschiede für diesen Teil eine Schätzung. Gemessene Verbindungen ersetzen ihn, sobald CJP sie aufzeichnet.",
     "what_if_a_estimated_booking": "Vor den eigenen Aufzeichnungen von CJP ist auch das, was das Auto geladen hat, geschätzt: die Energie der Wallbox aus der Stundenstatistik, ihr Solaranteil so bewertet, wie CJP ihn bewertet, der Rest zum Netzpreis. Der Solaranteil ist eine Obergrenze (Stundenmittel) und neigt zu CJP, und die Hausbatterie zählt als Netzstrom und neigt in die andere Richtung",
@@ -791,10 +765,10 @@
     "what_if_note_smart_hindsight_prices": "Smart kennt alle Preise der Verbindung im Voraus (Rückschau).",
     "what_if_note_energy_balanced_to_cjp": "Über die Zeit müssen die drei dieselbe Energie liefern: Die Energie, die CJP gekauft hat und die keine aufgezeichnete Fahrt erklärt (kleine Fahrten, Standby-Verbrauch), wird in allen dreien als Fahrt hinzugefügt.",
     "what_if_b_title": "Reserve und Maximalstand",
-    "what_if_b_explain": "Spielt Ihren aufgezeichneten Verlauf ab und vergleicht Ihre **aktuellen Einstellungen** mit einer **alternativen täglichen Reserve** und/oder einem **alternativen maximal empfohlenen Niveau**. Die Reserve ist der Akkustand, den das Auto bei der Heimkehr noch haben soll; das Maximum ist das höchste Niveau, auf das CJP lädt. Bei jeder Verbindung wird in den günstigsten Stunden bis zu dem Niveau geladen, das die nächste Fahrt braucht, plus Reserve, nie über dem Maximum. Fahrstrecke, Verbindungen, Ladeverlust, Ladeleistung und Stundenpreise sind für beide Einstellungen gleich.\n\nEinstellungen: der **Zeitraum** und der **Akkustand beim ersten Anstecken** (wie im Vergleich oben), **What-if alternatives tägliches Heimkehr-Niveau** und **What-if max. empfohlene Ladegrenze des EV** (0 nutzt die aktuelle Einstellung, daher kann eine Reserve von genau 0 % nicht getestet werden; nutzen Sie 1). Mit **What-if-Einstellungen berechnen** wird berechnet; am Plan, an den Einstellungen, am Auto und am Lader ändert sich nichts.\n\nDie Tabelle zeigt beide Einstellungen mit Reserve und Maximum, geladener Energie, Kosten, der Korrektur für den Akkustand am Ende und der bereinigten Differenz, die einen Unterschied im Akkustand am Ende zu dem Preis pro kWh bewertet, der tatsächlich gezahlt wurde, weil eine niedrigere Reserve niedriger endet (negativ bedeutet, die Alternative war günstiger). Decken die beiden Einstellungen nicht dieselbe Fahrstrecke ab, sind die Differenzen nur ein Anhaltspunkt, mit ≈ markiert, und die Karte sagt warum. Darunter stehen eine Tabelle pro Monat, die Abdeckung, die Warnungen und die Annahmen sowie zwei Diagramme: Kosten pro Monat für beide Einstellungen und die kumulierte Differenz.\n\nDas ist ein vereinfachtes Modell der CJP-Planungsregel, nicht des CJP-Planers, und es nutzt die aktuellen Einstellungen, weil frühere Einstellungen nicht gespeichert werden. Es ist ein Blick zurück im Nachhinein und keine garantierte Ersparnis: Die nächste Fahrt ist im Voraus bekannt, und Laden in günstigen Stunden, erzwungenes Laden unter der Reserve, Solar, Hausgrenzen, Standby-Verbrauch und ein Abfahrtspuffer sind nicht enthalten. Die letzte Verbindung wird weggelassen, weil die Fahrt danach unbekannt ist. Eine Stunde ohne Preis nutzt den Preisverlauf oder einen geschätzten Preis. Ein unbekannter Startstand wird durch die erste Verbindung gesetzt, und die Warnungen sagen es. Die Reserve kann wirkungslos sein, wenn das Maximum das Niveau bereits bestimmt.",
+    "what_if_b_explain": "Spielt Ihren aufgezeichneten Verlauf ab und vergleicht Ihre **aktuellen Einstellungen** mit einer **alternativen täglichen Reserve** und/oder einem **alternativen maximal empfohlenen Niveau**. Die Reserve ist der Akkustand, den das Auto bei der Heimkehr noch haben soll; das Maximum ist das höchste Niveau, auf das CJP lädt. Bei jeder Verbindung wird in den günstigsten Stunden bis zu dem Niveau geladen, das die nächste Fahrt braucht, plus Reserve, nie über dem Maximum. Fahrstrecke, Verbindungen, Ladeverlust, Ladeleistung und Stundenpreise sind für beide Einstellungen gleich.\n\nEinstellungen: der **Zeitraum** und der **Akkustand beim ersten Anstecken** (wie im Vergleich oben), **What-if alternativer täglicher Akkustand bei Heimkehr** und **What-if max. empfohlene Ladegrenze des EV** (0 nutzt die aktuelle Einstellung, daher kann eine Reserve von genau 0 % nicht getestet werden; nutzen Sie 1). Mit **What-if-Einstellungen berechnen** wird berechnet; am Plan, an den Einstellungen, am Auto und am Lader ändert sich nichts.\n\nDie Tabelle zeigt beide Einstellungen mit Reserve und Maximum, geladener Energie, Kosten, der Korrektur für den Akkustand am Ende und der bereinigten Differenz, die einen Unterschied im Akkustand am Ende zu dem Preis pro kWh bewertet, der tatsächlich gezahlt wurde, weil eine niedrigere Reserve niedriger endet (negativ bedeutet, die Alternative war günstiger). Decken die beiden Einstellungen nicht dieselbe Fahrstrecke ab, sind die Differenzen nur ein Anhaltspunkt, mit ≈ markiert, und die Karte sagt warum. Darunter stehen eine Tabelle pro Monat, die Abdeckung, die Warnungen und die Annahmen sowie zwei Diagramme: Kosten pro Monat für beide Einstellungen und die kumulierte Differenz.\n\nDas ist ein vereinfachtes Modell der CJP-Planungsregel, nicht des CJP-Planers, und es nutzt die aktuellen Einstellungen, weil frühere Einstellungen nicht gespeichert werden. Es ist ein Blick zurück im Nachhinein und keine garantierte Ersparnis: Die nächste Fahrt ist im Voraus bekannt, und Laden in günstigen Stunden, erzwungenes Laden unter der Reserve, Solar, Hausgrenzen, Standby-Verbrauch und ein Abfahrtspuffer sind nicht enthalten. Die letzte Verbindung wird weggelassen, weil die Fahrt danach unbekannt ist. Eine Stunde ohne Preis nutzt den Preisverlauf oder einen geschätzten Preis. Ein unbekannter Startstand wird durch die erste Verbindung gesetzt, und die Warnungen sagen es. Die Reserve kann wirkungslos sein, wenn das Maximum das Niveau bereits bestimmt.",
     "what_if_b_col_current": "Aktuelle Einstellungen",
     "what_if_b_col_alternative": "Alternative",
-    "what_if_b_reserve": "Tägliches Heimkehr-Niveau",
+    "what_if_b_reserve": "Täglicher Akkustand bei Heimkehr",
     "what_if_b_maximum": "Max. empfohlene Ladegrenze des EV",
     "what_if_reason_no_change": "Nichts zu vergleichen: beide alternativen Werte sind 0 oder gleich den aktuellen Einstellungen. Geben Sie eine andere Reserve oder einen anderen Maximalstand ein",
     "what_if_reason_invalid_settings": "Eine Reserve oder ein Maximalstand liegt außerhalb des erlaubten Bereichs",
@@ -825,16 +799,16 @@
     "what_if_d_left_missing_buy_price": "fehlender Bezugspreis",
     "what_if_d_left_missing_sell_price": "fehlender Verkaufspreis",
     "what_if_d_left_not_captured": "nicht rechtzeitig bewertet (vorher in die Tageshistorie zusammengefasst)",
-    "what_if_d_note_solar_from_power_history": "Die Solarenergie wird Stunde für Stunde aus der Recorder-Statistik von Solarproduktion, Hausverbrauch und Ladeleistung berechnet.",
+    "what_if_d_note_solar_from_power_history": "Die Solarenergie wird Stunde für Stunde aus der Home-Assistant-Statistik von Solarproduktion, Hausverbrauch und Ladeleistung berechnet.",
     "what_if_d_note_production_price_assumed_current": "Der Erzeugungspreis für Stunden ohne gespeicherten Wert wird als der jetzt eingestellte angenommen.",
     "what_if_d_col_hours": "Ladestunden",
-    "what_if_d_upper_bound": "Enthält Ladestunden, die kein aufgezeichneter Ladevorgang abdeckt, geschätzt aus Stundenmitteln der Recorder-Statistik. Ihre Solarenergie ist eine Obergrenze: Ein Stundenmittel kann kurzes Laden mit voller Leistung nicht von langsamem Laden über die ganze Stunde unterscheiden. Die Beträge dieser Stunden folgen dieser Energie und sind daher ebenfalls nicht genau.",
+    "what_if_d_upper_bound": "Enthält Ladestunden, die kein aufgezeichneter Ladevorgang abdeckt, geschätzt aus Stundenmitteln der Home-Assistant-Statistik. Ihre Solarenergie ist eine Obergrenze: Ein Stundenmittel kann kurzes Laden mit voller Leistung nicht von langsamem Laden über die ganze Stunde unterscheiden. Die Beträge dieser Stunden folgen dieser Energie und sind daher ebenfalls nicht genau.",
     "what_if_d_hours_left_out": "Ausgelassene Ladestunden",
     "what_if_warning_energy_not_balanced": "Der Akkustand beim letzten Abstecken konnte nicht gelesen werden, daher ist nicht bekannt, ob die drei dieselbe Energie liefern: CJP kann Energie gekauft haben, die die aufgezeichneten Fahrten nicht erklären. Es wird keine bereinigte Differenz angegeben.",
     "what_if_note_booked_cost": "Die CJP-Kosten sind das, was CJP gebucht hat: ein Preis pro Ladevorgang (der Preis zum Zeitpunkt der Buchung, er kann daher von den Stundenpreisen abweichen, zu denen geladen wurde), mit Solar und Hausbatterie zu dem Wert, den CJP ihnen gibt. Smart und Sofortiges Laden sind nur Netzstrom, daher kann ein Teil eines Unterschieds Solar sein.",
     "what_if_warning_windows_before_recorded_gap_left_out": "Ältere Verbindungen sind ausgelassen, weil die Ladehistorie von CJP sie nicht erreicht oder für eine davon nicht gelesen werden kann. Nur die neueste ununterbrochene Reihe wird verglichen.",
     "what_if_warning_start_level_unknown_calibrated": "Der Akkustand beim ersten Anstecken ist unbekannt. Die erste Verbindung dient nur dazu, das Auto auf ein gemeinsames Niveau zu bringen (darin wird nichts geladen oder gezählt), und das Abspielen läuft ab den Fahrten danach.",
-    "what_if_warning_older_connections_not_validated": "Die älteren Verbindungen, die die Batteriestand-Statistik nahelegt, passten nicht gut genug zu den von CJP selbst gemessenen Verbindungen und werden daher nicht verwendet.",
+    "what_if_warning_older_connections_not_validated": "Die älteren Verbindungen, die die Akkustand-Statistik nahelegt, passten nicht gut genug zu den von CJP selbst gemessenen Verbindungen und werden daher nicht verwendet.",
     "what_if_warning_estimated_connections_without_prices_left_out": "Geschätzte Verbindungen aus der Zeit vor der ersten mit gespeichertem Preis sind weggelassen: Für eine Verbindung, die selbst eine Schätzung ist, wird kein Preis geschätzt.",
     "what_if_price_estimate": "Preis für Stunden ohne Preis (der Durchschnitt der bepreisten Stunden)",
     "what_if_ns_title": "Ohne Solar: vom Netz geplant",
@@ -850,7 +824,7 @@
     "what_if_ns_method_estimated": "Schätzung: Ein Teil der Daten fehlte, siehe unten",
     "what_if_ns_no_result": "Noch keine Berechnung. Drücken Sie What-if ohne Solar berechnen.",
     "what_if_d_powerwall": "Heimspeicherenergie in diesen Ladevorgängen, unverändert belassen und nicht ersetzt",
-    "economy_explain": "*Ø: der Durchschnittspreis, während das Auto angesteckt war. Täglich: wie die meisten smarten Lader – am günstigsten bis zur nächsten Abfahrt (Arbeitsplan), ohne auf eine günstigere Nacht zu warten. Niedrigster: die günstigsten Stunden der ganzen angesteckten Zeit (kennt alle Preise im Voraus, 100 % sind daher kaum möglich). Score: wie nah der Preis am niedrigsten lag, gemessen vom Durchschnitt (100 % = die günstigsten Stunden, 0 % = der Durchschnittspreis). {valuta}/{distance}: alles Laden inkl. öffentlich geteilt durch die gefahrenen {distance}. Der Vergleich gibt es nur für Zeiträume mit bekannten Anschlusszeiten (ab den letzten 30 Tagen).*",
+    "economy_explain": "*Bezahlt: die Kosten des Ladens, daneben der Preis pro kWh. Ø: der Durchschnittspreis, während das Auto angesteckt war. Täglich: wie die meisten smarten Lader – am günstigsten bis zur nächsten Abfahrt (Arbeitsplan), ohne auf eine günstigere Nacht zu warten. Niedrigster: die günstigsten Stunden der ganzen angesteckten Zeit (kennt alle Preise im Voraus, 100 % sind daher kaum möglich). Bewertung: wie nah der Preis am niedrigsten lag, gemessen vom Durchschnitt (100 % = die günstigsten Stunden, 0 % = der Durchschnittspreis). {valuta}/{distance}: alles Laden inkl. öffentlich geteilt durch die gefahrenen {distance}. Gespart: was tägliches Laden für dieselben kWh gekostet hätte, minus das Bezahlte – ein Vergleich und keine garantierte Ersparnis. Die beiden Diagramme zeigen die kWh pro Quelle und die Preise im Vergleich zu den Referenzen. Den Vergleich gibt es nur für Zeiträume mit bekannten Anschlusszeiten (ab der Installation und davor so weit zurück, wie der Verlauf von Home Assistant reichte).*",
     "section_drive_temperature": "Fahren und Temperatur",
     "drive_temperature_fit_1": "Pro Grad kälter fährt das Auto",
     "drive_temperature_fit_2": "weniger ({distance} pro kWh aus dem Akku):",
@@ -894,9 +868,9 @@
     "capacity_title": "kWh vom Lader pro 1 % und Monat",
     "capacity_explain": "*Steigt der Wert über die Jahre, fasst der Akku weniger (oder der Ladeverlust ist gestiegen). Im Winter ist er höher, weil das Auto Energie zum Heizen des Akkus braucht. Vergleiche deshalb denselben Monat Jahr für Jahr und dieselbe Leistungsgruppe.*",
     "section_history": "Verlauf",
-    "drive_temperature_explain": "*Jede Fahrt vom Abstecken bis zum erneuten Anstecken, mit der Außentemperatur (Mittelwert, während das Auto weg war) und {distance_kwh} aus Kilometerzähler und Batteriestand (mit der in CJP eingestellten Batteriegröße). Die orange Linie ist der Durchschnitt pro 5 °C. Der Trend zeigt, wie sich {distance_kwh} pro Grad ändert und was die Kälte kostet. Fahrten unter 5 {distance} oder unter 2 % Batterie werden ausgelassen. Beim ersten Mal werden die Fahrten aus dem Verlauf des Recorders (die letzten Tage) gelesen, danach wird jede Fahrt gespeichert.*",
-    "departures_explain": "*Bei jeder Abfahrt des Arbeitsplans wird der Batteriestand, mit dem das Auto losfuhr, mit der Anforderung verglichen: die Fahrstrecke des Tages plus das tägliche Minimum (✅ = erfüllt). Das Ziel des Plans ist der Stand, den der Plan vor der Arbeit anstrebte. Nur Abfahrten ab jetzt werden gespeichert (die Pläne der Vergangenheit werden nicht aufbewahrt), die letzten 14 werden gezeigt.*",
-    "planned_explain": "*Jeden Abend um 23:59 werden die kWh gespeichert, die der Plan am nächsten Tag laden will. Hier werden sie mit dem verglichen, was an dem Tag tatsächlich geladen wurde. Außerhalb des Plans = manuelles Laden, Laden wegen niedrigem Batteriestand und sonstiges Laden. Öffentliches Laden wird nicht gezählt.*",
+    "drive_temperature_explain": "*Jede Fahrt vom Abstecken bis zum erneuten Anstecken, mit der Außentemperatur (Mittelwert, während das Auto weg war) und {distance_kwh} aus Kilometerzähler und Akkustand (mit der in CJP eingestellten Akkugröße). Die orange Linie ist der Durchschnitt pro 5 °C. Der Trend zeigt, wie sich {distance_kwh} pro Grad ändert und was die Kälte kostet. Fahrten unter 5 {distance} oder unter 2 % Akku werden ausgelassen. Beim ersten Mal werden die Fahrten aus dem Verlauf von Home Assistant (die letzten Tage) gelesen, danach wird jede Fahrt gespeichert.*",
+    "departures_explain": "*Bei jeder Abfahrt des Arbeitsplans wird der Akkustand, mit dem das Auto losfuhr, mit der Anforderung verglichen: die Fahrstrecke des Tages plus das tägliche Minimum (✅ = erfüllt). Das Ziel des Plans ist der Stand, den der Plan vor der Arbeit anstrebte. Nur Abfahrten ab jetzt werden gespeichert (die Pläne der Vergangenheit werden nicht aufbewahrt), die letzten 14 werden gezeigt.*",
+    "planned_explain": "*Jeden Abend um 23:59 werden die kWh gespeichert, die der Plan am nächsten Tag laden will. Hier werden sie mit dem verglichen, was an dem Tag tatsächlich geladen wurde. Außerhalb des Plans = manuelles Laden, Laden wegen niedrigem Akkustand und sonstiges Laden. Öffentliches Laden wird nicht gezählt.*",
     "section_price_forecast": "Preisprognose",
     "price_forecast_intro": "Die Prognose der Preisintegration gegen den echten Preis, die letzten 30 Tage:",
     "days_ahead": "Tage voraus",
@@ -921,14 +895,14 @@
     "price_forecast_corrected": "Verwendete Prognose (korrigiert)",
     "price_forecast_correction_off": "Die Korrektur der Preisprognose ist aus (*Einstellungen → Erweitert*).",
     "price_forecast_correction_waiting": "Die Prognose wird pro Tag voraus nach 7 Tagen Messung korrigiert.",
-    "price_forecast_explain": "Jede Stunde speichert CJP den Kaufpreis aus der Prognose der Preisintegration (ohne CJPs eigenen Aufschlag pro Tag voraus) für die kommenden Tage. Wenn die echten Preise eines Tages kommen (gegen 13 Uhr am Vortag), werden sie mit dem verglichen, was die Prognose 1, 2, 3 … Tage vorher sagte. **Fehler** ist die durchschnittliche Abweichung pro Stunde, **Abweichung** > 0: die Prognose war zu hoch. **Günstigste getroffen**: wie viele der 4 günstigsten Stunden des Tages laut Prognose wirklich unter den 4 günstigsten waren – die Stunden, in denen der Plan das Auto am liebsten lädt. Der Mehrpreis in Klammern ist, was die Wahl nach der Prognose statt der echten Stunden pro kWh gekostet hat. Das Diagramm zeigt die echten Preise und die Prognosen der letzten und kommenden Tage.",
-    "section_soc_power": "Ladeleistung nach SOC",
-    "soc_power_explain": "Das Diagramm und die Tabelle zeigen, mit wie viel Leistung das Auto bei verschiedenen Akkuständen (SOC) laden kann und ob es 1 oder 3 Phasen sind. Wenn ein Niveau in mehreren Ladevorgängen deutlich langsameres Laden gezeigt hat als ein niedrigeres, lernt CJP eine Grenze, und der Plan nutzt sie, damit er nicht mit mehr Leistung rechnet, als das Auto tatsächlich aufnimmt. Die Tabelle zeigt auch, wie viele Ladevorgänge stabile Messungen haben und wie viele langsameres Laden zeigten; für eine Grenze sind mindestens 3 nötig. Solange ein Niveau keine eigenen Messungen hat, dienen stabile Stundenwerte aus der Statistik von Home Assistant als Startwert (markiert mit 📊). Das ist nur eine Planungsberechnung und steuert den Lader nicht. Der Schalter schaltet die Nutzung der gelernten Grenzen im Plan ein oder aus; die Messungen werden in jedem Fall gesammelt.",
-    "soc_power_chart_title": "Gelernte Ladeleistung nach SOC",
-    "soc_power_soc": "SOC",
+    "price_forecast_explain": "Jede Stunde speichert CJP den Kaufpreis aus der Prognose der Preisintegration (ohne CJPs eigenen Aufschlag pro Tag voraus) für die kommenden Tage. Wenn die echten Preise eines Tages kommen (gegen 13 Uhr am Vortag), werden sie mit dem verglichen, was die Prognose 1, 2, 3 … Tage vorher sagte. **Fehler** ist der durchschnittliche Fehler pro Stunde, egal ob die Prognose zu hoch oder zu niedrig war. **Abweichung** > 0: die Prognose war zu hoch. **Schlechteste Stunde**: der größte Fehler in einer einzelnen Stunde. **Günstigste getroffen**: wie viele der 4 günstigsten Stunden des Tages laut Prognose wirklich unter den 4 günstigsten waren – die Stunden, in denen der Plan das Auto am liebsten lädt. Der Mehrpreis in Klammern ist, was die Wahl nach der Prognose statt der echten Stunden pro kWh gekostet hat. Das Diagramm zeigt die echten Preise und die Prognosen der letzten und kommenden Tage. Ein zweites Diagramm zeigt den Fehler pro Tag. **Korrektur**: Ist *Preisprognose korrigieren* an, passt der Plan die Prognosepreise für jeden Tag im Voraus um ihre durchschnittliche **Abweichung** der letzten 30 Tage an (eine zu hohe Prognose wird gesenkt), nach mindestens 7 Tagen Messung und höchstens um ±0,50 {valuta_kwh}. Das Diagramm zeigt dann auch *Verwendete Prognose (korrigiert)*.",
+    "section_soc_power": "Ladeleistung nach Akkustand",
+    "soc_power_explain": "Das Diagramm und die Tabelle zeigen, mit wie viel Leistung das Auto bei verschiedenen Akkuständen laden kann und ob es 1 oder 3 Phasen sind. Wenn ein Niveau in mehreren Ladevorgängen deutlich langsameres Laden gezeigt hat als ein niedrigeres, lernt CJP eine Grenze, und der Plan nutzt sie, damit er nicht mit mehr Leistung rechnet, als das Auto tatsächlich aufnimmt. Die Tabelle zeigt auch, wie viele Ladevorgänge stabile Messungen haben und wie viele langsameres Laden zeigten; für eine Grenze sind mindestens 3 nötig. Solange ein Niveau keine eigenen Messungen hat, dienen stabile Stundenwerte aus der Statistik von Home Assistant als Startwert (markiert mit 📊). Das ist nur eine Planungsberechnung und steuert den Lader nicht. Der Schalter schaltet die Nutzung der gelernten Grenzen im Plan ein oder aus; die Messungen werden in jedem Fall gesammelt.",
+    "soc_power_chart_title": "Gelernte Ladeleistung nach Akkustand",
+    "soc_power_soc": "Akkustand",
     "soc_power_phases": "Phasen",
     "soc_power_samples": "Stabile Ladevorgänge",
-    "soc_power_tapers": "Ladevorgänge mit Abfall",
+    "soc_power_tapers": "Langsamere Ladevorgänge",
     "soc_power_cap": "Gelernte Grenze",
     "soc_power_no_cap": "Keine Grenze gelernt",
     "soc_power_no_data": "Noch keine verwendbaren Messwerte",
@@ -954,6 +928,6 @@
     "forecast_auto_waiting_drives": "🔄 Die automatische Wahl für die {distance_kwh} beginnt nach {drives} Fahrten. Bis dahin wird der gewählte ✅ <b>{manual}</b> genutzt.",
     "forecast_no_data": "Wird ab jetzt gesammelt: der Hausverbrauch nach dem ersten ganzen Tag, {distance_kwh} nach der ersten Fahrt.",
     "forecast_explain": "Kurz bevor eine neue Messung in den Verlauf kommt (der Hausverbrauch jede Stunde, die {distance_kwh} des Autos nach jeder Fahrt), berechnet CJP, was jeder Prognosetyp aus demselben Verlauf vorhergesagt hätte, und vergleicht es mit der Messung. ✅ der genutzte Prognosetyp, ⭐ der genaueste. **Ø** ist, was jeder Typ im Durchschnitt erwartet hat, gegen den tatsächlichen Wert oben. Der **Fehler** wird Stunde für Stunde / Fahrt für Fahrt gezählt, ein Typ kann also den Durchschnitt treffen und trotzdem jedes Mal stark daneben liegen. **Abweichung** > 0: die Prognose war zu hoch.\n\nDer Prognosetyp (*Einstellungen → Erweitert → Prognosetyp*) gilt für Hausverbrauch, {distance_kwh} und die Ersatzpreise zugleich, wähle also den, der dort am besten trifft, wo es am meisten zählt. Mit *Prognosetyp automatisch wählen* an nutzen Hausverbrauch und {distance_kwh} stattdessen jeweils den genauesten Typ (nach 7 Tagen Messung / 10 Fahrten) und wechseln nur, wenn ein anderer Typ mindestens 5 % weniger Fehler hat; die Ersatzpreise und der Solarverlauf nutzen weiter den gewählten Typ. Der Hausverbrauch wird nur für den Solarüberschuss genutzt; {distance_kwh} dafür, wie viel Fahrten und Arbeitstage brauchen.",
-    "history_explain": "* **Batteriestand und Ladegrenze**: die letzten 48 Stunden (und der simulierte Batteriestand, wenn er eingeschaltet ist).\n* **Fahreffizienz**: die letzten 30 Tage.\n* **Mit Solar geladen**: die letzten 7 Tage."
+    "history_explain": "* **Akkustand und Ladelimit**: die letzten 48 Stunden (und der simulierte Akkustand, wenn er eingeschaltet ist).\n* **Fahreffizienz**: die letzten 30 Tage.\n* **Mit Solar geladen**: die letzten 7 Tage."
   }
 }
