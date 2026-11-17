@@ -87,7 +87,7 @@ class CoordinatorRefresh:
         charger = self.config["charger"]["entity_ids"]
         soc_id = self.config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"]
         meter_id = charger["kwh_meter_entity_id"]
-        power_id = charger["power_consumtion_entity_id"]
+        power_id = charger["charger_power_entity_id"]
         if not (soc_id and meter_id and power_id):
             return
         phase_ids = [f"sensor.{self.object_prefix}_charger_phase_{i}_amps" for i in (1, 2, 3)]
@@ -361,7 +361,7 @@ class CoordinatorRefresh:
                         break
             solar_id = self.config["solar"]["entity_ids"].get("production_entity_id") if self.engine.is_solar_configured() else ""
             house_id = self.config["home"]["entity_ids"].get("power_consumption_entity_id")
-            ev_id = self.config["charger"]["entity_ids"].get("power_consumtion_entity_id")
+            ev_id = self.config["charger"]["entity_ids"].get("charger_power_entity_id")
             if solar_id and house_id and ev_id:
                 stats = await instance.async_add_executor_job(
                     statistics_during_period, self.hass, start, end, {solar_id, house_id, ev_id}, "hour", {"power": "W"}, {"mean"}
@@ -396,7 +396,7 @@ class CoordinatorRefresh:
         from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
 
         soc_id = self.config["ev_car"]["entity_ids"].get("usable_battery_level_entity_id") if self.ev_configured else ""
-        power_id = self.config["charger"]["entity_ids"].get("power_consumtion_entity_id")
+        power_id = self.config["charger"]["entity_ids"].get("charger_power_entity_id")
         if not soc_id or not power_id:
             data["ev_hours"] = {}
             return

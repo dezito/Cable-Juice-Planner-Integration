@@ -70,7 +70,9 @@ The home battery shouldn't be drained into the car – unless there is energy to
 1. CJP setup → **House and home battery:** the home battery's level and power.
 2. CJP settings: *Charge EV after home battery minimum level* (e.g. 80 %) and, if the car may use the
    home battery's surplus, *Home battery surplus to EV*.
-3. BattMind setup → **Consumption → Ignored consumers:** the charger's power sensor.
+3. BattMind setup → **Consumption:** leave **Ignore Cable Juice Planner chargers** on (the default), so BattMind
+   finds the chargers of your cars here by itself. A charger that is not set up in Cable Juice Planner goes under
+   **Ignored consumers**.
 4. [BattMind's blueprint](https://github.com/dezito/BattMind-Integration/blob/main/docs/actions.md#ev-optional) →
    **EV (optional)**: the charger's power sensor, *While the car is charging* (discharge power 0), *Allow
    discharging into the car when* `switch.cjp_<car>_powerwall_discharge_above_needed`, and *Only above this

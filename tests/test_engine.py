@@ -33,7 +33,7 @@ EXPENSIVE_HOURS = set(range(17, 21))
 OPTIONS = {
     **const.default_options(),
     "status_entity_id": "sensor.charger_status",
-    "power_consumtion_entity_id": "sensor.charger_power",
+    "charger_power_entity_id": "sensor.charger_power",
     "kwh_meter_entity_id": "sensor.charger_kwh",
     "lifetime_kwh_meter_entity_id": "sensor.charger_lifetime_kwh",
     "usable_battery_level_entity_id": "sensor.ev_battery_level",

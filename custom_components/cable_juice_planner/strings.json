@@ -19,7 +19,7 @@
         "description": "The sensors Cable Juice Planner reads from your charger. Status, power and the two kWh meters are required.",
         "data": {
           "status_entity_id": "Charger status",
-          "power_consumtion_entity_id": "Charging power",
+          "charger_power_entity_id": "Charging power",
           "kwh_meter_entity_id": "kWh meter",
           "lifetime_kwh_meter_entity_id": "Lifetime kWh meter",
           "enabled_entity_id": "Charger enabled",
@@ -28,7 +28,7 @@
         },
         "data_description": {
           "status_entity_id": "Charger status (Supported states: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Charging power (watts)",
+          "charger_power_entity_id": "Charging power (watts)",
           "kwh_meter_entity_id": "Use Riemann-sum integration sensor (method: Left Riemann-sum) if the charger’s kWh meter is slow (e.g., Easee); otherwise use the charger’s lifetime kWh meter",
           "lifetime_kwh_meter_entity_id": "Alternative to kwh_meter_entity_id if you don’t want to use the charger’s lifetime kWh meter",
           "enabled_entity_id": "Optional: switch/sensor showing if the charger is on (on/off). When the charger is off, the attribute charger_enabled of the action sensor asks to turn it on.",
@@ -107,18 +107,20 @@
       },
       "home": {
         "title": "House consumption",
-        "description": "Used to calculate the solar surplus that can be used for charging.",
+        "description": "Used to calculate the solar surplus that can be used for charging.\n\nChargers of cars with lower priority found: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "House consumption",
           "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
           "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
-          "ignore_consumption_from_entity_ids": "Ignore consumption from"
+          "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home consumption (watts), not grid consumption",
           "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
           "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
-          "ignore_consumption_from_entity_ids": "List of power sensors to ignore"
+          "ignore_consumption_from_entity_ids": "List of power sensors to ignore",
+          "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
       "powerwall": {
@@ -425,7 +427,7 @@
         "description": "The sensors Cable Juice Planner reads from your charger. Status, power and the two kWh meters are required.",
         "data": {
           "status_entity_id": "Charger status",
-          "power_consumtion_entity_id": "Charging power",
+          "charger_power_entity_id": "Charging power",
           "kwh_meter_entity_id": "kWh meter",
           "lifetime_kwh_meter_entity_id": "Lifetime kWh meter",
           "enabled_entity_id": "Charger enabled",
@@ -434,7 +436,7 @@
         },
         "data_description": {
           "status_entity_id": "Charger status (Supported states: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Charging power (watts)",
+          "charger_power_entity_id": "Charging power (watts)",
           "kwh_meter_entity_id": "Use Riemann-sum integration sensor (method: Left Riemann-sum) if the charger’s kWh meter is slow (e.g., Easee); otherwise use the charger’s lifetime kWh meter",
           "lifetime_kwh_meter_entity_id": "Alternative to kwh_meter_entity_id if you don’t want to use the charger’s lifetime kWh meter",
           "enabled_entity_id": "Optional: switch/sensor showing if the charger is on (on/off). When the charger is off, the attribute charger_enabled of the action sensor asks to turn it on.",
@@ -513,18 +515,20 @@
       },
       "home": {
         "title": "House consumption",
-        "description": "Used to calculate the solar surplus that can be used for charging.",
+        "description": "Used to calculate the solar surplus that can be used for charging.\n\nChargers of cars with lower priority found: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "House consumption",
           "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
           "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
-          "ignore_consumption_from_entity_ids": "Ignore consumption from"
+          "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home consumption (watts), not grid consumption",
           "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
           "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
-          "ignore_consumption_from_entity_ids": "List of power sensors to ignore"
+          "ignore_consumption_from_entity_ids": "List of power sensors to ignore",
+          "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
       "powerwall": {

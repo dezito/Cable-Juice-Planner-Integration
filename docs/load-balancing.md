@@ -44,6 +44,23 @@ subtracted, and an overloaded phase limits the last car at once.
 house uses 5 A on L1. Car 2 gets 25 − 1 − 5 − 16 = 3 A on L1 – too little, so it is planned in other hours
 (or with fewer amps once car 1 is done).
 
+## Solar surplus between cars
+
+The priority also decides who gets the solar surplus. The car with priority 1 has the first right to it, then
+priority 2, and so on. Each car calculates its surplus as the solar production minus the house's consumption, and
+the house's consumption includes the other cars' charging **only for the cars ahead of it**: car 2 sees what car 1
+charges with as consumption and only gets what is left, while car 1 doesn't count car 2's charging (see
+*Ignore chargers of cars with lower priority* on the house page). If every car left
+out every other car's charging, they would each count the same surplus as theirs. Cars with the same priority
+count each other's charging as consumption, so the default (everyone priority 1) is the careful choice. A charger
+you added yourself under *Ignored consumers* is always subtracted, so don't add the charger of a car ahead of this
+one there. Turn the setting off if the house consumption sensor doesn't include the chargers.
+
+The right is by priority only, also when the car behind charges from the grid at that moment (a trip soon or a
+car below its daily minimum goes first in the *current* limit, but not in the solar surplus): the car ahead then
+counts the surplus as its own, and the car behind pays the grid price for its charging. The priority only exists
+with a shared grid connection (the *Load balancing* page); without one every car has priority 1.
+
 ## Shared circuit (e.g. Easee master)
 
 Some chargers share one circuit limit: with Easee, the circuit (set on the master) limits the current per phase

@@ -10,7 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from ..management.backup import BACKUP_DIR, async_export, async_import, backup_dir, list_backups
-from ..const import CONF_CIRCUITS, CONF_ENTITY_PREFIX, SITE_DEFAULTS, OPTIONS_MENU, default_options, object_prefix, normalize_language, strip_removed_options
+from ..const import CONF_CIRCUITS, CONF_ENTITY_PREFIX, SITE_DEFAULTS, OPTIONS_MENU, default_options, object_prefix, normalize_language, upgrade_options
 from .schema import BACKUP_EXPORT, providers_from_options, site_options, site_schema
 from .pages import CJPFlowPages
 
@@ -95,7 +95,7 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
 
     async def _async_finish(self) -> ConfigFlowResult:
         self._save_circuit()
-        return self.async_create_entry(data=strip_removed_options(self._options))
+        return self.async_create_entry(data=upgrade_options(self._options))
 
 
 class CJPSiteOptionsFlow(OptionsFlow):

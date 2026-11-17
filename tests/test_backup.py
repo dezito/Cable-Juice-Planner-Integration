@@ -194,3 +194,22 @@ async def test_restoring_an_old_backup_does_not_bring_back_the_removed_testing_m
     await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
     assert loaded_entry.state is ConfigEntryState.LOADED
     assert "testing_mode" not in loaded_entry.options
+
+
+async def test_restoring_an_old_backup_renames_the_charger_power_option(hass: HomeAssistant, config_dir: Path, loaded_entry) -> None:
+    """A backup from before the rename holds power_consumtion_entity_id: it is restored as charger_power_entity_id."""
+    response = await hass.services.async_call(DOMAIN, "export_data", {}, blocking=True, return_response=True)
+    path = config_dir.parent / next(iter(response["files"].values()))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    charger = data["options"].pop("charger_power_entity_id")
+    data["options"]["power_consumtion_entity_id"] = "sensor.restored_charger"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert charger
+
+    old_coordinator = loaded_entry.runtime_data
+    await backup.async_import(hass, loaded_entry, path.name, restore_configuration=True)
+    await _settle(hass)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+    assert loaded_entry.state is ConfigEntryState.LOADED
+    assert "power_consumtion_entity_id" not in loaded_entry.options
+    assert loaded_entry.options["charger_power_entity_id"] == "sensor.restored_charger"

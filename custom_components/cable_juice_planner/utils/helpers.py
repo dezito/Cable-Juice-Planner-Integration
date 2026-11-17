@@ -190,6 +190,11 @@ def round_up(n, decimals=0) -> float:
     return float(math.ceil(n * multiplier) / multiplier)
 
 
+def unique_entity_ids(entity_ids) -> list[str]:
+    """The entity ids in order, without empty values and repeats (a sensor listed twice is counted once)."""
+    return list(dict.fromkeys(entity_id for entity_id in entity_ids or [] if entity_id))
+
+
 def average(data) -> float:
     if not isinstance(data, list):
         data = [data]

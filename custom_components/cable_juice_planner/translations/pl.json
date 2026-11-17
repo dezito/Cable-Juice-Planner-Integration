@@ -19,7 +19,7 @@
         "description": "Czujniki ładowarki. Status, moc i oba liczniki kWh są wymagane.",
         "data": {
           "status_entity_id": "Status ładowarki",
-          "power_consumtion_entity_id": "Moc ładowania",
+          "charger_power_entity_id": "Moc ładowania",
           "kwh_meter_entity_id": "Licznik kWh",
           "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
           "enabled_entity_id": "Ładowarka włączona",
@@ -28,7 +28,7 @@
         },
         "data_description": {
           "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Moc ładowania (W)",
+          "charger_power_entity_id": "Moc ładowania (W)",
           "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
           "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
           "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
@@ -107,18 +107,20 @@
       },
       "home": {
         "title": "Zużycie domu",
-        "description": "Do obliczenia nadwyżki słonecznej do ładowania.",
+        "description": "Do obliczenia nadwyżki słonecznej do ładowania.\n\nZnalezione ładowarki samochodów o niższym priorytecie: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
           "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
-          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z"
+          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
           "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
-          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania"
+          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
       "powerwall": {
@@ -425,7 +427,7 @@
         "description": "Czujniki ładowarki. Status, moc i oba liczniki kWh są wymagane.",
         "data": {
           "status_entity_id": "Status ładowarki",
-          "power_consumtion_entity_id": "Moc ładowania",
+          "charger_power_entity_id": "Moc ładowania",
           "kwh_meter_entity_id": "Licznik kWh",
           "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
           "enabled_entity_id": "Ładowarka włączona",
@@ -434,7 +436,7 @@
         },
         "data_description": {
           "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Moc ładowania (W)",
+          "charger_power_entity_id": "Moc ładowania (W)",
           "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
           "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
           "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
@@ -513,18 +515,20 @@
       },
       "home": {
         "title": "Zużycie domu",
-        "description": "Do obliczenia nadwyżki słonecznej do ładowania.",
+        "description": "Do obliczenia nadwyżki słonecznej do ładowania.\n\nZnalezione ładowarki samochodów o niższym priorytecie: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
           "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
-          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z"
+          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
           "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
-          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania"
+          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
       "powerwall": {

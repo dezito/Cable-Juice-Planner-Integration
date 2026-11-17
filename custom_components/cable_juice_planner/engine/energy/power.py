@@ -5,7 +5,7 @@ import datetime
 import logging
 from copy import deepcopy
 
-from ...utils.helpers import average, get_specific_values
+from ...utils.helpers import average, get_specific_values, unique_entity_ids
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,9 +29,7 @@ class EnergyPower:
     def power_from_ignored(self, from_time_stamp, to_time_stamp) -> float:
         total = 0.0
         try:
-            for entity_id in self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"] or []:
-                if entity_id == "" or entity_id is None:
-                    continue
+            for entity_id in unique_entity_ids(self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"]):
                 try:
                     total += float(self.history.get_average_value(entity_id, from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0))
                 except Exception:  # noqa: BLE001
@@ -102,7 +100,7 @@ class EnergyPower:
             powerwall_values = self.get_powerwall_values(from_time_stamp, to_time_stamp)
             powerwall_charging_consumption = self.charge_from_powerwall(powerwall_values)
             powerwall_discharging_consumption = self.discharge_from_powerwall(powerwall_values)
-            ev_used_consumption = abs(round(float(history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0)), 2))
+            ev_used_consumption = abs(round(float(history.get_average_value(self.config["charger"]["entity_ids"]["charger_power_entity_id"], from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0)), 2))
             solar_production = abs(round(float(history.get_average_value(self.config["solar"]["entity_ids"]["production_entity_id"], from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0)), 2))
 
             if not home["power_consumption_entity_id_include_powerwall_discharging"]:

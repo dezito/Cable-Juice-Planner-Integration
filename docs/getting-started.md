@@ -81,6 +81,15 @@ integration (virtual EV).
 - **House consumption:** the house's consumption, not the grid import. Used for the solar surplus.
 - **Ignored consumers:** power sensors subtracted from the house – e.g. a heat pump you don't want in the
   forecast. The charger itself is subtracted automatically.
+- **Ignore chargers of cars with lower priority** (on by default): with several cars in Cable Juice Planner, the car
+  with [priority](load-balancing.md#solar-surplus-between-cars) 1 has the first right to the solar surplus, then 2,
+  and so on. A car therefore counts the charging of the cars ahead of it as consumption of the house, but subtracts
+  the chargers of the cars behind it, so you don't add them to the list yourself. Cars with the same priority (the
+  default is 1 for everyone) don't leave each other out. The page shows the chargers it found. A car added later, or
+  one with another priority, is picked up automatically (the cars concerned reload once), this car's own charger is
+  never counted twice, and a charger that is also in your list is subtracted once. Turn it off if the house
+  consumption sensor does not include the chargers, e.g. a separate meter: subtracting them would then take
+  consumption that was never there out of the forecast.
 - **Home battery:** level and power, if you have one. See [Solar surplus charging](rules/solar.md#home-battery).
 
 ### Prices

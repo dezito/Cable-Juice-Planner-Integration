@@ -162,9 +162,9 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
     sl_sell = prices["stromligning_sell_current_price"]
     mapping = {
         "sensor.bil_lader_status": charger["status_entity_id"],
-        "sensor.bil_lader_power": charger["power_consumtion_entity_id"],
+        "sensor.bil_lader_power": charger["charger_power_entity_id"],
         "sensor.bil_lader_2_status": charger["status_entity_id"],
-        "sensor.bil_lader_2_power": charger["power_consumtion_entity_id"],
+        "sensor.bil_lader_2_power": charger["charger_power_entity_id"],
         "sensor.mcqueen_battery_level": ev["usable_battery_level_entity_id"],
         "sensor.mcqueen_odometer": ev["odometer_entity_id"],
         "binary_sensor.mcqueen_charge_cable": ev["charge_cable_entity_id"],

@@ -31,7 +31,7 @@ async def test_the_battery_level_and_the_charger_power_are_read_as_hourly_statis
     coordinator.ev_configured = True
     with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.dict(
         coordinator.config["ev_car"]["entity_ids"], {"usable_battery_level_entity_id": "sensor.level"}
-    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.power"}):
+    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"charger_power_entity_id": "sensor.power"}):
         data: dict = {}
         end = datetime(2026, 10, 2, tzinfo=UTC)
         await coordinator._async_economy_ev_statistics(_FakeRecorder(), data, end, _stat_ts)
@@ -52,7 +52,7 @@ async def test_without_the_entities_nothing_is_estimated_and_a_failing_read_leav
     coordinator.ev_configured = True
     with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=RuntimeError("no statistics")), patch.dict(
         coordinator.config["ev_car"]["entity_ids"], {"usable_battery_level_entity_id": "sensor.level"}
-    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.power"}):
+    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"charger_power_entity_id": "sensor.power"}):
         data = {}
         await coordinator._async_economy_ev_statistics(_FakeRecorder(), data, end, _stat_ts)
     assert data == {}  # the stored estimate stays
@@ -85,7 +85,7 @@ async def test_the_hours_the_statistics_lack_are_filled_from_the_recorder_states
     with patch("homeassistant.components.recorder.statistics.statistics_during_period", return_value={}), patch(
         "homeassistant.components.recorder.history.get_significant_states", side_effect=raw
     ), patch.dict(coordinator.config["ev_car"]["entity_ids"], {"usable_battery_level_entity_id": "sensor.level"}), patch.dict(
-        coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.power"}
+        coordinator.config["charger"]["entity_ids"], {"charger_power_entity_id": "sensor.power"}
     ):
         data: dict = {}
         await coordinator._async_economy_ev_statistics(_FakeRecorder(), data, end, _stat_ts, keep_days=30)

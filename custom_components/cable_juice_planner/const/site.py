@@ -32,7 +32,7 @@ CONF_CIRCUIT = "site_circuit"
 # the car's charger entities; their devices tell which charger the car uses
 CIRCUIT_ENTITY_KEYS = (
     "status_entity_id",
-    "power_consumtion_entity_id",
+    "charger_power_entity_id",
     "kwh_meter_entity_id",
     "lifetime_kwh_meter_entity_id",
     "enabled_entity_id",

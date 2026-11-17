@@ -19,7 +19,7 @@
         "description": "Сенсори зарядного пристрою. Статус, потужність і обидва лічильники кВт·год обов’язкові.",
         "data": {
           "status_entity_id": "Статус зарядного пристрою",
-          "power_consumtion_entity_id": "Потужність заряджання",
+          "charger_power_entity_id": "Потужність заряджання",
           "kwh_meter_entity_id": "Лічильник кВт·год",
           "lifetime_kwh_meter_entity_id": "Загальний лічильник кВт·год",
           "enabled_entity_id": "Зарядний пристрій увімкнено",
@@ -28,7 +28,7 @@
         },
         "data_description": {
           "status_entity_id": "Статус зарядки (Підтримувані стани: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Потужність заряджання (Вт)",
+          "charger_power_entity_id": "Потужність заряджання (Вт)",
           "kwh_meter_entity_id": "Використовуйте інтегральний сенсор Riemann-sum (метод: ліва сума Рімана), якщо лічильник кВт·год повільний (наприклад Easee); інакше використовуйте лічильник загального ресурсу",
           "lifetime_kwh_meter_entity_id": "Альтернатива kwh_meter_entity_id, якщо не хочете використовувати лічильник загального ресурсу",
           "enabled_entity_id": "Необов’язково: перемикач/сенсор, що показує, чи увімкнено зарядний пристрій (on/off). Якщо вимкнено, атрибут charger_enabled сенсора дії просить увімкнути.",
@@ -107,18 +107,20 @@
       },
       "home": {
         "title": "Споживання будинку",
-        "description": "Для розрахунку сонячного надлишку для заряджання.",
+        "description": "Для розрахунку сонячного надлишку для заряджання.\n\nЗнайдені зарядні пристрої автомобілів з нижчим пріоритетом: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Споживання будинку",
           "power_consumption_entity_id_include_powerwall_charging": "Включає заряджання домашньої батареї",
           "power_consumption_entity_id_include_powerwall_discharging": "Включає розряджання домашньої батареї",
-          "ignore_consumption_from_entity_ids": "Ігнорувати споживання від"
+          "ignore_consumption_from_entity_ids": "Ігнорувати споживання від",
+          "ignore_cjp_chargers": "Ігнорувати зарядні пристрої автомобілів з нижчим пріоритетом"
         },
         "data_description": {
           "power_consumption_entity_id": "Споживання будинку (Вт), не споживання мережі",
           "power_consumption_entity_id_include_powerwall_charging": "Споживання будинку + заряд батареї (Вт)",
           "power_consumption_entity_id_include_powerwall_discharging": "Споживання будинку + розряд батареї (Вт)",
-          "ignore_consumption_from_entity_ids": "Список сенсорів, які ігноруються"
+          "ignore_consumption_from_entity_ids": "Список сенсорів, які ігноруються",
+          "ignore_cjp_chargers": "Віднімає потужність зарядки зарядних пристроїв ваших автомобілів Cable Juice Planner з нижчим пріоритетом (більше число) від споживання будинку, також для автомобілів, доданих пізніше. Автомобіль з пріоритетом 1 першим має право на сонячний надлишок, потім 2 тощо: цей автомобіль враховує заряджання автомобілів перед собою як споживання, але не тих, що за ним. Власний зарядний пристрій цього автомобіля не враховується, а пристрій, який є і в списку вище, віднімається лише один раз. Автомобілі з однаковим пріоритетом не ігнорують один одного. Вимкніть, якщо датчик споживання будинку не включає зарядні пристрої."
         }
       },
       "powerwall": {
@@ -425,7 +427,7 @@
         "description": "Сенсори зарядного пристрою. Статус, потужність і обидва лічильники кВт·год обов’язкові.",
         "data": {
           "status_entity_id": "Статус зарядного пристрою",
-          "power_consumtion_entity_id": "Потужність заряджання",
+          "charger_power_entity_id": "Потужність заряджання",
           "kwh_meter_entity_id": "Лічильник кВт·год",
           "lifetime_kwh_meter_entity_id": "Загальний лічильник кВт·год",
           "enabled_entity_id": "Зарядний пристрій увімкнено",
@@ -434,7 +436,7 @@
         },
         "data_description": {
           "status_entity_id": "Статус зарядки (Підтримувані стани: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Потужність заряджання (Вт)",
+          "charger_power_entity_id": "Потужність заряджання (Вт)",
           "kwh_meter_entity_id": "Використовуйте інтегральний сенсор Riemann-sum (метод: ліва сума Рімана), якщо лічильник кВт·год повільний (наприклад Easee); інакше використовуйте лічильник загального ресурсу",
           "lifetime_kwh_meter_entity_id": "Альтернатива kwh_meter_entity_id, якщо не хочете використовувати лічильник загального ресурсу",
           "enabled_entity_id": "Необов’язково: перемикач/сенсор, що показує, чи увімкнено зарядний пристрій (on/off). Якщо вимкнено, атрибут charger_enabled сенсора дії просить увімкнути.",
@@ -513,18 +515,20 @@
       },
       "home": {
         "title": "Споживання будинку",
-        "description": "Для розрахунку сонячного надлишку для заряджання.",
+        "description": "Для розрахунку сонячного надлишку для заряджання.\n\nЗнайдені зарядні пристрої автомобілів з нижчим пріоритетом: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Споживання будинку",
           "power_consumption_entity_id_include_powerwall_charging": "Включає заряджання домашньої батареї",
           "power_consumption_entity_id_include_powerwall_discharging": "Включає розряджання домашньої батареї",
-          "ignore_consumption_from_entity_ids": "Ігнорувати споживання від"
+          "ignore_consumption_from_entity_ids": "Ігнорувати споживання від",
+          "ignore_cjp_chargers": "Ігнорувати зарядні пристрої автомобілів з нижчим пріоритетом"
         },
         "data_description": {
           "power_consumption_entity_id": "Споживання будинку (Вт), не споживання мережі",
           "power_consumption_entity_id_include_powerwall_charging": "Споживання будинку + заряд батареї (Вт)",
           "power_consumption_entity_id_include_powerwall_discharging": "Споживання будинку + розряд батареї (Вт)",
-          "ignore_consumption_from_entity_ids": "Список сенсорів, які ігноруються"
+          "ignore_consumption_from_entity_ids": "Список сенсорів, які ігноруються",
+          "ignore_cjp_chargers": "Віднімає потужність зарядки зарядних пристроїв ваших автомобілів Cable Juice Planner з нижчим пріоритетом (більше число) від споживання будинку, також для автомобілів, доданих пізніше. Автомобіль з пріоритетом 1 першим має право на сонячний надлишок, потім 2 тощо: цей автомобіль враховує заряджання автомобілів перед собою як споживання, але не тих, що за ним. Власний зарядний пристрій цього автомобіля не враховується, а пристрій, який є і в списку вище, віднімається лише один раз. Автомобілі з однаковим пріоритетом не ігнорують один одного. Вимкніть, якщо датчик споживання будинку не включає зарядні пристрої."
         }
       },
       "powerwall": {
