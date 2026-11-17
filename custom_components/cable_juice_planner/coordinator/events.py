@@ -208,5 +208,5 @@ class CoordinatorEvents:
     @callback
     def set_charging_rule(self, text: str) -> None:
         """Progress text during startup (the engine sets the rule afterwards)."""
-        self.data["current_charging_rule"] = format_charging_rule(text, self.testing)
+        self.data["current_charging_rule"] = format_charging_rule(text)
         async_dispatcher_send(self.hass, self.signal, "current_charging_rule")

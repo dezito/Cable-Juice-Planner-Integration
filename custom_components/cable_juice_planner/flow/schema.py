@@ -148,7 +148,6 @@ SELECTORS: dict[str, Any] = {
     "dashboard": BOOLEAN,
     "dashboard_icon": selector.IconSelector(selector.IconSelectorConfig(placeholder=DEFAULT_DASHBOARD_ICON)),
     "enable_diagnostic_file_log": BOOLEAN,
-    "testing_mode": BOOLEAN,
     "power_values_db_data_to_save": _number(1, 100, 1, "d"),
     "solar_available_db_data_to_save": _number(1, 100, 1),
     "kwh_avg_prices_db_data_to_save": _number(1, 100, 1, "d"),

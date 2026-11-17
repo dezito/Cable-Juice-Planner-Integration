@@ -31,7 +31,7 @@ from .const import (
     SERVICE_IMPORT_DATA,
 )
 from .coordinator import CJPCoordinator
-from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix
+from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix, strip_removed_options
 from .management.blueprint_install import async_install_blueprints
 from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
 from .management.dashboard_cards import async_dismiss_card_notification
@@ -224,7 +224,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _async_migrate_removed_entities(hass, entry)
     if entry.version == 2 and entry.minor_version < 3:
         _async_migrate_last_full_charge(hass, entry)
+    if entry.version == 2 and entry.minor_version < 4:
+        _async_migrate_removed_testing_mode(hass, entry)
     return True
+
+
+@callback
+def _async_migrate_removed_testing_mode(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Version 2.4: the testing mode option is gone, a stored value is dropped (it is no longer read)."""
+    hass.config_entries.async_update_entry(entry, options=strip_removed_options(entry.options), minor_version=4)
+    _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2.4 (testing mode removed)", entry.title)
 
 
 @callback

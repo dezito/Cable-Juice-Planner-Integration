@@ -274,14 +274,12 @@
         "data": {
           "cron_interval": "Інтервал",
           "dashboard": "Панель на бічній панелі",
-          "enable_diagnostic_file_log": "Діагностичний лог-файл",
-          "testing_mode": "Тестовий режим"
+          "enable_diagnostic_file_log": "Діагностичний лог-файл"
         },
         "data_description": {
           "cron_interval": "Хвилини між перевірками плану та заряджання.",
           "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, apexcharts-card, config-template-card та card-mod (необов’язково). Сповіщення перелічує відсутні картки.",
-          "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації).",
-          "testing_mode": "Позначає правило заряджання 🧪 і пропускає перевірку заряджання, підігрів та інші дії."
+          "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації)."
         }
       },
       "database": {
@@ -682,14 +680,12 @@
         "data": {
           "cron_interval": "Інтервал",
           "dashboard": "Панель на бічній панелі",
-          "enable_diagnostic_file_log": "Діагностичний лог-файл",
-          "testing_mode": "Тестовий режим"
+          "enable_diagnostic_file_log": "Діагностичний лог-файл"
         },
         "data_description": {
           "cron_interval": "Хвилини між перевірками плану та заряджання.",
           "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, apexcharts-card, config-template-card та card-mod (необов’язково). Сповіщення перелічує відсутні картки.",
-          "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації).",
-          "testing_mode": "Позначає правило заряджання 🧪 і пропускає перевірку заряджання, підігрів та інші дії."
+          "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації)."
         }
       },
       "database": {

@@ -26,9 +26,6 @@ class ControlPreheat:
             limit = preheat_min_before * 3
             return minutes_between(next_drive, now, error_value=limit + 1) > limit and minutes_between(next_drive, now, error_value=limit + 11) <= limit + 10
 
-        if self.testing:
-            _LOGGER.debug("TESTING not preheating car")
-            return
         if not self.is_ev_configured() or not self.workplan_charging_enabled():
             return
         climate_entity = self.config["ev_car"]["entity_ids"]["climate_entity_id"]

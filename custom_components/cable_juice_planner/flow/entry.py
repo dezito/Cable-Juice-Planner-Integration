@@ -11,7 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from ..management.backup import BACKUP_DIR, async_load_backup, backup_dir, list_backups
-from ..const import CONF_ENTITY_PREFIX, CONF_SITE, SITE_DEFAULTS, SITE_TITLE, DEFAULT_ENTITY_PREFIX, DOMAIN, SENSOR_DEFS, dashboard_icon, default_options, CONF_CAR_NAME, instance_title, normalize_prefix, object_prefix, normalize_language
+from ..const import CONF_ENTITY_PREFIX, CONF_SITE, SITE_DEFAULTS, SITE_TITLE, DEFAULT_ENTITY_PREFIX, DOMAIN, SENSOR_DEFS, dashboard_icon, default_options, CONF_CAR_NAME, instance_title, normalize_prefix, object_prefix, normalize_language, strip_removed_options
 from ..management.storage import find_legacy_sources, load_legacy_config
 from .pages import CJPFlowPages
 from .options import CJPOptionsFlow, CJPSiteOptionsFlow
@@ -22,7 +22,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
     """Handle the Cable Juice Planner config flow."""
 
     VERSION = 2
-    MINOR_VERSION = 3
+    MINOR_VERSION = 4
 
     def __init__(self) -> None:
         self._prefix = DEFAULT_ENTITY_PREFIX
@@ -121,7 +121,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
             self._restore_backup = name
             self._car_name = self._car_name or (backup.get(CONF_CAR_NAME) or "").strip()
             language, icon = self._options["language"], self._options["dashboard_icon"]
-            self._options = {**default_options(), **(backup.get("options") or {}), "language": language, "dashboard_icon": icon}
+            self._options = {**default_options(), **strip_removed_options(backup.get("options") or {}), "language": language, "dashboard_icon": icon}
             self._providers = providers_from_options(self._options)
             return await self._async_next()
 

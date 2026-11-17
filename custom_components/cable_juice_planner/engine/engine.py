@@ -96,7 +96,6 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self.config = config
         self.name = prefix  # start of the entity ids (cjp or cjp_<prefix>)
         self.texts = texts  # runtime texts, see formatting.translate
-        self.testing = bool(config.get("testing_mode"))
         self.title = title or f"Cable Juice Planner ({prefix})"
 
         self.charger_configured = is_charger_configured(config)
@@ -581,7 +580,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         extra = f"\n🚧{self.powerwall_charging_text}" if self.powerwall_charging_text else ""
         if self.site_charging_text:
             extra += f"\n🚧{self.site_charging_text}"
-        self.set_state("current_charging_rule", format_charging_rule(text, self.testing, extra))
+        self.set_state("current_charging_rule", format_charging_rule(text, extra))
 
     # ------------------------------------------------------------------ #
     # Settings (ev.py get_* functions)

@@ -262,7 +262,7 @@ Setup is done in the UI, split into pages with help texts:
 6. **Price providers:** Energi Data Service and/or Strømligning, refund and selling fee
 7. **Solar panels, solar charging and weather** (only with solar panels), incl. a
    [fixed solar sell price](docs/rules/solar.md#fixed-solar-sell-price) (−1 = the hourly price)
-8. **Notifications, advanced** (interval, dashboard, diagnostic file log, testing mode) **and databases**
+8. **Notifications, advanced** (interval, dashboard and diagnostic file log) **and databases**
 
 The entity selectors only show relevant entities: battery level only `battery` sensors, power
 only `power` sensors, kWh only `energy` sensors, prices only entities from the price integrations

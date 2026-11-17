@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.cable_juice_planner.const import CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN
+from custom_components.cable_juice_planner.const.config import build_config, default_options
+from custom_components.cable_juice_planner.utils.formatting import format_charging_rule
 
 from .conftest import (
     CHARGER_OPTIONS,
@@ -178,6 +180,17 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     assert options["charge_port_door_entity_id"] == "cover.my_car_charge_port_door"
     assert options["notify_list"] == ["notify.mobile_app_phone"]
     assert options["language"] == "da"
+    # the removed testing mode in the legacy file (testing_mode: true) is ignored, not imported
+    assert "testing_mode" not in options
+
+
+def test_removed_testing_mode_is_ignored() -> None:
+    """A testing_mode left in stored options changes nothing: no marker, no config key."""
+    config = build_config({**default_options(), "testing_mode": True})
+    assert "testing_mode" not in config
+    assert "testing_mode" not in default_options()
+    assert format_charging_rule("  Charge \n\nSell  ") == "Charge\nSell"
+    assert format_charging_rule("Charge", "\n🚧Site") == "Charge\n🚧Site"
 
 
 async def test_options_flow_changes_battery_size(hass: HomeAssistant, loaded_entry) -> None:
@@ -191,6 +204,20 @@ async def test_options_flow_changes_battery_size(hass: HomeAssistant, loaded_ent
     await hass.async_block_till_done(wait_background_tasks=True)
     assert loaded_entry.options["battery_size"] == 82.0
     assert loaded_entry.runtime_data.config["ev_car"]["battery_size"] == 82.0  # reloaded
+
+
+async def test_options_flow_drops_a_stored_testing_mode(hass: HomeAssistant, loaded_entry) -> None:
+    """A removed option that the stored options still hold (old backup) is not saved again."""
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "testing_mode": True})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_ev"})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "testing_mode" not in result["data"]
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert "testing_mode" not in loaded_entry.options
 
 
 async def test_site_options_flow(hass: HomeAssistant) -> None:
