@@ -372,7 +372,7 @@ class HistoryCombine:
         now = self.now()
         past = now - datetime.timedelta(minutes=self.config["cron_interval"])
         charger = self.config["charger"]["entity_ids"]
-        watt = self.history.get_average_value(charger["power_consumtion_entity_id"], past, now, convert_to="W", error_state=0.0)
+        watt = self.history.get_average_value(charger["charger_power_entity_id"], past, now, convert_to="W", error_state=0.0)
         if watt == 0.0:
             return
         current_charger_meter = float(self.get_state(charger["kwh_meter_entity_id"], float_type=True))

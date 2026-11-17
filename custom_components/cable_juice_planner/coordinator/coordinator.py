@@ -45,7 +45,9 @@ from ..const import (
 from ..management.debug_export import DebugRecorder
 from ..engine import CJPEngine, JobResult
 from ..prices import CombinedPriceProvider
+from ..utils.chargers import lower_priority_charger_power_entities
 from ..utils.formatting import translate
+from ..utils.helpers import unique_entity_ids
 from ..management.storage import CJPStorage
 from .data import CoordinatorData
 from .events import CoordinatorEvents
@@ -111,6 +113,16 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # last jobs and snapshots for the debug export (management/debug_export.py)
         self.debug = DebugRecorder()
 
+        # The ignored consumption: the sensors the user listed plus (unless switched off) the chargers of the cars with a
+        # lower priority, once each. This car's own charger is subtracted on its own, so it is never added. The engine
+        # reads this list.
+        listed = unique_entity_ids(self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"])
+        self.lower_priority_chargers: list[str] = self._lower_priority_chargers() if self.config["home"]["ignore_cjp_chargers"] else []
+        # not required to exist or be available at start: a car that is not set up yet must not hold this one up
+        self.auto_ignored_entities = [entity_id for entity_id in self.lower_priority_chargers if entity_id not in listed]
+        self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"] = [*listed, *self.auto_ignored_entities]
+        self._chargers_reload_scheduled = False
+
         charger = self.config["charger"]["entity_ids"]
         ev = self.config["ev_car"]["entity_ids"]
         home = self.config["home"]["entity_ids"]
@@ -121,7 +133,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 home["power_consumption_entity_id"],
                 home["powerwall_watt_flow_entity_id"],
                 solar["production_entity_id"],
-                charger["power_consumtion_entity_id"],
+                charger["charger_power_entity_id"],
                 *(home["ignore_consumption_from_entity_ids"] or []),
             ) if e
         })
@@ -132,8 +144,11 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
             if isinstance(section, dict) and "entity_ids" in section:
                 for value in section["entity_ids"].values():
                     entities.update(value if isinstance(value, list) else [value])
-        self.configured_entities = sorted((entities - set(self.price_entities)) - {""})
-        self.buffered_entities = sorted(set(self.configured_entities) | set(self.long_entities))
+        # what the user configured: it must exist and be available before the planner starts
+        self.configured_entities = sorted((entities - set(self.price_entities)) - {""} - set(self.auto_ignored_entities))
+        # the states and units of the snapshot also cover the chargers of the other cars (read in the right unit)
+        self.snapshot_entities = sorted({*self.configured_entities, *self.auto_ignored_entities})
+        self.buffered_entities = sorted(set(self.snapshot_entities) | set(self.long_entities))
         for entity_id in self.buffered_entities:
             if entity_id in self.long_entities:
                 self._retention[entity_id] = HISTORY_LONG_BUFFER_HOURS
@@ -179,6 +194,12 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
     @property
     def site(self):
         return self.hass.data.get(DOMAIN, {}).get("site")
+
+    def _lower_priority_chargers(self) -> list[str]:
+        """The chargers of the cars with a lower priority than this one, from the options of the config entries."""
+        return lower_priority_charger_power_entities(
+            self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, self.site_priority
+        )
 
     @property
     def site_priority(self) -> int:

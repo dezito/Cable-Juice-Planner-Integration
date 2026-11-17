@@ -10,13 +10,14 @@ from queue import SimpleQueue
 from typing import Any
 
 from homeassistant.components import persistent_notification
+from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED, ConfigEntry, ConfigEntryChange
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CoreState, Event, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import translation
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
@@ -53,6 +54,8 @@ class CoordinatorLifecycle:
         # Home Assistant stopping does not unload the entries, and the what-if thread (a worker thread of an executor) is
         # waited for when the process exits: a replay with minutes left would hold up the stop or the restart
         self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
+        if self.config["home"]["ignore_cjp_chargers"]:
+            self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
 
         ent_reg = er.async_get(self.hass)
         dev_reg = dr.async_get(self.hass)
@@ -66,6 +69,22 @@ class CoordinatorLifecycle:
 
         await self._async_apply_restore()
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
+
+    @callback
+    def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:
+        """A car was added, removed, enabled, disabled, got another charger or another priority: start again with the new list.
+
+        The signal also comes for every state change of a car's entry (loading, reloading), so the chargers of the cars
+        with a lower priority are compared with the ones this start used; only a real difference reloads, and only once.
+        A reload changes nothing in the options of the other cars, so the cars never reload each other in turn.
+        """
+        if entry.domain != DOMAIN or entry.entry_id == self.entry.entry_id or self._chargers_reload_scheduled:
+            return
+        if self._lower_priority_chargers() == self.lower_priority_chargers:
+            return
+        self._chargers_reload_scheduled = True
+        _LOGGER.info("The chargers of the cars with a lower priority changed, reloading %s to leave out their consumption", self.entry.title)
+        self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 
     async def _async_apply_restore(self) -> None:
         """Databases and settings of a backup imported or chosen in the config flow (management/backup.py)."""

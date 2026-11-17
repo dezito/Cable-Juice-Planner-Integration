@@ -272,7 +272,7 @@ class CJPSite:
         """What the car draws now per grid phase (from its charger power sensor)."""
         charger = coordinator.config["charger"]
         voltage = float(charger["power_voltage"]) or 230.0
-        watt = self._amps(charger["entity_ids"]["power_consumtion_entity_id"], 1.0) or 0.0
+        watt = self._amps(charger["entity_ids"]["charger_power_entity_id"], 1.0) or 0.0
         request = self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0]
         phases = sum(1 for value in request if value > 0) or int(charger["charging_phases"])
         per_phase = watt / voltage / phases
@@ -407,7 +407,7 @@ class CJPSite:
 
         end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
         start = end - datetime.timedelta(days=FORECAST_DAYS)
-        chargers = {e: c.config["charger"]["entity_ids"]["power_consumtion_entity_id"] for e, c in self.members.items()}
+        chargers = {e: c.config["charger"]["entity_ids"]["charger_power_entity_id"] for e, c in self.members.items()}
         ids = {*self.phase_entities, *(c for c in chargers.values() if c)}
         try:
             stats = await get_instance(self.hass).async_add_executor_job(statistics_during_period, self.hass, start, end, ids, "hour", None, {"mean"})

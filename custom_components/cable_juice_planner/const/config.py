@@ -25,7 +25,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "charger": {
         "entity_ids": {
             "status_entity_id": "",
-            "power_consumtion_entity_id": "",
+            "charger_power_entity_id": "",
             "kwh_meter_entity_id": "",
             "lifetime_kwh_meter_entity_id": "",
             "enabled_entity_id": "",
@@ -98,6 +98,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "power_consumption_entity_id_include_powerwall_charging": False,
         "power_consumption_entity_id_include_powerwall_discharging": False,
         "invert_powerwall_watt_flow_entity_id": False,
+        # also leave out the power of the chargers of the other cars (found at start, see utils/chargers.py)
+        "ignore_cjp_chargers": True,
     },
     "language": "da",
     "notification": {
@@ -156,6 +158,8 @@ CONFIG_KEYS_RENAMING = {
     "ev_car.daily_drive_distance": "ev_car.typical_daily_distance_non_working_day",
     "charger.entity_ids.dynamic_circuit_limit": "charger.entity_ids.dynamic_circuit_limit_entity_id",
     "prices.entity_ids.power_prices_entity_id": "prices.entity_ids.energidataservice_buy_entity_id",
+    # the PyScript key of the charger power sensor was misspelled
+    "charger.entity_ids.power_consumtion_entity_id": "charger.entity_ids.charger_power_entity_id",
 }
 
 # Config flow option key -> path in DEFAULT_CONFIG
@@ -163,7 +167,7 @@ OPTION_PATHS: dict[str, str] = {
     "language": "language",
     # charger
     "status_entity_id": "charger.entity_ids.status_entity_id",
-    "power_consumtion_entity_id": "charger.entity_ids.power_consumtion_entity_id",
+    "charger_power_entity_id": "charger.entity_ids.charger_power_entity_id",
     "kwh_meter_entity_id": "charger.entity_ids.kwh_meter_entity_id",
     "lifetime_kwh_meter_entity_id": "charger.entity_ids.lifetime_kwh_meter_entity_id",
     "enabled_entity_id": "charger.entity_ids.enabled_entity_id",
@@ -191,6 +195,7 @@ OPTION_PATHS: dict[str, str] = {
     "power_consumption_entity_id_include_powerwall_charging": "home.power_consumption_entity_id_include_powerwall_charging",
     "power_consumption_entity_id_include_powerwall_discharging": "home.power_consumption_entity_id_include_powerwall_discharging",
     "ignore_consumption_from_entity_ids": "home.entity_ids.ignore_consumption_from_entity_ids",
+    "ignore_cjp_chargers": "home.ignore_cjp_chargers",
     "powerwall_watt_flow_entity_id": "home.entity_ids.powerwall_watt_flow_entity_id",
     "invert_powerwall_watt_flow_entity_id": "home.invert_powerwall_watt_flow_entity_id",
     "powerwall_battery_level_entity_id": "home.entity_ids.powerwall_battery_level_entity_id",
@@ -253,7 +258,7 @@ FLOW_STEPS: dict[str, list[str]] = {
     "general": ["language", "dashboard_icon"],
     "charger": [
         "status_entity_id",
-        "power_consumtion_entity_id",
+        "charger_power_entity_id",
         "kwh_meter_entity_id",
         "lifetime_kwh_meter_entity_id",
         "enabled_entity_id",
@@ -280,6 +285,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "power_consumption_entity_id_include_powerwall_charging",
         "power_consumption_entity_id_include_powerwall_discharging",
         "ignore_consumption_from_entity_ids",
+        "ignore_cjp_chargers",
     ],
     "powerwall": [
         "powerwall_watt_flow_entity_id",
@@ -367,6 +373,24 @@ def strip_removed_options(options: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in options.items() if key not in REMOVED_OPTION_KEYS}
 
 
+# Options that were renamed (old name -> new name); old backups and not yet migrated entries still use the old name
+RENAMED_OPTION_KEYS = {"power_consumtion_entity_id": "charger_power_entity_id"}
+
+
+def upgrade_options(options: dict[str, Any]) -> dict[str, Any]:
+    """Stored options (an entry, a backup) in the current form: removed options dropped, renamed ones under the new name.
+
+    If both names are there, the new one wins, unless it is empty (the form defaults are an empty string).
+    """
+    upgraded = strip_removed_options(options)
+    for old, new in RENAMED_OPTION_KEYS.items():
+        if old in upgraded:
+            value = upgraded.pop(old)
+            if upgraded.get(new) in (None, ""):
+                upgraded[new] = value
+    return upgraded
+
+
 def build_config(options: dict[str, Any]) -> dict[str, Any]:
     """Build the nested CONFIG dict from flat config entry options."""
     config = deepcopy(DEFAULT_CONFIG)
@@ -378,7 +402,7 @@ def build_config(options: dict[str, Any]) -> dict[str, Any]:
 
 def is_charger_configured(config: dict) -> bool:
     ids = config["charger"]["entity_ids"]
-    return bool(ids["kwh_meter_entity_id"] and ids["lifetime_kwh_meter_entity_id"] and ids["power_consumtion_entity_id"] and ids["status_entity_id"])
+    return bool(ids["kwh_meter_entity_id"] and ids["lifetime_kwh_meter_entity_id"] and ids["charger_power_entity_id"] and ids["status_entity_id"])
 
 
 def is_solar_configured(config: dict) -> bool:

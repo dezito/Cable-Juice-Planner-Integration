@@ -19,7 +19,7 @@
         "description": "De sensorer Cable Juice Planner læser fra din lader. Status, effekt og de to kWh-målere er påkrævet.",
         "data": {
           "status_entity_id": "Ladestatus",
-          "power_consumtion_entity_id": "Ladeeffekt",
+          "charger_power_entity_id": "Ladeeffekt",
           "kwh_meter_entity_id": "kWh-måler",
           "lifetime_kwh_meter_entity_id": "Livstids-kWh-måler",
           "enabled_entity_id": "Lader aktiveret",
@@ -28,7 +28,7 @@
         },
         "data_description": {
           "status_entity_id": "Ladestatus (Understøttede tilstande: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Ladeeffekt i watt",
+          "charger_power_entity_id": "Ladeeffekt i watt",
           "kwh_meter_entity_id": "Brug Riemann-sum integral-sensor (integrationsmetode: Venstre Riemann-sum), hvis laderens kWh-måler er langsom (fx Easee); ellers brug laderens livstids-kWh-måler",
           "lifetime_kwh_meter_entity_id": "Alternativ til kwh_meter_entity_id, hvis du ikke vil bruge laderens livstids-kWh-måler",
           "enabled_entity_id": "Valgfri: kontakt/sensor der viser om laderen er tændt (on/off). Er laderen slukket, sættes attributten charger_enabled på action-sensoren.",
@@ -107,18 +107,20 @@
       },
       "home": {
         "title": "Husets forbrug",
-        "description": "Bruges til at beregne soloverskuddet der kan lades med.",
+        "description": "Bruges til at beregne soloverskuddet der kan lades med.\n\nLadere til biler med lavere prioritet fundet: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "power_consumption_entity_id_include_powerwall_charging": "Indeholder husbatteriets opladning",
           "power_consumption_entity_id_include_powerwall_discharging": "Indeholder husbatteriets afladning",
-          "ignore_consumption_from_entity_ids": "Ignorer forbrug fra"
+          "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "power_consumption_entity_id_include_powerwall_charging": "Hjemmets forbrug inkl. husbatteri-opladning (watt-entitet)",
           "power_consumption_entity_id_include_powerwall_discharging": "Hjemmets forbrug inkl. husbatteri-afladning (watt-entitet)",
-          "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres"
+          "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
       "powerwall": {
@@ -425,7 +427,7 @@
         "description": "De sensorer Cable Juice Planner læser fra din lader. Status, effekt og de to kWh-målere er påkrævet.",
         "data": {
           "status_entity_id": "Ladestatus",
-          "power_consumtion_entity_id": "Ladeeffekt",
+          "charger_power_entity_id": "Ladeeffekt",
           "kwh_meter_entity_id": "kWh-måler",
           "lifetime_kwh_meter_entity_id": "Livstids-kWh-måler",
           "enabled_entity_id": "Lader aktiveret",
@@ -434,7 +436,7 @@
         },
         "data_description": {
           "status_entity_id": "Ladestatus (Understøttede tilstande: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Ladeeffekt i watt",
+          "charger_power_entity_id": "Ladeeffekt i watt",
           "kwh_meter_entity_id": "Brug Riemann-sum integral-sensor (integrationsmetode: Venstre Riemann-sum), hvis laderens kWh-måler er langsom (fx Easee); ellers brug laderens livstids-kWh-måler",
           "lifetime_kwh_meter_entity_id": "Alternativ til kwh_meter_entity_id, hvis du ikke vil bruge laderens livstids-kWh-måler",
           "enabled_entity_id": "Valgfri: kontakt/sensor der viser om laderen er tændt (on/off). Er laderen slukket, sættes attributten charger_enabled på action-sensoren.",
@@ -513,18 +515,20 @@
       },
       "home": {
         "title": "Husets forbrug",
-        "description": "Bruges til at beregne soloverskuddet der kan lades med.",
+        "description": "Bruges til at beregne soloverskuddet der kan lades med.\n\nLadere til biler med lavere prioritet fundet: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "power_consumption_entity_id_include_powerwall_charging": "Indeholder husbatteriets opladning",
           "power_consumption_entity_id_include_powerwall_discharging": "Indeholder husbatteriets afladning",
-          "ignore_consumption_from_entity_ids": "Ignorer forbrug fra"
+          "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "power_consumption_entity_id_include_powerwall_charging": "Hjemmets forbrug inkl. husbatteri-opladning (watt-entitet)",
           "power_consumption_entity_id_include_powerwall_discharging": "Hjemmets forbrug inkl. husbatteri-afladning (watt-entitet)",
-          "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres"
+          "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
       "powerwall": {

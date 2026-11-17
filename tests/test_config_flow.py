@@ -169,6 +169,8 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"import_source": "ev"})
     assert result["step_id"] == "charger"
     assert form_defaults(result)["status_entity_id"] == "sensor.ev_charger_status"
+    # the PyScript file still has the old, misspelled key of the charger power sensor
+    assert form_defaults(result)["charger_power_entity_id"] == "sensor.ev_charger_power"
 
     result = await _submit_defaults_until(hass, result, None)
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -182,6 +184,8 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     assert options["language"] == "da"
     # the removed testing mode in the legacy file (testing_mode: true) is ignored, not imported
     assert "testing_mode" not in options
+    assert options["charger_power_entity_id"] == "sensor.ev_charger_power"
+    assert "power_consumtion_entity_id" not in options
 
 
 def test_removed_testing_mode_is_ignored() -> None:

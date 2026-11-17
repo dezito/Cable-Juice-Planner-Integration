@@ -61,7 +61,7 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
         coordinator.engine, "is_solar_configured", return_value=True
     ), patch.dict(coordinator.config["solar"]["entity_ids"], {"production_entity_id": "sensor.solar"}), patch.dict(
         coordinator.config["home"]["entity_ids"], {"power_consumption_entity_id": "sensor.house"}
-    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"power_consumtion_entity_id": "sensor.charger"}), patch.object(
+    ), patch.dict(coordinator.config["charger"]["entity_ids"], {"charger_power_entity_id": "sensor.charger"}), patch.object(
         provider, "sell_price_entity_ids", return_value=["sensor.sell_first", "sensor.sell"]
     ):
         data: dict = {}

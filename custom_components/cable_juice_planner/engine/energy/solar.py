@@ -272,7 +272,7 @@ class EnergySolar:
         try:
             now = self.now()
             past = now - datetime.timedelta(minutes=60)
-            ev_watt = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], past, now, convert_to="W", error_state=0.0))), 3)
+            ev_watt = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["charger_power_entity_id"], past, now, convert_to="W", error_state=0.0))), 3)
             solar_watt = round(max(self.local_energy_available(period=60, without_all_exclusion=True, solar_only=True), 0.0), 3)
             if not ev_watt:
                 return
@@ -318,7 +318,7 @@ class EnergySolar:
             minutes = self.now().minute if period is None else period
             now = self.now()
             past = now - datetime.timedelta(minutes=minutes)
-            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], past, now, convert_to="W", error_state=0.0))) / 1000.0, 3)
+            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["charger_power_entity_id"], past, now, convert_to="W", error_state=0.0))) / 1000.0, 3)
             solar_kwh_available = round(max(self.local_energy_available(period=minutes, without_all_exclusion=True, solar_only=True), 0.0) / 1000.0, 3)
             ev_solar_kwh = round(solar_kwh_available, 3)
             ev_grid_kwh = round(max(ev_kwh - solar_kwh_available, 0.0), 3)
@@ -454,7 +454,7 @@ class EnergySolar:
         if ev_kwh is None:
             now = self.now()
             past = now - datetime.timedelta(minutes=minutes)
-            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["power_consumtion_entity_id"], past, now, convert_to="kW", error_state=0.0))) * hours, 3)
+            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["charger_power_entity_id"], past, now, convert_to="kW", error_state=0.0))) * hours, 3)
         ev_watt = ev_kwh * 1000.0 / hours  # the EV's average power over the period
         _available, watts_from_local_energy, solar_watts, powerwall_watts = self.local_energy_available(
             period=minutes, include_local_energy_distribution=True, without_all_exclusion=True

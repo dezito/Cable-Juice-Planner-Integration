@@ -37,7 +37,7 @@ PRICE = "sensor.energi_data_service"
 
 CHARGER_OPTIONS: dict[str, Any] = {
     "status_entity_id": CHARGER_STATUS,
-    "power_consumtion_entity_id": CHARGER_POWER,
+    "charger_power_entity_id": CHARGER_POWER,
     "kwh_meter_entity_id": CHARGER_KWH,
     "lifetime_kwh_meter_entity_id": CHARGER_LIFETIME_KWH,
     "power_voltage": 230.0,

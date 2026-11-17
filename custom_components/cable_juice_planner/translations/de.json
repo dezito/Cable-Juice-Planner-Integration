@@ -19,7 +19,7 @@
         "description": "Die Sensoren, die Cable Juice Planner vom Ladegerät liest. Status, Leistung und die beiden kWh-Zähler sind erforderlich.",
         "data": {
           "status_entity_id": "Ladestatus",
-          "power_consumtion_entity_id": "Ladeleistung",
+          "charger_power_entity_id": "Ladeleistung",
           "kwh_meter_entity_id": "kWh-Zähler",
           "lifetime_kwh_meter_entity_id": "Gesamt-kWh-Zähler",
           "enabled_entity_id": "Ladegerät aktiviert",
@@ -28,7 +28,7 @@
         },
         "data_description": {
           "status_entity_id": "Ladezustand (Unterstützte Zustände: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Ladeleistung in Watt",
+          "charger_power_entity_id": "Ladeleistung in Watt",
           "kwh_meter_entity_id": "Riemann-Summen-Integralsensor verwenden (Methode: linke Riemann-Summe), wenn der kWh-Zähler des Laders träge ist (z. B. Easee); sonst Lebensdauer-kWh-Zähler des Laders nutzen",
           "lifetime_kwh_meter_entity_id": "Alternative zu kwh_meter_entity_id, wenn der Lebensdauer-kWh-Zähler nicht genutzt werden soll",
           "enabled_entity_id": "Optional: Schalter/Sensor, der anzeigt, ob das Ladegerät an ist (on/off). Ist es aus, bittet das Attribut charger_enabled des Aktionssensors um Einschalten.",
@@ -107,18 +107,20 @@
       },
       "home": {
         "title": "Hausverbrauch",
-        "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.",
+        "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.\n\nGefundene Ladegeräte von Autos mit niedrigerer Priorität: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
           "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
-          "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von"
+          "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
           "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
-          "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden"
+          "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
       "powerwall": {
@@ -425,7 +427,7 @@
         "description": "Die Sensoren, die Cable Juice Planner vom Ladegerät liest. Status, Leistung und die beiden kWh-Zähler sind erforderlich.",
         "data": {
           "status_entity_id": "Ladestatus",
-          "power_consumtion_entity_id": "Ladeleistung",
+          "charger_power_entity_id": "Ladeleistung",
           "kwh_meter_entity_id": "kWh-Zähler",
           "lifetime_kwh_meter_entity_id": "Gesamt-kWh-Zähler",
           "enabled_entity_id": "Ladegerät aktiviert",
@@ -434,7 +436,7 @@
         },
         "data_description": {
           "status_entity_id": "Ladezustand (Unterstützte Zustände: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
-          "power_consumtion_entity_id": "Ladeleistung in Watt",
+          "charger_power_entity_id": "Ladeleistung in Watt",
           "kwh_meter_entity_id": "Riemann-Summen-Integralsensor verwenden (Methode: linke Riemann-Summe), wenn der kWh-Zähler des Laders träge ist (z. B. Easee); sonst Lebensdauer-kWh-Zähler des Laders nutzen",
           "lifetime_kwh_meter_entity_id": "Alternative zu kwh_meter_entity_id, wenn der Lebensdauer-kWh-Zähler nicht genutzt werden soll",
           "enabled_entity_id": "Optional: Schalter/Sensor, der anzeigt, ob das Ladegerät an ist (on/off). Ist es aus, bittet das Attribut charger_enabled des Aktionssensors um Einschalten.",
@@ -513,18 +515,20 @@
       },
       "home": {
         "title": "Hausverbrauch",
-        "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.",
+        "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.\n\nGefundene Ladegeräte von Autos mit niedrigerer Priorität: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
           "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
-          "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von"
+          "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
           "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
-          "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden"
+          "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
       "powerwall": {

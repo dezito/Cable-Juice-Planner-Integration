@@ -34,7 +34,7 @@ class CoordinatorData:
         states: dict[str, str] = {}
         attributes: dict[str, dict] = {}
         units: dict[str, str | None] = {}
-        for entity_id in self.configured_entities:
+        for entity_id in self.snapshot_entities:
             state = self.hass.states.get(entity_id)
             if state is None:
                 continue

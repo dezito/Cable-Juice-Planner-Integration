@@ -184,7 +184,7 @@ class ControlSchedule:
         # a stop "in the future" after the clock went back an hour doesn't count)
         if self.charger_stopped_at is not None and past < self.charger_stopped_at <= now:
             return False
-        entity_id = self.config["charger"]["entity_ids"]["power_consumtion_entity_id"]
+        entity_id = self.config["charger"]["entity_ids"]["charger_power_entity_id"]
         power = abs(float(self.get_state(entity_id, float_type=True, error_state=0.0)))
         power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3)
         trigger_count = 3

@@ -72,6 +72,10 @@ def build_snapshot(item: dict[str, Any]) -> Snapshot:
 def build_engine(export: dict[str, Any]) -> CJPEngine:
     """Engine with the exported configuration and runtime state."""
     config = export["config"]
+    # an export from before the charger power option was renamed
+    charger_ids = (config.get("charger") or {}).get("entity_ids") or {}
+    if "power_consumtion_entity_id" in charger_ids:
+        charger_ids.setdefault("charger_power_entity_id", charger_ids.pop("power_consumtion_entity_id"))
     engine = CJPEngine(config, export["prefix"], load_texts(config.get("language") or "en"))
     for key, value in (export.get("engine") or {}).items():
         if key in _REBUILT or not hasattr(engine, key):

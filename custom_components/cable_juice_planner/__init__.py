@@ -31,7 +31,7 @@ from .const import (
     SERVICE_IMPORT_DATA,
 )
 from .coordinator import CJPCoordinator
-from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix, strip_removed_options
+from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix, strip_removed_options, upgrade_options
 from .management.blueprint_install import async_install_blueprints
 from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
 from .management.dashboard_cards import async_dismiss_card_notification
@@ -226,7 +226,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _async_migrate_last_full_charge(hass, entry)
     if entry.version == 2 and entry.minor_version < 4:
         _async_migrate_removed_testing_mode(hass, entry)
+    if entry.version == 2 and entry.minor_version < 5:
+        _async_migrate_renamed_charger_power(hass, entry)
     return True
+
+
+@callback
+def _async_migrate_renamed_charger_power(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Version 2.5: the option power_consumtion_entity_id (the charger's power sensor) is now charger_power_entity_id."""
+    hass.config_entries.async_update_entry(entry, options=upgrade_options(entry.options), minor_version=5)
+    _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2.5 (charger power option renamed)", entry.title)
 
 
 @callback

@@ -12,6 +12,7 @@ from homeassistant.helpers import selector
 
 from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, object_prefix
 from ..site import charger_devices, circuit_of, update_circuits
+from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
 from .schema import ENERGIDATASERVICE_URL, PRICE_PROVIDERS, build_schema, normalize_input, validate_step
 
 
@@ -88,8 +89,22 @@ class CJPFlowPages:
                 self.hass.config.currency,  # type: ignore[attr-defined]
             ),
             errors=errors,
-            description_placeholders={**self._placeholders(), "eds_url": ENERGIDATASERVICE_URL},
+            description_placeholders={
+                **self._placeholders(),
+                "eds_url": ENERGIDATASERVICE_URL,
+                # the chargers of the cars with a lower priority that are left out of the house consumption by themselves (the house page)
+                "cjp_chargers": self._other_chargers_text(),
+            },
         )
+
+    def _other_chargers_text(self) -> str:
+        chargers = lower_priority_charger_power_entities(
+            self.hass,  # type: ignore[attr-defined]
+            self._this_entry_id(),
+            charger_power_entity(self._options) or None,
+            site_priority(self._options),
+        )
+        return ", ".join(chargers) or "–"
 
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
