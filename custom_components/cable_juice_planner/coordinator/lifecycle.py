@@ -23,7 +23,9 @@ from homeassistant.util import dt as dt_util
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
 from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
 from ..engine import CJPEngine
+from ..management.dependency_checks import DependencyWatcher, stromligning_entities_to_watch
 from ..utils.formatting import load_texts
+from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none
 from ..management.storage import load_legacy_databases
 
@@ -56,6 +58,7 @@ class CoordinatorLifecycle:
         self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
         if self.config["home"]["ignore_cjp_chargers"]:
             self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
+        self._start_dependency_checks()
 
         ent_reg = er.async_get(self.hass)
         dev_reg = dr.async_get(self.hass)
@@ -69,6 +72,14 @@ class CoordinatorLifecycle:
 
         await self._async_apply_restore()
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
+
+    def _start_dependency_checks(self) -> None:
+        """Repairs for Strømligning and Solcast sensors this car needs but that are disabled or not provided."""
+        stromligning = stromligning_entities_to_watch(self.config["prices"]["entity_ids"])
+        forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"] if self.solar_configured else ""
+        watcher = DependencyWatcher(self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7))
+        watcher.start()
+        self.entry.async_on_unload(watcher.stop)
 
     @callback
     def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:

@@ -157,7 +157,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.",
+        "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Købspris",
           "stromligning_buy_tomorrow_available": "Købspris i morgen",
@@ -177,7 +177,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffer ved salg",
-        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.",
+        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.\n\nTarif-sensorerne kan være deaktiveret i Strømligning, og så kan de ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*).\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Transporttarif",
           "stromligning_sell_electricity_tax": "Elafgift",
@@ -206,7 +206,7 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
           "forecast_entity_id": "Solprognose (Solcast)",
@@ -565,7 +565,7 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.",
+        "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
         "data": {
           "stromligning_buy_current_price": "Købspris",
           "stromligning_buy_tomorrow_available": "Købspris i morgen",
@@ -585,7 +585,7 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffer ved salg",
-        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.",
+        "description": "Ved salg fratrækkes tariffer og afgifter i prisen, derefter salgsgebyr samt net- og systemtarif. Lad et felt være tomt for at bruge 0.\n\nTarif-sensorerne kan være deaktiveret i Strømligning, og så kan de ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*).\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
         "data": {
           "stromligning_sell_distribution": "Transporttarif",
           "stromligning_sell_electricity_tax": "Elafgift",
@@ -614,7 +614,7 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
           "forecast_entity_id": "Solprognose (Solcast)",
@@ -1375,6 +1375,14 @@
           }
         }
       }
+    },
+    "stromligning_entities": {
+      "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) bruger Strømligning-sensorer, der er deaktiveret eller som Strømligning ikke leverer. En manglende salgstarif tæller som 0, hvilket gør den beregnede salgspris for høj, og uden pris-sensorerne bruges de gemte priser.\n\nDeaktiveret i Home Assistant (Strømligning deaktiverer som standard sine sensorer uden moms – aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** med *Vis deaktiverede entiteter*):\n{disabled}\n\nIkke leveret af Strømligning (f.eks. er prisprognoserne slået fra i dens indstillinger):\n{not_provided}\n\nDenne reparation forsvinder af sig selv, når sensorerne virker igen."
+    },
+    "solcast_entities": {
+      "title": "Solcast-prognosesensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) kan ikke bruge alle de Solcast-prognosesensorer, den skal bruge, så dagene uden en planlægges i stedet ud fra vejrudsigten og den gemte solhistorik. Solcast deaktiverer som standard prognosesensorerne fra dag 3 og frem.\n\nDeaktiveret i Home Assistant (aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** med *Vis deaktiverede entiteter*):\n{disabled}\n\nIkke navngivet som Cable Juice Planner forventer (entity-id'et skal ende på _today, _tomorrow eller _day_3 …):\n{renamed}\n\nUden timedetaljer (slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger):\n{no_detail}\n\nDenne reparation forsvinder af sig selv, når sensorerne er rettet."
     }
   }
 }
