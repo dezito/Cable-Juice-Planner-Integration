@@ -464,7 +464,8 @@ async def test_the_recorder_rows_are_read_as_numbers(monkeypatch) -> None:
 
     first = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
     second = first + datetime.timedelta(minutes=5)
-    states = {"sensor.a": [SimpleNamespace(state="12.5", last_updated=first), SimpleNamespace(state="unavailable", last_updated=second)]}
+    # the compressed form of the recorder: "s" is the state, "lu" the time it was updated as a timestamp
+    states = {"sensor.a": [{"s": "12.5", "lu": first.timestamp()}, {"s": "unavailable", "lu": second.timestamp()}]}
     asked: dict = {}
 
     class Instance:
@@ -483,6 +484,8 @@ async def test_the_recorder_rows_are_read_as_numbers(monkeypatch) -> None:
 
     assert rows == {"sensor.a": [(first.timestamp(), 12.5), (second.timestamp(), None)], "sensor.b": []}
     assert asked["include_start_time_state"] is True and asked["significant_changes_only"] is False and asked["no_attributes"] is True
+    # the cheap form of the rows, or a day of a sensor that reports every second takes too long to read
+    assert asked["minimal_response"] is True and asked["compressed_state_format"] is True
 
 
 async def test_no_recorder_a_timeout_or_an_error_is_unknown_and_never_raises(monkeypatch) -> None:
