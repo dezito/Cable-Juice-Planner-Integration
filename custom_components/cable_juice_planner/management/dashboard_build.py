@@ -42,6 +42,7 @@ from homeassistant.helpers.storage import Store
 
 from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, dashboard_icon, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
+from ..prices import price_dashboard_entities
 from .dashboard_cards import async_update_card_notification, async_watch_card_resources
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,10 +140,6 @@ def template_file(config: dict[str, Any]) -> Path:
     return TEMPLATE_DIR / "cable_juice_planner.yaml"
 
 
-def _derive(entity_id: str, old: str, new: str) -> str:
-    return entity_id.replace(old, new) if old in entity_id else ""
-
-
 def _car_base(config: dict[str, Any]) -> str:
     """'sensor.tesla_battery_level' -> 'tesla' (object id without the battery suffix)."""
     battery = config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"]
@@ -158,8 +155,6 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
     prices = config["prices"]["entity_ids"]
     charger = config["charger"]["entity_ids"]
     ev = config["ev_car"]["entity_ids"]
-    sl_buy = prices["stromligning_buy_current_price"]
-    sl_sell = prices["stromligning_sell_current_price"]
     mapping = {
         "sensor.bil_lader_status": charger["status_entity_id"],
         "sensor.bil_lader_power": charger["charger_power_entity_id"],
@@ -172,21 +167,8 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
         "device_tracker.mcqueen_location": ev["location_entity_id"],
         "climate.mcqueen_climate": ev["climate_entity_id"],
         "number.mcqueen_charge_limit": ev["charging_limit_entity_id"],
-        "sensor.energi_data_service": prices["energidataservice_buy_entity_id"],
-        "sensor.energi_data_service_salg": prices["energidataservice_sell_entity_id"],
-        "sensor.stromligning_current_price_vat": sl_buy,
-        "sensor.stromligning_forecasts_vat": prices["stromligning_buy_forecasts"],
-        "binary_sensor.stromligning_tomorrow_available_vat": prices["stromligning_buy_tomorrow_available"],
-        "sensor.stromligning_nettariff_vat": _derive(sl_buy, "current_price", "nettariff"),
-        "sensor.stromligning_systemtariff_vat": _derive(sl_buy, "current_price", "systemtariff"),
-        "sensor.stromligning_15min_spotprice_ex_vat": _derive(sl_sell, "current_price", "spotprice"),
-        "sensor.stromligning_15min_forecasts_ex_vat": prices["stromligning_sell_forecasts"],
-        "binary_sensor.stromligning_15min_tomorrow_available_ex_vat": prices["stromligning_sell_tomorrow_available"],
+        **price_dashboard_entities(prices),
     }
-    if sl_buy:
-        # one price chart: Strømligning is preferred, the Energi Data Service chart is removed
-        mapping["sensor.energi_data_service"] = ""
-        mapping["sensor.energi_data_service_salg"] = ""
     base = _car_base(config)
     for entity_id in _CAR_EXTRAS:
         mapping[entity_id] = entity_id.replace(_CAR, base, 1) if base else ""

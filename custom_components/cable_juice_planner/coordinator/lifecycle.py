@@ -23,7 +23,8 @@ from homeassistant.util import dt as dt_util
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
 from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
 from ..engine import CJPEngine
-from ..management.dependency_checks import DependencyWatcher, stromligning_entities_to_watch
+from ..management.dependency_checks import DependencyWatcher
+from ..prices import stromligning_entities_to_watch
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none

@@ -13,8 +13,13 @@ against the step in battery power. A sensor of the total load of the house does 
 is there anyway); a sensor derived from grid and solar steps up by the charging power and down by the discharging power.
 Because only the minutes around a switch-over are compared, a load that differs between the evening and the night, or an
 EV charging in the same hours, does not count, and a battery that sells to the grid does not look like a sensor that
-excludes the discharging. A switch-over takes about 25 minutes of unbroken history, but one is not enough: at least
-MIN_EDGES of the latest ones must agree (and nearly all of what is looked at), otherwise the setting stays unknown.
+excludes the discharging. A switch-over takes about 25 minutes of unbroken history, but one is not enough: the latest
+MIN_EDGES must all agree; if one does not, more are looked at (up to MAX_EDGES) and EDGE_AGREE of them must, otherwise
+the setting stays unknown. A step that is far bigger than the battery power (an EV that starts in the same minutes) or
+that goes the wrong way says nothing. Something else that switches with the battery and is about its size can still fake
+ONE direction, so the charging and the discharging must tell the same story - a total load (excludes charging, includes
+discharging) or a sensor from grid and solar (the opposite) - and both must be decided, otherwise nothing is (agree()). The consumers the engine leaves out of the house consumption (the ignored ones, the
+chargers of Cable Juice Planner) are subtracted first, the same way, when they are given.
 
 How far back it looks: the history is read a day at a time, newest first, for up to LOOKBACK_DAYS (the recorder may keep
 less), until everything is decided. The stretches and switch-overs used are the latest the history has that are clear,
@@ -56,8 +61,9 @@ STEADY = 0.3  # the two bins of a battery that flows may differ by this share of
 MIN_EDGES = 4  # switch-overs that must agree before an include setting is decided
 MAX_EDGES = 8  # the latest switch-overs looked at; if they do not agree it stays unknown
 EDGE_AGREE = 0.8  # share of the switch-overs looked at that must agree
-STEP_FOLLOWS = 0.6  # a step of at least this share of the battery power: the sensor follows the battery (grid and solar)
-STEP_FLAT = 0.25  # a step of at most this share: the sensor does not follow the battery (total load)
+STEP_FOLLOWS = 0.6  # a step of this share of the battery power (up to STEP_FOLLOWS_MAX): the sensor follows the battery (grid and solar)
+STEP_FOLLOWS_MAX = 1.4  # a bigger step is something else that switched at the same time (an EV, a load that follows the battery)
+STEP_FLAT = 0.25  # a step of at most this share either way: the sensor does not follow the battery (total load)
 NO_EXPORT = 0.8  # a load that covers the battery is at least this share of its power; below that the battery sells to the grid
 SHOWN_FROM_HOURS = 6  # how far back an answer reaches before the page says so
 LOAD_TIMEOUT = 10  # seconds for one read of the recorder
@@ -106,11 +112,20 @@ def _grid(rows: Rows, start: float, minutes: int) -> list[float | None]:
     return values
 
 
-def _bins(consumption: Rows, power: Rows, level: Rows, end: float, hours: int) -> Bins:
-    """(consumption W, battery power W, battery level %) per 5 minutes, None where one of the three is not known."""
+def _bins(consumption: Rows, power: Rows, level: Rows, end: float, hours: int, ignored: list[Rows] | None = None) -> Bins:
+    """(consumption W, battery power W, battery level %) per 5 minutes, None where one of the three is not known.
+
+    The ignored consumers are subtracted from the consumption the way the engine does it (their sum, a missing one 0 W).
+    """
     minutes = hours * 60
     start = end - minutes * 60
     grids = [_grid(rows, start, minutes) for rows in (consumption, power, level)]
+    if ignored:
+        left_out = [_grid(rows, start, minutes) for rows in ignored]
+        grids[0] = [
+            None if value is None else value - abs(sum(grid[minute] or 0.0 for grid in left_out))
+            for minute, value in enumerate(grids[0])
+        ]
     per_bin = BIN_SECONDS // 60
     result: list[tuple[float, float, float] | None] = []
     for first in range(0, minutes - per_bin + 1, per_bin):
@@ -184,7 +199,7 @@ def decide_invert(bins: Bins, limit: int | None = None) -> Verdict:
                 continue
             found = _invert(bins[first:end])
             if found.value is not None:
-                return Verdict(found.value, hours, found.numbers, (total - end) * BIN_SECONDS / 3600)
+                return Verdict(found.value, hours, found.numbers, (total - first) * BIN_SECONDS / 3600)  # how far back it reaches
             if not _has_numbers(verdict):
                 verdict = Verdict(None, None, found.numbers)
     return verdict
@@ -256,14 +271,14 @@ def _says_included(edge: _Edge, charging: bool) -> bool | None:
     # a sensor from grid and solar steps up by the charging power and down by the discharging power; the total load does not step
     step = edge.step if charging else -edge.step
     covered = edge.c_active >= NO_EXPORT * edge.flow
-    if step >= STEP_FOLLOWS:
+    if STEP_FOLLOWS <= step <= STEP_FOLLOWS_MAX:
         # follows the battery: includes the charging (then it is never below the charging power), excludes the discharging
         return (True if covered else None) if charging else False
-    if step <= STEP_FLAT:
+    if abs(step) <= STEP_FLAT:
         # does not follow it: excludes the charging, includes the discharging - unless the battery sells to the grid or the
         # load follows the battery (a sensor from grid and solar then also stays flat), which a load below the battery power shows
         return False if charging else (True if covered else None)
-    return None
+    return None  # a step that is neither: something else switched at the same moment (it says nothing)
 
 
 def decide_include(bins: Bins, positive_is_charging: bool | None, charging: bool) -> Verdict:
@@ -290,8 +305,24 @@ def decide_include(bins: Bins, positive_is_charging: bool | None, charging: bool
     for count in range(MIN_EDGES, len(edges) + 1):
         for value in (True, False):
             if sum(1 for item in says[:count] if item is value) >= EDGE_AGREE * count:
-                return Verdict(value, count, shown(edges[:count]), (len(bins) - edges[count - 1].first) * BIN_SECONDS / 3600)
+                # the numbers and the count are those of the switch-overs that agree; the oldest of them says how far back it reaches
+                used = [edge for edge, item in zip(edges[:count], says[:count]) if item is value]
+                return Verdict(value, len(used), shown(used), (len(bins) - used[-1].first) * BIN_SECONDS / 3600)
     return Verdict(None, None, shown(edges))
+
+
+def agree(charging: Verdict, discharging: Verdict) -> tuple[Verdict, Verdict]:
+    """The two include settings must tell the same story, otherwise neither is decided.
+
+    A sensor of the total load of the house excludes the charging and includes the discharging; a sensor from grid and solar
+    includes the charging and excludes the discharging. Something else that switches in the same minutes as the battery
+    (a heat pump, an EV with the battery's own size) can fake one direction, but it does not fake both in the way of the
+    other kind of sensor, and a direction that is not decided at all cannot be checked against the other. So both must be
+    decided and be one of the two pairs; anything else is unknown (the current values are kept).
+    """
+    if charging.value is not None and discharging.value is not None and charging.value is not discharging.value:
+        return charging, discharging
+    return Verdict(None, None, charging.numbers), Verdict(None, None, discharging.numbers)
 
 
 def decide(bins: Bins, trusted_positive_is_charging: bool | None = None) -> Detection:
@@ -303,7 +334,7 @@ def decide(bins: Bins, trusted_positive_is_charging: bool | None = None) -> Dete
     """
     invert = decide_invert(bins)
     sign = invert.value if invert.value is not None else trusted_positive_is_charging
-    return Detection(invert, decide_include(bins, sign, True), decide_include(bins, sign, False))
+    return Detection(invert, *agree(decide_include(bins, sign, True), decide_include(bins, sign, False)))
 
 
 def detect(
@@ -313,9 +344,10 @@ def detect(
     end: float,
     trusted_positive_is_charging: bool | None = None,
     hours: int = 3,
+    ignored: list[Rows] | None = None,
 ) -> Detection:
     """The three verdicts from series in W and %, covering the hours before the timestamp end (UTC seconds)."""
-    return decide(_bins(consumption, power, level, end, hours), trusted_positive_is_charging)
+    return decide(_bins(consumption, power, level, end, hours, ignored), trusted_positive_is_charging)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -364,19 +396,25 @@ def _factor(hass: HomeAssistant, entity_id: str) -> float | None:
 def _read_day(
     loaded: dict[str, Rows],
     entities: list[str],
-    factors: tuple[float, float],
+    factors: list[float | None],
     chunk_end: float,
     bins: Bins,
     invert: Verdict,
     day: int,
 ) -> tuple[Bins, Verdict, Verdict | None, Verdict | None]:
-    """Add a day of rows (older than the bins so far) and decide what can be decided; the include verdicts when the sign is known."""
-    consumption, power, level = (loaded[entity_id] for entity_id in entities)
-    scaled = [
-        [(stamp, value * factor if value is not None else None) for stamp, value in rows]
-        for rows, factor in ((consumption, factors[0]), (power, factors[1]))
-    ]
-    new_bins = _bins(scaled[0], scaled[1], list(level), chunk_end, CHUNK_HOURS)
+    """Add a day of rows (older than the bins so far) and decide what can be decided; the include verdicts when the sign is known.
+
+    entities: consumption, battery power, battery level, then the consumers that are left out; factors: the unit of every
+    one of them but the level, as a factor to W.
+    """
+    level = loaded[entities[2]]
+    scaled = {
+        entity_id: [(stamp, value * factor if value is not None else None) for stamp, value in loaded[entity_id]]
+        for entity_id, factor in zip([entities[0], entities[1], *entities[3:]], factors)
+        if factor is not None
+    }
+    left_out = [scaled[entity_id] for entity_id in entities[3:]]
+    new_bins = _bins(scaled[entities[0]], scaled[entities[1]], list(level), chunk_end, CHUNK_HOURS, left_out)
     bins = new_bins + bins
     if invert.value is None:
         invert = _merge(invert, decide_invert(bins, len(new_bins) if day else None))
@@ -393,18 +431,24 @@ async def async_detect(
     level_entity: str,
     trusted_positive_is_charging: bool | None = None,
     now: datetime.datetime | None = None,
+    ignored_entities: list[str] | tuple[str, ...] = (),
 ) -> Detection:
     """Look at the history of the three sensors, a day at a time from now backwards, until every setting is decided.
+
+    ignored_entities are the consumers the engine leaves out of the house consumption (the ignored ones and the
+    chargers of Cable Juice Planner): their history is subtracted first. One that has no state is left out, like the
+    engine does (0 W).
 
     Never raises: no recorder, a timeout, an unknown unit or too little data is 'unknown'. Reading stops at LOOKBACK_DAYS,
     at the end of the history the recorder has, or when TOTAL_TIMEOUT has passed (what was read by then is used).
     """
     if not (consumption_entity and power_entity and level_entity):
         return Detection(reason="entities")
-    consumption_factor, power_factor = _factor(hass, consumption_entity), _factor(hass, power_entity)
-    if consumption_factor is None or power_factor is None:
+    left_out = [entity_id for entity_id in dict.fromkeys(ignored_entities) if entity_id and hass.states.get(entity_id) is not None]
+    factors = [_factor(hass, entity_id) for entity_id in (consumption_entity, power_entity, *left_out)]
+    if None in factors:
         return Detection(reason="unit")  # a power in an unknown unit would be compared in the wrong size
-    entities = [consumption_entity, power_entity, level_entity]
+    entities = [consumption_entity, power_entity, level_entity, *left_out]
     end = now or datetime.datetime.now(datetime.timezone.utc)
     loop = asyncio.get_running_loop()
     deadline = loop.time() + TOTAL_TIMEOUT
@@ -428,18 +472,18 @@ async def async_detect(
             break
         if loaded is None:
             return Detection(reason="recorder")
-        if not any(loaded[entity_id] for entity_id in entities):
+        if not any(loaded[entity_id] for entity_id in entities[:3]):
             break  # nothing older is kept
         try:
             # the arithmetic of a day of history is done outside the event loop
             bins, invert, charging, discharging = await asyncio.to_thread(
-                _read_day, loaded, entities, (consumption_factor, power_factor), chunk_end.timestamp(), bins, invert, day
+                _read_day, loaded, entities, factors, chunk_end.timestamp(), bins, invert, day
             )
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Could not read the history for the suggestions: %s", err)
             return Detection(reason="error")
         if charging is not None and discharging is not None and charging.value is not None and discharging.value is not None:
-            return Detection(invert, charging, discharging)
+            return Detection(invert, *agree(charging, discharging))  # both decided: what is found further back cannot change it
         if loop.time() >= deadline:
             break
         await asyncio.sleep(0)  # let the event loop breathe between days
@@ -447,7 +491,7 @@ async def async_detect(
     # the history decided no sign (or not all the settings): the sign of the setting as it is now stands in for it
     sign = invert.value if invert.value is not None else trusted_positive_is_charging
     try:
-        found = await asyncio.to_thread(lambda: Detection(invert, decide_include(bins, sign, True), decide_include(bins, sign, False)))
+        found = await asyncio.to_thread(lambda: Detection(invert, *agree(decide_include(bins, sign, True), decide_include(bins, sign, False))))
     except Exception as err:  # noqa: BLE001
         _LOGGER.debug("Could not read the history for the suggestions: %s", err)
         return Detection(reason="error")

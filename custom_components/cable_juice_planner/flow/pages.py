@@ -12,7 +12,8 @@ from homeassistant.helpers import selector
 
 from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, object_prefix
 from ..site import charger_devices, circuit_of, update_circuits
-from ..management.dependency_checks import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, disabled_sensors
+from ..management.dependency_checks import disabled_sensors
+from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, has_stromligning_sell_prices
 from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
@@ -45,6 +46,7 @@ class CJPFlowPages:
         """The sensors in the options now are not 'changed': what was stored, restored or imported is not detected again."""
         self._baseline = self._detection_sensors()
         self._baseline_sign = bool(self._options.get("invert_powerwall_watt_flow_entity_id"))
+
     # chargers on the car's circuit from the load balancing page, saved in the site entry on finish
     _circuit: list[str] | None = None
 
@@ -66,7 +68,7 @@ class CJPFlowPages:
         if step == "prices_stromligning":
             return "stromligning" in self._providers
         if step == "prices_stromligning_tariffs":
-            return "stromligning" in self._providers and bool(self._options.get("stromligning_sell_current_price"))
+            return "stromligning" in self._providers and has_stromligning_sell_prices(self._options)
         if step in ("solar_charging", "weather"):
             return bool(self._options.get("production_entity_id"))
         if step == "detection_review":
@@ -144,19 +146,38 @@ class CJPFlowPages:
             self._options.update(normalize_input(keys, user_input))
         sensors = self._detection_sensors()
         changed = sensors != self._baseline
-        if all(sensors) and (user_input is not None or (changed and sensors not in self._detections)):
+        detection = self._detections.get(sensors)
+        if all(sensors) and (user_input is not None or (changed and detection is None)):
             # a sign set before is only trusted for the sensor it was set for
             trusted = self._baseline_sign if sensors[1] == self._baseline[1] and self._baseline[1] else None
-            detection = await async_detect(self.hass, sensors[0], sensors[1], sensors[2], trusted)  # type: ignore[attr-defined]
-            if detection.reason not in ("timeout", "error"):
+            detection = await async_detect(self.hass, sensors[0], sensors[1], sensors[2], trusted, None, self._left_out_consumers())  # type: ignore[attr-defined]
+            if detection.reason not in ("timeout", "error"):  # these are tried again at the next visit
                 self._detections[sensors] = detection
             self._options.update(verdict_values(detection))
         schema = build_schema(keys, self._options, None, self.hass.config.currency)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined]
             step_id="detection_review",
             data_schema=vol.Schema({**schema.schema, vol.Optional(REDETECT, default=False): BOOLEAN}),
-            description_placeholders={**self._placeholders(), **evidence_placeholders(self._detections.get(sensors))},
+            errors={"base": f"detection_{detection.reason}"} if detection and detection.reason else {},
+            description_placeholders={**self._placeholders(), **evidence_placeholders(detection)},
         )
+
+    def _left_out_consumers(self) -> list[str]:
+        """What the engine leaves out of the house consumption: the ignored ones, this car's charger and - only when the
+        option is on, as in the engine - the chargers of the cars behind this one (a higher priority number)."""
+        ignored = self._options.get("ignore_consumption_from_entity_ids") or []
+        own = charger_power_entity(self._options)
+        behind = (
+            lower_priority_charger_power_entities(
+                self.hass,  # type: ignore[attr-defined]
+                self._this_entry_id(),
+                own or None,
+                site_priority(self._options),
+            )
+            if self._options.get("ignore_cjp_chargers", True)
+            else []
+        )
+        return [*([ignored] if isinstance(ignored, str) else ignored), *([own] if own else []), *behind]
 
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

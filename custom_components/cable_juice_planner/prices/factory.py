@@ -23,3 +23,15 @@ def create_price_provider(config: dict) -> CombinedPriceProvider:
     if not providers:
         raise ValueError("No supported price provider configured")
     return CombinedPriceProvider(config, providers)
+
+
+FLOW_PROVIDER_ORDER = ("energidataservice", "stromligning")
+
+
+def providers_from_options(options: dict) -> list[str]:
+    """The providers the flat options of a config entry have a buy sensor for (flow time, no provider exists yet).
+
+    Energi Data Service when there is none, as the first page of the flow suggests.
+    """
+    found = [name for name in FLOW_PROVIDER_ORDER if options.get(PROVIDER_CLASSES[name].buy_key)]
+    return found or ["energidataservice"]

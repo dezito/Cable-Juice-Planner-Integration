@@ -326,15 +326,6 @@ def options_from_legacy(legacy: dict[str, Any]) -> tuple[dict[str, Any], dict[st
     return options, settings
 
 
-def providers_from_options(options: dict[str, Any]) -> list[str]:
-    providers = []
-    if options.get("energidataservice_buy_entity_id"):
-        providers.append("energidataservice")
-    if options.get("stromligning_buy_current_price"):
-        providers.append("stromligning")
-    return providers or ["energidataservice"]
-
-
 SITE_SELECTORS: dict[str, Any] = {
     "fuse_l1": _number(6, 400, 1, "A"),
     "fuse_l2": _number(6, 400, 1, "A"),

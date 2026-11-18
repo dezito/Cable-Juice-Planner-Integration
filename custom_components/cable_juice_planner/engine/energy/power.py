@@ -23,15 +23,59 @@ POWER_VALUE_KEYS = (
 )
 
 
+# A left-out consumer (an ignored sensor, the charger of a car behind this one) that has not reported for this long, with a
+# value that is not 0, is taken to be stuck (a hung integration is not 'unavailable'): subtracting it for ever would take
+# the house consumption down to 0, so it is not subtracted - the higher consumption is the safe side.
+STALE_REPORT_SECONDS = 30 * 60
+
+
 class EnergyPower:
     """Power measurements and the power database."""
 
+    def _ends_after_stuck(self, entity_id, from_time_stamp, to_time_stamp) -> bool | None:
+        """Does the window end after the entity got stuck? None when it is not stuck (it reported within the limit, or is unknown).
+
+        Stuck = no report for STALE_REPORT_SECONDS, i.e. from last report + that limit. A window that ended before that was
+        recorded while it reported and stays as it was; the live window and the hours since are corrected. Some callers give
+        the two ends the other way round (timeFrom=0, timeTo=X), so the later one counts; no window at all is the live one.
+        """
+        age = (getattr(self._snap, "report_ages", None) or {}).get(entity_id)
+        if self._snap is None or age is None or age <= STALE_REPORT_SECONDS:
+            return None
+        if entity_id not in (self.config["home"].get("charger_entity_ids") or []):
+            return None  # only a charger is checked: a plug or a template sensor of a steady load may report only when it changes
+        ends = [stamp for stamp in (from_time_stamp, to_time_stamp) if stamp is not None]
+        stuck_since = self.now() - datetime.timedelta(seconds=age - STALE_REPORT_SECONDS)
+        return not ends or max(ends) > stuck_since
+
+    def _current_reading(self, entity_id) -> float | None:
+        """What the entity reads now (the number of its state, in its own unit), None when it is not a number."""
+        try:
+            return float(self._snap.states.get(entity_id))
+        except (TypeError, ValueError):
+            return None
+
     def power_from_ignored(self, from_time_stamp, to_time_stamp) -> float:
         total = 0.0
+        stale = self.__dict__.setdefault("_stale_consumers", set())  # the ones already warned about, until they report again
         try:
             for entity_id in unique_entity_ids(self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"]):
                 try:
-                    total += float(self.history.get_average_value(entity_id, from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0))
+                    value = float(self.history.get_average_value(entity_id, from_time_stamp, to_time_stamp, convert_to="W", error_state=0.0))
+                    after_stuck = self._ends_after_stuck(entity_id, from_time_stamp, to_time_stamp)
+                    if after_stuck is None:
+                        if self._snap is not None and entity_id in (self._snap.report_ages or {}):
+                            stale.discard(entity_id)  # it reports: a new stop is a new episode
+                    elif after_stuck and self._current_reading(entity_id):
+                        # stuck = it shows a number that is not 0 NOW; one that shows 0 now was only above 0 earlier in the window
+                        if entity_id not in stale:
+                            stale.add(entity_id)
+                            _LOGGER.warning(
+                                "%s has not reported for over %s minutes and still reads %s: it is not subtracted from the house consumption until it reports again",
+                                entity_id, STALE_REPORT_SECONDS // 60, self._snap.states.get(entity_id),
+                            )
+                        continue
+                    total += value
                 except Exception:  # noqa: BLE001
                     pass
         except Exception as err:  # noqa: BLE001

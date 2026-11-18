@@ -80,7 +80,7 @@ integration (virtual EV).
 
 - **House consumption:** the house's consumption, not the grid import. Used for the solar surplus.
 - **Ignored consumers:** power sensors subtracted from the house – e.g. a heat pump you don't want in the
-  forecast. The charger itself is subtracted automatically.
+  forecast. The charger itself is subtracted automatically. The house consumption used for the solar surplus is never below 0 W.
 - **Ignore chargers of cars with lower priority** (on by default): with several cars in Cable Juice Planner, the car
   with [priority](load-balancing.md#solar-surplus-between-cars) 1 has the first right to the solar surplus, then 2,
   and so on. A car therefore counts the charging of the cars ahead of it as consumption of the house, but subtracts
@@ -90,6 +90,13 @@ integration (virtual EV).
   never counted twice, and a charger that is also in your list is subtracted once. Turn it off if the house
   consumption sensor does not include the chargers, e.g. a separate meter: subtracting them would then take
   consumption that was never there out of the forecast.
+- **A charger that hangs:** The charger of another car that has not reported for over 30 minutes while it still reads a number other
+  than 0 (a hung integration is not *unavailable*) is taken to be stuck: it is not subtracted, in the current hour and in the
+  hours since it got stuck, until it reports again, and a warning is logged. The higher consumption is the safe side. It is the
+  report time that counts, not the value, so a charger that holds a steady value is fine as long as it keeps reporting; the
+  other ignored sensors are always subtracted, whatever they report, and so is this car's own charger. A charger that only
+  writes its state when the value changes (a template sensor of a constant power) is taken to be stuck after 30 minutes
+  of a steady value: make such a sensor report regularly.
 - **Home battery:** level and power, if you have one. See [Solar surplus charging](rules/solar.md#home-battery).
 
 With a home battery, a **check page** follows the battery sensors. CJP looks at the history the recorder has for the battery and the house consumption – as far back as it takes,
@@ -102,8 +109,12 @@ up to a few weeks – and suggests three settings, with the numbers it used so y
 | **Consumption includes discharging** | at the moments the battery starts or stops discharging, the consumption does not step (the total load, which the battery covers) or falls by about the discharge power (a sensor from grid and solar) |
 
 Only the minutes around each start and stop are compared, so a load that is different in the evening than at night, or an
-EV that charges in the same hours, does not count. One start or stop is not enough: at least four of the latest must
-agree, and in practice a few days of history are needed. Each answer needs only a short stretch of unbroken history – a
+EV that charges in the same hours but starts and stops at other moments, does not count. One start or stop is not enough:
+at least four of the latest must agree, and in practice a few days of history are needed. A consumer that starts and
+stops in the same minutes as the battery and is about as big (an EV or a heat pump on the same cheap-hour schedule) can fake
+one direction: the charging and the discharging must therefore tell the same story – a sensor of the total load (does not
+include the charging, includes the discharging) or one from grid and solar (the opposite) – and both must be decided,
+otherwise nothing is suggested. Add such a consumer under *Ignored consumers* and look again to get a suggestion. Each answer needs only a short stretch of unbroken history – a
 stretch of an hour or two, or about 25 minutes around a start or stop – but it may be days or weeks back if that is where
 the history is clear. A battery that sells to the grid, a load that follows the battery, or a sensor that never changes
 leaves the answer open.
@@ -114,6 +125,11 @@ decide it: the current value is then kept, never a guess. Everything can be chan
 continue. The suggestions are only made when you have chosen or changed one of the three sensors in the flow, so a
 restored backup, an import from PyScript and the stored settings keep their values; tick *Detect again* to look again
 (the page is the last one of *Home* under *Configure*). The numbers are only suggestions – check that they fit before you continue.
+
+The consumption numbers are read after the consumers that the planner itself leaves out are subtracted (the ignored ones, this car's charger and, when the switch above is on, the chargers of the cars behind it), so
+the page compares what the planner works with. If the page shows a message instead of numbers (no recorder, the reading took
+too long, a power sensor with an unknown unit, no usable history), the current values are kept; tick *Detect again* to try
+again.
 
 ### Prices
 

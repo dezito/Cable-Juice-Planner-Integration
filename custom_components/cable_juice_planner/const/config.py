@@ -100,6 +100,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "invert_powerwall_watt_flow_entity_id": False,
         # also leave out the power of the chargers of the other cars (found at start, see utils/chargers.py)
         "ignore_cjp_chargers": True,
+        # the chargers of the cars behind this one, also when they are not added automatically (set by the coordinator, not an
+        # option): the only left-out sensors that are checked for a hung reading (engine/energy/power.py)
+        "charger_entity_ids": [],
     },
     "language": "da",
     "notification": {

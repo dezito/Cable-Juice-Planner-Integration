@@ -13,19 +13,19 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.start import async_at_started
 
-from ..const import DOMAIN, FLOW_STEPS
+from ..const import DOMAIN
+from ..prices import stromligning_problems
 from ..utils.solcast import SOLCAST_PLATFORM, SOLCAST_UNIQUE_IDS, strip_forecast_suffix
 
 _LOGGER = logging.getLogger(__name__)
 
-STROMLIGNING_PLATFORM = "stromligning"
 ISSUE_STROMLIGNING = "stromligning_entities"
 ISSUE_SOLCAST = "solcast_entities"
 # Home Assistant reloads an integration about 30 seconds after one of its entities was enabled or disabled
@@ -34,57 +34,6 @@ RECHECK_INTERVAL = datetime.timedelta(hours=1)
 NOTHING = "–"
 # the list in a flow page: the first sensors, then how many more there are
 FLOW_LIST_LIMIT = 12
-# the Strømligning sensors that can be selected on the price pages (the start of their unique ids)
-STROMLIGNING_UNIQUE_ID_PREFIXES = (
-    "current_price",
-    "tomorrow_available",
-    "forecasts",
-    "distribution",
-    "electricity_tax",
-    "nettariff",
-    "systemtariff",
-    "surcharge",
-)
-
-
-def stromligning_entities_to_watch(prices: dict[str, str]) -> list[str]:
-    """The configured Strømligning sensors that count: the tariff sensors only with a sell sensor (their page is hidden without it)."""
-    tariffs = FLOW_STEPS["prices_stromligning_tariffs"] if not prices.get("stromligning_sell_current_price") else []
-    return [entity_id for key, entity_id in prices.items() if key.startswith("stromligning_") and entity_id and key not in tariffs]
-
-
-def stromligning_problems(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, list[str]]:
-    """Which of the configured Strømligning sensors are disabled, and which the integration doesn't provide.
-
-    A sensor with no state, or only the state Home Assistant restores for an entity nobody provides, is not provided
-    (e.g. the price forecasts when they are off in the options of Strømligning). That is only a finding while the
-    Strømligning entry that owns the sensor runs: during an outage every sensor is unavailable, which is not a setting.
-    """
-    registry = er.async_get(hass)
-    disabled: list[str] = []
-    not_provided: list[str] = []
-    for entity_id in dict.fromkeys(entity_ids):
-        entry = registry.async_get(entity_id)
-        if entry is not None and entry.disabled_by:
-            disabled.append(entity_id)
-            continue
-        state = hass.states.get(entity_id)
-        if (state is None or state.attributes.get("restored")) and _integration_running(hass, entry):
-            not_provided.append(entity_id)
-    return {"disabled": disabled, "not_provided": not_provided}
-
-
-def _integration_running(hass: HomeAssistant, entry: er.RegistryEntry | None) -> bool:
-    """Whether the Strømligning entry that owns the sensor runs (there can be one for buying and one for selling).
-
-    Without a registry entry (the sensor was never created) any running Strømligning entry will do.
-    """
-    owner = hass.config_entries.async_get_entry(entry.config_entry_id) if entry is not None and entry.config_entry_id else None
-    if owner is not None:
-        return owner.state is ConfigEntryState.LOADED
-    return any(candidate.state is ConfigEntryState.LOADED for candidate in hass.config_entries.async_entries(STROMLIGNING_PLATFORM))
-
-
 def solcast_problems(hass: HomeAssistant, forecast_entity: str, endings: list[str]) -> dict[str, list[str]] | None:
     """Which of the Solcast forecast sensors a plan needs are disabled, named differently or without hourly detail.
 

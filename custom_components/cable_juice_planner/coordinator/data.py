@@ -34,6 +34,8 @@ class CoordinatorData:
         states: dict[str, str] = {}
         attributes: dict[str, dict] = {}
         units: dict[str, str | None] = {}
+        report_ages: dict[str, float] = {}
+        utc_now = dt_util.utcnow()
         for entity_id in self.snapshot_entities:
             state = self.hass.states.get(entity_id)
             if state is None:
@@ -41,6 +43,8 @@ class CoordinatorData:
             states[entity_id] = state.state
             attributes[entity_id] = dict(state.attributes)
             units[entity_id] = state.attributes.get("unit_of_measurement")
+            if (reported := getattr(state, "last_reported", None)) is not None:
+                report_ages[entity_id] = max((utc_now - reported).total_seconds(), 0.0)
         for entity_id in self.price_entities:
             if (state := self.hass.states.get(entity_id)) is not None:
                 states[entity_id] = state.state
@@ -55,6 +59,7 @@ class CoordinatorData:
             attributes=attributes,
             platforms=dict(self._platforms),
             units=units,
+            report_ages=report_ages,
             buffers={entity_id: list(rows) for entity_id, rows in self._buffers.items()},
             statistics={entity_id: list(rows) for entity_id, rows in self._statistics.items()},
             astral=observer,

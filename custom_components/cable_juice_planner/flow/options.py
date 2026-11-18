@@ -11,7 +11,8 @@ from homeassistant.helpers import selector
 
 from ..management.backup import BACKUP_DIR, async_export, async_import, backup_dir, list_backups
 from ..const import CONF_CIRCUITS, CONF_ENTITY_PREFIX, SITE_DEFAULTS, OPTIONS_MENU, default_options, object_prefix, normalize_language, upgrade_options
-from .schema import BACKUP_EXPORT, providers_from_options, site_options, site_schema
+from ..prices import providers_from_options
+from .schema import BACKUP_EXPORT, site_options, site_schema
 from .pages import CJPFlowPages
 
 
