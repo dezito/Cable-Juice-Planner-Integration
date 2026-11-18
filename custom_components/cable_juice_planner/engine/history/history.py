@@ -4,14 +4,17 @@ The PyScript version asked the recorder for every window (``history.get_values``
 ``get_average_value``, many queries per planning run on the event loop). The
 coordinator keeps a buffer of states per entity instead (one recorder load at
 startup + state events) and the hourly mean statistics, and this module reproduces
-the old semantics exactly:
+the old interface:
 
 * short term: the state at the window start (placed at the start) and every state
-  inside the window; numeric states are interpolated to 100 points
-  (``numpy.linspace`` + ``numpy.interp``, reimplemented with the same float
-  operations), non-numeric states are kept with their own timestamp
-* long term: hourly mean statistics for the hours of the window, interpolated the same
-  way
+  inside the window; numeric states are sampled at 100 points (``numpy.linspace``
+  reimplemented with the same float operations) with every state held until the next
+  change. The PyScript version drew lines between the rows (``numpy.interp``), which is
+  wrong for a sensor that only writes a row when it changes: a power that jumps between
+  0 and several kW got ramps over the quiet minutes and its energy was far too high.
+  Non-numeric states are kept with their own timestamp and end the hold of a number
+* long term: hourly mean statistics for the hours of the window, interpolated linearly
+  to 100 points
 * average = mean of both point sets
 
 Runs in the worker thread. The rows are (epoch seconds, raw state string).
@@ -132,27 +135,39 @@ class History:
             keys = self._keys[(kind, entity_id)] = [row[0] for row in rows]
         return keys
 
-    def _interpolate(self, sensor_data: list[tuple[float, object]], start_ts: float, end_ts: float) -> dict:
-        """history.interpolate_data on (ts, value) rows sorted by ts."""
+    def _interpolate(self, sensor_data: list[tuple[float, object]], start_ts: float, end_ts: float, hold: bool = True) -> dict:
+        """history.interpolate_data on (ts, value) rows sorted by ts: the numeric states sampled at 100 points.
+
+        hold (the states of a sensor): a state is held until the next row. A sensor writes a row only when its
+        state changes, so a line between two rows (the PyScript ``numpy.interp``) invents values for the quiet
+        time in between: a charger that jumps between 0 and 11 kW got ramps. A row that is no finite number
+        ("unavailable", "nan", ...) ends the hold of the value before it and the points it covers get no value
+        (an average counts only the time that is known); before the first row the first value is held back.
+        Without hold (the hourly mean statistics) the values are interpolated linearly, as before."""
         result: dict = {}
         try:
-            numeric_x: list[float] = []
-            numeric_y: list[float] = []
+            states: list[tuple[float, float | None]] = []
             non_numeric: list[tuple[float, object]] = []
             for ts, value in sensor_data:
                 try:
                     number = float(value)
-                except ValueError:
+                except (TypeError, ValueError):
                     non_numeric.append((ts, value))
+                    states.append((ts, None))
                     continue
-                if not math.isfinite(number):
-                    continue  # "nan" and "inf" are no measurement: they would turn every interpolated point into nan/inf
-                numeric_y.append(number)
-                numeric_x.append(ts)
-            if numeric_x:
+                states.append((ts, number if math.isfinite(number) else None))  # "nan"/"inf" are no measurement
+            if any(value is not None for _, value in states):
                 points = linspace(start_ts, end_ts, NUM_POINTS)
-                for ts, value in zip(points, interp(points, numeric_x, numeric_y)):
-                    result[self._dt(ts)] = value
+                if hold:
+                    keys = [ts for ts, _ in states]
+                    for ts in points:
+                        value = states[max(bisect.bisect_right(keys, ts) - 1, 0)][1]
+                        if value is not None:
+                            result[self._dt(ts)] = value
+                else:
+                    numbers = [(ts, value) for ts, value in states if value is not None]
+                    for ts, value in zip(points, interp(points, [ts for ts, _ in numbers], [value for _, value in numbers])):
+                        result[self._dt(ts)] = value
             for ts, value in non_numeric:
                 result[self._dt(ts)] = value
         except Exception as err:  # noqa: BLE001
@@ -201,7 +216,7 @@ class History:
                 if any(value is None for _, value in selected):
                     _LOGGER.error("Error in fetch_statistics_data for %s: mean is None", entity_id)
                 else:
-                    result = self._interpolate(selected, start_ts, end_ts)
+                    result = self._interpolate(selected, start_ts, end_ts, hold=False)
         self._cache[cache_key] = dict(result)
         return result
 
@@ -256,13 +271,34 @@ class History:
         return error_state
 
     def get_last_value(self, entity_id, float_type=False, convert_to=None, error_state="unknown", max_age=datetime.timedelta(days=1), warn=True):
-        """Last value within max_age (the last day), interpolated like the original.
+        """Last value within max_age (the last day): the newest state that is a value, read from the rows themselves.
 
-        The state at the start of the window counts: a value that has not changed since before the window is still the last value."""
+        Not from the 100 sampled points: when the sensor is unavailable now (the case this is used for) the last
+        points have no value, and a value that was reported minutes ago would be missed. The state at the start of
+        the window counts: a value that has not changed since before the window is still the last value. States
+        that are unavailable, unknown, nan or inf are no value; numbers are floats, other states stay text
+        (unless float_type)."""
         to_datetime = self.now
-        states = self.get_values(entity_id, to_datetime - max_age, to_datetime, float_type=float_type, convert_to=convert_to)
-        if states and isinstance(states, list):
-            return states[-1]
+        rows = self.buffers.get(entity_id) if entity_id else None
+        if rows:
+            start_ts, end_ts = self._ts(to_datetime - max_age), self._ts(to_datetime)
+            keys = self._row_keys("short", entity_id, rows)
+            lo = bisect.bisect_right(keys, start_ts)
+            hi = bisect.bisect_left(keys, end_ts)
+            unit = self.units.get(entity_id)
+            for _, state in reversed(rows[max(lo - 1, 0):hi]):
+                if state in ENTITY_UNAVAILABLE_STATES:
+                    continue
+                try:
+                    value = float(state)
+                except (TypeError, ValueError):
+                    if float_type:
+                        continue
+                    value = state
+                else:
+                    if not math.isfinite(value):
+                        continue
+                return value if convert_to is None else power_convert(value, unit, convert_to)
         if warn:
             _LOGGER.warning("No data found for %s the last %s, returning %s", entity_id, max_age, error_state)
         return error_state

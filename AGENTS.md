@@ -201,6 +201,12 @@ These rules apply to code, tests, documentation, and the dashboard.
 Agents record lasting decisions and findings for this repository here (not in
 private agent memory). Update or remove a note when it stops being true.
 
+- Window values (`engine/history/history.py`, `History._interpolate`) hold every sensor state until the next row
+  (`hold=True`). Never draw lines between rows: a sensor writes a row only when its state changes, so lines turned a
+  power that jumps between 0 and several kW into far too much energy. A row that is no finite number ends the hold
+  and gives no value (an average counts only known time); text states keep their own timestamps. The hourly
+  statistics (`hold=False`) stay linearly interpolated. `get_last_value` reads the newest value row itself, not the
+  100 samples (the sensor it is used for is unavailable or broken now). Keep `WindowCalculator` in BattMind in sync.
 - Built like BattMind-Integration; keep the worker-thread design so calculations
   never block HA: single-thread executor, snapshot -> job result.
 - Database fail-safe lives in `management/storage.py` (same code in BattMind):
