@@ -29,6 +29,7 @@ CONFIG_FLOW_STEPS = [
     "ev_specs",
     "home",
     "powerwall",
+    "detection_review",
     "price_provider",
     "prices_energidataservice",
     "prices_stromligning",

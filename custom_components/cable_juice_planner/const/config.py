@@ -282,18 +282,21 @@ FLOW_STEPS: dict[str, list[str]] = {
     "ev_specs": ["battery_size", "last_charging_hour_before_departure_buffer"],
     "home": [
         "power_consumption_entity_id",
-        "power_consumption_entity_id_include_powerwall_charging",
-        "power_consumption_entity_id_include_powerwall_discharging",
         "ignore_consumption_from_entity_ids",
         "ignore_cjp_chargers",
     ],
     "powerwall": [
         "powerwall_watt_flow_entity_id",
-        "invert_powerwall_watt_flow_entity_id",
         "powerwall_battery_level_entity_id",
         "powerwall_battery_size",
         "powerwall_charging_power_limit",
         "powerwall_discharging_power",
+    ],
+    # suggested from the recorder after the battery and the consumption sensors were chosen (flow/detection.py)
+    "detection_review": [
+        "invert_powerwall_watt_flow_entity_id",
+        "power_consumption_entity_id_include_powerwall_charging",
+        "power_consumption_entity_id_include_powerwall_discharging",
     ],
     "prices_energidataservice": ["energidataservice_buy_entity_id", "energidataservice_sell_entity_id"],
     "prices_stromligning": [
@@ -344,7 +347,7 @@ OPTIONS_MENU: dict[str, list[str]] = {
     "general": ["general"],
     "charger": ["charger", "charger_specs", "load_balancing"],
     "ev": ["ev", "ev_specs"],
-    "home": ["home", "powerwall"],
+    "home": ["home", "powerwall", "detection_review"],
     "prices": ["price_provider", "prices_energidataservice", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
     "solar": ["solar", "solar_charging", "weather"],
     "notifications": ["notifications"],

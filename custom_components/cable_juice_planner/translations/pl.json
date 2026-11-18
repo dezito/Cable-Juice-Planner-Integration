@@ -110,15 +110,11 @@
         "description": "Do obliczenia nadwyżki słonecznej do ładowania.\n\nZnalezione ładowarki samochodów o niższym priorytecie: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
-          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
-          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
-          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
@@ -128,7 +124,6 @@
         "description": "Wypełnij, jeśli masz magazyn energii.",
         "data": {
           "powerwall_watt_flow_entity_id": "Moc magazynu energii",
-          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
           "powerwall_battery_level_entity_id": "Poziom magazynu energii",
           "powerwall_battery_size": "Pojemność magazynu energii",
           "powerwall_charging_power_limit": "Maks. moc ładowania magazynu",
@@ -136,11 +131,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Przepływ mocy baterii domowej (dodatnie=rozładowanie, ujemne=ładowanie; odwróć znak przez home.invert_powerwall_watt_flow_entity_id). Wskazówka: wyłącz rozładowanie podczas ładowania EV",
-          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
           "powerwall_battery_level_entity_id": "Używane z solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Pojemność baterii domowej (kWh)",
           "powerwall_charging_power_limit": "Limit mocy ładowania baterii domowej (W)",
           "powerwall_discharging_power": "Moc rozładowania baterii domowej (W) używana do ładowania EV powyżej progu"
+        }
+      },
+      "detection_review": {
+        "title": "Sprawdź ustawienia baterii i zużycia",
+        "description": "Zaproponowane na podstawie zapisanej historii czujników baterii i zużycia domu, tak daleko wstecz, jak to konieczne. Sprawdź liczby – możesz zmienić wszystko.\n\nW nawiasach: h = godziny nieprzerwanych danych, n = porównane zmiany mocy baterii oraz jak daleko wstecz to znaleziono.\n\n✅ = włączone, ⬜ = wyłączone, ❔ = nie udało się ustalić: obecna wartość zostaje. Dopóki czujniki się nie zmienią, nic nie jest sprawdzane ponownie; zaznacz *Wykryj ponownie*, aby to zrobić.\n\n**Znak mocy baterii** {invert_mark} ({invert_window})\nPoziom baterii zmienił się z {soc_start} na {soc_end} %, a średnia moc baterii wynosiła {power_avg} W. Rosnący poziom przy dodatniej mocy oznacza, że dodatnia = ładowanie: włącz *Odwróć znak mocy*.\n\n**Zużycie obejmuje ładowanie** {charging_mark} ({charging_window})\nW chwilach, gdy bateria zaczynała lub kończyła ładowanie, zużycie domu wynosiło {c_charging} W podczas ładowania z mocą {p_charging} W, wobec {c_idle_charging} W tuż przed lub po, w bezczynności. Skok o mniej więcej moc ładowania oznacza, że je obejmuje; brak skoku oznacza, że go nie obejmuje.\n\n**Zużycie obejmuje rozładowanie** {discharging_mark} ({discharging_window})\nW chwilach, gdy bateria zaczynała lub kończyła rozładowanie, zużycie domu wynosiło {c_discharging} W podczas rozładowania z mocą {p_discharging} W, wobec {c_idle_discharging} W tuż przed lub po, w bezczynności. Spadek o mniej więcej moc rozładowania oznacza, że go nie obejmuje; brak spadku oznacza, że je obejmuje (jeśli dom zużywa co najmniej tyle, ile oddaje bateria).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
+          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
+          "redetect": "Wykryj ponownie"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
+          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
+          "redetect": "Ponownie odczytuje rejestrator dla trzech czujników i wstawia wynik do ustawień powyżej. Nic nie jest zapisywane, dopóki nie przejdziesz dalej bez tego zaznaczenia."
         }
       },
       "prices_energidataservice": {
@@ -518,15 +528,11 @@
         "description": "Do obliczenia nadwyżki słonecznej do ładowania.\n\nZnalezione ładowarki samochodów o niższym priorytecie: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
-          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
-          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
-          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
@@ -536,7 +542,6 @@
         "description": "Wypełnij, jeśli masz magazyn energii.",
         "data": {
           "powerwall_watt_flow_entity_id": "Moc magazynu energii",
-          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
           "powerwall_battery_level_entity_id": "Poziom magazynu energii",
           "powerwall_battery_size": "Pojemność magazynu energii",
           "powerwall_charging_power_limit": "Maks. moc ładowania magazynu",
@@ -544,11 +549,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Przepływ mocy baterii domowej (dodatnie=rozładowanie, ujemne=ładowanie; odwróć znak przez home.invert_powerwall_watt_flow_entity_id). Wskazówka: wyłącz rozładowanie podczas ładowania EV",
-          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
           "powerwall_battery_level_entity_id": "Używane z solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Pojemność baterii domowej (kWh)",
           "powerwall_charging_power_limit": "Limit mocy ładowania baterii domowej (W)",
           "powerwall_discharging_power": "Moc rozładowania baterii domowej (W) używana do ładowania EV powyżej progu"
+        }
+      },
+      "detection_review": {
+        "title": "Sprawdź ustawienia baterii i zużycia",
+        "description": "Zaproponowane na podstawie zapisanej historii czujników baterii i zużycia domu, tak daleko wstecz, jak to konieczne. Sprawdź liczby – możesz zmienić wszystko.\n\nW nawiasach: h = godziny nieprzerwanych danych, n = porównane zmiany mocy baterii oraz jak daleko wstecz to znaleziono.\n\n✅ = włączone, ⬜ = wyłączone, ❔ = nie udało się ustalić: obecna wartość zostaje. Dopóki czujniki się nie zmienią, nic nie jest sprawdzane ponownie; zaznacz *Wykryj ponownie*, aby to zrobić.\n\n**Znak mocy baterii** {invert_mark} ({invert_window})\nPoziom baterii zmienił się z {soc_start} na {soc_end} %, a średnia moc baterii wynosiła {power_avg} W. Rosnący poziom przy dodatniej mocy oznacza, że dodatnia = ładowanie: włącz *Odwróć znak mocy*.\n\n**Zużycie obejmuje ładowanie** {charging_mark} ({charging_window})\nW chwilach, gdy bateria zaczynała lub kończyła ładowanie, zużycie domu wynosiło {c_charging} W podczas ładowania z mocą {p_charging} W, wobec {c_idle_charging} W tuż przed lub po, w bezczynności. Skok o mniej więcej moc ładowania oznacza, że je obejmuje; brak skoku oznacza, że go nie obejmuje.\n\n**Zużycie obejmuje rozładowanie** {discharging_mark} ({discharging_window})\nW chwilach, gdy bateria zaczynała lub kończyła rozładowanie, zużycie domu wynosiło {c_discharging} W podczas rozładowania z mocą {p_discharging} W, wobec {c_idle_discharging} W tuż przed lub po, w bezczynności. Spadek o mniej więcej moc rozładowania oznacza, że go nie obejmuje; brak spadku oznacza, że je obejmuje (jeśli dom zużywa co najmniej tyle, ile oddaje bateria).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
+          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
+          "redetect": "Wykryj ponownie"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
+          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
+          "redetect": "Ponownie odczytuje rejestrator dla trzech czujników i wstawia wynik do ustawień powyżej. Nic nie jest zapisywane, dopóki nie przejdziesz dalej bez tego zaznaczenia."
         }
       },
       "prices_energidataservice": {

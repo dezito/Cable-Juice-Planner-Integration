@@ -92,6 +92,29 @@ integration (virtual EV).
   consumption that was never there out of the forecast.
 - **Home battery:** level and power, if you have one. See [Solar surplus charging](rules/solar.md#home-battery).
 
+With a home battery, a **check page** follows the battery sensors. CJP looks at the history the recorder has for the battery and the house consumption – as far back as it takes,
+up to a few weeks – and suggests three settings, with the numbers it used so you can see that they fit:
+
+| Setting | How it is found |
+|---|---|
+| **Invert** (battery power sign) | an unbroken stretch of 1–3 hours in which the battery level rises while the power has one sign: that sign means charging |
+| **Consumption includes charging** | at the moments the battery starts or stops charging, the house consumption steps by about the charging power (a sensor from grid and solar) or does not step (the total load of the house) |
+| **Consumption includes discharging** | at the moments the battery starts or stops discharging, the consumption does not step (the total load, which the battery covers) or falls by about the discharge power (a sensor from grid and solar) |
+
+Only the minutes around each start and stop are compared, so a load that is different in the evening than at night, or an
+EV that charges in the same hours, does not count. One start or stop is not enough: at least four of the latest must
+agree, and in practice a few days of history are needed. Each answer needs only a short stretch of unbroken history – a
+stretch of an hour or two, or about 25 minutes around a start or stop – but it may be days or weeks back if that is where
+the history is clear. A battery that sells to the grid, a load that follows the battery, or a sensor that never changes
+leaves the answer open.
+
+The brackets show what an answer rests on: **h** = hours of unbroken data, **n** = the number of starts and stops
+compared, and how far back it was found (for example `n=4, -2 d`). ✅ means on, ⬜ off and ❔ that the history could not
+decide it: the current value is then kept, never a guess. Everything can be changed, and nothing is saved before you
+continue. The suggestions are only made when you have chosen or changed one of the three sensors in the flow, so a
+restored backup, an import from PyScript and the stored settings keep their values; tick *Detect again* to look again
+(the page is the last one of *Home* under *Configure*). The numbers are only suggestions – check that they fit before you continue.
+
 ### Prices
 
 Energi Data Service and/or Strømligning. With both, Strømligning has priority: its price is used for every

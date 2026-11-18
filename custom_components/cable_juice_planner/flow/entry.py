@@ -35,6 +35,8 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
         self._restore_backup: str | None = None
         self._queue: list[str] = []
         self._providers: list[str] = ["energidataservice"]
+        self._baseline = ("", "", "")
+        self._detections = {}
 
     @staticmethod
     @callback
@@ -123,6 +125,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
             language, icon = self._options["language"], self._options["dashboard_icon"]
             self._options = {**default_options(), **upgrade_options(backup.get("options") or {}), "language": language, "dashboard_icon": icon}
             self._providers = providers_from_options(self._options)
+            self._set_baseline()
             return await self._async_next()
 
         options = [selector.SelectOptionDict(value=name, label=label) for name, label in self._backups.items()]
@@ -154,6 +157,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
                     self._options["language"] = language
                     self._options["dashboard_icon"] = icon
                     self._providers = providers_from_options(self._options)
+                    self._set_baseline()
             return await self._async_next()
 
         sources = list(self._legacy_sources)

@@ -110,15 +110,11 @@
         "description": "Used to calculate the solar surplus that can be used for charging.\n\nChargers of cars with lower priority found: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "House consumption",
-          "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
-          "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home consumption (watts), not grid consumption",
-          "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
           "ignore_consumption_from_entity_ids": "List of power sensors to ignore",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
@@ -128,7 +124,6 @@
         "description": "Fill in if you have a home battery. It is used to charge the car from the home battery and to prioritise charging the home battery.",
         "data": {
           "powerwall_watt_flow_entity_id": "Home battery power",
-          "invert_powerwall_watt_flow_entity_id": "Invert the power sign",
           "powerwall_battery_level_entity_id": "Home battery level",
           "powerwall_battery_size": "Home battery capacity",
           "powerwall_charging_power_limit": "Home battery max charging",
@@ -136,11 +131,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Home battery watt flow (positive = discharging, negative = charging; invert sign with home.invert_powerwall_watt_flow_entity_id). Tip: Disable Powerwall discharging while EV is charging",
-          "invert_powerwall_watt_flow_entity_id": "Invert sign for home.entity_ids.powerwall_watt_flow_entity_id (charging positive, discharging negative)",
           "powerwall_battery_level_entity_id": "Used with solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Home battery size (kWh)",
           "powerwall_charging_power_limit": "Home battery charging power limit (watts)",
           "powerwall_discharging_power": "Home battery discharging power (watts) used to charge the EV when above threshold and switch.PREFIX_powerwall_discharge_above_needed is enabled"
+        }
+      },
+      "detection_review": {
+        "title": "Check the battery and consumption settings",
+        "description": "Suggested from the recorded history of the battery and house consumption sensors, as far back as needed. Check the numbers – you can change everything.\n\nIn the brackets: h = hours of unbroken data, n = battery switch-overs compared, and how far back it was found.\n\n✅ = on, ⬜ = off, ❔ = could not be determined: the current value is kept. Nothing is looked up again while the sensors are unchanged; tick *Detect again* to do it.\n\n**Battery power sign** {invert_mark} ({invert_window})\nThe battery level went from {soc_start} to {soc_end} % while the average battery power was {power_avg} W. A rising level with positive power means positive = charging: turn *Invert the power sign* on.\n\n**Consumption includes charging** {charging_mark} ({charging_window})\nAround the moments the battery started or stopped charging, the house consumption was {c_charging} W while it charged {p_charging} W, against {c_idle_charging} W just before or after, when it was idle. A step of about the charging power means it includes it; no step means it does not.\n\n**Consumption includes discharging** {discharging_mark} ({discharging_window})\nAround the moments the battery started or stopped discharging, the house consumption was {c_discharging} W while it discharged {p_discharging} W, against {c_idle_discharging} W just before or after, when it was idle. A fall of about the discharge power means it does not include it; no fall means it does (if the house uses at least as much as the battery gives).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Invert the power sign",
+          "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
+          "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
+          "redetect": "Detect again"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Invert sign for home.entity_ids.powerwall_watt_flow_entity_id (charging positive, discharging negative)",
+          "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
+          "redetect": "Looks at the recorder again for the three sensors and puts what it finds in the settings above. Nothing is saved until you continue without it."
         }
       },
       "prices_energidataservice": {
@@ -518,15 +528,11 @@
         "description": "Used to calculate the solar surplus that can be used for charging.\n\nChargers of cars with lower priority found: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "House consumption",
-          "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
-          "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home consumption (watts), not grid consumption",
-          "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
           "ignore_consumption_from_entity_ids": "List of power sensors to ignore",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
@@ -536,7 +542,6 @@
         "description": "Fill in if you have a home battery. It is used to charge the car from the home battery and to prioritise charging the home battery.",
         "data": {
           "powerwall_watt_flow_entity_id": "Home battery power",
-          "invert_powerwall_watt_flow_entity_id": "Invert the power sign",
           "powerwall_battery_level_entity_id": "Home battery level",
           "powerwall_battery_size": "Home battery capacity",
           "powerwall_charging_power_limit": "Home battery max charging",
@@ -544,11 +549,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Home battery watt flow (positive = discharging, negative = charging; invert sign with home.invert_powerwall_watt_flow_entity_id). Tip: Disable Powerwall discharging while EV is charging",
-          "invert_powerwall_watt_flow_entity_id": "Invert sign for home.entity_ids.powerwall_watt_flow_entity_id (charging positive, discharging negative)",
           "powerwall_battery_level_entity_id": "Used with solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Home battery size (kWh)",
           "powerwall_charging_power_limit": "Home battery charging power limit (watts)",
           "powerwall_discharging_power": "Home battery discharging power (watts) used to charge the EV when above threshold and switch.PREFIX_powerwall_discharge_above_needed is enabled"
+        }
+      },
+      "detection_review": {
+        "title": "Check the battery and consumption settings",
+        "description": "Suggested from the recorded history of the battery and house consumption sensors, as far back as needed. Check the numbers – you can change everything.\n\nIn the brackets: h = hours of unbroken data, n = battery switch-overs compared, and how far back it was found.\n\n✅ = on, ⬜ = off, ❔ = could not be determined: the current value is kept. Nothing is looked up again while the sensors are unchanged; tick *Detect again* to do it.\n\n**Battery power sign** {invert_mark} ({invert_window})\nThe battery level went from {soc_start} to {soc_end} % while the average battery power was {power_avg} W. A rising level with positive power means positive = charging: turn *Invert the power sign* on.\n\n**Consumption includes charging** {charging_mark} ({charging_window})\nAround the moments the battery started or stopped charging, the house consumption was {c_charging} W while it charged {p_charging} W, against {c_idle_charging} W just before or after, when it was idle. A step of about the charging power means it includes it; no step means it does not.\n\n**Consumption includes discharging** {discharging_mark} ({discharging_window})\nAround the moments the battery started or stopped discharging, the house consumption was {c_discharging} W while it discharged {p_discharging} W, against {c_idle_discharging} W just before or after, when it was idle. A fall of about the discharge power means it does not include it; no fall means it does (if the house uses at least as much as the battery gives).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Invert the power sign",
+          "power_consumption_entity_id_include_powerwall_charging": "Includes home battery charging",
+          "power_consumption_entity_id_include_powerwall_discharging": "Includes home battery discharging",
+          "redetect": "Detect again"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Invert sign for home.entity_ids.powerwall_watt_flow_entity_id (charging positive, discharging negative)",
+          "power_consumption_entity_id_include_powerwall_charging": "Home consumption incl. home battery charging (watts)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Home consumption incl. home battery discharging (watts)",
+          "redetect": "Looks at the recorder again for the three sensors and puts what it finds in the settings above. Nothing is saved until you continue without it."
         }
       },
       "prices_energidataservice": {
