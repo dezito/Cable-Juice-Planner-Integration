@@ -22,6 +22,8 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
         self._options: dict[str, Any] = {}
         self._queue: list[str] = []
         self._providers: list[str] = []
+        self._baseline = ("", "", "")
+        self._detections = {}
 
     def _placeholders(self) -> dict[str, str]:
         return {"prefix": self.config_entry.data.get(CONF_ENTITY_PREFIX, "")}
@@ -33,6 +35,8 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
         self._options = {**default_options(), **self.config_entry.options}
         self._options["language"] = normalize_language(self._options.get("language"))
         self._providers = providers_from_options(self._options)
+        self._set_baseline()
+        self._detections = {}
         return self.async_show_menu(step_id="init", menu_options=[*(f"menu_{group}" for group in OPTIONS_MENU), "backup"])
 
     async def async_step_backup(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

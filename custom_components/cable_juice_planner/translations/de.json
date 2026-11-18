@@ -110,15 +110,11 @@
         "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.\n\nGefundene Ladegeräte von Autos mit niedrigerer Priorität: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
-          "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
-          "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
-          "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
@@ -128,7 +124,6 @@
         "description": "Ausfüllen, wenn du einen Hausakku hast.",
         "data": {
           "powerwall_watt_flow_entity_id": "Leistung des Hausakkus",
-          "invert_powerwall_watt_flow_entity_id": "Vorzeichen umkehren",
           "powerwall_battery_level_entity_id": "Stand des Hausakkus",
           "powerwall_battery_size": "Kapazität des Hausakkus",
           "powerwall_charging_power_limit": "Max. Ladeleistung des Hausakkus",
@@ -136,11 +131,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Hausbatterie-Leistungsfluss (positiv=Entladen, negativ=Laden; Vorzeichen mit home.invert_powerwall_watt_flow_entity_id invertieren). Tipp: Entladen während EV-Ladung deaktivieren",
-          "invert_powerwall_watt_flow_entity_id": "Vorzeichen für home.entity_ids.powerwall_watt_flow_entity_id invertieren (Laden positiv, Entladen negativ)",
           "powerwall_battery_level_entity_id": "Genutzt mit solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Hausbatterie-Kapazität (kWh)",
           "powerwall_charging_power_limit": "Hausbatterie-Ladeleistungsgrenze (Watt)",
           "powerwall_discharging_power": "Hausbatterie-Entladeleistung (Watt) zum EV, wenn über Schwellwert und switch.PREFIX_powerwall_discharge_above_needed aktiv"
+        }
+      },
+      "detection_review": {
+        "title": "Batterie- und Verbrauchseinstellungen prüfen",
+        "description": "Vorgeschlagen aus dem aufgezeichneten Verlauf der Sensoren für Batterie und Hausverbrauch, so weit zurück wie nötig. Prüfe die Zahlen – du kannst alles ändern.\n\nIn den Klammern: h = Stunden lückenloser Daten, n = verglichene Wechsel der Batterieleistung und wie weit zurück es gefunden wurde.\n\n✅ = an, ⬜ = aus, ❔ = nicht bestimmbar: der aktuelle Wert bleibt. Solange die Sensoren unverändert sind, wird nichts erneut ermittelt; setze ein Häkchen bei *Erneut ermitteln*, um es zu tun.\n\n**Vorzeichen der Batterieleistung** {invert_mark} ({invert_window})\nDer Batteriestand ging von {soc_start} auf {soc_end} % bei einer durchschnittlichen Batterieleistung von {power_avg} W. Ein steigender Stand bei positiver Leistung bedeutet positiv = Laden: schalte *Vorzeichen umkehren* ein.\n\n**Verbrauch enthält das Laden** {charging_mark} ({charging_window})\nRund um die Zeitpunkte, an denen die Batterie zu laden begann oder aufhörte, war der Hausverbrauch {c_charging} W beim Laden mit {p_charging} W, gegenüber {c_idle_charging} W kurz davor oder danach im Ruhezustand. Ein Sprung um etwa die Ladeleistung bedeutet, dass er sie enthält; kein Sprung, dass er sie nicht enthält.\n\n**Verbrauch enthält das Entladen** {discharging_mark} ({discharging_window})\nRund um die Zeitpunkte, an denen die Batterie zu entladen begann oder aufhörte, war der Hausverbrauch {c_discharging} W beim Entladen mit {p_discharging} W, gegenüber {c_idle_discharging} W kurz davor oder danach im Ruhezustand. Ein Rückgang um etwa die Entladeleistung bedeutet, dass er sie nicht enthält; kein Rückgang, dass er sie enthält (wenn das Haus mindestens so viel verbraucht, wie die Batterie liefert).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Vorzeichen umkehren",
+          "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
+          "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
+          "redetect": "Erneut ermitteln"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Vorzeichen für home.entity_ids.powerwall_watt_flow_entity_id invertieren (Laden positiv, Entladen negativ)",
+          "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
+          "redetect": "Liest den Recorder für die drei Sensoren erneut aus und übernimmt das Ergebnis in die Einstellungen oben. Nichts wird gespeichert, bevor du ohne dieses Häkchen fortfährst."
         }
       },
       "prices_energidataservice": {
@@ -518,15 +528,11 @@
         "description": "Zur Berechnung des Solarüberschusses, mit dem geladen werden kann.\n\nGefundene Ladegeräte von Autos mit niedrigerer Priorität: {cjp_chargers}",
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
-          "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
-          "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
-          "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
-          "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
@@ -536,7 +542,6 @@
         "description": "Ausfüllen, wenn du einen Hausakku hast.",
         "data": {
           "powerwall_watt_flow_entity_id": "Leistung des Hausakkus",
-          "invert_powerwall_watt_flow_entity_id": "Vorzeichen umkehren",
           "powerwall_battery_level_entity_id": "Stand des Hausakkus",
           "powerwall_battery_size": "Kapazität des Hausakkus",
           "powerwall_charging_power_limit": "Max. Ladeleistung des Hausakkus",
@@ -544,11 +549,26 @@
         },
         "data_description": {
           "powerwall_watt_flow_entity_id": "Hausbatterie-Leistungsfluss (positiv=Entladen, negativ=Laden; Vorzeichen mit home.invert_powerwall_watt_flow_entity_id invertieren). Tipp: Entladen während EV-Ladung deaktivieren",
-          "invert_powerwall_watt_flow_entity_id": "Vorzeichen für home.entity_ids.powerwall_watt_flow_entity_id invertieren (Laden positiv, Entladen negativ)",
           "powerwall_battery_level_entity_id": "Genutzt mit solar.ev_charge_after_powerwall_battery_level",
           "powerwall_battery_size": "Hausbatterie-Kapazität (kWh)",
           "powerwall_charging_power_limit": "Hausbatterie-Ladeleistungsgrenze (Watt)",
           "powerwall_discharging_power": "Hausbatterie-Entladeleistung (Watt) zum EV, wenn über Schwellwert und switch.PREFIX_powerwall_discharge_above_needed aktiv"
+        }
+      },
+      "detection_review": {
+        "title": "Batterie- und Verbrauchseinstellungen prüfen",
+        "description": "Vorgeschlagen aus dem aufgezeichneten Verlauf der Sensoren für Batterie und Hausverbrauch, so weit zurück wie nötig. Prüfe die Zahlen – du kannst alles ändern.\n\nIn den Klammern: h = Stunden lückenloser Daten, n = verglichene Wechsel der Batterieleistung und wie weit zurück es gefunden wurde.\n\n✅ = an, ⬜ = aus, ❔ = nicht bestimmbar: der aktuelle Wert bleibt. Solange die Sensoren unverändert sind, wird nichts erneut ermittelt; setze ein Häkchen bei *Erneut ermitteln*, um es zu tun.\n\n**Vorzeichen der Batterieleistung** {invert_mark} ({invert_window})\nDer Batteriestand ging von {soc_start} auf {soc_end} % bei einer durchschnittlichen Batterieleistung von {power_avg} W. Ein steigender Stand bei positiver Leistung bedeutet positiv = Laden: schalte *Vorzeichen umkehren* ein.\n\n**Verbrauch enthält das Laden** {charging_mark} ({charging_window})\nRund um die Zeitpunkte, an denen die Batterie zu laden begann oder aufhörte, war der Hausverbrauch {c_charging} W beim Laden mit {p_charging} W, gegenüber {c_idle_charging} W kurz davor oder danach im Ruhezustand. Ein Sprung um etwa die Ladeleistung bedeutet, dass er sie enthält; kein Sprung, dass er sie nicht enthält.\n\n**Verbrauch enthält das Entladen** {discharging_mark} ({discharging_window})\nRund um die Zeitpunkte, an denen die Batterie zu entladen begann oder aufhörte, war der Hausverbrauch {c_discharging} W beim Entladen mit {p_discharging} W, gegenüber {c_idle_discharging} W kurz davor oder danach im Ruhezustand. Ein Rückgang um etwa die Entladeleistung bedeutet, dass er sie nicht enthält; kein Rückgang, dass er sie enthält (wenn das Haus mindestens so viel verbraucht, wie die Batterie liefert).",
+        "data": {
+          "invert_powerwall_watt_flow_entity_id": "Vorzeichen umkehren",
+          "power_consumption_entity_id_include_powerwall_charging": "Enthält Laden des Hausakkus",
+          "power_consumption_entity_id_include_powerwall_discharging": "Enthält Entladen des Hausakkus",
+          "redetect": "Erneut ermitteln"
+        },
+        "data_description": {
+          "invert_powerwall_watt_flow_entity_id": "Vorzeichen für home.entity_ids.powerwall_watt_flow_entity_id invertieren (Laden positiv, Entladen negativ)",
+          "power_consumption_entity_id_include_powerwall_charging": "Hauslast inkl. Batterieladung (Watt)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Hauslast inkl. Batterieentladung (Watt)",
+          "redetect": "Liest den Recorder für die drei Sensoren erneut aus und übernimmt das Ergebnis in die Einstellungen oben. Nichts wird gespeichert, bevor du ohne dieses Häkchen fortfährst."
         }
       },
       "prices_energidataservice": {
