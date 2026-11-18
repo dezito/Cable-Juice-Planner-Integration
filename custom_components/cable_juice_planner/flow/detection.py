@@ -40,6 +40,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import partial
 
+from homeassistant.const import COMPRESSED_STATE_LAST_UPDATED, COMPRESSED_STATE_STATE
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -361,6 +362,9 @@ async def async_load_rows(hass: HomeAssistant, entity_ids: list[str], start: dat
         return None
     from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
 
+    # The compressed form is what the graphs of the frontend use: a plain {"s": state, "lu": timestamp} per change, with no
+    # State object and no datetime made per row, and equal states in a row left out (a state stays until the next one).
+    # That is a lot cheaper for a sensor that reports every second, and a day of one is what is read here.
     states = await get_instance(hass).async_add_executor_job(
         partial(
             history.get_significant_states,
@@ -371,8 +375,9 @@ async def async_load_rows(hass: HomeAssistant, entity_ids: list[str], start: dat
             None,
             include_start_time_state=True,
             significant_changes_only=False,
-            minimal_response=False,
+            minimal_response=True,
             no_attributes=True,
+            compressed_state_format=True,
         )
     )
     result: dict[str, Rows] = {}
@@ -380,10 +385,10 @@ async def async_load_rows(hass: HomeAssistant, entity_ids: list[str], start: dat
         rows: Rows = []
         for state in states.get(entity_id, []):
             try:
-                value: float | None = float(state.state)
+                value: float | None = float(state[COMPRESSED_STATE_STATE])
             except (TypeError, ValueError):
                 value = None
-            rows.append((state.last_updated.timestamp(), value))
+            rows.append((float(state[COMPRESSED_STATE_LAST_UPDATED]), value))
         result[entity_id] = rows
     return result
 
