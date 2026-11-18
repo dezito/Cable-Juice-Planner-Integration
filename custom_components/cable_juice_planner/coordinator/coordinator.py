@@ -121,6 +121,10 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # not required to exist or be available at start: a car that is not set up yet must not hold this one up
         self.auto_ignored_entities = [entity_id for entity_id in self.lower_priority_chargers if entity_id not in listed]
         self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"] = [*listed, *self.auto_ignored_entities]
+        # every other car's charger, whatever its priority and whether it was added or listed: these are checked for a hung reading
+        self.config["home"]["charger_entity_ids"] = lower_priority_charger_power_entities(
+            hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, float("-inf")
+        )
         self._chargers_reload_scheduled = False
 
         charger = self.config["charger"]["entity_ids"]

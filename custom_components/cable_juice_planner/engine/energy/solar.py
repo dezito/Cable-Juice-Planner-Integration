@@ -44,7 +44,10 @@ class EnergySolar:
             ev_used_consumption = values["ev_used_consumption"]
             solar_production = values["solar_production"]
             total_local_energy = solar_production + powerwall_discharging_consumption
-            house_power_consumption = values["power_consumption_without_all_exclusion"] if without_all_exclusion else values["power_consumption_without_ignored"]
+            # never below 0: an ignored consumer or charger that reads more than the house sensor would otherwise add to the surplus
+            house_power_consumption = max(
+                values["power_consumption_without_all_exclusion"] if without_all_exclusion else values["power_consumption_without_ignored"], 0.0
+            )
 
             watts_available_from_local_energy = max(total_local_energy - house_power_consumption, 0.0)
             watts_available_from_local_energy_solar_only = max(solar_production - house_power_consumption, 0.0)

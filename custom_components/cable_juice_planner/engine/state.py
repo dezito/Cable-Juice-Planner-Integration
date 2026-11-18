@@ -17,6 +17,8 @@ class Snapshot:
     attributes: dict[str, dict] = field(default_factory=dict)
     platforms: dict[str, str | None] = field(default_factory=dict)
     units: dict[str, str | None] = field(default_factory=dict)
+    # seconds since each entity last reported (HA last_reported: also when the value did not change); missing = unknown
+    report_ages: dict[str, float] = field(default_factory=dict)
     buffers: dict[str, list] = field(default_factory=dict)
     statistics: dict[str, list] = field(default_factory=dict)
     price_data: dict | None = None

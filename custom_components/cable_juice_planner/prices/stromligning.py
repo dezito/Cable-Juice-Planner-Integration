@@ -4,6 +4,11 @@ from __future__ import annotations
 import datetime
 import logging
 
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+
+from ..const import FLOW_STEPS
 from ..utils.helpers import to_datetime
 from .base import BasePriceProvider, _naive, is_number
 
@@ -131,3 +136,64 @@ class StromligningPriceProvider(BasePriceProvider):
             return 0.0
         value = self._get_cached_entity_state(entity_id)
         return value if isinstance(value, (int, float)) else 0.0
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Flow time and repairs: no provider exists yet, so these read the options / the registry themselves - here, in prices/
+# ---------------------------------------------------------------------------------------------------------------------
+
+STROMLIGNING_PLATFORM = "stromligning"
+
+# the Strømligning sensors that can be selected on the price pages (the start of their unique ids)
+STROMLIGNING_UNIQUE_ID_PREFIXES = (
+    "current_price",
+    "tomorrow_available",
+    "forecasts",
+    "distribution",
+    "electricity_tax",
+    "nettariff",
+    "systemtariff",
+    "surcharge",
+)
+
+
+def stromligning_entities_to_watch(prices: dict[str, str]) -> list[str]:
+    """The configured Strømligning sensors that count: the tariff sensors only with a sell sensor (their page is hidden without it)."""
+    tariffs = FLOW_STEPS["prices_stromligning_tariffs"] if not prices.get("stromligning_sell_current_price") else []
+    return [entity_id for key, entity_id in prices.items() if key.startswith("stromligning_") and entity_id and key not in tariffs]
+
+
+def stromligning_problems(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, list[str]]:
+    """Which of the configured Strømligning sensors are disabled, and which the integration doesn't provide.
+
+    A sensor with no state, or only the state Home Assistant restores for an entity nobody provides, is not provided
+    (e.g. the price forecasts when they are off in the options of Strømligning). That is only a finding while the
+    Strømligning entry that owns the sensor runs: during an outage every sensor is unavailable, which is not a setting.
+    """
+    registry = er.async_get(hass)
+    disabled: list[str] = []
+    not_provided: list[str] = []
+    for entity_id in dict.fromkeys(entity_ids):
+        entry = registry.async_get(entity_id)
+        if entry is not None and entry.disabled_by:
+            disabled.append(entity_id)
+            continue
+        state = hass.states.get(entity_id)
+        if (state is None or state.attributes.get("restored")) and _integration_running(hass, entry):
+            not_provided.append(entity_id)
+    return {"disabled": disabled, "not_provided": not_provided}
+
+
+def _integration_running(hass: HomeAssistant, entry: er.RegistryEntry | None) -> bool:
+    """Whether the Strømligning entry that owns the sensor runs (there can be one for buying and one for selling).
+
+    Without a registry entry (the sensor was never created) any running Strømligning entry will do.
+    """
+    owner = hass.config_entries.async_get_entry(entry.config_entry_id) if entry is not None and entry.config_entry_id else None
+    if owner is not None:
+        return owner.state is ConfigEntryState.LOADED
+    return any(candidate.state is ConfigEntryState.LOADED for candidate in hass.config_entries.async_entries(STROMLIGNING_PLATFORM))
+
+
+def has_stromligning_sell_prices(options: dict) -> bool:
+    """Whether the options (the flat options of a config entry) have a Strømligning sell sensor, so the tariff page is needed."""
+    return bool(options.get("stromligning_sell_current_price"))

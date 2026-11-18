@@ -113,14 +113,50 @@ def test_a_load_that_is_only_there_while_the_battery_is_idle_does_not_count_eith
     assert found.include_discharging.value is True
 
 
+def test_an_ev_that_charges_in_the_same_minutes_as_the_battery_does_not_make_a_total_load_include_the_charging() -> None:
+    """Cheap hours: the battery grid-charges 3 kW and an EV 11 kW, both starting and stopping together. The step is 3.7 times the battery."""
+    load = [2500.0 + (11_000.0 if 40 <= minute % 180 < 80 else 0.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, "total", load=load)
+
+    found = detect(consumption, flow, level, END, hours=HOURS)
+
+    assert found.include_charging.value is None  # unknown, never "includes"
+    assert found.include_discharging.value is None  # clean on its own, but one direction cannot be checked against the other
+
+
+def test_a_charger_that_is_left_out_is_subtracted_before_the_switch_overs_are_read() -> None:
+    """The same EV, but its own sensor is one of the consumers the engine leaves out of the house consumption."""
+    ev = [(11_000.0 if 40 <= minute % 180 < 80 else 0.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, "total", load=[2500.0 + watt for watt in ev])
+    start = END - len(ROUNDS) * 60
+    charger = [(start + minute * 60, watt) for minute, watt in enumerate(ev)]
+
+    assert detect(consumption, flow, level, END, hours=HOURS).include_charging.value is not False  # the EV is in the way
+    found = detect(consumption, flow, level, END, hours=HOURS, ignored=[charger])
+
+    assert found.include_charging.value is False
+    assert found.include_discharging.value is True
+
+
+def test_a_derived_sensor_of_a_battery_that_cannot_cover_a_jump_in_the_load_is_not_taken_for_a_total_load() -> None:
+    """The load jumps 5 kW when the battery starts, which can only give 2 kW: the sensor reads 3 kW higher, not lower."""
+    load = [2500.0 + (5000.0 if 110 <= minute % 180 < 150 else 0.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, "derived", load=load)
+
+    found = detect(consumption, flow, level, END, hours=HOURS)
+
+    assert found.include_discharging.value is not True  # not "includes": a sensor from grid and solar excludes it
+    assert found.include_charging.value is not False
+
+
 def test_a_battery_that_sells_to_the_grid_is_not_taken_for_a_sensor_that_excludes_the_discharging() -> None:
     """The battery delivers 3 kW to the grid while the house uses 400 W: the sensor is below the discharge power - unknown."""
     consumption, flow, level = series(profile(SELLING * 4), "total", load=400.0)
 
     found = detect(consumption, flow, level, END, hours=HOURS)
 
-    assert found.include_charging.value is False
     assert found.include_discharging.value is None  # could be a total load of a house that sells, or a derived sensor
+    assert found.include_charging.value is None  # and one direction alone is not enough
 
 
 def test_a_derived_sensor_of_a_load_following_battery_is_not_taken_for_a_total_load() -> None:
@@ -133,6 +169,30 @@ def test_a_derived_sensor_of_a_load_following_battery_is_not_taken_for_a_total_l
 
     assert found.invert.value is True
     assert found.include_discharging.value is None  # below the battery power, flat: unknown, not "included"
+
+
+@pytest.mark.parametrize("sensor", ["total", "derived"])
+def test_something_of_the_batterys_own_size_that_switches_with_it_decides_nothing(sensor: str) -> None:
+    """A 3.7 kW consumer (a heat pump, a PHEV) on the same schedule as the 3 kW battery charge: a step of 1.2 x the battery power."""
+    load = [2500.0 + (3700.0 if 40 <= minute % 180 < 80 else 0.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, sensor, load=load)
+
+    found = detect(consumption, flow, level, END, hours=HOURS)
+
+    assert found.include_charging.value is None and found.include_discharging.value is None
+    assert verdict_values(found) == {"invert_powerwall_watt_flow_entity_id": True}  # only the sign is suggested
+
+
+def test_a_consumer_that_stops_when_the_battery_starts_covering_the_house_decides_nothing() -> None:
+    """A total-load sensor; a 2.3 kW load is blocked in the minutes the battery starts to discharge 2 kW (a step of about +1)."""
+    load = [2500.0 + (0.0 if minute % 180 >= 110 else 2300.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, "total", load=load)
+
+    found = detect(consumption, flow, level, END, hours=HOURS)
+
+    # the discharging alone would say "excludes" (the step is about the battery power) and the charging says "excludes" too:
+    # that is neither kind of sensor, so nothing is decided
+    assert found.include_charging.value is None and found.include_discharging.value is None
 
 
 def test_an_idle_battery_decides_nothing() -> None:
@@ -211,8 +271,7 @@ def test_a_gap_in_the_data_is_not_filled_with_numbers() -> None:
     consumption, flow, level = series(ROUNDS, "total")
     cut_from, cut_to = END - 8 * 3600, END - 7 * 3600
     flow = [row for row in flow if not cut_from <= row[0] < cut_to]  # a state stays until the next one, so mark it unavailable
-    flow.append((cut_from, None))
-    flow.append((cut_to, flow[-1][1] if False else 0.0))
+    flow.append((cut_from, None))  # unavailable until the first state after the gap
     flow.sort(key=lambda row: row[0])
 
     found = detect(consumption, flow, level, END, hours=HOURS)
@@ -295,6 +354,27 @@ async def test_kilowatt_sensors_are_read_in_watt(monkeypatch) -> None:
 
     assert found.invert.value is True and found.include_charging.value is False and found.include_discharging.value is True
     assert found.include_charging.numbers["p_charging"] == pytest.approx(3000, abs=100)
+
+
+async def test_the_consumers_that_are_left_out_are_read_from_the_recorder_and_subtracted(monkeypatch) -> None:
+    ev = [(11_000.0 if 40 <= minute % 180 < 80 else 0.0) for minute in range(len(ROUNDS))]
+    consumption, flow, level = series(ROUNDS, "total", load=[2500.0 + watt for watt in ev])
+    history = history_of(consumption, flow, level)
+    history["sensor.ev"] = [(END - len(ROUNDS) * 60 + minute * 60, watt / 1000) for minute, watt in enumerate(ev)]
+    calls: list = []
+    monkeypatch.setattr(detection, "async_load_rows", recorder_of(history, calls))
+    hass = hass_with_units(**ALL_W, **{"sensor.ev": "kW"})
+
+    without = await async_detect(hass, "sensor.house", "sensor.battery", "sensor.level", now=NOW)
+    with_it = await async_detect(hass, "sensor.house", "sensor.battery", "sensor.level", now=NOW, ignored_entities=["sensor.ev", "sensor.ev", "sensor.not_there", ""])
+
+    assert without.include_charging.value is not False
+    assert with_it.include_charging.value is False and with_it.include_discharging.value is True
+    assert all("sensor.not_there" not in call for call in calls)
+
+    # a left-out consumer in a unit that is not a power makes the answer unknown instead of wrong
+    hass = hass_with_units(**ALL_W, **{"sensor.ev": "kWh"})
+    assert (await async_detect(hass, "sensor.house", "sensor.battery", "sensor.level", now=NOW, ignored_entities=["sensor.ev"])).reason == "unit"
 
 
 async def test_a_unit_that_is_not_a_power_decides_nothing(monkeypatch) -> None:
@@ -408,7 +488,6 @@ async def test_the_recorder_rows_are_read_as_numbers(monkeypatch) -> None:
 async def test_no_recorder_a_timeout_or_an_error_is_unknown_and_never_raises(monkeypatch) -> None:
     hass = SimpleNamespace(states=SimpleNamespace(get=lambda entity_id: None), config=SimpleNamespace(components=set()))
     with_units = hass_with_units(**ALL_W)
-    assert (await async_detect(with_units, "sensor.house", "sensor.battery", "sensor.level")).reason == "unit" or True
     no_recorder = SimpleNamespace(states=with_units.states, config=SimpleNamespace(components=set()))
     assert (await async_detect(no_recorder, "sensor.house", "sensor.battery", "sensor.level")).reason == "recorder"
     assert (await async_detect(hass, "", "sensor.battery", "sensor.level")).reason == "entities"
