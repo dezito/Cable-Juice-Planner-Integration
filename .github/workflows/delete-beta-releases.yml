@@ -1,0 +1,66 @@
+name: Delete beta releases
+
+# Run by hand (Actions -> Delete beta releases -> Run workflow).
+# Deletes every release whose tag contains "beta" (case-insensitive), drafts
+# and pre-releases included, e.g. v1.0.9-beta.1. Stable releases are never
+# touched. Dry run is ticked by default and only lists what would be deleted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only list the releases that would be deleted
+        type: boolean
+        default: true
+      delete_tags:
+        description: Also delete the git tags of the deleted releases
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: delete-beta-releases
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      DELETE_TAGS: ${{ inputs.delete_tags }}
+    steps:
+      - name: Delete beta releases
+        run: |
+          set -euo pipefail
+
+          tags=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
+            --json tagName | jq -r '.[].tagName | select(test("beta"; "i"))')
+
+          if [ -z "$tags" ]; then
+            echo "No releases with beta in the tag."
+            exit 0
+          fi
+
+          echo "Releases with beta in the tag:"
+          echo "$tags" | sed 's/^/  /'
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run - nothing deleted. Run again with dry run unticked to delete."
+            exit 0
+          fi
+
+          cleanup=()
+          if [ "$DELETE_TAGS" = "true" ]; then
+            cleanup=(--cleanup-tag)
+          fi
+
+          count=0
+          while IFS= read -r tag; do
+            gh release delete "$tag" --yes "${cleanup[@]}" --repo "$GITHUB_REPOSITORY"
+            count=$((count + 1))
+          done <<< "$tags"
+
+          echo "Deleted $count release(s)."
