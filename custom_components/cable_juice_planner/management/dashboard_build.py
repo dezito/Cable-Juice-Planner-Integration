@@ -2,7 +2,9 @@
 
 The template (dashboard/cable_juice_planner.yaml) is written for the entities of the
 integration with the prefix ``cjp`` and the author's car, charger, price and solar
-entities. At setup it is rewritten for this config entry:
+entities. The price chart of each price integration is a file of its own
+(dashboard/prices/<provider>.yaml) that the template includes with a ``# @include`` line.
+At setup it is rewritten for this config entry:
 
 * own entities ``<platform>.cjp_*`` -> ``<platform>.cjp_<prefix>_*``
 * external entities (charger, car, Energi Data Service, Strømligning, Solcast) -> the
@@ -49,6 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 
 TEMPLATE_DIR = Path(__file__).parent.parent / "dashboard"
 
+_INCLUDE = re.compile(r"^(?P<indent> *)# @include (?P<name>\S+) *$", re.MULTILINE)
 _OWN_ENTITY = re.compile(r"\b(sensor|binary_sensor|switch|number|select|text|button|time|datetime|event)\.cjp_")
 _ENTITY_ID = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
 _PLACEHOLDER = re.compile(r"@@(\w+)@@")
@@ -138,6 +141,25 @@ class CJPDashboard(lovelace_dashboard.LovelaceYAML):
 def template_file(config: dict[str, Any]) -> Path:
     """One template for every configuration: the cards of a missing car/solar/... are removed."""
     return TEMPLATE_DIR / "cable_juice_planner.yaml"
+
+
+def expand_includes(text: str, directory: Path = TEMPLATE_DIR) -> str:
+    """Replace every ``# @include <file>`` line by the lines of directory/<file>, indented like the marker.
+
+    The price chart of each price integration is a file of its own, dashboard/prices/<provider>.yaml
+    (<provider> is the key of ``PROVIDER_CLASSES``). A missing file raises: a card must never vanish silently.
+    """
+
+    def expand(match: re.Match[str]) -> str:
+        lines = (directory / match["name"]).read_text(encoding="utf-8").removesuffix("\n").split("\n")
+        return "\n".join(f"{match['indent']}{line}" if line else "" for line in lines)
+
+    return _INCLUDE.sub(expand, text)
+
+
+def template_text(config: dict[str, Any]) -> str:
+    """The dashboard template with its included files (blocking file I/O). Everything reads the template through this."""
+    return expand_includes(template_file(config).read_text(encoding="utf-8"))
 
 
 def _car_base(config: dict[str, Any]) -> str:
@@ -338,7 +360,7 @@ def render_dashboard(
     """
     own = object_prefix(prefix)
     mapping = external_entities(config)
-    text = template_file(config).read_text(encoding="utf-8").replace("__ENTRY_ID__", entry_id)
+    text = template_text(config).replace("__ENTRY_ID__", entry_id)
     replace = {source: target for source, target in mapping.items() if target and source != target}
     text = _replace(text, replace)
     if own != ENTITY_ID_PREFIX:

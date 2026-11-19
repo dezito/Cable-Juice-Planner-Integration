@@ -11,7 +11,8 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
 
 from custom_components.cable_juice_planner import const
-from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
+from custom_components.cable_juice_planner.management.dashboard_build import TEMPLATE_DIR, expand_includes, render_dashboard, template_text
+from custom_components.cable_juice_planner.prices.factory import PROVIDER_CLASSES
 from custom_components.cable_juice_planner.entity import help_values
 from custom_components.cable_juice_planner.utils.formatting import (
     format_analysis_help_text,
@@ -103,6 +104,34 @@ def test_sell_price_chart_subtracts_the_configured_sell_fee() -> None:
     assert "const sellFee = Number('0.07') || 0;" in text
     assert "0.025" not in text and "@@sell_fee_value@@" not in text
     assert "spotprice - sellCosts" in text
+
+
+def test_every_price_provider_has_a_chart_file_of_its_own() -> None:
+    """dashboard/prices/<provider>.yaml for every key of PROVIDER_CLASSES, each included by the template."""
+    files = {path.stem for path in (TEMPLATE_DIR / "prices").glob("*.yaml")}
+    assert files == set(PROVIDER_CLASSES)
+    main = (TEMPLATE_DIR / "cable_juice_planner.yaml").read_text(encoding="utf-8")
+    for provider in PROVIDER_CLASSES:
+        assert main.count(f"# @include prices/{provider}.yaml") == 1, provider  # twice would draw the chart twice
+
+
+def test_the_expanded_template_has_every_price_chart_and_no_marker_left() -> None:
+    text = template_text({})
+    assert "@include" not in text
+    # exactly one chart stack per price integration: its first card is the "integration is down" notice
+    stacks = [card for card in _cards(yaml.safe_load(text)["views"]) if card.get("type") == "vertical-stack"]
+    first_entities = [
+        (stack["cards"][0].get("conditions") or [{}])[0].get("entity") for stack in stacks if stack["cards"] and stack["cards"][0].get("type") == "conditional"
+    ]
+    assert first_entities.count("sensor.energi_data_service") == 1
+    assert first_entities.count("sensor.stromligning_current_price_vat") == 1
+
+
+def test_an_include_is_indented_like_its_marker_and_a_missing_file_raises(tmp_path) -> None:
+    (tmp_path / "x.yaml").write_text("- a: 1\n  b: |\n    one\n\n    two\n", encoding="utf-8")
+    assert expand_includes("k:\n    # @include x.yaml\nz: 1\n", tmp_path) == "k:\n    - a: 1\n      b: |\n        one\n\n        two\nz: 1\n"
+    with pytest.raises(FileNotFoundError):
+        expand_includes("k:\n    # @include missing.yaml\n", tmp_path)
 
 
 def test_distance_follows_home_assistant() -> None:
@@ -512,9 +541,7 @@ def test_texts_have_the_same_keys_and_placeholders_in_every_language(language: s
 @pytest.mark.parametrize("language", ["da", "de", "en", "en-GB", "pl", "uk"])
 def test_economy_score_column_is_translated_and_explained(language: str) -> None:
     """The Score column of the economy table is a text of its own and the Read more names it with the same word."""
-    from pathlib import Path
-
-    source = (Path(const.__file__).parent.parent / "dashboard" / "cable_juice_planner.yaml").read_text(encoding="utf-8")
+    source = template_text({})
     assert "| Score |" not in source and " · Score " not in source and "@@economy_score@@" in source
     texts = load_texts(language, "GBP", "km")
     assert f"**{texts['dashboard.economy_score']}**:" in texts["dashboard.economy_explain"], language

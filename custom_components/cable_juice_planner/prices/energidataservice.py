@@ -27,6 +27,13 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
     def get_sell_price_entity_id(self) -> str:
         return self.sell_entity_id
 
+    @classmethod
+    def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
+        return {
+            "sensor.energi_data_service": prices["energidataservice_buy_entity_id"],
+            "sensor.energi_data_service_salg": prices["energidataservice_sell_entity_id"],
+        }
+
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_entity_id)
 

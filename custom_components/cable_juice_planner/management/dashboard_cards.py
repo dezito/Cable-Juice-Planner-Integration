@@ -51,7 +51,7 @@ class DashboardCard:
         return f"https://my.home-assistant.io/redirect/hacs_repository/?owner={self.owner}&repository={self.repository}"
 
 
-# Every custom card type of dashboard/cable_juice_planner.yaml; card-mod only styles tables
+# Every custom card type of the dashboard template (dashboard/cable_juice_planner.yaml and its included files); card-mod only styles tables
 DASHBOARD_CARDS: tuple[DashboardCard, ...] = (
     DashboardCard("Mushroom", "piitaya", "lovelace-mushroom", ("mushroom",)),
     DashboardCard("ApexCharts Card", "RomRider", "apexcharts-card", ("apexcharts-card",)),
