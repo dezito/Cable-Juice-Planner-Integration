@@ -221,7 +221,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self._job_cache = {}
         self._changed_sensors = set()
         if self.price_provider is not None:
-            self.price_provider.set_now(snapshot.now)
+            self.price_provider.set_now(snapshot.now, snapshot.tz)
             if snapshot.price_data is not None:
                 self.price_provider.set_snapshot(snapshot.price_data)
         try:

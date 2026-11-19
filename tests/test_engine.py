@@ -1992,6 +1992,25 @@ def test_history_sell_prices_get_the_adder_that_makes_a_sale_worth_less(fixed: f
     assert sell.value[target] == pytest.approx(2.5 + sign * 2 / 30, abs=0.006)
 
 
+def test_the_engine_gives_the_price_provider_home_assistants_time_zone() -> None:
+    """Price rows in UTC give the same prices as the same rows in local time: the engine passes the snapshot's time zone on."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+
+    def buy_prices(utc: bool) -> dict:
+        snap = snapshot(now)
+        if utc:
+            for key in ("raw_today", "raw_tomorrow", "forecast"):
+                for row in snap.attributes["sensor.price"][key]:
+                    row["hour"] = datetime.datetime.fromisoformat(row["hour"]).astimezone(datetime.timezone.utc).isoformat()
+        engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+        assert engine.run_job(snap, engine.startup, {}).error is None
+        assert engine.run_job(snap, engine.update_grid_prices).error is None
+        return dict(engine.price_provider.get_buy_prices())
+
+    local = buy_prices(False)
+    assert local and buy_prices(True) == local
+
+
 def test_sell_value_with_fixed_solar_sell_price() -> None:
     """A fixed price settles the difference to the hourly price: fixed - hourly, also negative."""
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)

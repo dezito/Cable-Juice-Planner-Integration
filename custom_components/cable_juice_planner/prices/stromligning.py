@@ -9,8 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from ..const import FLOW_STEPS
-from ..utils.helpers import to_datetime
-from .base import BasePriceProvider, _naive, is_number
+from .base import BasePriceProvider, _naive, is_number, price_timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ class StromligningPriceProvider(BasePriceProvider):
         if "prices" not in attr:
             raise ValueError(f"prices not in {entity_id} attributes")
         for raw in attr["prices"]:
-            timestamp = _naive(to_datetime(raw.get("start")))
+            timestamp = price_timestamp(raw.get("start"), self.tz)
             price = raw.get("price")
             if not isinstance(timestamp, datetime.datetime) or not is_number(price):
                 continue
@@ -137,10 +136,10 @@ class StromligningPriceProvider(BasePriceProvider):
             self._distribution_prices = {}
             if self._entity_exists(self.sell_distribution):
                 for raw in self._get_entity_attr(self.sell_distribution).get("prices", []):
-                    price_timestamp = _naive(to_datetime(raw.get("start")))
+                    row_timestamp = price_timestamp(raw.get("start"), self.tz)
                     price = raw.get("price")
-                    if isinstance(price_timestamp, datetime.datetime) and isinstance(price, (int, float)):
-                        self._distribution_prices[price_timestamp] = price
+                    if isinstance(row_timestamp, datetime.datetime) and isinstance(price, (int, float)):
+                        self._distribution_prices[row_timestamp] = price
         result = self.get_price_at_timestamp(self._distribution_prices, timestamp)
         if result is None and self._distribution_prices:
             # The sensor only has today's tariffs, but tomorrow's and the forecast prices include

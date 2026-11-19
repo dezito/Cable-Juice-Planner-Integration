@@ -7,6 +7,8 @@ import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from dateutil import parser as dateutil_parser
+
 from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
 from ..utils.helpers import days_between, float_or_none, reset_time_to_hour
 
@@ -54,6 +56,28 @@ def _naive(timestamp):
     return timestamp.replace(tzinfo=None) if isinstance(timestamp, datetime.datetime) else timestamp
 
 
+def price_timestamp(value, tz: datetime.tzinfo | None = None):
+    """The start of a price row from an entity attribute (ISO string or datetime) as naive local time.
+
+    An aware timestamp, with any offset (UTC from Nord Pool, EPEX, ...), is converted to tz (Home Assistant's
+    time zone) before the offset is dropped; a naive one is taken as local time already. Without a tz the offset
+    is just dropped. Anything that is no timestamp is returned unchanged (the providers skip such rows).
+    """
+    if isinstance(value, str):
+        try:
+            value = dateutil_parser.isoparse(value)
+        except (ValueError, OverflowError):
+            return value
+    if isinstance(value, datetime.datetime):
+        if tz is not None and value.tzinfo is not None:
+            try:
+                value = value.astimezone(tz)
+            except OverflowError:  # a timestamp at the edge of the calendar: keep its own wall time
+                pass
+        return value.replace(tzinfo=None)
+    return value
+
+
 def is_number(value) -> bool:
     """A usable price: a finite number (not None, text, a bool, NaN or infinity)."""
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
@@ -84,6 +108,8 @@ class BasePriceProvider:
         self.sell_price_details: dict = {}
         self.shared_data: dict = {"attributes": {}, "values": {}, "version": 0}
         self.now = datetime.datetime.now().replace(microsecond=0)
+        # Home Assistant's time zone (set_now): the offset of a price row is converted to it, see price_timestamp()
+        self.tz: datetime.tzinfo | None = None
 
     @staticmethod
     def get_price_at_timestamp(prices: dict, timestamp):
@@ -92,11 +118,11 @@ class BasePriceProvider:
             return None
         timestamp = _naive(timestamp)
         best = None
-        for price_timestamp in prices:
-            price_timestamp = _naive(price_timestamp)
-            if price_timestamp.date() == timestamp.date() and price_timestamp <= timestamp:
-                if best is None or price_timestamp > best:
-                    best = price_timestamp
+        for start in prices:
+            start = _naive(start)
+            if start.date() == timestamp.date() and start <= timestamp:
+                if best is None or start > best:
+                    best = start
         if best is None:
             return None
         return {"price_timestamp": best, "price": prices[best]}
@@ -220,7 +246,7 @@ class BasePriceProvider:
     def _periods_in_hour(prices: dict, timestamp) -> int:
         hour_start = _naive(timestamp).replace(minute=0, second=0, microsecond=0)
         hour_end = hour_start + datetime.timedelta(hours=1)
-        return sum(1 for price_timestamp in prices if hour_start <= _naive(price_timestamp) < hour_end)
+        return sum(1 for start in prices if hour_start <= _naive(start) < hour_end)
 
 
 class CombinedPriceProvider(BasePriceProvider):
@@ -289,10 +315,13 @@ class CombinedPriceProvider(BasePriceProvider):
 
     # prices (worker) ----------------------------------------------------- #
 
-    def set_now(self, now: datetime.datetime) -> None:
+    def set_now(self, now: datetime.datetime, tz: datetime.tzinfo | None = None) -> None:
+        """now: local time without tzinfo; tz: Home Assistant's time zone (None = drop the offset of a price row as it is)."""
         self.now = now
+        self.tz = tz
         for provider in self.providers:
             provider.now = now
+            provider.tz = tz
 
     def set_snapshot(self, price_data: dict) -> None:
         """New HA snapshot (replaces _update_shared_price_data)."""
@@ -420,10 +449,10 @@ class CombinedPriceProvider(BasePriceProvider):
         result = self.get_price_at_timestamp(self.sell_prices, timestamp)
         if result is None:
             raise ValueError(f"No sell price available for {timestamp}")
-        price_timestamp = result["price_timestamp"]
-        details = self.sell_price_details.get(price_timestamp)
+        start = result["price_timestamp"]
+        details = self.sell_price_details.get(start)
         if details is None:
-            return {"price": result["price"], "details": {"price_timestamp": price_timestamp, "solar_sell_price": result["price"]}}
+            return {"price": result["price"], "details": {"price_timestamp": start, "solar_sell_price": result["price"]}}
         return {"price": result["price"], "details": details.copy()}
 
     def buy_prices_available(self) -> bool:

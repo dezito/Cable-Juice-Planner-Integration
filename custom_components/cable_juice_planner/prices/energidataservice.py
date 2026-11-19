@@ -4,8 +4,8 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ..utils.helpers import days_between, reset_time_to_hour, to_datetime
-from .base import BasePriceProvider, _ZERO_TARIFFS, _naive, is_number, sell_price_parts
+from ..utils.helpers import days_between, reset_time_to_hour
+from .base import BasePriceProvider, _ZERO_TARIFFS, is_number, price_timestamp, sell_price_parts
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,10 +52,9 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
             prices[timestamp] = self.calculate_sell_price(timestamp, price)
         return prices
 
-    @staticmethod
-    def _rows(rows):
+    def _rows(self, rows):
         for raw in rows or []:
-            timestamp = _naive(to_datetime(raw["hour" if "hour" in raw else "time"]))
+            timestamp = price_timestamp(raw["hour" if "hour" in raw else "time"], self.tz)
             price = raw["price"]
             if isinstance(timestamp, datetime.datetime) and is_number(price):
                 yield timestamp, price
