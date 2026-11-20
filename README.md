@@ -61,7 +61,7 @@ For battery health, regular smaller top-ups can keep the battery in a narrower s
 | Plans workdays, trips and preheating.<br>Automates routine charging and can find cheaper hours earlier in the week. | More settings and reliable price, charger and battery data are needed. |
 | Combines prices, solar, home battery, driving distance and measured charging loss. | Charger control needs your automation.<br>The included blueprint helps. |
 | Daily reserve avoids charging to a high level every day.<br>Very cheap hours can fill toward the recommended limit. | An unexpected long trip may require public charging if only the daily reserve remains. |
-| Lower average SOC may help battery longevity.<br>CJP also includes a dashboard, history and cost comparisons. | Built-in price providers are Energi Data Service and/or Strømligning.<br>Other sources may need extra setup. |
+| Lower average SOC may help battery longevity.<br>CJP also includes a dashboard, history and cost comparisons. | Built-in price providers are Energi Data Service, Strømligning and Energy Price Forecast (outside Denmark).<br>Other sources may need extra setup. |
 | Works with supported HA charger and car integrations through your own automation. | More rules and forecasts mean more setup and complexity than a simple price scheduler. |
 
 ---
@@ -127,7 +127,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   and chargers sharing one circuit limit (e.g. an Easee master)
 - **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
-  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund;
+  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund, and
+  [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) for prices and forecasts in most of Europe;
   forecast prices are corrected with their measured bias
 - **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
 - **[Public charging](docs/public-charging.md)** (with EV integration and location)
@@ -195,7 +196,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - Home Assistant **2025.1** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
   its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
 - A charger with **status**, **power** (W) and **kWh** sensors
-- Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning)
+- Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning) and/or [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant)
 - Optional:
   - EV integration (battery level, range and odometer, and preferably charge port, charge limit and location)
   - solar production (W) and [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar)
@@ -259,7 +260,7 @@ Setup is done in the UI, split into pages with help texts:
    location, update time and climate, as well as battery size. Skip the page if you don't have
    an EV integration (virtual EV).
 5. **House and home battery:** consumption, ignored consumers, the home battery's level and power
-6. **Price providers:** Energi Data Service and/or Strømligning, refund and selling fee
+6. **Price providers:** Energi Data Service, Strømligning and/or Energy Price Forecast, refund and selling fee
 7. **Solar panels, solar charging and weather** (only with solar panels), incl. a
    [fixed solar sell price](docs/rules/solar.md#fixed-solar-sell-price) (−1 = the hourly price)
 8. **Notifications, advanced** (interval, dashboard and diagnostic file log) **and databases**

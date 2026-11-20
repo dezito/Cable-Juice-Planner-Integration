@@ -165,6 +165,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service entity_id ціни продажу"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Датчики інтеграції Energy Price Forecast (ціни та прогнози для більшої частини Європи). Як ціну купівлі виберіть її датчик з роздрібною ціною: він дає опубліковані ціни на сьогодні й завтра та прогноз на наступні дні. Як ціну продажу виберіть її датчик з оптовою ціною. Ціни мають бути за kWh у валюті (не в центах чи пенсах); ціна за MWh перераховується в kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Ціна купівлі (датчик з роздрібною ціною)",
+          "energypriceforecast_sell_entity_id": "Ціна продажу"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Датчик Energy Price Forecast з роздрібною ціною, разом з маржею постачальника, податками та мережевим тарифом",
+          "energypriceforecast_sell_entity_id": "Датчик Energy Price Forecast з оптовою ціною. Ціна продажу — це ця ціна мінус комісія за продаж (роздрібна ціна вища за те, що дає продаж, тому її не використовують як ціну продажу)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
@@ -316,7 +328,7 @@
       },
       "price_provider": {
         "title": "Ціни на електроенергію",
-        "description": "Оберіть, звідки беруться погодинні ціни. З обома пріоритет має Strømligning: його ціна використовується для кожної години, для якої вона є, а Energi Data Service заповнює прогалини.",
+        "description": "Оберіть, звідки беруться погодинні ціни. З кількома порядок такий: Strømligning, потім Energi Data Service, потім Energy Price Forecast: для кожної години використовується ціна першого, який її має, а наступний заповнює прогалини.",
         "data": {
           "price_providers": "Постачальники цін"
         }
@@ -403,7 +415,11 @@
       "min_above_max": "Мінімум не може перевищувати максимум.",
       "invalid_icon": "Використайте назву значка, напр. mdi:ev-station.",
       "circuit_no_charger_device": "Сутності зарядного пристрою цього авто не належать жодному пристрою, тому його не можна прив'язати до кола.",
-      "circuit_own_charger_missing": "Оберіть також зарядний пристрій цього авто."
+      "circuit_own_charger_missing": "Оберіть також зарядний пристрій цього авто.",
+      "price_unit_subunit": "Цей датчик показує ціну в центах або пенсах (або, для Energi Data Service, за MWh). Виберіть датчик з ціною за kWh у валюті (наприклад, EUR/kWh).",
+      "price_sensor_not_retail": "Це не датчик з роздрібною ціною. Як ціну купівлі виберіть датчик Energy Price Forecast з роздрібною ціною (оптова ціна є ціною продажу).",
+      "price_sensor_not_wholesale": "Це датчик з роздрібною ціною. Як ціну продажу виберіть датчик Energy Price Forecast з оптовою ціною (роздрібна ціна вища за те, що дає продаж).",
+      "price_currency_mismatch": "Цей датчик у іншій валюті, ніж інші датчики цін. Використовуйте датчики цін в одній валюті (або зніміть вибір з іншого постачальника цін)."
     },
     "abort": {
       "site_exists": "Спільне підключення вже існує."
@@ -589,6 +605,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service entity_id ціни продажу"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Датчики інтеграції Energy Price Forecast (ціни та прогнози для більшої частини Європи). Як ціну купівлі виберіть її датчик з роздрібною ціною: він дає опубліковані ціни на сьогодні й завтра та прогноз на наступні дні. Як ціну продажу виберіть її датчик з оптовою ціною. Ціни мають бути за kWh у валюті (не в центах чи пенсах); ціна за MWh перераховується в kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Ціна купівлі (датчик з роздрібною ціною)",
+          "energypriceforecast_sell_entity_id": "Ціна продажу"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Датчик Energy Price Forecast з роздрібною ціною, разом з маржею постачальника, податками та мережевим тарифом",
+          "energypriceforecast_sell_entity_id": "Датчик Energy Price Forecast з оптовою ціною. Ціна продажу — це ця ціна мінус комісія за продаж (роздрібна ціна вища за те, що дає продаж, тому її не використовують як ціну продажу)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
@@ -740,7 +768,7 @@
       },
       "price_provider": {
         "title": "Ціни на електроенергію",
-        "description": "Оберіть, звідки беруться погодинні ціни. З обома пріоритет має Strømligning: його ціна використовується для кожної години, для якої вона є, а Energi Data Service заповнює прогалини.",
+        "description": "Оберіть, звідки беруться погодинні ціни. З кількома порядок такий: Strømligning, потім Energi Data Service, потім Energy Price Forecast: для кожної години використовується ціна першого, який її має, а наступний заповнює прогалини.",
         "data": {
           "price_providers": "Постачальники цін"
         }
@@ -800,7 +828,11 @@
       "min_above_max": "Мінімум не може перевищувати максимум.",
       "invalid_icon": "Використайте назву значка, напр. mdi:ev-station.",
       "circuit_no_charger_device": "Сутності зарядного пристрою цього авто не належать жодному пристрою, тому його не можна прив'язати до кола.",
-      "circuit_own_charger_missing": "Оберіть також зарядний пристрій цього авто."
+      "circuit_own_charger_missing": "Оберіть також зарядний пристрій цього авто.",
+      "price_unit_subunit": "Цей датчик показує ціну в центах або пенсах (або, для Energi Data Service, за MWh). Виберіть датчик з ціною за kWh у валюті (наприклад, EUR/kWh).",
+      "price_sensor_not_retail": "Це не датчик з роздрібною ціною. Як ціну купівлі виберіть датчик Energy Price Forecast з роздрібною ціною (оптова ціна є ціною продажу).",
+      "price_sensor_not_wholesale": "Це датчик з роздрібною ціною. Як ціну продажу виберіть датчик Energy Price Forecast з оптовою ціною (роздрібна ціна вища за те, що дає продаж).",
+      "price_currency_mismatch": "Цей датчик у іншій валюті, ніж інші датчики цін. Використовуйте датчики цін в одній валюті (або зніміть вибір з іншого постачальника цін)."
     },
     "abort": {
       "backup_exported": "Резервну копію збережено як **{file}**.",
@@ -817,7 +849,8 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
-        "stromligning": "Strømligning"
+        "stromligning": "Strømligning",
+        "energypriceforecast": "Energy Price Forecast (Європа)"
       }
     },
     "restore_backup": {

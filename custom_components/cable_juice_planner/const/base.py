@@ -10,7 +10,7 @@ ENTITY_ID_PREFIX = "cjp"
 
 # Price providers in priority order. For each hour the planner and the economy use the
 # first configured provider that has a price, then fall back to the next one.
-PRICE_PROVIDER_PRIORITY = ("stromligning", "energidataservice")
+PRICE_PROVIDER_PRIORITY = ("stromligning", "energidataservice", "energypriceforecast")
 
 
 def normalize_prefix(prefix: str | None) -> str:

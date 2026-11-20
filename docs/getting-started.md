@@ -8,7 +8,7 @@ days of watching the plan before you trust it.
 | You need | Why |
 |---|---|
 | A charger with **status**, **power** (W) and **kWh** sensors | whether the car is connected and charging, and how much went in |
-| [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning) | the prices per hour |
+| [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning) and/or [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) | the prices per hour |
 | A way to start/stop the charger (or the car) and set the current from Home Assistant | CJP only decides – your automation does it |
 
 Optional:
@@ -133,10 +133,18 @@ again.
 
 ### Prices
 
-Energi Data Service and/or Strømligning. With both, Strømligning has priority: its price is used for every
-hour it has one, and Energi Data Service fills the gaps (also in the economy statement).
+Energi Data Service, Strømligning and/or Energy Price Forecast. With several, the priority is Strømligning, then
+Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour,
+and the next fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
+
+**Energy Price Forecast** (for prices outside Denmark): choose its retail price sensor as the buy price – it gives
+the published prices of today and tomorrow and the forecast after them. Choose its wholesale price sensor as the sell
+price (required: the retail price is higher than what a sale pays, so it is refused as a sell sensor; an entry restored from a backup without one sells at the buy price less the sell fee). The sensors must give the price per kWh
+in the currency (EUR/kWh, GBP/kWh, …), not in cents or pence: CJP refuses a sensor in ct/kWh or p/kWh. A sensor in EUR/MWh (a wholesale sensor often is) is converted to kWh, also in the recorded buy price history (read in the unit the sensor has now: if you change its unit, the old history is off by 1000; a sensor that is missing from Home Assistant has its history left out). The
+currency of the sensor sets the [price scale](how-it-works.md#prices). All price sensors must be in the same
+currency (a backup provider in another currency is refused).
 
 Strømligning switches its sensors excl. VAT (which the sell sensors and the tariffs use) off by default, and a
 disabled sensor can't be selected: enable them first under **Settings → Devices & services → Entities** (*Show

@@ -1,4 +1,4 @@
-"""Price providers (Energi Data Service and Strømligning).
+"""Price providers (Energi Data Service, Strømligning and Energy Price Forecast).
 
 Port of the PyScript module ``price_provider``. Everything about prices goes through
 ``CombinedPriceProvider`` (see ``create_price_provider``): the coordinator asks it which
@@ -14,8 +14,9 @@ Energi Data Service) with a price for a timestamp wins; real prices always win o
 forecasts.
 """
 from .base import PRICE_SNAPSHOT_SECONDS, BasePriceProvider, CombinedPriceProvider
-from .currency import detect_price_scale
+from .currency import detect_price_scale, price_currency_errors, price_sensor_errors
 from .energidataservice import EnergiDataServicePriceProvider
+from .energypriceforecast import EnergyPriceForecastPriceProvider
 from .dashboard import price_dashboard_entities
 from .factory import create_price_provider, providers_from_options
 from .stromligning import (
@@ -33,12 +34,15 @@ __all__ = [
     "BasePriceProvider",
     "CombinedPriceProvider",
     "EnergiDataServicePriceProvider",
+    "EnergyPriceForecastPriceProvider",
     "StromligningPriceProvider",
     "PRICE_SNAPSHOT_SECONDS",
     "create_price_provider",
     "detect_price_scale",
     "has_stromligning_sell_prices",
+    "price_currency_errors",
     "price_dashboard_entities",
+    "price_sensor_errors",
     "providers_from_options",
     "stromligning_entities_to_watch",
     "stromligning_problems",

@@ -59,7 +59,7 @@ def test_a_missing_or_invalid_scale_is_kroner() -> None:
         ("DKK/kWh", 1.0), ("kr/kWh", 1.0), ("kr./kWh", 1.0), (" dkk / kWh ", 1.0), ("SEK/kWh", 1.4), ("NOK/kWh", 1.5),
         ("EUR/kWh", 0.134), ("€/kWh", 0.134), ("GBP/kWh", 0.115), ("£/kWh", 0.115), ("PLN/kWh", 0.57), ("zł/kWh", 0.57),
         # not a known currency per kWh: not guessed
-        ("EUR/MWh", None), ("ct/kWh", None), ("EUR", None), ("XYZ/kWh", None), ("", None), (None, None), (5, None),
+        ("EUR/MWh", 0.134), ("ct/kWh", None), ("GBp/kWh", None), ("Kr/kWh", 1.0), ("Zł/kWh", 0.57), ("Eur/kWh", 0.134), ("Gbp/kWh", 0.115), ("p/kWh", None), ("c/kWh", None), ("EURct/kWh", None), ("EUR", None), ("XYZ/kWh", None), ("", None), (None, None), (5, None),
     ],
 )
 def test_the_scale_of_a_price_unit(unit, scale) -> None:

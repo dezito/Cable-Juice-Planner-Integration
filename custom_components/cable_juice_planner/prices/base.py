@@ -69,6 +69,16 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def is_price_per_mwh(unit) -> bool:
+    """A price per MWh (EUR/MWh): 1000 times the price per kWh, as a wholesale sensor often gives it."""
+    return isinstance(unit, str) and "/" in unit and unit.rsplit("/", 1)[1].strip().lower() == "mwh"
+
+
+def price_unit_divisor(unit) -> float:
+    """What the numbers of a price sensor are divided by to get the price per kWh: 1000 for a price per MWh, else 1."""
+    return 1000.0 if is_price_per_mwh(unit) else 1.0
+
+
 def sell_price_parts(price: float, tariff: Mapping, costs: Mapping, sell_fee: float, decimals: int = 2) -> tuple[float, float, float]:
     """The sell price formula (see calculate_sell_price): (price without the tariffs in it, selling costs, sell price).
 
@@ -290,6 +300,27 @@ class CombinedPriceProvider(BasePriceProvider):
                 value = float_or_none(state.state)
                 values[entity_id] = value if value is not None else 0.0
         return {"attributes": attributes, "values": values}
+
+    def price_unit_divisors(self, get_state) -> dict[str, float]:
+        """{entity_id: divisor} of the Energy Price Forecast sensors whose recorded history (the statistics and states of the sensor
+        itself) is not a price per kWh as it is: 1000.0 for a price per MWh, None when the sensor is not in Home Assistant (its
+        unit is not known, so its history is left out, never read as kWh). The unit is the sensor's unit now; the recorder keeps
+        no unit for the states, so a sensor that changed its unit has its old history read in the new one."""
+        divisors: dict[str, float | None] = {}
+        for provider in self.providers:
+            if getattr(provider, "source_name", "") != "energypriceforecast":
+                continue
+            for entity_id in (provider.buy_entity_id, provider.sell_entity_id):
+                if not entity_id:
+                    continue
+                state = get_state(entity_id)
+                if state is None:
+                    divisors[entity_id] = None
+                    continue
+                divisor = price_unit_divisor(getattr(state, "attributes", {}).get("unit_of_measurement"))
+                if divisor != 1.0:
+                    divisors[entity_id] = divisor
+        return divisors
 
     def sell_price_entity_ids(self) -> list[str]:
         """The sell price entities of the providers that have one, in priority order."""

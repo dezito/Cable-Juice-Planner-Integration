@@ -165,6 +165,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service entity_id ceny sprzedaży"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Czujniki integracji Energy Price Forecast (ceny i prognozy dla większości Europy). Jako cenę zakupu wybierz jej czujnik z ceną detaliczną: podaje opublikowane ceny na dziś i jutro oraz prognozę na kolejne dni. Jako cenę sprzedaży wybierz jej czujnik z ceną hurtową. Ceny muszą być podane za kWh w walucie (nie w centach ani pensach); cena za MWh jest przeliczana na kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Cena zakupu (czujnik z ceną detaliczną)",
+          "energypriceforecast_sell_entity_id": "Cena sprzedaży"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Czujnik Energy Price Forecast z ceną detaliczną, wraz z marżą dostawcy, podatkami i opłatą sieciową",
+          "energypriceforecast_sell_entity_id": "Czujnik Energy Price Forecast z ceną hurtową. Cena sprzedaży to ta cena minus opłata za sprzedaż (cena detaliczna jest wyższa niż to, co daje sprzedaż, więc nie jest używana jako cena sprzedaży)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
@@ -316,7 +328,7 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy obu pierwszeństwo ma Strømligning: jego cena jest używana dla każdej godziny, dla której ją ma, a Energi Data Service uzupełnia luki.",
+        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki.",
         "data": {
           "price_providers": "Dostawcy cen"
         }
@@ -403,7 +415,11 @@
       "min_above_max": "Minimum nie może być większe niż maksimum.",
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
-      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
+      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
+      "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
+      "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
+      "price_currency_mismatch": "Ten czujnik jest w innej walucie niż pozostałe czujniki cen. Używaj czujników cen w jednej walucie (lub odznacz innego dostawcę cen)."
     },
     "abort": {
       "site_exists": "Wspólne przyłącze już istnieje."
@@ -589,6 +605,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service entity_id ceny sprzedaży"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Czujniki integracji Energy Price Forecast (ceny i prognozy dla większości Europy). Jako cenę zakupu wybierz jej czujnik z ceną detaliczną: podaje opublikowane ceny na dziś i jutro oraz prognozę na kolejne dni. Jako cenę sprzedaży wybierz jej czujnik z ceną hurtową. Ceny muszą być podane za kWh w walucie (nie w centach ani pensach); cena za MWh jest przeliczana na kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Cena zakupu (czujnik z ceną detaliczną)",
+          "energypriceforecast_sell_entity_id": "Cena sprzedaży"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Czujnik Energy Price Forecast z ceną detaliczną, wraz z marżą dostawcy, podatkami i opłatą sieciową",
+          "energypriceforecast_sell_entity_id": "Czujnik Energy Price Forecast z ceną hurtową. Cena sprzedaży to ta cena minus opłata za sprzedaż (cena detaliczna jest wyższa niż to, co daje sprzedaż, więc nie jest używana jako cena sprzedaży)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
@@ -740,7 +768,7 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy obu pierwszeństwo ma Strømligning: jego cena jest używana dla każdej godziny, dla której ją ma, a Energi Data Service uzupełnia luki.",
+        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki.",
         "data": {
           "price_providers": "Dostawcy cen"
         }
@@ -800,7 +828,11 @@
       "min_above_max": "Minimum nie może być większe niż maksimum.",
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
-      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
+      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
+      "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
+      "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
+      "price_currency_mismatch": "Ten czujnik jest w innej walucie niż pozostałe czujniki cen. Używaj czujników cen w jednej walucie (lub odznacz innego dostawcę cen)."
     },
     "abort": {
       "backup_exported": "Kopia zapasowa została zapisana jako **{file}**.",
@@ -817,7 +849,8 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
-        "stromligning": "Strømligning"
+        "stromligning": "Strømligning",
+        "energypriceforecast": "Energy Price Forecast (Europa)"
       }
     },
     "restore_backup": {

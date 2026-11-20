@@ -165,6 +165,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service Verkaufs-entity_id"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Sensoren der Integration Energy Price Forecast (Preise und Prognosen für große Teile Europas). Wähle ihren Sensor mit dem Endkundenpreis als Kaufpreis: Er liefert die veröffentlichten Preise von heute und morgen und die Prognose danach. Wähle ihren Sensor mit dem Großhandelspreis als Verkaufspreis. Die Preise müssen pro kWh in der Währung angegeben sein (nicht in Cent oder Pence); ein Preis pro MWh wird in kWh umgerechnet.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Kaufpreis (Sensor mit Endkundenpreis)",
+          "energypriceforecast_sell_entity_id": "Verkaufspreis"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt",
+          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.\n\nStrømligning schaltet seine Sensoren ohne MwSt. standardmäßig aus, und ein deaktivierter Sensor kann hier nicht gewählt werden: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*). Die Preisprognosen brauchen außerdem *Include price forecasts for the next week?* in den Strømligning-Optionen.\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
@@ -316,7 +328,7 @@
       },
       "price_provider": {
         "title": "Strompreise",
-        "description": "Wähle, woher die Stundenpreise kommen. Bei beiden hat Strømligning Vorrang: sein Preis wird für jede Stunde genutzt, für die er einen hat, und Energi Data Service füllt die Lücken.",
+        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken.",
         "data": {
           "price_providers": "Preisanbieter"
         }
@@ -403,7 +415,11 @@
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
-      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
+      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
+      "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
+      "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
+      "price_currency_mismatch": "Dieser Sensor hat eine andere Währung als die anderen Preissensoren. Verwende Preissensoren in einer Währung (oder wähle den anderen Preisanbieter ab)."
     },
     "abort": {
       "site_exists": "Es gibt bereits einen gemeinsamen Netzanschluss."
@@ -589,6 +605,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service Verkaufs-entity_id"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Sensoren der Integration Energy Price Forecast (Preise und Prognosen für große Teile Europas). Wähle ihren Sensor mit dem Endkundenpreis als Kaufpreis: Er liefert die veröffentlichten Preise von heute und morgen und die Prognose danach. Wähle ihren Sensor mit dem Großhandelspreis als Verkaufspreis. Die Preise müssen pro kWh in der Währung angegeben sein (nicht in Cent oder Pence); ein Preis pro MWh wird in kWh umgerechnet.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Kaufpreis (Sensor mit Endkundenpreis)",
+          "energypriceforecast_sell_entity_id": "Verkaufspreis"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt",
+          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensoren der Strømligning Integration. Der Kaufpreis ist erforderlich.\n\nStrømligning schaltet seine Sensoren ohne MwSt. standardmäßig aus, und ein deaktivierter Sensor kann hier nicht gewählt werden: aktiviere sie zuerst unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*). Die Preisprognosen brauchen außerdem *Include price forecasts for the next week?* in den Strømligning-Optionen.\nJetzt in Strømligning deaktiviert: {stromligning_disabled}",
@@ -740,7 +768,7 @@
       },
       "price_provider": {
         "title": "Strompreise",
-        "description": "Wähle, woher die Stundenpreise kommen. Bei beiden hat Strømligning Vorrang: sein Preis wird für jede Stunde genutzt, für die er einen hat, und Energi Data Service füllt die Lücken.",
+        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken.",
         "data": {
           "price_providers": "Preisanbieter"
         }
@@ -800,7 +828,11 @@
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
-      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
+      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
+      "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
+      "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
+      "price_currency_mismatch": "Dieser Sensor hat eine andere Währung als die anderen Preissensoren. Verwende Preissensoren in einer Währung (oder wähle den anderen Preisanbieter ab)."
     },
     "abort": {
       "backup_exported": "Das Backup wurde als **{file}** gespeichert.",
@@ -817,7 +849,8 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
-        "stromligning": "Strømligning"
+        "stromligning": "Strømligning",
+        "energypriceforecast": "Energy Price Forecast (Europa)"
       }
     },
     "restore_backup": {

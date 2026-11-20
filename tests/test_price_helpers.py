@@ -17,6 +17,8 @@ BUY = "stromligning_buy_current_price"
 PRICE_KEYS = [
     "energidataservice_buy_entity_id",
     "energidataservice_sell_entity_id",
+    "energypriceforecast_buy_entity_id",
+    "energypriceforecast_sell_entity_id",
     BUY,
     "stromligning_buy_tomorrow_available",
     "stromligning_buy_forecasts",
@@ -62,7 +64,7 @@ def test_the_dashboard_price_chart_with_only_stromligning_or_none() -> None:
     assert mapping["sensor.energi_data_service"] == "" and mapping["sensor.energi_data_service_salg"] == ""
 
 
-@pytest.mark.parametrize(("provider", "prefix"), [("energidataservice", "energi_data_service"), ("stromligning", "stromligning")])
+@pytest.mark.parametrize(("provider", "prefix"), [("energidataservice", "energi_data_service"), ("stromligning", "stromligning"), ("energypriceforecast", "energy_price_forecast")])
 def test_a_provider_maps_exactly_the_external_entities_of_its_chart_file(provider: str, prefix: str) -> None:
     """dashboard/prices/<provider>.yaml and the provider's dashboard_entities() stay together."""
     mapped = set(PROVIDER_CLASSES[provider].dashboard_entities(dict.fromkeys(PRICE_KEYS, "")))

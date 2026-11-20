@@ -18,7 +18,7 @@ RESERVED_PREFIXES = {"site"}  # sensor.cjp_site_* belong to the shared grid conn
 IMPORT_NONE = "none"
 BACKUP_EXPORT = "export"
 CRON_INTERVALS = ["1", "2", "3", "4", "5", "6", "10", "12", "15", "20", "30"]
-PRICE_PROVIDERS = ["energidataservice", "stromligning"]
+PRICE_PROVIDERS = ["energidataservice", "stromligning", "energypriceforecast"]
 ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
 EV_REQUIRED = ("usable_battery_level_entity_id", "estimated_battery_range_entity_id", "odometer_entity_id")
 CONFIG_FLOW_STEPS = [
@@ -32,6 +32,7 @@ CONFIG_FLOW_STEPS = [
     "detection_review",
     "price_provider",
     "prices_energidataservice",
+    "prices_energypriceforecast",
     "prices_stromligning",
     "prices_stromligning_tariffs",
     "price_fees",
@@ -113,6 +114,8 @@ SELECTORS: dict[str, Any] = {
     # prices (only entities from the price integrations)
     "energidataservice_buy_entity_id": _entity("sensor", integration="energidataservice"),
     "energidataservice_sell_entity_id": _entity("sensor", integration="energidataservice"),
+    "energypriceforecast_buy_entity_id": _entity("sensor", integration="energypriceforecast"),
+    "energypriceforecast_sell_entity_id": _entity("sensor", integration="energypriceforecast"),
     "stromligning_buy_current_price": _entity("sensor", integration="stromligning"),
     "stromligning_buy_tomorrow_available": _entity("binary_sensor", integration="stromligning"),
     "stromligning_buy_forecasts": _entity("sensor", integration="stromligning"),
@@ -175,6 +178,8 @@ REQUIRED_KEYS = {
     "powerwall_charging_power_limit",
     "powerwall_discharging_power",
     "energidataservice_buy_entity_id",
+    "energypriceforecast_buy_entity_id",
+    "energypriceforecast_sell_entity_id",
     "stromligning_buy_current_price",
     "refund",
     "sell_fee",

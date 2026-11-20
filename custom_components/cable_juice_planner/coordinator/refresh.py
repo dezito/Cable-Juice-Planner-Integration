@@ -298,6 +298,11 @@ class CoordinatorRefresh:
                 for price_id, hourly in recorded.items():
                     for hour, row in filled[price_id].items():
                         hourly.setdefault(hour, row[0])  # a statistic always wins
+                # a sensor that gives the price per MWh (Energy Price Forecast): the history is per kWh like the live prices
+                for price_id, divisor in provider.price_unit_divisors(self.hass.states.get).items():
+                    if price_id in recorded:
+                        # (no divisor: the sensor is not in Home Assistant, its unit is unknown and its history is left out)
+                        recorded[price_id] = {} if divisor is None else {hour: value / divisor for hour, value in recorded[price_id].items()}
                 data["prices"] = provider.combine_history(recorded)
             await self._async_economy_solar_statistics(instance, provider, data, end, stat_ts, keep_days)
             await self._async_economy_ev_statistics(instance, data, end, stat_ts, keep_days)
@@ -352,9 +357,12 @@ class CoordinatorRefresh:
                     instance, {sell_id: {stat_ts(row) for row in stats.get(sell_id, []) if row.get("mean") is not None} for sell_id in sell_ids},
                     start, end, keep_days,
                 )
+                divisors = provider.price_unit_divisors(self.hass.states.get)
                 for sell_id in sell_ids:
                     hourly = {stat_ts(row): row["mean"] for row in stats.get(sell_id, []) if row.get("mean") is not None}
                     hourly.update({hour: row[0] for hour, row in filled[sell_id].items() if hour not in hourly})
+                    if sell_id in divisors:  # a price per MWh (Energy Price Forecast) as a price per kWh; an unknown unit: no history
+                        hourly = {} if divisors[sell_id] is None else {hour: value / divisors[sell_id] for hour, value in hourly.items()}
                     if hourly:
                         data["sell_history"] = hourly  # the first provider that has a history
                         data["sell_history_entity_id"] = sell_id  # converted by the provider of this entity

@@ -114,6 +114,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "entity_ids": {
             "energidataservice_buy_entity_id": "",
             "energidataservice_sell_entity_id": "",
+            "energypriceforecast_buy_entity_id": "",
+            "energypriceforecast_sell_entity_id": "",
             "stromligning_buy_current_price": "",
             "stromligning_buy_tomorrow_available": "",
             "stromligning_buy_forecasts": "",
@@ -210,6 +212,8 @@ OPTION_PATHS: dict[str, str] = {
     # prices
     "energidataservice_buy_entity_id": "prices.entity_ids.energidataservice_buy_entity_id",
     "energidataservice_sell_entity_id": "prices.entity_ids.energidataservice_sell_entity_id",
+    "energypriceforecast_buy_entity_id": "prices.entity_ids.energypriceforecast_buy_entity_id",
+    "energypriceforecast_sell_entity_id": "prices.entity_ids.energypriceforecast_sell_entity_id",
     "stromligning_buy_current_price": "prices.entity_ids.stromligning_buy_current_price",
     "stromligning_buy_tomorrow_available": "prices.entity_ids.stromligning_buy_tomorrow_available",
     "stromligning_buy_forecasts": "prices.entity_ids.stromligning_buy_forecasts",
@@ -305,6 +309,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "power_consumption_entity_id_include_powerwall_discharging",
     ],
     "prices_energidataservice": ["energidataservice_buy_entity_id", "energidataservice_sell_entity_id"],
+    "prices_energypriceforecast": ["energypriceforecast_buy_entity_id", "energypriceforecast_sell_entity_id"],
     "prices_stromligning": [
         "stromligning_buy_current_price",
         "stromligning_buy_tomorrow_available",
@@ -345,6 +350,7 @@ FLOW_STEPS: dict[str, list[str]] = {
 
 PRICE_PROVIDER_KEYS: dict[str, list[str]] = {
     "energidataservice": FLOW_STEPS["prices_energidataservice"],
+    "energypriceforecast": FLOW_STEPS["prices_energypriceforecast"],
     "stromligning": FLOW_STEPS["prices_stromligning"] + FLOW_STEPS["prices_stromligning_tariffs"],
 }
 
@@ -354,7 +360,7 @@ OPTIONS_MENU: dict[str, list[str]] = {
     "charger": ["charger", "charger_specs", "load_balancing"],
     "ev": ["ev", "ev_specs"],
     "home": ["home", "powerwall", "detection_review"],
-    "prices": ["price_provider", "prices_energidataservice", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
+    "prices": ["price_provider", "prices_energidataservice", "prices_energypriceforecast", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
     "solar": ["solar", "solar_charging", "weather"],
     "notifications": ["notifications"],
     "advanced": ["advanced", "database"],

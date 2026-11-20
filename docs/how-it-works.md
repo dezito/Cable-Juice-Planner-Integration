@@ -40,8 +40,8 @@ used alone. The surplus the car can use is subtracted from what has to be bought
 
 ### Prices
 
-Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
-solar surplus.
+Buy prices per hour (or 15 minutes) from Energi Data Service, Strømligning and/or Energy Price Forecast, and sell
+prices for the solar surplus.
 
 Price timestamps mark the start of each interval. CJP supports different interval lengths in the same hour:
 each price applies until the next timestamp, up to the end of that hour. After a longer gap, CJP limits the
@@ -51,9 +51,10 @@ covered by prices. The four most expensive hours and the average of the 15 cheap
 per hour; interval prices are combined into duration-weighted hourly averages for those comparisons.
 
 **Sell price:** the spot price less what selling a kWh costs. Every tariff, tax and surcharge in the sell
-price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings) plus Energinet's net tariff
+price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings: what the buyer of your electricity charges for buying it) plus Energinet's net tariff
 and system tariff. A sell sensor from Energi Data Service without tariffs is already the spot price, so its
-net and system tariff come from the buy sensor.
+net and system tariff come from the buy sensor. Energy Price Forecast has no tariffs in its prices: the sell price is
+the price of its sell sensor (the wholesale price, required: the retail price is higher than what a sale pays) less the sell fee.
 
 **Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
 prices: a forecast buy price is raised and a forecast sell price lowered (a sale is worth less; with a
@@ -70,9 +71,10 @@ CJP reads the unit of the price sensor (e.g. `EUR/kWh`) and stores a *price scal
 currency: with euro prices the adder is about 0.0045 € per day and the correction limit about ±0.07 €, and
 prices are rounded to 3 decimals instead of 2. Your own settings are never changed: only the *Sell fee*
 suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
-to prices in another currency, check the *Sell fee*. A sensor without a known unit (or one in MWh or cents)
+to prices in another currency, check the *Sell fee*. A sensor without a known unit
 leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
-this. The rates are rough: they only set the size of the limits, no price is ever converted. Currencies worth
+this. The price pages of Energi Data Service and Energy Price Forecast refuse a sensor in cents or pence (and Energi Data Service one per MWh; Energy Price Forecast converts a price per MWh to kWh), and every
+price sensor must be in the same currency (a backup provider in another currency is refused). The rates are rough: they only set the size of the limits, no price is ever converted between currencies. Currencies worth
 much less than a krone (CZK, HUF, ISK) are not recognised yet.
 
 <p align="center">

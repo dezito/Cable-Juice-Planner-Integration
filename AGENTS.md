@@ -39,6 +39,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price providers; CombinedPriceProvider is the only entry point
+│   └── energypriceforecast.py           Energy Price Forecast: buy = its retail sensor, sell = its wholesale sensor
 ├── management/                          Storage, backups, dashboard, and blueprint setup
 ├── utils/                               Shared utilities and datetime/time platform implementations
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
@@ -112,7 +113,7 @@ Read the relevant documentation before changing behavior. In particular:
   `CombinedPriceProvider.set_now(now, tz)`. A daily weather forecast whose time is midnight in its own offset names a
   date and keeps it (`forecast_day()`); any other time is converted. The repeated hour of the autumn change shares
   one price key; which row wins depends on the provider (Energi Data Service: the last row; Strømligning: the
-  first, its distribution tariff the last). Data stored before the conversion (prices, averages and price hours,
+  first, its distribution tariff the last; Energy Price Forecast: the first). Data stored before the conversion (prices, averages and price hours,
   the weather score of `solar_available_db`) keeps its old hours when the source gave UTC; it is not migrated and
   phases out.
 - Money limits are chosen for Danish kroner (the forecast adder, the rounding of prices, the economy and booking tolerances, score
@@ -122,7 +123,11 @@ Read the relevant documentation before changing behavior. In particular:
   from Home Assistant's currency setting (EUR by default, also in Denmark). A new money amount per kWh in the code is
   chosen for kroner and read through `price_scale(config)` and `price_decimals(config)`; never scale a value the user
   entered or the `-1` of the fixed solar sell price. The rates are rough and only set the size of a limit, no price is
-  converted. A unit in cents or per MWh is not recognised (the scale stays).
+  converted between currencies. A price sensor in a subunit (ct, p, GBp, øre …) is refused on the Energi Data Service and Energy Price Forecast
+  pages (`price_sensor_errors()`), and so is a price per MWh from Energi Data Service. Energy Price Forecast converts a
+  price per MWh to kWh (`price_unit_divisor()`): its rows in the provider and its recorded history where the history is
+  read (`CombinedPriceProvider.price_unit_divisors()`; the unit is the sensor's current one); units are read case-sensitively (`GBp` is not `GBP`), and all price sensors must be in one
+  currency (`price_currency_errors()`), so a backup provider with a known unit is never in another currency.
 - Preserve compatibility of config-entry options, entity IDs/unique IDs,
   stored history, backups, and import from the PyScript version. Changes to
   these formats or identifiers require a migration/compatibility path and
@@ -148,7 +153,7 @@ Read the relevant documentation before changing behavior. In particular:
 - All price handling goes through `CombinedPriceProvider` (`prices/`, built by
   `create_price_provider()`): which price entities to read, the snapshot, the
   recorded price history, the provider priority (`PRICE_PROVIDER_PRIORITY`:
-  Strømligning before Energi Data Service) and the prices themselves. Other
+  Strømligning, then Energi Data Service, then Energy Price Forecast) and the prices themselves. Other
   code calls its methods (the coordinator via `coordinator.price_provider`)
   and never reads price entities, config keys or provider attributes itself.
 - Keep network and blocking work out of the event loop. Follow the existing
@@ -414,6 +419,10 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - Energi Data Service: a sell sensor with a `tariffs` attribute includes them. A sell sensor without it is a raw
   price (tariffs in the price = 0); the selling costs (net and system tariff) then come from the buy sensor's
   `tariffs` attribute (`get_sell_costs()` / `eds_sell_costs()`).
+- `sell_fee` is what the buyer of your electricity charges for buying it (user's definition).
+- Energy Price Forecast has no tariffs in its prices: sell price = the price of its sell sensor − `sell_fee`. The page
+  requires the sell sensor and refuses a retail sensor or the buy sensor as the sell sensor (the retail price is higher than
+  what a sale pays). An entry without one (a backup restored in the options menu) sells at its buy sensor's price less the fee (decided with the user): higher than a sale pays.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - The dashboard's sell price chart subtracts the configured fee (`@@sell_fee_value@@`, set in
   `render_dashboard()`); keep it in sync with `calculate_sell_price()`.
@@ -544,14 +553,15 @@ Inside it, run `python -m pytest` from the repository root; it is Linux, so no
 shims are needed. The dev HA runs on `http://localhost:8123`; after a code
 change run `bash ha-dev/devcontainer/restart.sh`, and
 `bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates seven car profiles, each with its own prefix ("Car with
+Seeding creates eight car profiles, each with its own prefix ("Car with
 everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
 without car entities, "Car without climate entity"/`car_no_climate` without the
 climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
 updates every 30 minutes with the battery level simulation on, "Car without
 Energi Data Service"/`car_no_eds` with only Strømligning as price provider, and two
 cars with load balancing priority 1 and 2 (`car_priority_1`, `car_priority_2`) each with
-its own charger power sensor) plus the shared site entry. Use them to test
+its own charger power sensor, and "Car with Energy Price Forecast"/`car_epf` on the simulated
+Energy Price Forecast sensors, which are in euro) plus the shared site entry. Use them to test
 missing-entity and single-provider cases. The dev HA, the dev user's profile
 and the seeded entries are in English.
 

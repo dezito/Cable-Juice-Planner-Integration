@@ -165,6 +165,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service salg-entity_id"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Sensorer fra Energy Price Forecast-integrationen (priser og prognoser for det meste af Europa). Vælg dens sensor med detailprisen som købspris: den giver dagens og morgendagens offentliggjorte priser og prognosen derefter. Vælg dens sensor med engrosprisen som salgspris. Priserne skal være pr. kWh i valutaen (ikke i cent eller pence); en pris pr. MWh regnes om til kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Købspris (sensor med detailpris)",
+          "energypriceforecast_sell_entity_id": "Salgspris"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif",
+          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
@@ -316,7 +328,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med begge har Strømligning første prioritet: dens pris bruges for hver time, den har en, og Energi Data Service udfylder hullerne.",
+        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
         "data": {
           "price_providers": "Prisleverandører"
         }
@@ -403,7 +415,11 @@
       "min_above_max": "Minimum må ikke være større end maksimum.",
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
-      "circuit_own_charger_missing": "Vælg også denne bils lader."
+      "circuit_own_charger_missing": "Vælg også denne bils lader.",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
+      "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
+      "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
       "site_exists": "Der findes allerede en fælles el-tilslutning."
@@ -589,6 +605,18 @@
           "energidataservice_sell_entity_id": "Energi Data Service salg-entity_id"
         }
       },
+      "prices_energypriceforecast": {
+        "title": "Energy Price Forecast",
+        "description": "Sensorer fra Energy Price Forecast-integrationen (priser og prognoser for det meste af Europa). Vælg dens sensor med detailprisen som købspris: den giver dagens og morgendagens offentliggjorte priser og prognosen derefter. Vælg dens sensor med engrosprisen som salgspris. Priserne skal være pr. kWh i valutaen (ikke i cent eller pence); en pris pr. MWh regnes om til kWh.",
+        "data": {
+          "energypriceforecast_buy_entity_id": "Købspris (sensor med detailpris)",
+          "energypriceforecast_sell_entity_id": "Salgspris"
+        },
+        "data_description": {
+          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif",
+          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris)"
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
@@ -740,7 +768,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med begge har Strømligning første prioritet: dens pris bruges for hver time, den har en, og Energi Data Service udfylder hullerne.",
+        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
         "data": {
           "price_providers": "Prisleverandører"
         }
@@ -800,7 +828,11 @@
       "min_above_max": "Minimum må ikke være større end maksimum.",
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
-      "circuit_own_charger_missing": "Vælg også denne bils lader."
+      "circuit_own_charger_missing": "Vælg også denne bils lader.",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
+      "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
+      "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
       "backup_exported": "Backuppen blev gemt som **{file}**.",
@@ -817,7 +849,8 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
-        "stromligning": "Strømligning"
+        "stromligning": "Strømligning",
+        "energypriceforecast": "Energy Price Forecast (Europa)"
       }
     },
     "restore_backup": {
