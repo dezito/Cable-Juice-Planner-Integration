@@ -1,0 +1,862 @@
+- type: vertical-stack
+  cards:
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: sensor.stromligning_current_price_vat
+      state: unavailable
+    card:
+      type: horizontal-stack
+      cards:
+      - type: markdown
+        content: '# Strømligning @@is_down@@ <font color=red>!!!</font>'
+      - show_name: true
+        show_icon: true
+        type: button
+        entity: sensor.stromligning_current_price_vat
+        tap_action:
+          action: call-service
+          service: homeassistant.reload_config_entry
+          target:
+            entity_id: sensor.stromligning_current_price_vat
+        hold_action:
+          action: none
+        icon: mdi:reload
+        name: '@@restart@@ Strømligning'
+        show_state: true
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: sensor.stromligning_current_price_vat
+      state_not: unavailable
+    card:
+      type: custom:config-template-card
+      variables:
+        today_prices: |
+          states['sensor.stromligning_current_price_vat']
+            ?.attributes?.prices || []
+        tomorrow_prices: |
+          (() => {
+            const entity =
+              states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+            return entity?.attributes?.prices || [];
+          })()
+        forecast_prices: |
+          states['sensor.stromligning_forecasts_vat']
+            ?.attributes?.prices || []
+        all_prices: |
+          (() => {
+            const today =
+              states['sensor.stromligning_current_price_vat']
+                ?.attributes?.prices || [];
+
+            const tomorrowEntity =
+              states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+            const tomorrow =
+              tomorrowEntity?.attributes?.prices || [];
+
+            const tomorrowIsForecast =
+              tomorrowEntity?.attributes?.forecast_data === true;
+
+            const officialTomorrow =
+              tomorrowIsForecast ? [] : tomorrow;
+
+            const official = [
+              ...today,
+              ...officialTomorrow
+            ];
+
+            let officialEnd = 0;
+
+            official.forEach(p => {
+              const end = new Date(p.end).getTime();
+
+              if (!isNaN(end) && end > officialEnd)
+                officialEnd = end;
+            });
+
+            const forecast =
+              states['sensor.stromligning_forecasts_vat']
+                ?.attributes?.prices || [];
+
+            const prices = [
+              ...today,
+              ...tomorrow
+            ]
+              .map(p => Number(p.price))
+              .filter(Number.isFinite);
+
+            let forecastEnd = 0;
+
+            tomorrow.forEach(p => {
+              const end = new Date(p.end).getTime();
+
+              if (!isNaN(end) && end > forecastEnd)
+                forecastEnd = end;
+            });
+
+            const existingEnd =
+              Math.max(officialEnd, forecastEnd);
+
+            forecast.forEach(p => {
+              const start = new Date(p.start).getTime();
+              const price = Number(p.price);
+
+              if (
+                start >= existingEnd &&
+                Number.isFinite(price)
+              ) {
+                prices.push(price);
+              }
+            });
+
+            return prices;
+          })()
+        total_hours: |
+          vars.all_prices.length
+        lowest_price: |
+          (() => {
+            if (!vars.all_prices.length)
+              return 0;
+
+            return Math.min(...vars.all_prices) * 1.05;
+          })()
+        highest_price: |
+          (() => {
+            if (!vars.all_prices.length)
+              return 0;
+
+            return Math.max(...vars.all_prices) * 0.95;
+          })()
+        mean_price: |
+          (() => {
+            if (!vars.all_prices.length)
+              return 0;
+
+            return vars.all_prices.reduce(
+              (sum, price) => sum + price,
+              0
+            ) / vars.all_prices.length;
+          })()
+        step_under_mean: |
+          (vars.mean_price - vars.lowest_price) / 5
+        step_over_mean: |
+          (vars.highest_price - vars.mean_price) / 5
+        price1: vars.lowest_price
+        price2: vars.mean_price - vars.step_under_mean * 4
+        price3: vars.mean_price - vars.step_under_mean * 3
+        price4: vars.mean_price - vars.step_under_mean * 2
+        price5: vars.mean_price - vars.step_under_mean
+        price6: vars.mean_price
+        price7: vars.mean_price + vars.step_over_mean
+        price8: vars.mean_price + vars.step_over_mean * 2
+        price9: vars.mean_price + vars.step_over_mean * 3
+        price10: vars.mean_price + vars.step_over_mean * 4
+        price11: vars.highest_price
+        total_span: 24 * 7 - 1
+      entities:
+      - sensor.stromligning_current_price_vat
+      - binary_sensor.stromligning_tomorrow_available_vat
+      - sensor.stromligning_forecasts_vat
+      - sensor.stromligning_15min_spotprice_ex_vat
+      - binary_sensor.stromligning_15min_tomorrow_available_ex_vat
+      - sensor.stromligning_15min_forecasts_ex_vat
+      - sensor.stromligning_nettariff_vat
+      - sensor.stromligning_systemtariff_vat
+      - sensor.solcast_pv_forecast_forecast_today
+      - sensor.solcast_pv_forecast_forecast_tomorrow
+      - sensor.solcast_pv_forecast_forecast_day_3
+      - sensor.solcast_pv_forecast_forecast_day_4
+      - sensor.solcast_pv_forecast_forecast_day_5
+      - sensor.solcast_pv_forecast_forecast_day_6
+      - sensor.solcast_pv_forecast_forecast_day_7
+      card:
+        type: custom:apexcharts-card
+        apex_config:
+          chart:
+            height: 300px
+          xaxis:
+            tooltip:
+              enabled: false
+          tooltip:
+            shared: true
+            intersect: false
+            followCursor: true
+            fixed:
+              enabled: false
+            x:
+              show: true
+            enabledOnSeries:
+            - 0
+            - 1
+            - 2
+            - 4
+            custom: |
+              EVAL:function({ series, dataPointIndex, w }) {
+                const indices = [0, 1, 2, 4];
+                const xValues = w.globals.seriesX[0] || [];
+                const time = xValues[dataPointIndex];
+                const title = Number.isFinite(time)
+                  ? new Date(time).toLocaleString(undefined, {
+                      weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                    })
+                  : '';
+                const rows = indices.map(index => {
+                  const values = series[index] || [];
+                  const value = values[dataPointIndex];
+                  const valid = value !== null && value !== undefined && Number.isFinite(Number(value));
+                  const suffix = index < 2 ? ' @@valuta@@' : ' kWh';
+                  const shown = valid ? Number(value).toFixed(2) + suffix : '-';
+                  const color = w.globals.colors[index] || '#888';
+                  const name = w.globals.seriesNames[index] || '';
+                  return '<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;">' +
+                    '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';"></span>' +
+                    '<span>' + name + ':</span><strong style="margin-left:auto;">' + shown + '</strong></div>';
+                }).join('');
+                return '<div class="apexcharts-tooltip-title" style="padding:6px 10px;">' + title + '</div>' + rows;
+              }
+          stroke:
+            curve: straight
+          markers:
+            size: 0
+        all_series_config:
+          unit: kWh
+          extend_to: false
+          fill_raw: zero
+          show:
+            legend_value: false
+            offset_in_name: false
+        experimental:
+          color_threshold: true
+          brush: true
+        brush:
+          selection_span: ${total_span + "h"}
+        header:
+          title: ${"@@price_chart_title@@ 🔵" + vars.lowest_price.toFixed(2) + " 🟢" + vars.mean_price.toFixed(2) + " 🟣" + vars.highest_price.toFixed(2)}
+          show: true
+          standard_format: false
+          show_states: false
+          colorize_states: true
+        now:
+          show: true
+          label: '@@now@@'
+        graph_span: ${total_span + "h"}
+        span:
+          start: day
+        yaxis:
+        - id: price
+        - id: solar
+          opposite: true
+          decimals: 1
+          max: ~6.0
+          min: 0
+        - id: charge
+          min: 0
+          opposite: true
+          show: false
+        show:
+          loading: true
+          last_updated: true
+        series:
+        - entity: sensor.stromligning_current_price_vat
+          yaxis_id: price
+          type: column
+          name: '@@incl_taxes@@'
+          unit: '@@valuta@@'
+          color: green
+          data_generator: |
+            const data = [];
+
+            // ------------------------------------------
+            // TODAY
+            // ------------------------------------------
+
+            const today =
+              hass.states[
+                'sensor.stromligning_current_price_vat'
+              ]?.attributes?.prices || [];
+
+            today.forEach(p => {
+              const price = Number(p.price);
+
+              if (Number.isFinite(price)) {
+                data.push([
+                  new Date(p.start),
+                  price
+                ]);
+              }
+            });
+
+
+            // ------------------------------------------
+            // I MORGEN
+            // ------------------------------------------
+
+            const tomorrowEntity =
+              hass.states[
+                'binary_sensor.stromligning_tomorrow_available_vat'
+              ];
+
+            const tomorrowPrices =
+              tomorrowEntity?.attributes?.prices || [];
+
+            const tomorrowIsForecast =
+              tomorrowEntity?.attributes?.forecast_data === true;
+
+            const officialTomorrow =
+              tomorrowIsForecast
+                ? []
+                : tomorrowPrices;
+
+            officialTomorrow.forEach(p => {
+              const price = Number(p.price);
+
+              if (Number.isFinite(price)) {
+                data.push([
+                  new Date(p.start),
+                  price
+                ]);
+              }
+            });
+
+
+            // ------------------------------------------
+            // LAST OFFICIAL PRICE
+            // ------------------------------------------
+
+            let officialEnd = 0;
+
+            [...today, ...officialTomorrow].forEach(p => {
+              const end = new Date(p.end).getTime();
+
+              if (
+                !isNaN(end) &&
+                end > officialEnd
+              ) {
+                officialEnd = end;
+              }
+            });
+
+
+            // ------------------------------------------
+            // FORECAST FOR I MORGEN
+            // ------------------------------------------
+
+            if (tomorrowIsForecast) {
+              tomorrowPrices.forEach(p => {
+                const price = Number(p.price);
+
+                if (Number.isFinite(price)) {
+                  data.push([
+                    new Date(p.start),
+                    price
+                  ]);
+                }
+              });
+            }
+
+
+            // ------------------------------------------
+            // LAST TOMORROW TIMESTAMP
+            // ------------------------------------------
+
+            let tomorrowEnd = officialEnd;
+
+            tomorrowPrices.forEach(p => {
+              const end = new Date(p.end).getTime();
+
+              if (
+                !isNaN(end) &&
+                end > tomorrowEnd
+              ) {
+                tomorrowEnd = end;
+              }
+            });
+
+
+            // ------------------------------------------
+            // FORECAST
+            // ------------------------------------------
+
+            const forecast =
+              hass.states[
+                'sensor.stromligning_forecasts_vat'
+              ]?.attributes?.prices || [];
+
+            forecast.forEach(p => {
+              const start =
+                new Date(p.start).getTime();
+
+              const price =
+                Number(p.price);
+
+              if (
+                start >= tomorrowEnd &&
+                Number.isFinite(price)
+              ) {
+                data.push([
+                  new Date(p.start),
+                  price
+                ]);
+              }
+            });
+            const sellRows = [
+              ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+            ];
+            const values = new Map(data.map(([time, value]) => [new Date(time).getTime(), value]));
+            const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+            const hourlyValues = new Map(data.map(([time, value]) => [hourKey(time), value]));
+            const times = [...new Set([
+              ...data.map(([time]) => new Date(time).getTime()),
+              ...sellRows.map(row => new Date(row.start).getTime())
+            ].filter(Number.isFinite))].sort((a, b) => a - b);
+            return times.map(time => [time, values.has(time) ? values.get(time) : (hourlyValues.has(hourKey(time)) ? hourlyValues.get(hourKey(time)) : null)]);
+          float_precision: 2
+          group_by:
+            func: avg
+            duration: 15min
+          color_threshold:
+          - value: ${vars.price1}
+            color: '#0064FF'
+          - value: ${vars.price2}
+            color: '#0096FF'
+          - value: ${vars.price3}
+            color: '#00B496'
+          - value: ${vars.price4}
+            color: '#00FA50'
+          - value: ${vars.price5}
+            color: '#00FF32'
+          - value: ${vars.price6}
+            color: '#00FF00'
+          - value: ${vars.price7}
+            color: '#FFFF00'
+          - value: ${vars.price8}
+            color: '#FFA500'
+          - value: ${vars.price9}
+            color: '#FF5000'
+          - value: ${vars.price10}
+            color: '#C81919'
+          - value: ${vars.price11}
+            color: '#C800C8'
+          opacity: 0.75
+          show:
+            in_brush: true
+        - entity: sensor.stromligning_current_price_vat
+          yaxis_id: price
+          type: area
+          name: '@@sell_price@@'
+          unit: '@@valuta@@'
+          color: white
+          stroke_width: 0
+          data_generator: |
+            const data = [];
+
+            const sellFee = Number('@@sell_fee_value@@') || 0;
+
+            const nettariff = Number(
+              hass.states[
+                'sensor.stromligning_nettariff_vat'
+              ]?.state
+            ) || 0;
+
+            const systemtariff = Number(
+              hass.states[
+                'sensor.stromligning_systemtariff_vat'
+              ]?.state
+            ) || 0;
+
+            const sellCosts =
+              nettariff +
+              systemtariff +
+              sellFee;
+
+
+            // ------------------------------------------
+            // TODAY
+            // ------------------------------------------
+
+            const today =
+              hass.states[
+                'sensor.stromligning_15min_spotprice_ex_vat'
+              ]?.attributes?.prices || [];
+
+            today.forEach(p => {
+              const spotprice = Number(p.price);
+
+              if (Number.isFinite(spotprice)) {
+                data.push([
+                  new Date(p.start),
+                  spotprice - sellCosts
+                ]);
+              }
+            });
+
+
+            // ------------------------------------------
+            // I MORGEN
+            // ------------------------------------------
+
+            const tomorrowEntity =
+              hass.states[
+                'binary_sensor.stromligning_15min_tomorrow_available_ex_vat'
+              ];
+
+            const tomorrowPrices =
+              tomorrowEntity?.attributes?.prices || [];
+
+            tomorrowPrices.forEach(p => {
+              const spotprice = Number(p.price);
+
+              if (Number.isFinite(spotprice)) {
+                data.push([
+                  new Date(p.start),
+                  spotprice - sellCosts
+                ]);
+              }
+            });
+
+
+            // ------------------------------------------
+            // LAST PRICE FROM THE TOMORROW ENTITY
+            // ------------------------------------------
+
+            let availableEnd = 0;
+
+            [...today, ...tomorrowPrices].forEach(p => {
+              const end =
+                new Date(p.end).getTime();
+
+              if (
+                !isNaN(end) &&
+                end > availableEnd
+              ) {
+                availableEnd = end;
+              }
+            });
+
+
+            // ------------------------------------------
+            // FORECAST
+            // ------------------------------------------
+
+            const forecast =
+              hass.states[
+                'sensor.stromligning_15min_forecasts_ex_vat'
+              ]?.attributes?.prices || [];
+
+            forecast.forEach(p => {
+              const start =
+                new Date(p.start).getTime();
+
+              const spotprice =
+                Number(p.price);
+
+              if (
+                start >= availableEnd &&
+                Number.isFinite(spotprice)
+              ) {
+                data.push([
+                  new Date(p.start),
+                  spotprice - sellCosts
+                ]);
+              }
+            });
+            const buyRows = [
+              ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || [])
+            ];
+            const values = new Map(data.map(([time, value]) => [new Date(time).getTime(), value]));
+            const times = [...new Set([
+              ...data.map(([time]) => new Date(time).getTime()),
+              ...buyRows.map(row => new Date(row.start).getTime())
+            ].filter(Number.isFinite))].sort((a, b) => a - b);
+            return times.map(time => [time, values.has(time) ? values.get(time) : null]);
+          float_precision: 2
+          group_by:
+            func: avg
+            duration: 15min
+          opacity: 0.75
+          show:
+            in_brush: true
+        - entity: sensor.stromligning_current_price_vat
+          yaxis_id: solar
+          type: area
+          name: '@@solar_forecast@@'
+          data_generator: |
+            const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+            const rows = [
+              ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+            ];
+            const times = [...new Set(rows.map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+            const solarByHour = new Map();
+            const overlay = (series) => {
+              (series || []).forEach(row => {
+                const value = Number(row.pv_estimate);
+                if (Number.isFinite(value)) solarByHour.set(hourKey(row.period_start), value);
+              });
+            };
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_today']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []);
+            overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
+            return times.map(time => [time, solarByHour.get(hourKey(time)) || 0]);
+          color: orange
+          stroke_width: 0
+          opacity: 0.5
+          group_by:
+            func: avg
+            duration: 15min
+          show:
+            in_brush: true
+        - entity: sensor.stromligning_current_price_vat
+          yaxis_id: price
+          type: area
+          name: '@@forecast@@'
+          unit: ''
+          stroke_width: 0
+          opacity: 0.25
+          color: purple
+          data_generator: |
+            try {
+
+              // ------------------------------------------
+              // TODAY
+              // ------------------------------------------
+
+              const today =
+                hass.states[
+                  'sensor.stromligning_current_price_vat'
+                ]?.attributes?.prices || [];
+
+
+              // ------------------------------------------
+              // I MORGEN
+              // ------------------------------------------
+
+              const tomorrowEntity =
+                hass.states[
+                  'binary_sensor.stromligning_tomorrow_available_vat'
+                ];
+
+              const tomorrowPrices =
+                tomorrowEntity?.attributes?.prices || [];
+
+              const tomorrowIsForecast =
+                tomorrowEntity?.attributes?.forecast_data === true;
+
+              const officialTomorrow =
+                tomorrowIsForecast
+                  ? []
+                  : tomorrowPrices;
+
+              const tomorrowForecast =
+                tomorrowIsForecast
+                  ? tomorrowPrices
+                  : [];
+
+
+              // ------------------------------------------
+              // OFFICIELLE PRISER
+              // ------------------------------------------
+
+              const official = [
+                ...today,
+                ...officialTomorrow
+              ];
+
+
+              // ------------------------------------------
+              // FIND THE START OF THE FORECAST
+              // ------------------------------------------
+
+              let forecastStart = 0;
+
+              if (tomorrowForecast.length) {
+                forecastStart =
+                  Math.min(
+                    ...tomorrowForecast
+                      .map(p =>
+                        new Date(p.start).getTime()
+                      )
+                      .filter(t =>
+                        !isNaN(t)
+                      )
+                  );
+              }
+
+
+            const normalForecast =
+              hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || [];
+
+
+              if (
+                !forecastStart &&
+                normalForecast.length
+              ) {
+                const times =
+                  normalForecast
+                    .map(p =>
+                      new Date(p.start).getTime()
+                    )
+                    .filter(t =>
+                      !isNaN(t)
+                    );
+
+                if (times.length)
+                  forecastStart = Math.min(...times);
+              }
+
+
+              if (!forecastStart)
+                return [];
+
+
+              // ------------------------------------------
+              // ALL ROWS
+              // ------------------------------------------
+
+              const rows = [
+                ...official,
+                ...tomorrowForecast,
+                ...normalForecast
+              ];
+
+
+              // ------------------------------------------
+              // FIND MAX PRIS
+              // ------------------------------------------
+
+              let maxP = 0;
+
+              rows.forEach(row => {
+                const price =
+                  Number(row.price);
+
+                if (
+                  Number.isFinite(price) &&
+                  price > maxP
+                ) {
+                  maxP = price;
+                }
+              });
+
+
+              if (maxP <= 0)
+                maxP = 10;
+
+
+              // ------------------------------------------
+              // ALL TIMESTAMPS
+              // ------------------------------------------
+
+              const times = [
+                ...new Set(
+                  rows
+                    .map(row =>
+                      new Date(
+                        row.start
+                      ).getTime()
+                    )
+                    .filter(time =>
+                      !isNaN(time)
+                    )
+                )
+              ].sort(
+                (a, b) => a - b
+              );
+
+
+              if (!times.length) {
+                return [
+                  [
+                    new Date(forecastStart),
+                    maxP
+                  ],
+                  [
+                    new Date(
+                      forecastStart +
+                      3600000
+                    ),
+                    maxP
+                  ]
+                ];
+              }
+
+
+              // ------------------------------------------
+              // 0 BEFORE THE FORECAST
+              // MAX EFTER FORECAST
+              // ------------------------------------------
+
+              return times.map(time => [
+                new Date(time),
+                time >= forecastStart
+                  ? maxP
+                  : 0
+              ]);
+
+
+            } catch (e) {
+
+              console.log(
+                'stromligning forecast_zone error',
+                e
+              );
+
+              return [];
+            }
+          group_by:
+            func: avg
+            duration: 15min
+          show:
+            in_brush: false
+            legend_value: false
+        - entity: sensor.cjp_current_charging_rule
+          yaxis_id: charge
+          type: area
+          name: '@@planned_charging@@'
+          unit: kWh
+          color: '#2196F3'
+          opacity: 0.6
+          stroke_width: 1
+          curve: stepline
+          extend_to: false
+          float_precision: 2
+          data_generator: |
+            const plan = entity.attributes.charge_plan || [];
+            const rows = [
+              ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+              ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+            ];
+            const times = [...new Set(rows.map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+            return times.map(time => {
+              const charging = plan.find(p => {
+                const start = new Date(p.time).getTime();
+                const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                return time >= start && time < end;
+              });
+              return [time, charging ? Number(charging.kwh) : 0];
+            });
+          show:
+            in_brush: true
+            legend_value: false
+  grid_options:
+    columns: full
+    rows: auto

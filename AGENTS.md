@@ -47,6 +47,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 ├── repairs.py / site.py                 Repairs and site-related entities
 ├── translations/ texts/                 HA strings and user-facing descriptions
 ├── dashboard/ blueprints/               Bundled dashboard and automation blueprint
+│   └── dashboard/prices/                One price chart per price integration (the key of PROVIDER_CLASSES)
 └── manifest.json                        HA integration metadata
 
 tests/                                   Pytest suite
@@ -176,6 +177,11 @@ Read the relevant documentation before changing behavior. In particular:
   supported language (`da`, `de`, `en`, `en-GB`, `pl`, and `uk`)
   consistently. Check that keys and placeholders match across languages; do
   not update only Danish or English.
+- Read the dashboard template only through `template_text()` (`management/dashboard_build.py`). The price
+  chart of each price integration is `dashboard/prices/<provider>.yaml` (`<provider>` is the key of
+  `PROVIDER_CLASSES`), included by a `# @include` line, and the provider's `dashboard_entities()` maps the
+  external entities that chart uses; a test checks that both name the same entities. A new price integration
+  needs a provider class and a chart file. Keep `expand_includes()` in sync with BattMind.
 - Do not edit generated/cache files such as `__pycache__`, `.pytest_cache`, or
   `.ruff_cache`.
 
