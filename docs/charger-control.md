@@ -104,11 +104,16 @@ and *States*:
 If neither the charger nor the car can set the current, the blueprint only starts and stops charging –
 solar surplus charging and load balancing then can't regulate the current.
 
+For ready-made actions for KEBA, Wallbox, Easee, myenergi and Ohme, see [Ready-made charger actions](chargers.md).
+
 ### Shared circuit
 
 For chargers controlled through a circuit limit, e.g. Easee chargers behind a master. Fill in **Set circuit
 current (master only)** **only in the automation of the car whose charger is the master**, and leave it empty in
-the other cars' automations – otherwise several automations set the same circuit. Example for Easee:
+the other cars' automations – otherwise several automations set the same circuit. A single charger is its own
+master, so fill it in there too: Easee sets the current per phase through the circuit limit, while the charger's
+own limit (**Set charging current**) is the highest current it may use on its phases, and the lower of the two
+applies. Example for Easee:
 
 ```yaml
 action: easee.set_circuit_dynamic_limit
