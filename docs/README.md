@@ -9,7 +9,7 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 |---|---|
 | [Getting started](getting-started.md) | you install CJP for the first time |
 | [How CJP plans](how-it-works.md) | you want to understand why the car charges when it does |
-| [Charger and car control](charger-control.md) | you build the automation that controls the charger and the car |
+| [Charger and car control](charger-control.md) | you build the automation that controls the charger and the car, or [test it](charger-control.md#test-your-charger-automation) |
 | [Ready-made charger actions](chargers.md) | you have a KEBA, Wallbox, Easee, myenergi or Ohme charger and want actions to paste into the blueprint (checked against the source, not tested on a charger) |
 
 ## Charging rules

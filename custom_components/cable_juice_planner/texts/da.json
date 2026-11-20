@@ -254,6 +254,69 @@
       "phases": "Faser",
       "power": "Ladeeffekt"
     },
+    "charger_test": {
+      "car_phases": "Bilen ladede kun på {phases} fase(r), så trinnene blev bedømt på {phases} fase(r). Det er normalt for en bil med en mindre indbygget lader; lader bilen på tre faser, så tjek, at automationen skifter faser.",
+      "not_run": "Testen er ikke kørt endnu. Slå **Test min laderautomation** til for at starte den.",
+      "status": {
+        "idle": "Testen kører ikke",
+        "running": "Testen kører…",
+        "done": "Testen er færdig",
+        "stopped": "Testen blev stoppet",
+        "failed": "Testen kunne ikke køre"
+      },
+      "column_step": "Trin",
+      "column_result": "Resultat",
+      "step": {
+        "max": "Maksimum: {amps} A på {phases} fase(r)",
+        "min": "Laveste trin: {amps} A på {phases} fase(r)",
+        "single_max": "Højeste 1-fase-trin: {amps} A",
+        "single_min": "Laveste 1-fase-trin: {amps} A",
+        "stop": "Stop opladning"
+      },
+      "running_note": "Hver strøm udsendes i op til 2½ minut og består, så snart laderens effekt passer til den. Slå kontakten fra for at stoppe; planens egen handling og ampere udsendes så igen.",
+      "summary": "{ok} af {total} trin virkede, {fail} virkede ikke, {skip} kunne ikke testes.",
+      "stop_reason": {
+        "overdraw": "Laderen tog klart mere strøm, end den fik, og belastningsstyringen regner med det, CJP udsender, så testen blev stoppet. Tjek, at automationen sender strøm og faser videre til laderen.",
+        "not_configured": "Testen kræver laderens effektsensor.",
+        "unavailable": "Laderens status er ikke tilgængelig lige nu.",
+        "not_connected": "Testen kræver en bil, der er tilsluttet laderen.",
+        "completed": "Testen kræver en bil, der ikke er fuld: laderen siger, at opladningen er afsluttet.",
+        "not_ready": "Laderen er ikke klar til at lade lige nu.",
+        "other_ev": "En anden bil bruger denne lader.",
+        "running": "En test kører allerede.",
+        "stopped": "Testen blev stoppet.",
+        "no_charging": "Laderen gav (næsten) ingen effekt ved maksimal strøm, så de andre trin blev ikke prøvet. Tjek, at bilen er tilsluttet, og at automationen starter laderen.",
+        "internal_error": "Testen fejlede. Se Home Assistant-loggen."
+      },
+      "fail_hint": "For et trin, der ikke virkede: åbn laderautomationens trace og tjek, at den kørte trinnene for Set charging current med handlingens ampere, og at laderen tog imod kommandoen. En lader, der får mindre end bilens laveste ampere, eller mere end sikringen tillader, kan vise noget andet, og effekten afviger også, når den rigtige spænding ikke er spændingsindstillingen.",
+      "put_back": "Planens egen handling og ampere udsendes igen, og intet andet er ændret.",
+      "legend": "✅ virkede · ⚠️ virkede, se noten · ❌ laderen leverede ikke · 🔧 ikke testet",
+      "no_amps_control": "Din automation har ingen trin til at sætte strømmen (*Set charging current*, *Set charging current in the car* eller *Set circuit current*), eller planen har ingen solcelletrin, så kun maksimum og stop blev prøvet.",
+      "automation_unknown": "CJP kunne ikke finde din laderautomation i automations.yaml og kan derfor ikke se, hvilke handlinger der har trin (en automation i en package eller i YAML-tilstand findes ikke).",
+      "ok": {
+        "already_charging": "Bilen ladede allerede før testen, så starten er ikke bevist.",
+        "limited": "Effekten blev ved {watt} W, selvom der blev bedt om op til {configured_amps} A: bilen (fx et fuldt eller koldt batteri) eller laderen begrænser den, ikke nødvendigvis automationen. Sænk kun indstillingen, hvis laderen eller sikringen virkelig er begrænset.",
+        "ok": "Laderen leverede {watt} W (forventet {expected_w} W for {amps} A på {phases} fase(r)).",
+        "adjusted": "Det virkede ved {amps} A ({watt} W), ikke ved trinnets {configured_amps} A. Ret indstillingen, hvis den skal være {amps} A.",
+        "started": "Laderen startede: {watt} W.",
+        "stop": "Laderen stoppede ({watt} W)."
+      },
+      "fail": {
+        "overdraw": "Laderen tog {watt} W, klart mere end {amps} A på {phases} fase(r) giver, så testen blev stoppet med det samme.",
+        "charge": "Laderen leverede ikke effekten for {amps} A på {phases} fase(r) (forventet {expected_w} W, så {watt} W).",
+        "stop": "Laderen blev ved med at lade ({watt} W)."
+      },
+      "attempt": "{amps} A: {watt} W",
+      "tried": "Prøvet: {tried}.",
+      "skip": {
+        "no_steps": "Ikke testet: din automation har ingen trin til dette.",
+        "no_data": "Ikke testet: laderens effektsensor havde ikke et tal eller har ikke rapporteret for nylig.",
+        "site_limited": "Ikke testet: belastningsstyringen giver bilen mindre strøm, end trinnet beder om.",
+        "no_baseline": "Ikke bevist: laderen ladede ikke lige før, så et stop kan ikke ses.",
+        "not_ready": "Ikke testet: bilen blev frakoblet eller er fuld.",
+        "not_reached": "Ikke nået: testen sluttede før dette trin."
+      }
+    },
     "charging_rule_changed": {
       "charging_rule_conflict": "Konflikt mellem laderegler",
       "deactivate_optimal_rule": "Deaktivér Optimal ugeopladning",
@@ -550,6 +613,8 @@
     "battery_chart_title": "Batteri og ladeplan",
     "battery_level": "Batteriniveau",
     "planned_charging": "Planlagt ladning",
+    "section_charger_test": "Test min laderautomation",
+    "help_charger_test": "CJP styrer aldrig din lader: det gør din egen automation, når CJP's handling og ampere skifter. Testen tjekker, at din automation virkelig gør det, planen beder om.\n\n* **Test min laderautomation**: slå den til for at starte (en bil skal være tilsluttet og ikke fuld). CJP udsender den maksimale strøm, derefter det laveste og højeste trin i solcelleberegningen på alle faser og på én fase, og et stop, og læser laderens effekt. Et trin består, når effekten passer til ampere. Maksimum kommer først: giver laderen (næsten) ingen effekt ved det, prøves de andre trin ikke. Når et trin fejler, prøver CJP to ampere mod midten, og hvis det virker, den ene ampere imellem, så du ser den strøm tættest på trinnet, der virker. Effekt, der ikke stiger med flere ampere, vises som bilens eller laderens grænse, og en bil, der lader på færre faser, bedømmes på sine egne faser. Tager laderen klart mere, end den fik, stopper testen med det samme. Slå kontakten fra for at stoppe; planens egen handling og ampere udsendes så igen.\n* **Laderautomationstest**: testens status: inaktiv, kører, færdig, stoppet eller mislykket.\n* Tabellen under viser hvert trin: ✅ virkede, ⚠️ virkede, se noten, ❌ laderen leverede ikke, 🔧 ikke testet. Uden en måde at sætte strømmen på (ingen trin til *Set charging current*, *Set charging current in the car* eller *Set circuit current*) prøves kun maksimum og stop.\n\n**Vær opmærksom:** testen lader din bil i nogle minutter ved strømme, som planen måske ikke havde valgt, og den ændrer, hvad laderen gør. Belastningsstyringen begrænser stadig strømmen. Planen og indstillingerne ændres ikke. Ladede planen ikke, kan energien, som testen lader, mangle i ladehistorikken og det beregnede batteriniveau.",
     "section_status": "Status",
     "section_trip": "Tur",
     "section_public_charging": "Offentlig ladning",

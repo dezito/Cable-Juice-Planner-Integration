@@ -13,11 +13,12 @@ only publishes the decisions; the user's own automations act on them:
 from __future__ import annotations
 
 from .actions import ControlActions
+from .charger_test import ChargerTest
 from .charging_loss import ControlChargingLoss
 from .events import ControlEvents
 from .preheat import ControlPreheat
 from .schedule import ControlSchedule
 
 
-class Control(ControlActions, ControlSchedule, ControlPreheat, ControlChargingLoss, ControlEvents):
+class Control(ControlActions, ControlSchedule, ControlPreheat, ControlChargingLoss, ControlEvents, ChargerTest):
     """charge_if_needed and the event handlers of ev.py."""

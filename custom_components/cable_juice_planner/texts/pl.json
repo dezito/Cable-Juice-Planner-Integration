@@ -254,6 +254,69 @@
       "phases": "Fazy",
       "power": "Moc ładowania"
     },
+    "charger_test": {
+      "car_phases": "Samochód ładował tylko na mniejszej liczbie faz ({phases}), więc kroki oceniono dla tej liczby faz ({phases}). To normalne dla samochodu z mniejszą ładowarką pokładową; jeśli samochód ładuje na trzech fazach, sprawdź, czy automatyzacja przełącza fazy.",
+      "not_run": "Test nie został jeszcze uruchomiony. Włącz **Przetestuj moją automatyzację ładowarki**, aby go rozpocząć.",
+      "status": {
+        "idle": "Test nie jest uruchomiony",
+        "running": "Test trwa…",
+        "done": "Test zakończony",
+        "stopped": "Test zatrzymano",
+        "failed": "Test nie mógł się uruchomić"
+      },
+      "column_step": "Krok",
+      "column_result": "Wynik",
+      "step": {
+        "max": "Maksimum: {amps} A na {phases} faz(ach)",
+        "min": "Najniższy stopień: {amps} A na {phases} faz(ach)",
+        "single_max": "Najwyższy stopień 1-fazowy: {amps} A",
+        "single_min": "Najniższy stopień 1-fazowy: {amps} A",
+        "stop": "Zatrzymaj ładowanie"
+      },
+      "running_note": "Każdy prąd jest publikowany do 2,5 minuty i zalicza się, gdy tylko moc ładowarki do niego pasuje. Wyłącz przełącznik, aby zatrzymać; wtedy znów publikowane są akcja i ampery planu.",
+      "summary": "{ok} z {total} kroków zadziałało, {fail} nie zadziałało, {skip} nie dało się przetestować.",
+      "stop_reason": {
+        "overdraw": "Ładowarka pobrała wyraźnie więcej prądu, niż dostała, a zarządzanie obciążeniem polega na tym, co publikuje CJP, więc test zatrzymano. Sprawdź, czy automatyzacja przekazuje prąd i fazy do ładowarki.",
+        "not_configured": "Test wymaga czujnika mocy ładowarki.",
+        "unavailable": "Status ładowarki jest teraz niedostępny.",
+        "not_connected": "Test wymaga samochodu podłączonego do ładowarki.",
+        "completed": "Test wymaga samochodu, który nie jest naładowany: ładowarka podaje, że ładowanie zakończono.",
+        "not_ready": "Ładowarka nie jest teraz gotowa do ładowania.",
+        "other_ev": "Inny samochód korzysta z tej ładowarki.",
+        "running": "Test już trwa.",
+        "stopped": "Test zatrzymano.",
+        "no_charging": "Ładowarka nie dała (prawie) żadnej mocy przy maksymalnym prądzie, więc pozostałych kroków nie próbowano. Sprawdź, czy samochód jest podłączony i czy automatyzacja uruchamia ładowarkę.",
+        "internal_error": "Test zakończył się błędem. Zobacz dziennik Home Assistant."
+      },
+      "fail_hint": "Gdy krok nie zadziałał: otwórz ślad (trace) automatyzacji ładowarki i sprawdź, czy wykonała kroki dla Set charging current z amperami akcji oraz czy ładowarka przyjęła polecenie. Ładowarka, która dostaje mniej niż minimum samochodu lub więcej, niż pozwala bezpiecznik, może pokazywać coś innego, a moc różni się też, gdy rzeczywiste napięcie nie odpowiada ustawieniu napięcia.",
+      "put_back": "Akcja i ampery planu są znów publikowane, a nic innego nie zostało zmienione.",
+      "legend": "✅ zadziałało · ⚠️ zadziałało, zobacz uwagę · ❌ ładowarka nie dostarczyła · 🔧 nie testowano",
+      "no_amps_control": "Twoja automatyzacja nie ma kroków do ustawiania prądu (*Set charging current*, *Set charging current in the car* lub *Set circuit current*) albo plan nie ma stopni solarnych, więc wypróbowano tylko maksimum i zatrzymanie.",
+      "automation_unknown": "CJP nie znalazł Twojej automatyzacji ładowarki w automations.yaml, więc nie widzi, które akcje mają kroki (automatyzacja w pakiecie lub w trybie YAML nie jest znajdowana).",
+      "ok": {
+        "already_charging": "Samochód ładował się już przed testem, więc start nie jest udowodniony.",
+        "limited": "Moc pozostała na poziomie {watt} W, choć żądano do {configured_amps} A: ogranicza ją samochód (np. pełna lub zimna bateria) albo ładowarka, niekoniecznie automatyzacja. Obniż ustawienie tylko wtedy, gdy ładowarka lub bezpiecznik naprawdę są ograniczone.",
+        "ok": "Ładowarka dostarczyła {watt} W (oczekiwano {expected_w} W dla {amps} A na {phases} faz(ach)).",
+        "adjusted": "Zadziałało przy {amps} A ({watt} W), nie przy {configured_amps} A stopnia. Zmień ustawienie, jeśli ma wynosić {amps} A.",
+        "started": "Ładowarka wystartowała: {watt} W.",
+        "stop": "Ładowarka zatrzymała się ({watt} W)."
+      },
+      "fail": {
+        "overdraw": "Ładowarka pobrała {watt} W, wyraźnie więcej, niż daje {amps} A na liczbie faz {phases}, więc test natychmiast zatrzymano.",
+        "charge": "Ładowarka nie dostarczyła mocy dla {amps} A na {phases} faz(ach) (oczekiwano {expected_w} W, zobaczono {watt} W).",
+        "stop": "Ładowarka dalej ładowała ({watt} W)."
+      },
+      "attempt": "{amps} A: {watt} W",
+      "tried": "Próbowano: {tried}.",
+      "skip": {
+        "no_steps": "Nie testowano: Twoja automatyzacja nie ma na to kroków.",
+        "no_data": "Nie testowano: czujnik mocy ładowarki nie miał wartości lub dawno się nie zgłaszał.",
+        "site_limited": "Nie testowano: zarządzanie obciążeniem daje temu samochodowi mniej prądu, niż żąda krok.",
+        "no_baseline": "Nie udowodniono: ładowarka tuż przedtem nie ładowała, więc zatrzymania nie widać.",
+        "not_ready": "Nie testowano: samochód odłączono lub jest naładowany.",
+        "not_reached": "Nie dotarto: test zakończył się przed tym krokiem."
+      }
+    },
     "charging_rule_changed": {
       "charging_rule_conflict": "Konflikt reguł ładowania",
       "deactivate_optimal_rule": "Deaktywuj optymalne ładowanie tygodniowe",
@@ -550,6 +613,8 @@
     "battery_chart_title": "Bateria i plan ładowania",
     "battery_level": "Poziom baterii",
     "planned_charging": "Planowane ładowanie",
+    "section_charger_test": "Przetestuj moją automatyzację ładowarki",
+    "help_charger_test": "CJP nigdy sam nie steruje ładowarką: robi to Twoja własna automatyzacja, gdy zmieniają się akcja i ampery CJP. Test sprawdza, czy automatyzacja naprawdę robi to, czego żąda plan.\n\n* **Przetestuj moją automatyzację ładowarki**: włącz, aby rozpocząć (samochód musi być podłączony i niepełny). CJP publikuje maksymalny prąd, potem najniższy i najwyższy stopień obliczeń solarnych na wszystkich fazach i na jednej fazie oraz zatrzymanie, i odczytuje moc ładowarki. Krok zalicza się, gdy moc pasuje do amperów. Najpierw idzie maksimum: jeśli ładowarka przy nim nie daje (prawie) żadnej mocy, pozostałych kroków nie próbuje się. Gdy krok zawodzi, CJP próbuje dwa ampery w stronę środka, a jeśli to działa, jeden amper pośrodku, więc widzisz prąd najbliższy krokowi, który działa. Moc, która nie rośnie przy większej liczbie amperów, jest pokazywana jako ograniczenie samochodu lub ładowarki, a samochód ładujący na mniejszej liczbie faz jest oceniany na własnych fazach. Jeśli ładowarka pobiera wyraźnie więcej, niż dostała, test zatrzymuje się natychmiast. Wyłącz przełącznik, aby zatrzymać; wtedy znów publikowane są akcja i ampery planu.\n* **Test automatyzacji ładowarki**: stan testu: bezczynny, działa, zakończono, zatrzymano lub niepowodzenie.\n* Tabela poniżej pokazuje każdy krok: ✅ zadziałało, ⚠️ zadziałało, zobacz uwagę, ❌ ładowarka nie dostarczyła, 🔧 nie testowano. Bez możliwości ustawienia prądu (brak kroków dla *Set charging current*, *Set charging current in the car* lub *Set circuit current*) wypróbowuje się tylko maksimum i zatrzymanie.\n\n**Uwaga:** test przez kilka minut ładuje samochód prądami, których plan mógł nie wybrać, i zmienia to, co robi ładowarka. Zarządzanie obciążeniem nadal ogranicza prąd. Plan i ustawienia nie są zmieniane. Jeśli plan nie ładował, energii naładowanej przez test może brakować w historii ładowania i w obliczonym poziomie baterii.",
     "section_status": "Status",
     "section_trip": "Podróż",
     "section_public_charging": "Ładowanie publiczne",

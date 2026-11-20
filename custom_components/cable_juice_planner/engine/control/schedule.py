@@ -253,6 +253,10 @@ class ControlSchedule:
         updated time of the last calculation; an automation can fall back to charging
                 when it gets old (the integration stopped or hangs)
         """
+        if self.charger_hold_active():
+            # the test of the automation holds the current: nothing is planned or published until it ends
+            self._charger_test_publish()
+            return self.charger_action
         self.charger_mode = "normal"
         try:
             self.is_battery_fully_charged()

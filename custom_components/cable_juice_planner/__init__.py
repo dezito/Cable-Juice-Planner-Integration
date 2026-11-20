@@ -303,6 +303,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool
             hass.data.get(DOMAIN, {}).pop("site", None)
             await entry.runtime_data.async_stop()
         return unloaded
+    # a running test of the charger automation puts the plan back first: with the entities gone nothing can publish it
+    if (coordinator := getattr(entry, "runtime_data", None)) is not None:
+        await coordinator.async_unload_charger_test()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_unload()
