@@ -149,7 +149,7 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
             tariff = {"transmissions_nettarif": values[0], "systemtarif": values[1], "elafgift": values[2], "tariffs": values[3], "surcharge": 0.0, "tariff_sum": sum(values)}
         else:
             return None
-        return sell_price_parts(price, tariff, costs, abs(fee))[2]
+        return sell_price_parts(price, tariff, costs, abs(fee), self.decimals)[2]
 
 
 def eds_tariff_schedule(tariffs) -> dict | None:

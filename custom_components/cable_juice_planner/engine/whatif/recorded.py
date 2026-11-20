@@ -39,6 +39,7 @@ END_TOLERANCE = 60.0  # s: and end this long after the unplug time
 ESTIMATE_TOLERANCE = 7200.0  # s: the same for a connection that is itself an estimate (derive.py works in whole hours)
 MIN_HOME_KWH = 1e-3  # kWh: an entry with less home charging than this is public charging only
 MIN_BOOKED_GRID_KWH = 0.1  # kWh: grid energy booked at 0 above this is a missing price
+MIN_BOOKED_COST = 0.005  # kroner (times price_scale): an entry with less home charging and cost than this is public charging only
 
 
 def _number(value: Any, minimum: float | None = 0.0) -> float | None:
@@ -50,11 +51,12 @@ def _number(value: Any, minimum: float | None = 0.0) -> float | None:
 
 
 def history_rows(
-    history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime], float], battery_kwh: float | None
+    history: Mapping[Any, Any], to_ts: Callable[[datetime.datetime], float], battery_kwh: float | None, price_scale: float = 1.0
 ) -> list[dict[str, Any]]:
     """The home charging of every entry of the charging history as a plain row: start and end in epoch seconds, kWh,
     battery percent, kWh from local energy and cost, without the public charging inside the entry. A row with a figure that
-    is missing or not a finite number is "valid" False, never zero; a row that is only public charging is left out."""
+    is missing or not a finite number is "valid" False, never zero; a row that is only public charging is left out.
+    price_scale: the money tolerance (MIN_BOOKED_COST) is for kroner, see const/base.py price_scale."""
     rows: list[dict[str, Any]] = []
     for key, value in history.items():
         if not isinstance(key, datetime.datetime) or not isinstance(value, Mapping):
@@ -88,7 +90,7 @@ def history_rows(
             else:
                 kwh, percent, cost = max(kwh - public_kwh, 0.0), max(percent - public_kwh / battery * 100.0, 0.0), cost - public_cost  # type: ignore[operator]
                 local = min(local, kwh)  # type: ignore[type-var]
-        if valid and not ongoing and (kwh or 0.0) < MIN_HOME_KWH and (percent or 0.0) < 0.1 and abs(cost or 0.0) < 0.005:
+        if valid and not ongoing and (kwh or 0.0) < MIN_HOME_KWH and (percent or 0.0) < 0.1 and abs(cost or 0.0) < MIN_BOOKED_COST * price_scale:
             continue  # only public charging
         rows.append({
             "ts": start, "end": end, "ongoing": ongoing, "valid": valid,

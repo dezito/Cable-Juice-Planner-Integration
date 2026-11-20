@@ -357,7 +357,7 @@ class EnergySolar:
             if get_avg_offline_sell_price:
                 sun_events = self.get_sun_events()
                 return self.sell_value(average([
-                    self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
+                    self.get_price_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
                     for hour in range(sun_events["sunrise"].hour, sun_events["sunset"].hour)
                 ]))
 
@@ -432,7 +432,7 @@ class EnergySolar:
             sell_price = None
             using_text = "default"
             try:
-                sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week]))
+                sell_price = self.sell_value(self.get_price_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week]))
                 using_text = "database forecast"
             except Exception:  # noqa: BLE001
                 pass

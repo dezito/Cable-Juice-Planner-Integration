@@ -1,9 +1,10 @@
 """Charging amps and the commands to the charger."""
 from __future__ import annotations
 
+import datetime
 import logging
 
-from ...utils.helpers import get_closest_key, minutes_between, reset_datetime, to_datetime
+from ...utils.helpers import get_closest_key, minutes_between, reset_datetime, to_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,8 +211,12 @@ class ControlActions:
             return
         last_update_entity = self.config["ev_car"]["entity_ids"]["last_update_entity_id"]
         if self.is_entity_available(last_update_entity):
-            last_update = to_datetime(self.get_state(last_update_entity, error_state=reset_datetime()))
-            if minutes_between(last_update, self.now()) <= 14:
+            # a timestamp sensor has an offset (UTC): in Home Assistant's time zone, like now()
+            last_update = to_local_datetime(self.get_state(last_update_entity, error_state=reset_datetime()), self._snap.tz if self._snap else None)
+            if not isinstance(last_update, datetime.datetime):
+                # no readable time: the last update is unknown, so the car cannot be assumed to be awake
+                _LOGGER.warning("The car's last update %s is not a time, waking the car up", last_update)
+            elif minutes_between(last_update, self.now()) <= 14:
                 _LOGGER.debug("Ev already updated, skipping wake up call")
                 return
         self.last_wake_up_datetime = self.now()

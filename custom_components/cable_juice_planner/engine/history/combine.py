@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ...const import ENTITY_UNAVAILABLE_STATES
+from ...const import ENTITY_UNAVAILABLE_STATES, price_decimals
 from ...utils.formatting import (
     emoji_parse,
     emoji_sorting,
@@ -428,7 +428,7 @@ class HistoryCombine:
                     f"{self.title} failed",
                     f"{self.name}__charging_history_calc_local_energy_kwh_or_price_failed",
                 )
-            cost = round(kwh * price, 2)
+            cost = round(kwh * price, price_decimals(self.config))
             entry = db[when]
             entry["percentage"] = round(added_percentage, 1)
             entry["kWh"] = round(kwh, 3)

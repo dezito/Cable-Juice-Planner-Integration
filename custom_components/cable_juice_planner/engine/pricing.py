@@ -5,7 +5,7 @@ import datetime
 import logging
 from copy import deepcopy
 
-from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
+from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
 from ..prices.base import sell_adder_sign
 from ..prices.intervals import hourly_price_averages
 from ..utils.formatting import get_list_values
@@ -63,7 +63,7 @@ class Pricing:
                 if corrections:
                     current_hour = self.current_hour()
                     hour_prices = {
-                        timestamp: round(price + corrections.get(days_between(current_hour, timestamp), 0.0), 2)
+                        timestamp: round(price + corrections.get(days_between(current_hour, timestamp), 0.0), price_decimals(self.config))
                         if str(sources.get(timestamp, "")).endswith(":forecast") else price
                         for timestamp, price in hour_prices.items()
                     }
@@ -121,11 +121,11 @@ class Pricing:
         while timestamp < end:
             values = history.get(timestamp.hour, {}).get(timestamp.weekday(), [])
             if timestamp not in priced_hours and values:
-                adder = days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+                adder = days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER * price_scale(self.config)
                 if history_key == "history_sell":
                     # a sale at a price from the history is worth less too (see sell_adder_sign)
                     adder *= sell_adder_sign(self.config)
-                missing[timestamp] = round(self.get_forecast_value(values) + adder, 2)
+                missing[timestamp] = round(self.get_price_forecast_value(values) + adder, price_decimals(self.config))
             timestamp += datetime.timedelta(hours=1)
         return missing
 
@@ -171,15 +171,19 @@ class Pricing:
         self.drive_forecast_type = drives or self.forecast_type
         return self.forecast_type
 
-    def get_forecast_value(self, data=None, forecast_type: str | None = None) -> float:
+    def get_forecast_value(self, data=None, forecast_type: str | None = None, decimals: int = 2) -> float:
         """The forecast of the selected type, or of forecast_type (the forecast accuracy analysis)."""
         forecast_type = forecast_type or self.forecast_type
         if not data or not isinstance(data, list) or len(data) == 0:
             return 0.0
         if forecast_type == "ema":
-            return round(calculate_ema(reverse_list(get_list_values(data))), 2)
+            return round(calculate_ema(reverse_list(get_list_values(data))), decimals)
         if forecast_type == "average":
-            return round(average(get_list_values(data)), 2)
+            return round(average(get_list_values(data)), decimals)
         if forecast_type == "trend":
-            return round(calculate_trend(reverse_list(get_list_values(data))), 2)
+            return round(calculate_trend(reverse_list(get_list_values(data))), decimals)
         return 0.0
+
+    def get_price_forecast_value(self, data=None) -> float:
+        """get_forecast_value of a list of prices: rounded to the decimals of the price currency (2 for kroner)."""
+        return self.get_forecast_value(data, decimals=price_decimals(self.config))

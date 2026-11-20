@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -84,6 +85,68 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     assert options["usable_battery_level_entity_id"] == EV_LEVEL
     assert options["dashboard"] is False
     assert options["dashboard_icon"] == "mdi:car-electric"
+
+
+async def _to_the_price_pages(hass: HomeAssistant):
+    """A new car up to the price provider page (like test_full_flow_creates_entry)."""
+    result = await _start_instance(hass)
+    result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
+    result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
+    result = await _configure(
+        hass, result, "ev",
+        {"usable_battery_level_entity_id": EV_LEVEL, "estimated_battery_range_entity_id": EV_RANGE, "odometer_entity_id": EV_ODOMETER},
+    )
+    result = await _configure(hass, result, "ev_specs", {"battery_size": 75, "last_charging_hour_before_departure_buffer": 1})
+    result = await _configure(hass, result, "home", {"power_consumption_entity_id": CONSUMPTION})
+    result = await _configure(hass, result, "powerwall", form_defaults(result))
+    result = await _configure(hass, result, "price_provider", {"price_providers": ["energidataservice"]})
+    return await _configure(hass, result, "prices_energidataservice", {"energidataservice_buy_entity_id": PRICE})
+
+
+@pytest.mark.parametrize(
+    ("unit", "scale", "fee"),
+    [("DKK/kWh", 1.0, 0.03), ("EUR/kWh", 0.134, 0.004), ("kr/kWh", 1.0, 0.03), ("EUR/MWh", None, 0.03), (None, None, 0.03)],
+)
+async def test_a_new_entry_gets_the_price_scale_of_its_price_sensor(hass: HomeAssistant, unit, scale, fee) -> None:
+    """The scale comes from the unit of the price sensor, not from Home Assistant's currency (EUR by default)."""
+    hass.states.async_set(PRICE, "0.5", {"unit_of_measurement": unit} if unit else {})
+    result = await _to_the_price_pages(hass)
+    assert result["step_id"] == "price_fees"
+    assert form_defaults(result)["sell_fee"] == fee  # the suggestion is 0.03 kroner in the price currency
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    options = result["options"]
+    assert options.get("price_scale", 1.0) == (scale or 1.0)
+    assert options["sell_fee"] == fee
+
+
+async def test_a_sell_fee_the_user_changed_is_kept_when_the_scale_is_found(hass: HomeAssistant) -> None:
+    hass.states.async_set(PRICE, "0.5", {"unit_of_measurement": "EUR/kWh"})
+    result = await _to_the_price_pages(hass)
+    result = await _configure(hass, result, "price_fees", {"refund": 0.0, "sell_fee": 0.05})
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["options"]["price_scale"] == 0.134 and result["options"]["sell_fee"] == 0.05
+
+
+async def test_options_flow_finds_the_price_scale_and_keeps_it_without_a_unit(hass: HomeAssistant, loaded_entry) -> None:
+    async def save():
+        result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_ev"})
+        result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+        result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    price_entity = loaded_entry.options["energidataservice_buy_entity_id"]
+    hass.states.async_set(price_entity, "0.5", {"unit_of_measurement": "GBP/kWh"})
+    await save()
+    assert loaded_entry.options["price_scale"] == 0.115
+    sell_fee = loaded_entry.options["sell_fee"]
+    # a sensor without a known unit (not loaded yet at startup): the entry keeps its scale
+    hass.states.async_set(price_entity, "unavailable", {})
+    await save()
+    assert loaded_entry.options["price_scale"] == 0.115
+    assert loaded_entry.options["sell_fee"] == sell_fee  # an existing entry's fee is never rescaled
 
 
 async def test_ev_entities_all_or_nothing(hass: HomeAssistant) -> None:

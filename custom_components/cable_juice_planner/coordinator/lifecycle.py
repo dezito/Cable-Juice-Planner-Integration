@@ -21,7 +21,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dis
 from homeassistant.util import dt as dt_util
 
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
-from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
+from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, PRICE_CORRECTION_MAX, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language, price_scale
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
 from ..prices import stromligning_entities_to_watch
@@ -38,7 +38,8 @@ class CoordinatorLifecycle:
 
     async def async_setup(self) -> None:
         language = normalize_language(self.config.get("language"), normalize_language(self.hass.config.language))
-        self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit)
+        cap = PRICE_CORRECTION_MAX * price_scale(self.config)
+        self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit, cap)
         # entity names in the same language (HA would name translation_key entities in its own UI
         # language), English is the fallback for missing keys
         translations = await translation.async_get_translations(self.hass, language, "entity", {DOMAIN})

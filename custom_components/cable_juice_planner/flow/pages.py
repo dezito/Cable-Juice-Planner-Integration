@@ -10,10 +10,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
-from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, object_prefix
+from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, default_options, object_prefix, price_scale
 from ..site import charger_devices, circuit_of, update_circuits
 from ..management.dependency_checks import disabled_sensors
-from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, has_stromligning_sell_prices
+from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices
 from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
@@ -85,6 +85,27 @@ class CJPFlowPages:
     async def _async_finish(self) -> ConfigFlowResult:
         raise NotImplementedError
 
+    # True while a new entry is made (not changed): the defaults that are amounts of money follow the price currency then
+    _new_entry: bool = False
+
+    def _apply_price_scale(self, suggest_fee: bool = False) -> None:
+        """Store prices.price_scale from the unit of the price sensors (kept as it is when no sensor has a known unit).
+
+        suggest_fee (the page of the fee, before it is shown): a new car gets the default sell fee, 0.03 kroner, in the price
+        currency. Not for an import or a restored backup (their own fee stays) and not once the user has seen the page."""
+        previous = price_scale(self._options_as_config())
+        scale = detect_price_scale(self._options, self.hass.states.get)  # type: ignore[attr-defined]
+        if scale is None:
+            return
+        self._options["price_scale"] = scale
+        own_values = getattr(self, "_restore_backup", None) is not None or getattr(self, "_legacy_prefix", None) is not None
+        default_fee = default_options()["sell_fee"]
+        if suggest_fee and self._new_entry and not own_values and previous == 1.0 and scale != 1.0 and self._options.get("sell_fee") == default_fee:
+            self._options["sell_fee"] = round(default_fee * scale, 3)
+
+    def _options_as_config(self) -> dict[str, Any]:
+        return {"prices": {"price_scale": self._options.get("price_scale", 1.0)}}
+
     def _placeholders(self) -> dict[str, str]:
         return {}
 
@@ -95,6 +116,8 @@ class CJPFlowPages:
     async def _async_page(self, step: str, user_input: dict[str, Any] | None) -> ConfigFlowResult:
         keys = FLOW_STEPS[step]
         errors: dict[str, str] = {}
+        if step == "price_fees" and user_input is None:
+            self._apply_price_scale(suggest_fee=True)  # the price pages are done: the fee suggestion follows the currency
         values_for_form = dict(self._options)
         if user_input is not None:
             values = normalize_input(keys, user_input)

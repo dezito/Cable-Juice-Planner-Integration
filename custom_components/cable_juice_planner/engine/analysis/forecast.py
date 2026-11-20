@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from ...const import price_decimals, price_scale
 from .helpers import ANALYSIS_DAYS, FORECAST_AUTO_DAYS, FORECAST_AUTO_MIN_DAYS, FORECAST_AUTO_MIN_DRIVES, FORECAST_DRIVES, FORECAST_DRIVES_RECENT, FORECAST_TYPES, PRICE_CHART_DAYS, PRICE_CHART_LEADS, PRICE_CORRECTION_DAYS, PRICE_CORRECTION_MAX, PRICE_CORRECTION_MIN_DAYS, PRICE_FORECAST_DAYS, PRICE_RANK_HOURS, _is_num, _num, auto_forecast_choice
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,7 +31,8 @@ class AnalysisForecast:
             hours = sum(_num(entry.get("n")) for entry in entries)
             if len(entries) >= PRICE_CORRECTION_MIN_DAYS and hours:
                 bias = sum(_num(entry.get("bias")) for entry in entries) / hours
-                corrections[lead] = round(min(max(-bias, -PRICE_CORRECTION_MAX), PRICE_CORRECTION_MAX), 3)
+                limit = PRICE_CORRECTION_MAX * price_scale(self.config)
+                corrections[lead] = round(min(max(-bias, -limit), limit), 3 if price_decimals(self.config) == 2 else 4)
         return corrections
 
     def _price_forecast_attributes(self) -> dict:

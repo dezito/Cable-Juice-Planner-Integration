@@ -64,6 +64,17 @@ average, the plan subtracts 0.15 kr. A day ahead is only corrected after 7 days 
 most ±0.50 kr. The [price forecast analysis](dashboard-analysis.md#price-forecast) shows the measurements
 and the correction used.
 
+**Prices in another currency.** The amounts above (and a few small limits, such as the smallest saving that
+gives a score) are chosen for Danish kroner. When a car is set up, and again each time its options are saved,
+CJP reads the unit of the price sensor (e.g. `EUR/kWh`) and stores a *price scale*, so these amounts follow the
+currency: with euro prices the adder is about 0.0045 € per day and the correction limit about ±0.07 €, and
+prices are rounded to 3 decimals instead of 2. Your own settings are never changed: only the *Sell fee*
+suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
+to prices in another currency, check the *Sell fee*. A sensor without a known unit (or one in MWh or cents)
+leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
+this. The rates are rough: they only set the size of the limits, no price is ever converted. Currencies worth
+much less than a krone (CZK, HUF, ISK) are not recognised yet.
+
 <p align="center">
   <img src="../images/settings-advanced.png" alt="The Advanced settings: forecast type, choose the forecast type automatically and correct the price forecast" width="380">
 </p>

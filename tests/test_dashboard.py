@@ -504,6 +504,16 @@ def test_price_forecast_explanation_covers_the_correction(language: str) -> None
     assert "£/" in explain and "{valuta" not in explain, language  # the currency placeholder is filled in
 
 
+@pytest.mark.parametrize(("language", "kroner", "euro"), [("da", "±0,50 kr/kWh", "±0,067 €/kWh"), ("en", "±0.50 kr/kWh", "±0.067 €/kWh")])
+def test_the_correction_limit_in_the_help_texts_is_in_the_currency_of_the_prices(language: str, kroner: str, euro: str) -> None:
+    """0.50 kroner, or the same limit in a currency worth 0.134 krone (the price scale), written like the language does."""
+    assert kroner in load_texts(language, "DKK", "km")["dashboard.price_forecast_explain"]
+    assert euro in load_texts(language, "EUR", "km", 0.5 * 0.134)["dashboard.price_forecast_explain"]
+    assert euro in load_texts(language, "EUR", "km", 0.5 * 0.134)["entity_help.price_forecast"]
+    for text in load_texts(language, "EUR", "km", 0.067).values():
+        assert "{price_correction_max}" not in text
+
+
 def _raw_texts(language: str) -> dict[str, str]:
     import json
     from pathlib import Path

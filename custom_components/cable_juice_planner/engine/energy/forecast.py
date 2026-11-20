@@ -14,7 +14,7 @@ from ...utils.helpers import (
     in_between,
     reset_datetime,
     reset_time_to_hour,
-    to_datetime,
+    to_local_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,6 +26,19 @@ def weather_values() -> list:
         if condition not in output:
             output.append(condition)
     return output
+
+
+def forecast_day(value, tz):
+    """The day of a daily forecast time as naive local time.
+
+    A time that is midnight in its own offset names a date (2026-10-23T00:00:00+00:00, or the local midnight with
+    the local offset): that date is kept, whatever the time zone. Any other time (the local midnight in UTC, 22:00Z
+    in summer in Denmark) is converted to Home Assistant's time zone first.
+    """
+    wall_time = to_local_datetime(value)
+    if isinstance(wall_time, datetime.datetime) and wall_time.time() == datetime.time(0):
+        return wall_time
+    return to_local_datetime(value, tz)
 
 
 def strip_forecast_suffix(entity_id: str, endings: list):
@@ -52,18 +65,20 @@ class EnergyForecast:
         if key not in cache:
             hourly: dict = {}
             daily: dict = {}
+            # the forecast times come with an offset (UTC from Home Assistant): in Home Assistant's time zone
+            tz = self._snap.tz if self._snap else None
             for data in forecast_dict.get("hourly") or []:
                 if data is None:
                     continue
                 try:
-                    hourly.setdefault(reset_time_to_hour(to_datetime(data["datetime"])), data)
+                    hourly.setdefault(reset_time_to_hour(to_local_datetime(data["datetime"], tz)), data)
                 except Exception:  # noqa: BLE001
                     break
             for data in forecast_dict.get("daily") or []:
                 if data is None:
                     continue
                 try:
-                    daily.setdefault(to_datetime(data["datetime"]).replace(hour=0, minute=0, second=0, tzinfo=None), data)
+                    daily.setdefault(forecast_day(data["datetime"], tz).replace(hour=0, minute=0, second=0, tzinfo=None), data)
                 except Exception:  # noqa: BLE001
                     break
             cache[key] = (hourly, daily, forecast_dict)
@@ -142,8 +157,8 @@ class EnergyForecast:
             entity_id = f"{base_entity_id}_{ending}"
             try:
                 for data in solcast.get(entity_id) or {}:
-                    date = data["period_start"].replace(tzinfo=None)
-                    if date not in hour_prices:
+                    date = to_local_datetime(data["period_start"], self._snap.tz if self._snap else None)
+                    if date not in hour_prices or date in forecast:  # the repeated hour of the autumn: the first row, like the weather
                         continue
                     watt = round(data["pv_estimate"] * 1000.0, 0)
                     consumption = self.get_forecast_value(self.power_values_db[date.hour].get("power_consumption_without_all_exclusion", [0.0]), self.consumption_forecast_type)
@@ -214,7 +229,7 @@ class EnergyForecast:
                     power_one_down_list = [self.get_forecast_value(power_one_down_list)] if power_one_down_list else []
                     power_one_up_list = [self.get_forecast_value(power_one_up_list)] if power_one_up_list else []
                     avg_power = max(average(power_list + power_list + power_list + power_one_down_list + power_one_up_list), 0.0)
-                    avg_sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week]))
+                    avg_sell_price = self.sell_value(self.get_price_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week]))
                     return [avg_power / 1000, avg_sell_price, bool(power_list or power_one_down_list or power_one_up_list)]
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Cant get cloudiness: %s, hour: %s, day_of_week: %s. %s", cloudiness, hour, day_of_week, err)

@@ -100,6 +100,7 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
 
     async def _async_finish(self) -> ConfigFlowResult:
         self._save_circuit()
+        self._apply_price_scale()
         return self.async_create_entry(data=upgrade_options(self._options))
 
 

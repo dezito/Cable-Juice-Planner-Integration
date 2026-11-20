@@ -138,10 +138,12 @@ def translate(texts: dict[str, str], key: str, default: str | None = None, **fmt
         return value
 
 
-def load_texts(language: str, currency: str | None = None, distance: str | None = None) -> dict[str, str]:
+def load_texts(language: str, currency: str | None = None, distance: str | None = None, price_correction_max: float = 0.5) -> dict[str, str]:
     """Flattened runtime texts of texts/<language>.json, English is the fallback for missing keys.
 
     currency: hass.config.currency; replaces the language's currency in ui.common.valuta*.
+    price_correction_max: the cap of the price forecast correction in the currency of the prices (0.5 kroner times
+    the price scale); it fills {price_correction_max}, written like the language writes its decimals.
     distance: hass.config.units.length_unit ("km"/"mi", the unit the car's sensors are shown in);
     replaces the language's distance unit in ui.common.* when the language uses the other one.
     {valuta}, {valuta_kwh}, {distance} and {distance_kwh} are replaced in every text (also
@@ -184,14 +186,18 @@ def load_texts(language: str, currency: str | None = None, distance: str | None 
         texts["ui.common.distance_percentage"] = f"{distance}/%"
         texts["ui.common.wh_distance"] = f"Wh/{distance}"
         texts["ui.common.valuta_distance"] = f"{texts.get('ui.common.valuta', 'kr')}/{distance}"
+    cap = f"{price_correction_max:.2f}" if price_correction_max >= 0.1 else f"{price_correction_max:.3f}"
+    if language not in ("en", "en-GB"):
+        cap = cap.replace(".", ",")  # the other languages write 0,50
     units = {
         "valuta": texts.get("ui.common.valuta", "kr"),
         "valuta_kwh": texts.get("ui.common.valuta_kwh", "kr/kWh"),
         "distance": texts.get("ui.common.distance_type", "km"),
         "distance_kwh": texts.get("ui.common.distance_kwh", "km/kWh"),
+        "price_correction_max": cap,
     }
     for key, value in texts.items():
-        if isinstance(value, str) and ("{valuta" in value or "{distance" in value):
+        if isinstance(value, str) and ("{valuta" in value or "{distance" in value or "{price_correction_max}" in value):
             for token, replacement in units.items():
                 value = value.replace(f"{{{token}}}", replacement)
             texts[key] = value

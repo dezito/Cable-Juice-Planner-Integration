@@ -7,10 +7,8 @@ import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from dateutil import parser as dateutil_parser
-
-from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
-from ..utils.helpers import days_between, float_or_none, reset_time_to_hour
+from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
+from ..utils.helpers import days_between, float_or_none, reset_time_to_hour, to_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,19 +61,7 @@ def price_timestamp(value, tz: datetime.tzinfo | None = None):
     time zone) before the offset is dropped; a naive one is taken as local time already. Without a tz the offset
     is just dropped. Anything that is no timestamp is returned unchanged (the providers skip such rows).
     """
-    if isinstance(value, str):
-        try:
-            value = dateutil_parser.isoparse(value)
-        except (ValueError, OverflowError):
-            return value
-    if isinstance(value, datetime.datetime):
-        if tz is not None and value.tzinfo is not None:
-            try:
-                value = value.astimezone(tz)
-            except OverflowError:  # a timestamp at the edge of the calendar: keep its own wall time
-                pass
-        return value.replace(tzinfo=None)
-    return value
+    return to_local_datetime(value, tz)
 
 
 def is_number(value) -> bool:
@@ -83,11 +69,13 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def sell_price_parts(price: float, tariff: Mapping, costs: Mapping, sell_fee: float) -> tuple[float, float, float]:
-    """The sell price formula (see calculate_sell_price): (price without the tariffs in it, selling costs, sell price)."""
+def sell_price_parts(price: float, tariff: Mapping, costs: Mapping, sell_fee: float, decimals: int = 2) -> tuple[float, float, float]:
+    """The sell price formula (see calculate_sell_price): (price without the tariffs in it, selling costs, sell price).
+
+    decimals: what the sell price is rounded to (price_decimals of the config)."""
     raw_price = price - tariff["tariff_sum"]
     sell_tariffs = sum((sell_fee, costs["transmissions_nettarif"], costs["systemtarif"]))
-    return raw_price, sell_tariffs, round(raw_price - sell_tariffs, 2)
+    return raw_price, sell_tariffs, round(raw_price - sell_tariffs, decimals)
 
 
 class BasePriceProvider:
@@ -101,6 +89,9 @@ class BasePriceProvider:
         self.refund = abs(prices_config.get("refund", 0.0))
         self.sell_fee = abs(prices_config.get("sell_fee", 0.0))
         self.sell_adder_sign = sell_adder_sign(config)
+        # the money limits are for kroner: prices in another currency scale them (const/base.py price_scale)
+        self.price_scale = price_scale(config)
+        self.decimals = price_decimals(config)
         self.buy_real_prices: dict = {}
         self.buy_forecast_prices: dict = {}
         self.sell_real_prices: dict = {}
@@ -197,7 +188,7 @@ class BasePriceProvider:
         """Forecast prices get a small penalty per day ahead to prefer known prices.
 
         A forecast buy price is dearer, and a sale at a forecast sell price is worth less (sell_adder_sign)."""
-        adder = days_between(reset_time_to_hour(self.now), timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+        adder = days_between(reset_time_to_hour(self.now), timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER * self.price_scale
         return adder * self.sell_adder_sign if sell else adder
 
     def get_sell_costs(self, hour, day_of_week, timestamp=None) -> dict | None:
@@ -212,7 +203,7 @@ class BasePriceProvider:
         tariff = self.get_tariffs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
         sell_costs = self.get_sell_costs(timestamp.hour, timestamp.weekday(), timestamp=timestamp)
         costs = tariff if sell_costs is None else sell_costs
-        raw_price, sell_tariffs, sell_price = sell_price_parts(price, tariff, costs, self.sell_fee)
+        raw_price, sell_tariffs, sell_price = sell_price_parts(price, tariff, costs, self.sell_fee, self.decimals)
         self.sell_price_details[timestamp] = {
             "price": price,
             "price_timestamp": timestamp,
@@ -358,7 +349,7 @@ class CombinedPriceProvider(BasePriceProvider):
                     if not is_number(price):
                         continue  # NaN/infinity is no price: the hour gets another provider's price, else the price history's, else none
                     if timestamp not in prices:
-                        price = round(price, 2)
+                        price = round(price, self.decimals)
                         prices[timestamp] = price
                         real_prices[timestamp] = price
                         sources[timestamp] = f"{provider.source_name}:real"
@@ -373,7 +364,7 @@ class CombinedPriceProvider(BasePriceProvider):
                     if not is_number(price):
                         continue
                     if timestamp not in prices:
-                        prices[timestamp] = round(price, 2)
+                        prices[timestamp] = round(price, self.decimals)
                         sources[timestamp] = f"{provider.source_name}:forecast"
                         if sell and timestamp in provider.sell_price_details:
                             details[timestamp] = provider.sell_price_details[timestamp].copy()
@@ -418,7 +409,7 @@ class CombinedPriceProvider(BasePriceProvider):
     def _forecast(self, prices: dict, sources: dict, adder: bool, sign: float) -> dict:
         current_hour = reset_time_to_hour(self.now)
         return {
-            timestamp: price if adder else price - sign * days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+            timestamp: price if adder else price - sign * days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER * self.price_scale
             for timestamp, price in prices.items()
             if str(sources.get(timestamp, "")).endswith(":forecast")
         }

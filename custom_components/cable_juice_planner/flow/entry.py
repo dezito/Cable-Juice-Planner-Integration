@@ -24,6 +24,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
     MINOR_VERSION = 5
+    _new_entry = True
 
     def __init__(self) -> None:
         self._prefix = DEFAULT_ENTITY_PREFIX
@@ -176,6 +177,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
     async def _async_finish(self) -> ConfigFlowResult:
         title = instance_title(self._prefix, self._car_name)
         self._save_circuit()
+        self._apply_price_scale()
         return self.async_create_entry(
             title=title,
             data={

@@ -156,7 +156,7 @@ what the forecast said 1, 2, 3 … days before.
 | Bias | > 0: the forecast was too high on average |
 | Worst hour | the biggest error in a single hour |
 | Cheapest found | how many of the day's 4 cheapest hours by the forecast really were among the 4 cheapest – the hours the plan prefers to charge in. In brackets the extra price per kWh of picking them by the forecast |
-| Correction | what the plan adds to the forecast prices for that day ahead: minus the bias, after 7 days of measurements and at most ±0.50 kr. – while there are too few days, or when *Correct the price forecast* (*Settings → Advanced*) is off |
+| Correction | what the plan adds to the forecast prices for that day ahead: minus the bias, after 7 days of measurements and at most ±0.50 kr. (converted for another currency, see [how it works](how-it-works.md)) – while there are too few days, or when *Correct the price forecast* (*Settings → Advanced*) is off |
 
 The level of the forecast matters less than the order of the hours: a forecast that is 0.30 kr too high but
 finds the right cheap hours plans almost as well as the real prices. The charts show the real price against

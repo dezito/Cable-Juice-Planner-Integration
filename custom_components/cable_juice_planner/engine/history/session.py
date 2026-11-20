@@ -6,7 +6,7 @@ import logging
 
 from ...const import ENTITY_UNAVAILABLE_STATES, EV_PLUGGED_STATES, EV_UNPLUGGED_STATES
 from ...utils.formatting import emoji_parse
-from ...utils.helpers import to_datetime
+from ...utils.helpers import to_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -173,10 +173,9 @@ class HistorySession:
         try:
             if charging_session_start is None:
                 raise ValueError('"Charging Session Start" is required.')
-            charging_session_start = to_datetime(charging_session_start)
-            if isinstance(charging_session_start, datetime.datetime):
-                charging_session_start = charging_session_start.replace(tzinfo=None)
-            else:
+            # a start with an offset (e.g. {{ utcnow() }}) is converted to Home Assistant's time zone first
+            charging_session_start = to_local_datetime(charging_session_start, self._snap.tz if self._snap else None)
+            if not isinstance(charging_session_start, datetime.datetime):
                 raise ValueError('"Charging Session Start" must be a datetime object.')
             if battery_level_begin is None and battery_level_end is None and battery_level_added is None and battery_kwh_added is None:
                 raise ValueError('Use at least "Battery Level Begin" and "Battery Level End" or "Battery Level Added" or "Battery kWh Added" to calculate the added energy.')

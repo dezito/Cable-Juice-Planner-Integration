@@ -6,6 +6,7 @@ import logging
 import math
 from copy import deepcopy
 
+from ...const import price_decimals
 from ...utils.helpers import average, in_between, reset_time_to_hour, ultra_cheap_limit
 from ...prices.intervals import hourly_price_averages
 
@@ -57,7 +58,7 @@ class EnergyPrice:
                 if charging > 0.0 and sum(powerwall_kwh) < kwh:
                     history_key = "history_sell" if solar_available_production > 0 else "history"
                     # the hour offset (not the hour of day) indexes the price history, like ev.py
-                    kwh_price = self.get_forecast_value(self.kwh_avg_prices_db[history_key][hour][loop_timestamp.weekday()])
+                    kwh_price = self.get_price_forecast_value(self.kwh_avg_prices_db[history_key][hour][loop_timestamp.weekday()])
                     if history_key == "history_sell":
                         kwh_price = self.sell_value(kwh_price)
                     kwh_price_list.append(round(kwh_price, 3))
@@ -309,6 +310,7 @@ class EnergyPrice:
             _LOGGER.error("Can't append KWH avg prices: %s %s", err, type(err))
 
     def set_low_forecast_price(self) -> None:
-        price = round(self.get_forecast_value(self.kwh_avg_prices_db["min"]), 3)
-        self.set_attr("charge_very_cheap_battery_level", "low_forecast_price", round(price, 2))
-        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round(ultra_cheap_limit(price), 2))
+        price = round(self.get_price_forecast_value(self.kwh_avg_prices_db["min"]), 3)
+        decimals = price_decimals(self.config)
+        self.set_attr("charge_very_cheap_battery_level", "low_forecast_price", round(price, decimals))
+        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round(ultra_cheap_limit(price), decimals))

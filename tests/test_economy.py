@@ -28,8 +28,8 @@ def test_fill_cheapest_takes_the_cheapest_hours_first() -> None:
     assert fill_cheapest({}, 0.0, 3600.0, 1.0, KW) is None
 
 
-def _engine(settings: dict | None = None) -> tuple[CJPEngine, object]:
-    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+def _engine(settings: dict | None = None, scale: float | None = None) -> tuple[CJPEngine, object]:
+    engine = CJPEngine(const.build_config({**OPTIONS, **({"price_scale": scale} if scale else {})}), "cjp_test", TEXTS)
     snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0)), settings=settings)
     assert engine.run_job(snap, engine.startup, {}).error is None
     return engine, snap
@@ -86,6 +86,28 @@ def test_daily_charging_cannot_wait_for_a_cheaper_night() -> None:
     assert month["lowest"] == pytest.approx(11.0 * 0.4)
     assert month["saving_daily"] == pytest.approx(11.0 - 4.4)
     assert month["score"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(("scale", "score"), [(None, None), (0.01, 1.0)])
+def test_a_month_with_almost_nothing_to_save_has_a_score_in_a_cheap_currency(scale, score) -> None:
+    """The same month as above with prices 10000 times smaller: about 0.001 to save is below the 0.01 kroner limit, but not with a
+    price scale of 0.01 (the limit is 0.0001 there; the prices are smaller still to keep the month's saving under 0.01)."""
+    tuesday, wednesday = DAY - datetime.timedelta(days=2), DAY - datetime.timedelta(days=1)
+    prices = {}
+    for day in (tuesday, wednesday, DAY):
+        for hour in range(24):
+            prices[_ts(day, hour)] = 0.0002
+    for hour in (22, 23):
+        prices[_ts(tuesday, hour)] = 0.0001
+        prices[_ts(wednesday, hour)] = 0.00004
+    for hour in range(6):
+        prices[_ts(wednesday, hour)] = 0.0001
+        prices[_ts(DAY, hour)] = 0.00004
+    engine, snap = _engine({"workplan_charging": True, "workday_wednesday": True, "workday_departure_wednesday": datetime.time(7, 0)}, scale)
+    engine.charging_history_db[datetime.datetime.combine(wednesday, datetime.time(23))] = {"kWh": 11.0, "cost": 0.00044, "kWh_from_grid": 11.0}
+    window = (_ts(tuesday, 17), _ts(DAY, 8))
+    month = engine.run_job(snap, engine.economy_update, {"prices": prices, "windows": [window]}).attributes["economy"]["months"][-1]
+    assert month["score"] == (pytest.approx(score) if score is not None else None)
 
 
 def test_sources_per_month_and_public_charging() -> None:

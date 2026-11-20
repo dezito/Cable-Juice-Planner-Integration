@@ -20,7 +20,7 @@ from copy import deepcopy
 from dataclasses import replace
 from typing import Any
 
-from ...const import WEEKDAYS
+from ...const import WEEKDAYS, price_scale
 from ..economy import ECONOMY_WINDOW_SETTLE
 from ..soc_power import planning_power_cap
 from .derive import derive_windows
@@ -383,7 +383,8 @@ class WhatIf:
         estimated: the starts of the connections that are estimates (their edges are only known to about two hours)."""
         battery = self.config["ev_car"].get("battery_size")
         rows = history_rows(
-            self.charging_history_db, self._economy_ts, float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else None
+            self.charging_history_db, self._economy_ts, float(battery) if isinstance(battery, (int, float)) and not isinstance(battery, bool) else None,
+            price_scale(self.config),
         )
         # every measured connection takes part in the allocation, also the ones the comparison leaves out (before the period,
         # before the drive history, still open): an entry that reaches into a neighbour gives that neighbour its share, so the

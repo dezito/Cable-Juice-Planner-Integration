@@ -459,10 +459,10 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         return output
 
     def is_day(self, timestamp: datetime.datetime | None = None) -> bool:
-        """mytime.is_day: sunrise <= timestamp <= sunset.
+        """mytime.is_day: sunrise <= timestamp <= sunset, all in Home Assistant's time zone.
 
-        Like the PyScript version the sun events are UTC with the timezone removed and
-        compared with the local timestamp.
+        (The PyScript version compared the UTC sun events with the local timestamp, which was
+        1-2 hours off in Denmark and further off elsewhere.)
         """
         if not timestamp:
             timestamp = self.now()
@@ -472,7 +472,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
             events = []
             for name in ("sunrise", "sunset"):
                 try:
-                    value = getattr(astral.sun, name)(self._snap.astral, date)
+                    value = getattr(astral.sun, name)(self._snap.astral, date, tzinfo=self._snap.tz)
                 except ValueError:
                     value = None
                 events.append(value.replace(tzinfo=None) if value else None)
