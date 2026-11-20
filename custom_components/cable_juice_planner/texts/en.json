@@ -254,6 +254,69 @@
       "phases": "Phases",
       "power": "Charging power"
     },
+    "charger_test": {
+      "car_phases": "The car charged on {phases} phase(s) only, so the steps were judged on {phases} phase(s). That is normal for a car with a smaller on-board charger; if the car charges on three phases, check that the automation switches the phases.",
+      "not_run": "The test has not been run yet. Turn on **Test my charger automation** to start it.",
+      "status": {
+        "idle": "Test not running",
+        "running": "Running the test…",
+        "done": "Test finished",
+        "stopped": "Test stopped",
+        "failed": "Test could not run"
+      },
+      "column_step": "Step",
+      "column_result": "Result",
+      "step": {
+        "max": "Maximum: {amps} A on {phases} phase(s)",
+        "min": "Lowest step: {amps} A on {phases} phase(s)",
+        "single_max": "Highest 1-phase step: {amps} A",
+        "single_min": "Lowest 1-phase step: {amps} A",
+        "stop": "Stop charging"
+      },
+      "running_note": "Each current is published for up to 2½ minutes and passes as soon as the charger's power matches it. Turn the switch off to stop; the plan's own action and amps are then published again.",
+      "summary": "{ok} of {total} steps worked, {fail} did not work, {skip} could not be tested.",
+      "stop_reason": {
+        "overdraw": "The charger took clearly more current than it was given, and the load balancing counts on what CJP publishes, so the test was stopped. Check that the automation passes the current and the phases on to the charger.",
+        "not_configured": "The test needs the charger's power sensor.",
+        "unavailable": "The charger's status is unavailable right now.",
+        "not_connected": "The test needs a car plugged in to the charger.",
+        "completed": "The test needs a car that is not full: the charger says the charging is completed.",
+        "not_ready": "The charger is not ready to charge right now.",
+        "other_ev": "Another car is using this charger.",
+        "running": "A test is already running.",
+        "stopped": "The test was stopped.",
+        "no_charging": "The charger gave (almost) no power at the maximum current, so the other steps were not tried. Check that the car is plugged in and that the automation starts the charger.",
+        "internal_error": "The test failed with an error. See the Home Assistant log."
+      },
+      "fail_hint": "For a step that did not work: open the charger automation's trace and check that it ran the steps for Set charging current with the amps of the action, and that the charger took the command. A charger that gets less than the lowest current the car accepts, or more than its fuse allows, may show something else, and the power also differs when the real voltage is not the voltage setting.",
+      "put_back": "The plan's own action and amps are published again, and nothing else was changed.",
+      "legend": "✅ worked · ⚠️ worked, see the note · ❌ the charger did not deliver · 🔧 not tested",
+      "no_amps_control": "Your automation has no steps for setting the current (*Set charging current*, *Set charging current in the car* or *Set circuit current*), or the plan has no solar steps, so only the maximum and the stop were tried.",
+      "automation_unknown": "CJP could not find your charger automation in automations.yaml, so it can't see which actions have steps (an automation kept in a package or in YAML mode is not found).",
+      "ok": {
+        "already_charging": "The car was already charging before the test, so the start is not proven.",
+        "limited": "The power stayed at {watt} W although up to {configured_amps} A was asked for: the car (for example a full or cold battery) or the charger limits it, not necessarily the automation. Only lower the setting if the charger or the fuse really is limited.",
+        "ok": "The charger delivered {watt} W (expected {expected_w} W for {amps} A on {phases} phase(s)).",
+        "adjusted": "It worked at {amps} A ({watt} W), not at the step's {configured_amps} A. Change the setting if it should be {amps} A.",
+        "started": "The charger started: {watt} W.",
+        "stop": "The charger stopped ({watt} W)."
+      },
+      "fail": {
+        "overdraw": "The charger took {watt} W, clearly more than {amps} A on {phases} phase(s) gives, so the test was stopped at once.",
+        "charge": "The charger did not deliver the power of {amps} A on {phases} phase(s) (expected {expected_w} W, saw {watt} W).",
+        "stop": "The charger kept charging ({watt} W)."
+      },
+      "attempt": "{amps} A: {watt} W",
+      "tried": "Tried: {tried}.",
+      "skip": {
+        "no_steps": "Not tested: your automation has no steps for this.",
+        "no_data": "Not tested: the charger's power sensor had no number or has not reported lately.",
+        "site_limited": "Not tested: the load balancing gives this car less current than the step asks for.",
+        "no_baseline": "Not proven: the charger was not charging just before, so a stop can't be seen.",
+        "not_ready": "Not tested: the car was unplugged or is full.",
+        "not_reached": "Not reached: the test ended before this step."
+      }
+    },
     "charging_rule_changed": {
       "charging_rule_conflict": "Charging rule conflict",
       "deactivate_optimal_rule": "Deactivate Optimal weekly charging",
@@ -550,6 +613,8 @@
     "battery_chart_title": "Battery and charging plan",
     "battery_level": "Battery level",
     "planned_charging": "Planned charging",
+    "section_charger_test": "Test my charger automation",
+    "help_charger_test": "CJP never controls your charger: your own automation does, when the action and the amps of CJP change. This test checks that the automation really does what the plan asks.\n\n* **Test my charger automation**: turn it on to start (a car must be plugged in and not full). CJP publishes the maximum current, then the lowest and highest steps of the solar calculation on all phases and on one phase, and a stop, and reads the charger's power. A step passes when the power matches the amps. The maximum comes first: if the charger gives (almost) no power at it, the other steps are not tried. When a step fails, CJP tries two amps towards the middle, and if that works, the one amp in between, so you see the current closest to the step that works. Power that does not rise with more amps is shown as the car's or the charger's limit, and a car that charges on fewer phases is judged on its own phases. If the charger takes clearly more than it was given, the test stops at once. Turn the switch off to stop; the plan's own action and amps are then published again.\n* **Charger automation test**: the status of the test: idle, running, done, stopped or failed.\n* The table below shows every step: ✅ worked, ⚠️ worked, see the note, ❌ the charger did not deliver, 🔧 not tested. Without a way to set the current (no steps for *Set charging current*, *Set charging current in the car* or *Set circuit current*) only the maximum and the stop are tried.\n\n**Be aware:** the test charges your car for a few minutes at currents the plan may not have chosen, and it changes what the charger does. The load balancing still limits the current. The plan and the settings are not changed. If the plan was not charging, the energy the test charges may be missing from the charging history and the estimated battery level.",
     "section_status": "Status",
     "section_trip": "Trip",
     "section_public_charging": "Public charging",

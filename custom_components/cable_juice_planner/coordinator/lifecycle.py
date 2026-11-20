@@ -153,6 +153,8 @@ class CoordinatorLifecycle:
             self._settings_debounce()
         if self._charging_loss_timeout:
             self._charging_loss_timeout()
+        # a running test of the charger automation puts the plan back while the worker still runs
+        await self.async_unload_charger_test()
         for task in (self._public_cost_task, *self._tasks):
             if task and not task.done():
                 task.cancel()

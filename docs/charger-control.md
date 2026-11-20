@@ -180,6 +180,84 @@ If `charger_action` becomes unavailable, or its `updated` attribute is older tha
 current** (default 16 A) on **Fail-safe phases** (default 3) and sends the **Notification**. The variable
 `fail_safe` is `true` in your actions.
 
+## Test your charger automation
+
+To find out whether your automation does what the plan asks, run the test: turn on **Test my charger automation**
+under *Settings* on the dashboard (the switch `switch.cjp_<prefix>_charger_test_run`). A car must be plugged in and
+not full. CJP then publishes one charging current after the other on `sensor.cjp_<prefix>_charger_action`, reads
+the charger's power sensor, and shows the result as a table under the switch (the attribute `markdown` of
+`sensor.cjp_<prefix>_charger_test`).
+
+| Step | What is published | Passes when the charger's power is |
+|---|---|---|
+| Maximum | the charger's maximum amps on all its phases | the amps × phases × the configured voltage |
+| Lowest step | the lowest step of the solar calculation on all phases | the same for those amps |
+| Highest 1-phase step | the highest single phase step | the same on one phase |
+| Lowest 1-phase step | the lowest single phase step | the same on one phase |
+| Stop | stop | under 100 W (the last current that worked is published again first, and the stop is only tried when the charger then charges at 1 kW or more) |
+
+The solar steps are those of the solar charging calculation (the amps CJP can pick from, on one phase and on all
+phases, between the minimum and maximum amps of solar charging in the settings). Without solar charging, or when the
+blueprint has nothing in *Set charging current*, *Set charging current in the car* or *Set circuit current*, there are
+no steps to follow and only the maximum (it passes when the charger starts) and the stop are tried. A charger that pauses
+at 0 A can be started and stopped by *Set charging current* alone, so those steps count for the start and the stop too.
+
+The power must be within 5 % (at least 150 W) of the expected power, so the voltage in the charger specs has to be
+right: it is what CJP plans with, too. A step is judged on two readings 10 seconds apart, taken 20 seconds or more
+after the current was published, from the average of three readings.
+
+The **maximum comes first**: it shows that the charger charges at all. If the power stays under what a start needs
+(5 A), the other steps are not tried. If it charges, but not at the maximum, the test goes on.
+
+If a step fails (the maximum too), CJP searches for the current that works. It goes two amps towards the middle of the
+group (up for the *lowest* steps, down for the *highest*), and when that works it tries the one amp in between, so the
+result is the current closest to the step that works: *6 A: 0 W, 8 A: 1 840 W, 7 A: 0 W* means 8 A is the lowest that
+works. At most four currents are tried after the step's own, and never outside the group's steps.
+
+What the power shows besides a pass or a fail:
+
+- **The power does not rise with the amps** (*16 A: 8 000 W, 14 A: 8 000 W, 12 A: 8 000 W*): the car (a full or cold
+  battery) or the charger limits it. The step is shown with ⚠️ and the power it stayed at, not as a setting to change.
+- **The car charges on fewer phases** than asked (a car with a 1- or 2-phase on-board charger on a 3-phase charger): the
+  power matches the amps on fewer phases. From then on every step is judged on the car's phases, and the result says so.
+- **The charger takes clearly more than it was given** (more than 25 %, at least 500 W, for a whole minute), for example
+  an automation that does not switch the phases: the test stops at once. The load balancing counts on the published
+  amps, so it would plan with too little.
+- **The car was already charging** when the test began: the first step that charges is shown with ⚠️, because the start
+  is not proven.
+- **The load balancing limits the car during a step**: the step is not tested.
+
+- ✅ **Worked** at the step's current.
+- ⚠️ **Worked, see the note:** at another current (the lowest or highest current the charger and the car accept is not
+  the step's; change the matching minimum or maximum amps setting if it should be the one that worked), at a power the
+  car or the charger limits, or with a start that is not proven.
+- ❌ **The charger did not deliver:** open the automation's trace and check that it ran *Set charging current* with the
+  amps of the action, and that the charger took the command. The power also differs when the real voltage is not the
+  voltage setting.
+- 🔧 **Not tested:** the load balancing gives the car less than the step asks for (a step is never pushed past it), the
+  power sensor had no number or had not reported for 3 minutes, the automation has no steps for it, or a stop could not be
+  proven because the charger was not charging just before.
+
+CJP reads `automations.yaml` (only reads it) for the automation made from the blueprint that uses this action sensor, to
+see which fields have steps. An automation kept in a package or in YAML mode is not found; the result then says so, and
+the amps are tested if the plan steps by amps.
+
+What the test does and does not do:
+
+- It charges the car for a few minutes at currents the plan may not have chosen. The load balancing still limits the
+  current, and a shared circuit sees the request. During the stop step the circuit current stays open, like the plan's
+  own stop. The plan and the settings are not changed. If the plan was not charging, the energy the test charges may be
+  missing from the charging history and the estimated battery level.
+- The plan does not run while a current is held: no restart of the charger, no *charging without a rule*. The heartbeat
+  `updated` is kept, so the blueprint's fail-safe does not start. A car that pauses after a current it does not take is
+  therefore not restarted by CJP during the test.
+- Turning the switch off stops the test: the action, enabled and amps from before the test are put back, and the plan is
+  calculated again at once (also with a setting changed during the test). The test ends at once if the cable is pulled
+  out or the car becomes full. A test is never resumed after a restart; the plan publishes again when CJP starts. If the
+  test itself is lost, the held current is dropped by the first calculation after 4½ minutes.
+- A whole test takes about 5 minutes with a charger that follows, and up to an hour if every step needs the full search.
+- The result of the last finished test is kept over a restart.
+
 ## Your own automations
 
 Without the blueprint, e.g. the charge limit and the car requests:

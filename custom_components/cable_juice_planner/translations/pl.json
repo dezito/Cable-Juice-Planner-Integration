@@ -833,6 +833,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Przetestuj moją automatyzację ładowarki"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Wymuszone ładowanie poniżej dziennego poziomu"
       },
@@ -1128,6 +1131,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Test automatyzacji ładowarki",
+        "state": {
+          "idle": "Bezczynny",
+          "running": "Działa",
+          "done": "Zakończono",
+          "stopped": "Zatrzymano",
+          "failed": "Niepowodzenie"
+        }
+      },
       "current_charging_rule": {
         "name": "Aktywna reguła ładowania"
       },

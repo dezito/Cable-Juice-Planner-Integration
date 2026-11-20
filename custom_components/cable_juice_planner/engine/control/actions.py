@@ -100,6 +100,11 @@ class ControlActions:
             self.set_attr("charger_action", f"phase_{i}_amps", int(value))
 
     def set_charger_phase_limits(self, circuit_amps=None, charger_amps=None) -> None:
+        if (held := self.charger_hold_amps()) is not None:
+            # the test of the automation holds a current: the plan's amps wait (the load balancing below still limits it).
+            # A held stop leaves the circuit open, like the plan's stop: only the charger's own stop steps can pass it
+            charger_amps = held
+            circuit_amps = held if sum(held) > 0 else self._max_amps()
         circuit_amps = self._max_amps() if circuit_amps is None else circuit_amps
         charger_amps = self._max_amps() if charger_amps is None else charger_amps
         if self.site_active():
@@ -149,12 +154,15 @@ class ControlActions:
         self.current_charging_amps = phases
 
     def _publish_charger_action(self) -> None:
-        self.set_state("charger_action", self.charger_action)
-        self.set_attr("charger_action", "charger_enabled", self.charger_enabled)
+        held = self.charger_hold_action()
+        self.set_state("charger_action", held or self.charger_action)
+        self.set_attr("charger_action", "charger_enabled", True if held else self.charger_enabled)
         self.set_attr("charger_action", "stop_request", self.charger_stop_request)
 
     def start_charging(self, entities=None, force=False) -> None:
         """Charge (or with entities=['enabled']: only enable the charger)."""
+        if self.charger_hold_active():
+            return  # the test of the automation decides what is published; the plan runs again when it ends
         if entities == ["enabled"]:
             self.charger_enabled = True
         else:
@@ -172,6 +180,8 @@ class ControlActions:
         for the charger automation: stop_request is counted up, and the blueprint sends
         stop (or disable) once more.
         """
+        if self.charger_hold_active():
+            return  # the test of the automation decides what is published; the plan runs again when it ends
         if force:
             self.charger_stop_request += 1
             _LOGGER.info("Charger action: stop again (request %s)", self.charger_stop_request)

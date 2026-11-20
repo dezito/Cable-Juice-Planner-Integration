@@ -111,6 +111,10 @@ BUTTON_KEYS = ("enforce_planning", "trip_reset", "run_what_if", "run_what_if_set
 EV_BUTTON_KEYS = ("recalculate_charging_loss",)
 
 # Output sensors: key -> (unit, device_class, state_class, requires)
+# the test of the user's charger automation: the switch that runs it and the status of the last run
+CHARGER_TEST_RUN_SWITCH = "charger_test_run"
+CHARGER_TEST_STATUSES = ("idle", "running", "done", "stopped", "failed")
+
 SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = {
     "current_charging_rule": (None, None, None, None),
     "charger_action": (None, "enum", None, None),

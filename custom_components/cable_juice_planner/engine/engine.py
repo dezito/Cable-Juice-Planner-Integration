@@ -191,6 +191,12 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         # counts the forced stops (charging without a rule): a new value makes the charger
         # automation send stop again, also when the action already was stop. Not persisted.
         self.charger_stop_request = 0
+        # the current the test of the user's charger automation holds on the action sensor for a while (control/charger_test.py),
+        # and why a hold ended by itself. Not persisted: a restart is the end of a test.
+        self._charger_hold: dict | None = None
+        self._charger_abort: str | None = None
+        # what was published before the first hold of a test, put back when it ends
+        self._charger_saved: dict | None = None
         # when the action last went from charge to stop (or the charger was disabled): the
         # charger may still give power for a moment, which isn't charging without a rule
         self.charger_stopped_at: datetime.datetime | None = None

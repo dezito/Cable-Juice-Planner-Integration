@@ -833,6 +833,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Meine Ladeautomation testen"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Erzwungenes Laden unter täglichem Ziel"
       },
@@ -1128,6 +1131,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Ladeautomationstest",
+        "state": {
+          "idle": "Inaktiv",
+          "running": "Läuft",
+          "done": "Fertig",
+          "stopped": "Gestoppt",
+          "failed": "Fehlgeschlagen"
+        }
+      },
       "current_charging_rule": {
         "name": "Aktuelle Lade­regel"
       },

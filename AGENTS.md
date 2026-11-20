@@ -30,6 +30,8 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── planner/                         Charge plan and price-level decisions
 │   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
 │   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
+│   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
+│   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
 │   ├── energy/                          Prices, solar, forecasts, and power inputs
 │   ├── history/                         Charging sessions, consumption, cost, and efficiency
 │   ├── analysis/                        Economy/forecast analysis and published results

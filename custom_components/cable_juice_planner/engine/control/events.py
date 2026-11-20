@@ -168,13 +168,19 @@ class ControlEvents:
         self.calc_kwh_price(self.now().minute, update_entities=True)
         self.charge_trigger()
 
-    def charge_trigger(self, var_name: str | None = None) -> None:
-        """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities."""
+    def charge_trigger(self, var_name: str | None = None, force: bool = False) -> None:
+        """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities.
+
+        force: plan again although the plan hash did not change (the end of the charger test)."""
+        if self.charger_hold_active():
+            # the test of the automation holds the current: no restart of the charger, no "charging without a rule"
+            self._charger_test_publish()
+            return
         if self.is_charging() and not self.other_ev_connected():
             self.wake_up_ev()
             if not self.is_ev_configured():
                 self.charging_power_to_emulated_battery_level()
-        force = var_name == "enforce_planning"
+        force = force or var_name == "enforce_planning"
         self.charge_if_needed(force_recalculate=force)
         self.is_battery_fully_charged()
         if self.is_ev_configured():

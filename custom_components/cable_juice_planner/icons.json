@@ -1,6 +1,12 @@
 {
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "default": "mdi:ev-station",
+        "state": {
+          "on": "mdi:stop"
+        }
+      },
       "forced_charging_daily_battery_level": {
         "default": "mdi:battery-charging-low"
       },
@@ -286,6 +292,15 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "default": "mdi:test-tube",
+        "state": {
+          "running": "mdi:test-tube",
+          "done": "mdi:clipboard-check-outline",
+          "stopped": "mdi:test-tube-off",
+          "failed": "mdi:test-tube-off"
+        }
+      },
       "current_charging_rule": {
         "default": "mdi:battery-sync"
       },

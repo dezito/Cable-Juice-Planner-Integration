@@ -833,6 +833,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Test min laderautomation"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Tvangsladning under dagligt batteriniveau"
       },
@@ -1128,6 +1131,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Laderautomationstest",
+        "state": {
+          "idle": "Inaktiv",
+          "running": "Kører",
+          "done": "Færdig",
+          "stopped": "Stoppet",
+          "failed": "Mislykket"
+        }
+      },
       "current_charging_rule": {
         "name": "Nuværende laderegel"
       },

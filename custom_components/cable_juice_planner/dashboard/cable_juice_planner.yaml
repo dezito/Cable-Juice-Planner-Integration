@@ -822,6 +822,25 @@ views:
           type: entity
       grid_options: *id001
     - type: heading
+      heading: '@@section_charger_test@@'
+      icon: mdi:test-tube
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@help_charger_test@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_charger_test_run
+        name:
+          type: entity
+      - entity: sensor.cjp_charger_test
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      content: '{{ state_attr(''sensor.cjp_charger_test'', ''markdown'') or '''' }}'
+      grid_options: *id001
+    - type: heading
       heading: '@@section_problem@@'
       heading_style: subtitle
       icon: mdi:bug-outline
