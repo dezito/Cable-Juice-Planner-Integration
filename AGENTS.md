@@ -419,6 +419,54 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `site.update_from_result` recalculates all cars incl. the one that turned
   urgent; a changed live request recalculates the cars behind only when
   something changed (no ping-pong). Covered by `tests/test_site.py`.
+- User choice: current a car ahead was given but doesn't draw goes to the cars
+  behind. With working phase sensors (`_metered()`) the measured draw counts
+  (`_car_draw`). User choice: stale data never frees current here either. A
+  phase sensor not reported within `STALE_SECONDS` is no reading (`_measured`
+  None, so the power-sensor path below). The house then counts
+  `max(_last_house, house_forecast[hour])` per phase (`_house`; the
+  forecast's highest hour when this hour is missing), in the budget and added
+  to `_cars_draw` in the overload check. User choice: with no measurement
+  since start and no forecast the house is the whole budget (`fuse()`), so no
+  current for the cars until the meter reports. The forecast asks the
+  statistics in `FORECAST_UNITS` (W/A). A charger power reading that is stale
+  counts the request for the cars behind (`_car_draw` fallback), and in the
+  house subtraction at most the request, or 0 A when the charger's fresh
+  status is in `SETTLED_STATUS` (a full car can't hide the house, a steady
+  charge with a change-only sensor doesn't limit itself); one without W/kW
+  counts 0 A there.
+- Without phase sensors, or when one measures nothing, each charger's power
+  sensor is the measurement (`_ahead_draw` for the budget, `_cars_draw` for
+  the overload check), counted carefully:
+  - A car ahead counts with its request unless it is `_settled`: past
+    `RAMP_UP` (120 s) since its request rose, and its status in
+    `SETTLED_STATUS` (an allowlist of surely-not-charging statuses), and both
+    its status and power sensor reported (`last_reported`) within
+    `STALE_SECONDS` (300 s; user choice: a lost cloud push keeps the last
+    values, so stale data never frees current, even though a sensor that only
+    reports on change then frees for at most 5 minutes after its last change).
+    Going stale sends no event, so the overload check also runs every
+    `STALE_CHECK_SECONDS` (30 s). Tests make a sensor stale with
+    `async_set(..., timestamp=...)`, not with `freezer`. Ambiguous (`on`,
+    `connected`, `ready`), unknown or missing status counts as charging.
+  - No reading, a unit other than W/kW, or a power sensor shared with another
+    member also counts the request. A shared sensor is counted once per sensor
+    in the overload check.
+  - `_worst_case`: the power may all be on one phase, but never more than the
+    request per phase. Power above request × (1 + `OVERDRAW_SHARE`) (10 %,
+    voltage margin) is spread over the phases the charger can use (an
+    overdraw). Without a request: all of it on each phase for the budget
+    (`careful`), spread for the overload check (no false limits).
+  - Overload is checked on power and status events of the members' chargers
+    and on a raised request, against the raw fuse, limiting the last car with
+    a request (`OVERLOAD_THROTTLE`), rechecked while over and while a car has a
+    request.
+  - Open: `ready_to_charge`/`awaiting_start` frees current although a car on
+    its own timer may start (protection is then reactive, as fast as its
+    sensors report). An overdraw on fewer phases than given, or on a shared
+    sensor in the budget, is not seen.
+  - The circuit sum (`circuit_amps`) is capped at the fuse minus margin; the
+    cap ignores the house and cars outside the circuit.
 - Shared circuit (Easee master): user choices: chargers are picked as HA
   devices on each car's load balancing page; the circuit is stored once in the
   site options (`circuits`), so a change from one car applies to all of it; a
@@ -433,18 +481,45 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   `sensor.py`, from the attributes actually written, incl. the site's circuit
   patch) and compares from/to state into the `changed` variable. Not
   `mode: restart` + delay: a restart can cancel a start and lose what changed.
-- `stop_charging(force=True)` (charging without a rule, restart of a charger
-  that doesn't charge) counts `charger_stop_request` up; it is published as
+- `stop_charging(force=True)` (charging without a rule) counts
+  `charger_stop_request` up; it is published as
   `stop_request` and, when above 0, in `decision`, so the blueprint sends stop
   again although the action already is `stop` (`'stop'` in `changed` only when
   it rises; 0 after a restart). Without it a car/charger that starts by itself
   on plug-in is never stopped (Easee resets its dynamic charger limit to max
   on every new session).
+- The restart of a charger that doesn't start (`is_charging`) publishes a
+  plain stop at 0 A, or a disable with an enabled entity. That changes
+  `decision` by itself, so it does not count `stop_request`.
 - `charging_without_rule` has no blind minutes after the hour (the PyScript
   version skipped minute 0–4). Instead it skips the average's window after
   the action went charge → stop or the charger was disabled
   (`charger_stopped_at`), when the charger may still give power; a stop in
   the future (clock went back) is ignored.
+
+### Charger test: charge limit step
+
+- User choice: with the car's charge limit entity, the charger test ends with
+  a "limit" step (`_async_limit_step` in `coordinator/charger_test.py`,
+  `limit_test_value` / `charger_test_limit*` in `engine/control/charger_test.py`).
+  It publishes a test limit under the engine hold and waits for the car's limit
+  entity to show it.
+- Blueprint semantics it relies on: the limit is sent with every new `charge`
+  and on a limit change with the action unchanged, never together with a
+  switch to `stop`. So the test limit and the put-back are published with the
+  held action unchanged; the put-back runs in `finally` before the release.
+- The test value is 10 percentage points from the car's limit now, above it
+  first, below only while above a known battery level
+  (`battery_level(unknown=None)`), within the entity's min/max, the min. charge
+  limit and 100, rounded like `verify_charge_limit`. It is never the published
+  limit or the car's limit from before the test (no change would be sent).
+- What is put back is the car's limit from before the test (`own`); the charge
+  steps may have sent the plan's limit meanwhile. The put-back is confirmed
+  (`limit_put_back.ok`) only when the car showed the test limit first and then
+  its own. No wait on unload or `hass.is_stopping`.
+- `limit_put_back {"ok": None}` is published before the test limit, so a
+  restored `running` state (`sensor.py` passes it on) becomes `stopped` with
+  the "check the limit" note. A normal running test is not restored.
 
 ### PyScript import
 

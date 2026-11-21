@@ -1,7 +1,8 @@
 # Multiple cars (load balancing)
 
 If several cars charge on the same grid connection, together they can exceed the main fuse. A **Shared
-grid connection** plans them together, so they never use more current per phase than allowed.
+grid connection** plans them together and keeps them within the fuse per phase; if a phase still goes above
+it (a car ahead that starts after all, the house), the last car is limited at once.
 
 ## Setup
 
@@ -23,8 +24,9 @@ Then, for each car (under **Configure → Charger**, the *Load balancing* page):
 | Phase order | which grid phases the charger's L1/L2/L3 are connected to: L1-L2-L3, L2-L3-L1 or L3-L1-L2. 1-phase charging uses the charger's L1, so the right grid phase is loaded |
 | Chargers on the same circuit (optional) | the chargers (HA devices) sharing one circuit limit, e.g. Easee chargers behind a master – see [Shared circuit](#shared-circuit-eg-easee-master) |
 
-Without phase sensors, the fuse is a fixed budget for the cars. With all three, the house's consumption is
-subtracted, and an overloaded phase limits the last car at once.
+Without phase sensors, the fuse is a fixed budget for the cars, and the chargers' *Charging power* sensors
+show what each car really draws. With all three, the house's consumption is subtracted too. Either way, an
+overloaded phase limits the last car at once.
 
 ## How it works
 
@@ -36,9 +38,56 @@ subtracted, and an overloaded phase limits the last car at once.
   is planned in other cheap hours.
 - **1 or 3 phases:** the highest power that fits within the available current per phase is chosen. So a car
   can switch to 1 phase when a phase is full.
-- **Live:** the amps are always limited to what is available right now. If a car ahead changes its plan or
-  its current, the cars behind are recalculated after 15 seconds. With phase sensors, the car with the
-  lowest priority is limited immediately if a phase exceeds the fuse.
+- **Live:** the amps are always limited to what is available right now. A car ahead counts with what it
+  really draws, not with what it was given, so current it doesn't use (a car that doesn't start, a full
+  battery) goes to the next car in line at that car's next calculation (its interval, at most 15 minutes, or
+  sooner when the plan changes). If a car ahead
+  changes its plan or its current, the cars behind are recalculated after 15 seconds.
+- **With phase sensors** a sensor that has not reported for 5 minutes (also an unchanged value counts) is no
+  reading: a meter that hangs at a low value would free current and hide an overload. Then the cars are
+  counted as without phase sensors, below, and the house counts with the higher of its last measured
+  consumption and the hour's forecast (the forecast's highest hour when this hour has none) – in the cars'
+  amps and in the overload check. With none of them (after a restart, before the meter reported, without a
+  forecast) the cars get no current until the meter reports (they are recalculated then). A car's *Charging
+  power* sensor that has not reported for 5 minutes, or has no reading in W/kW, counts for the cars behind
+  with what the car was given, and a stale reading is taken from the house
+  with at most that – and not at all when the car's status says it is not charging (a full car can't hide the
+  house, and a car that charges steadily doesn't count its own charging as the house). One without a reading
+  in W/kW is not taken from the house.
+- **Without phase sensors** the *Charging power* sensor (W or kW) of each car is the measurement, so the
+  cars ahead are counted carefully. A car ahead counts with what it was given, unless **all** of these hold:
+  - its current was raised more than 2 minutes ago (the charger needs a moment to start),
+  - its charger status surely means not charging – *completed*, *finished*, *off*, *disconnected*,
+    *ready_to_charge*, *awaiting_start* or *awaiting_authorization*. *Charging*, a status that may also mean
+    charging (*on*, *connected*, *ready* …), an unknown one or none counts as charging (a power sensor that
+    hangs at 0 W must not give its current away),
+  - its power sensor has a reading in W or kW,
+  - both its status and its power sensor reported within the last 5 minutes (also an unchanged value: a lost
+    cloud connection keeps the last values, and a car that starts would not be seen). A sensor that only
+    reports when its value changes therefore frees current for at most 5 minutes after its last change,
+  - and no other car uses the same power sensor (one charger for two cars shows both).
+
+  Then all its measured power may be on one phase – a car can charge on fewer phases than it was given – so
+  only what no phase can draw is freed: a car given 3 × 16 A that still draws 2.3 kW (10 A) after its charger
+  stopped (e.g. preconditioning) frees 6 A per phase, one that draws 0 W frees all of it. In practice current
+  is freed mostly by a car that doesn't start or is full. A car ahead that charges without having been given
+  current (charging without a rule) counts with all of its power on each of its phases.
+
+  *ready_to_charge* and *awaiting_start* are also what a car waiting for its own timer shows: when it starts
+  by itself, the overload check below limits the car behind, as fast as the status or power sensor reports.
+  If the sensors stop reporting, the car ahead counts with its current again after 5 minutes: CJP checks every
+  30 seconds and limits the car behind when that is too much for the fuse.
+- **Overload:** if a phase exceeds the fuse – measured by the phase sensors, or without them the sum of the
+  chargers' power (counted the same careful way) – the charging car with the lowest priority is limited at
+  once, and checked again every 21 seconds while it is still too much. Without phase sensors (or when one has
+  no number or has not reported for 5 minutes; the house then counts as above), the reaction comes when a charger's power or status changes or a car ahead gets more current,
+  so a car ahead whose status says it charges, or that gets more current, limits the car behind at once,
+  even with a slow power sensor. A charger whose power is more than 10 % above all it was given (it did not
+  follow a limit yet, or did not switch to one phase) counts with its power spread over the phases it can use,
+  so that is seen – an overdraw on fewer phases than it was given is not (only the phase sensors see that), and
+  one on a power sensor that two cars share is seen by the overload check but not by the budget. A car that charges
+  without having been given current counts with its power spread over its phases here, so another car is not
+  limited for a draw that may not be there.
 
 **Example:** a 25 A fuse with 1 A margin, two cars with 3 × 16 A. Car 1 (priority 1) charges at 16 A. The
 house uses 5 A on L1. Car 2 gets 25 − 1 − 5 − 16 = 3 A on L1 – too little, so it is planned in other hours
@@ -77,7 +126,10 @@ charger entities have no device cannot be linked. A charger can be on one circui
 **What happens:**
 
 - Every car of the circuit gets the same `circuit_phase_1_amps` … `_3_amps` on its charger action: the **sum**
-  per grid phase of what the circuit's cars charge with (0 when none of them charges). The sum, not the
+  per grid phase of what the circuit's cars charge with (0 when none of them charges), at most the fuse minus
+  the margin – so when a car behind got current a car ahead doesn't use, the circuit still keeps both within the
+  fuse if the car ahead starts after all. This cap knows only the fuse: the house and cars outside the circuit
+  are not subtracted from it (they are in each car's own amps and in the overload check). The sum, not the
   highest value, because the circuit limit is shared – two cars at 16 A need 32 A on the circuit. The values
   are grid phases (the cars' phase order is applied); without a shared circuit they are the car's own circuit
   limit, as before.
@@ -92,7 +144,7 @@ charger entities have no device cannot be linked. A charger can be on one circui
 
 | Sensor | Content |
 |---|---|
-| `sensor.cjp_site_available_l1` … `_l3` | available current per phase (the `cars` attribute shows the order, each car's request and the cars sharing its circuit) |
+| `sensor.cjp_site_available_l1` … `_l3` | current per phase not given to any car (the `cars` attribute shows the order, each car's request, what is available to it now – where unused current of the cars ahead counts – and the cars sharing its circuit) |
 | `sensor.cjp_site_house_l1` … `_l3` | the house's current per phase, excluding the cars |
 
 The current per car is in its own [action entities](charger-control.md#the-action-entities) – the

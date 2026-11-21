@@ -253,8 +253,19 @@ class ControlEvents:
             return None
         if self.other_ev_connected():
             return None
+        if (value in CHARGER_NOT_READY_STATUS or old_value in CHARGER_NOT_READY_STATUS) and self._charger_restart_disabling():
+            # a charger the restart (is_charging) disabled may report off or disconnected: not an unplug and a plug-in,
+            # which would end the economy window and turn the manual and forced charging off. An unplug that is still so
+            # when the restart has settled is handled then (is_charging)
+            _LOGGER.info("Charger status changed from %s to %s during a restart of the charger: not an unplug yet", old_value, value)
+            self._charger_restart_unplug_pending = value in CHARGER_NOT_READY_STATUS
+            if value in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS and not self.restarting_charger:
+                # enabled again and ready: the plan publishes its action now, not an interval later
+                self.charge_if_needed()
+            return None
         _LOGGER.info("Charger port status changed from %s to %s", old_value, value)
         if value in CHARGER_READY_STATUS and old_value in CHARGER_NOT_READY_STATUS:
+            self.charger_restart_unplugged()  # it was unplugged: a restart begins again
             self.economy_plugged_in()
             self.set_setting("allow_manual_charging_now", False)
             self.set_setting("allow_manual_charging_solar", False)
@@ -263,19 +274,28 @@ class ControlEvents:
             self.notify_set_battery_level()
             return "wait"
         if value in CHARGER_NOT_READY_STATUS:
-            # the charger is at home: the connection window ends wherever the car says it is
-            self.economy_unplugged()
+            self.charger_unplugged(value)
+            return None
         if not self.is_ev_home():
             return None
-        if value in CHARGER_NOT_READY_STATUS:
-            self.stop_current_charging_session()
-            self.wake_up_ev()
-            self.power_connected_trigger(value)
-        elif old_value in CHARGER_CHARGING_STATUS and value in CHARGER_COMPLETED_STATUS:
+        if old_value in CHARGER_CHARGING_STATUS and value in CHARGER_COMPLETED_STATUS:
             if not self.is_ev_configured() and self.current_charging_session["start"]:
                 self.stop_current_charging_session()
                 self.set_setting("battery_level", self.get_completed_battery_level())
         return None
+
+    def charger_unplugged(self, value) -> None:
+        """The charger's status went to off/disconnected (charger_status_changed, or is_charging for one seen during a
+        restart of the charger)."""
+        # the charger is at home: the connection window ends wherever the car says it is
+        self.economy_unplugged()
+        # a restart of a charger that did not start begins again, also when it is plugged in before the next cron
+        self.charger_restart_unplugged()
+        if not self.is_ev_home():
+            return
+        self.stop_current_charging_session()
+        self.wake_up_ev()
+        self.power_connected_trigger(value)
 
     def charger_connected(self, value) -> None:
         """state_trigger_charger_port, after waiting for the car."""
