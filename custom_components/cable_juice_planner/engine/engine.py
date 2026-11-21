@@ -140,9 +140,18 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self.last_hash_results: dict = {}
         self.grid_price_cache: dict = {"using_offline_prices": False}
         self.sell_price_cache: dict = {"using_offline_prices": False}
-        self.charging_is_beginning = False
-        self.restarting_charger = False
+        # the restart of a charger that does not charge (control/schedule.is_charging). Not persisted
+        self.charging_is_beginning = False  # marked: it gets one more cron interval
+        self.restarting_charger = False  # stopped (or disabled) for the restart, started again on a later cron
         self.restarting_charger_count = 0
+        self._charger_restart_waiting_since: datetime.datetime | None = None  # first seen ready with a current, not charging
+        self._charger_restart_marked_at: datetime.datetime | None = None
+        self._charger_restart_stopped_at: datetime.datetime | None = None
+        self._charger_restart_started_at: datetime.datetime | None = None
+        self._charger_restart_enabled_seen_at: datetime.datetime | None = None  # the enabled entity on again after it
+        self._charger_restart_gave_up = False  # after the last restart: none until it charges, is done or is unplugged
+        self._charger_restart_rule = ""  # the reason shown while it restarts, or while the plan charges after it gave up
+        self._charger_restart_unplug_pending = False  # off/disconnected while the restart had the charger disabled
         self.current_charging_amps = [0, 0, 0]
         self.current_circuit_amps = [0, 0, 0]
         # amps asked for before the site limit (site_limit re-applies them)
@@ -197,6 +206,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self._charger_abort: str | None = None
         # what was published before the first hold of a test, put back when it ends
         self._charger_saved: dict | None = None
+        # when the last test ended: the restart of a charger that does not charge waits as after a new session
+        self._charger_test_released_at: datetime.datetime | None = None
         # when the action last went from charge to stop (or the charger was disabled): the
         # charger may still give power for a moment, which isn't charging without a rule
         self.charger_stopped_at: datetime.datetime | None = None
@@ -579,8 +590,6 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
     # ------------------------------------------------------------------ #
 
     def set_charging_rule(self, text: str = "", fresh: bool = True) -> None:
-        if self.restarting_charger_count >= 3:
-            return
         self.rule_set_this_run = self.rule_set_this_run or fresh
         self.last_charging_rule_text = text
         extra = f"\n🚧{self.powerwall_charging_text}" if self.powerwall_charging_text else ""

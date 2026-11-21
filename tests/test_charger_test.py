@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import re
 from contextlib import contextmanager
@@ -14,7 +15,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_state_change_event
 
-from custom_components.cable_juice_planner.const import CHARGER_TEST_STATUSES, build_config
+from custom_components.cable_juice_planner.const import CHARGER_TEST_STATUSES, DOMAIN, build_config
 from custom_components.cable_juice_planner.engine.control.charger_test import (
     MAX_ADJUSTMENTS,
     SKIP_REASONS,
@@ -26,6 +27,7 @@ from custom_components.cable_juice_planner.engine.control.charger_test import (
     car_phases_of,
     charger_step_text,
     judge_power,
+    limit_test_value,
     next_amps,
     overdraw_w,
     power_is_capped,
@@ -40,7 +42,7 @@ from custom_components.cable_juice_planner.management.automation_inputs import (
 from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
 from custom_components.cable_juice_planner.utils.formatting import translate
 
-from .conftest import CHARGER_POWER, CHARGER_STATUS, MOCK_OPTIONS, async_setup, async_unload_and_join, make_entry, set_source_states
+from .conftest import CHARGER_POWER, CHARGER_STATUS, EV_LIMIT, MOCK_OPTIONS, async_setup, async_unload_and_join, make_entry, set_source_states
 from .test_dashboard import _own
 from .test_engine import OPTIONS as ENGINE_OPTIONS
 
@@ -277,6 +279,10 @@ STEP_RESULTS = [
         for name in ("max", "min", "single_max", "single_min")
     ]
     for extra in ({"limited": True}, {"already_charging": True}, {"limited": True, "already_charging": True}, {"judged_phases": 1})
+] + [
+    {"name": "limit", "status": status, "reason": reason, "phases": 0, "configured_amps": 0, "amps": 0, "watt": 0, "expected_w": 0,
+     "attempts": [], "seconds": 40, "limit_from": 80, "limit_to": 90, "limit_seen": 80}
+    for status, reason in (("ok", None), ("fail", None), *(("skip", r) for r in SKIP_REASONS))
 ]
 
 
@@ -291,11 +297,12 @@ def test_every_text_of_the_result_exists_in_every_language(language) -> None:
     for status in CHARGER_TEST_STATUSES:
         for reason in (None, *STOP_REASONS):
             for automation, amps_control, car_phases in (("found", True, 1), ("unknown", False, None)):
-                markdown = build_charger_test_markdown(t, {
-                    "status": status, "steps": STEP_RESULTS, "reason": reason, "automation": automation, "amps_control": amps_control,
-                    "car_phases": car_phases,
-                })
-                assert "{" not in markdown and "ui.charger_test" not in markdown
+                for put_back in (None, {"ok": True, "limit": 80}, {"ok": False, "limit": 80}):
+                    markdown = build_charger_test_markdown(t, {
+                        "status": status, "steps": STEP_RESULTS, "reason": reason, "automation": automation, "amps_control": amps_control,
+                        "car_phases": car_phases, "limit_put_back": put_back,
+                    })
+                    assert "{" not in markdown and "ui.charger_test" not in markdown
         assert "ui.charger_test" not in build_charger_test_markdown(t, {"status": status, "steps": [], "reason": "completed"})
     assert "ui.charger_test" not in build_charger_test_markdown(t, {"status": "idle", "steps": [], "reason": None})
     for key in ("dashboard.section_charger_test", "dashboard.help_charger_test"):
@@ -341,20 +348,23 @@ def fast_runner():
     base = "custom_components.cable_juice_planner.coordinator.charger_test"
     with (
         patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
-        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 0.3), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0),
     ):
         yield
 
 
 def wire_charger(
     hass: HomeAssistant, max_amp: int = 16, min_amp: int = 6, working: bool = True, car_phases: int = 3, cap_w: float | None = None,
-    three_phases_always: bool = False, power_at=None,
+    three_phases_always: bool = False, power_at=None, limit_follows=lambda value: True, limits: list | None = None, on_limit=None,
 ):
     """The user's automation and charger: the power follows the published action and amps, like a charger would.
 
     car_phases: the phases the car's on-board charger uses. cap_w: the car takes no more (a full or cold battery).
     three_phases_always: an automation that does not switch the charger to one phase. power_at(amps, phases): the power
-    of a charge instead (a charger that does something else)."""
+    of a charge instead (a charger that does something else). limit_follows(value): whether the car takes a published
+    charge limit (the automation's *Set charge limit in the car*); limits gets (action, charge limit) of every publish, and
+    on_limit(value) is called when the car took one."""
     seen: list[tuple] = []
 
     def update(_event=None) -> None:
@@ -363,6 +373,17 @@ def wire_charger(
             return
         amps = [int(state.attributes.get(f"phase_{index}_amps") or 0) for index in (1, 2, 3)]
         seen.append((state.state, tuple(amps)))
+        limit = state.attributes.get("charging_limit")
+        if limits is not None:
+            limits.append((state.state, limit))
+        car = hass.states.get(EV_LIMIT)
+        # only the limits of the test's limit step (the plan's own, sent with a new charge, is not what is tested here)
+        engines = [entry.runtime_data.engine for entry in hass.config_entries.async_entries(DOMAIN) if getattr(entry, "runtime_data", None)]
+        testing = any("limit" in (getattr(engine, "_charger_hold", None) or {}) for engine in engines)
+        if limit and testing and car is not None and car.state != str(limit) and limit_follows(limit):
+            hass.states.async_set(EV_LIMIT, str(limit), dict(car.attributes))
+            if on_limit is not None:
+                on_limit(limit)
         power = 0.0
         if state.state == "charge" and working:
             per_phase, phases = max(amps), sum(1 for value in amps if value)
@@ -429,7 +450,7 @@ async def test_without_solar_the_maximum_and_the_stop_are_tried(hass, charger_en
         await _start(hass)
     state = hass.states.get(RESULT)
     steps = _steps_of(hass)
-    assert state.state == "done" and list(steps) == ["max", "stop"]
+    assert state.state == "done" and list(steps) == ["max", "stop", "limit"]
     assert steps["max"]["status"] == "ok" and steps["max"]["watt"] == 16 * 3 * VOLTAGE
     assert steps["stop"]["status"] == "ok"
     assert ("charge", (16, 16, 16)) in seen
@@ -497,7 +518,7 @@ async def test_without_steps_for_the_current_only_the_maximum_and_the_stop_are_t
     with patch(FOUND, return_value=found):
         await _start(hass)
     steps = _steps_of(hass)
-    assert list(steps) == ["max", "stop"]
+    assert list(steps) == ["max", "stop", "limit"]
     assert steps["max"]["status"] == "ok" and steps["max"]["expected_w"] == 0  # started: no power to compare with
     assert hass.states.get(RESULT).state == "done"
     assert "Set charging current" in hass.states.get(RESULT).attributes["markdown"]
@@ -509,7 +530,7 @@ async def test_a_step_the_automation_has_no_steps_for_is_not_tested(hass, solar_
     with patch(FOUND, return_value=found):
         await _start(hass)
     steps = _steps_of(hass)
-    assert list(steps) == ["max", "stop"]
+    assert list(steps) == ["max", "stop", "limit"]
     assert all(step["status"] == "skip" and step["reason"] == "no_steps" for step in steps.values())
 
 
@@ -518,8 +539,9 @@ async def test_a_charger_that_pauses_at_0_amps_is_tested_with_its_current_alone(
     with patch(FOUND, return_value=[{"amps_actions": [{"action": "test.amps"}], "start_actions": [], "stop_actions": []}]):
         await _start(hass)
     steps = _steps_of(hass)
-    assert list(steps) == ["max", "min", "single_max", "single_min", "stop"]
-    assert all(step["status"] in ("ok", "adjusted") for step in steps.values())
+    assert list(steps) == ["max", "min", "single_max", "single_min", "stop", "limit"]
+    assert all(step["status"] in ("ok", "adjusted") for name, step in steps.items() if name != "limit")
+    assert steps["limit"]["reason"] == "no_steps"  # no *Set charge limit in the car*
 
 
 async def test_an_automation_that_does_not_switch_to_one_phase_ends_the_test_at_once(hass, solar_entry, fast_runner) -> None:
@@ -628,10 +650,11 @@ async def test_a_charger_stuck_at_one_current_is_not_counted_as_working(hass, th
         await _start(hass)
     state = hass.states.get(RESULT)
     steps = _steps_of(hass)
-    assert list(steps) == ["max", "min", "stop"]
+    assert list(steps) == ["max", "min", "stop", "limit"]
+    assert steps["limit"]["status"] == "ok"  # not a current: amps_unproven leaves it
     assert all(steps[name]["status"] == "skip" and steps[name]["reason"] == "amps_unproven" for name in ("max", "min"))
     assert steps["stop"]["status"] == "ok"  # the charger does stop: that is proven
-    assert "1 af 3" in state.attributes["markdown"] and "4140 W" in state.attributes["markdown"]
+    assert "2 af 4" in state.attributes["markdown"] and "4140 W" in state.attributes["markdown"]
 
 
 async def test_a_charger_that_switches_the_phases_but_not_the_current_is_not_counted_as_working(hass, solar_entry, fast_runner) -> None:
@@ -651,7 +674,7 @@ async def test_a_car_on_fewer_phases_is_confirmed_below_a_maximum_that_is_the_on
         await _start(hass)
     state = hass.states.get(RESULT)
     steps = _steps_of(hass)
-    assert list(steps) == ["max", "stop"] and state.attributes["car_phases"] == 1
+    assert list(steps) == ["max", "stop", "limit"] and state.attributes["car_phases"] == 1
     assert steps["max"]["status"] == "ok" and steps["max"]["amps"] == 16 and steps["max"]["judged_phases"] == 1
     assert [attempt["amps"] for attempt in steps["max"]["attempts"]] == [16, 14]
     assert steps["stop"]["status"] == "ok"
@@ -1035,3 +1058,330 @@ async def test_the_power_of_a_sensor_that_stopped_reporting_is_not_believed(hass
     hass.states.async_set(CHARGER_POWER, "3000")
     with patch("custom_components.cable_juice_planner.coordinator.charger_test.STALE_SECONDS", -1):
         assert coordinator._charger_power(CHARGER_POWER) is None
+
+
+# --- the charge limit in the car ------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("current", "battery", "low", "high", "ten", "expected"),
+    [
+        (80, 40, 50, 100, False, 90),  # 10 % above
+        (95, 40, 50, 100, False, 85),  # no room above: 10 % below, still above the battery
+        (95, 85, 50, 100, False, None),  # below would be at the battery level: the car would stop or be done
+        (100, 40, 50, 100, False, 90),
+        (55, 40, 50, 60, False, None),  # the entity's own maximum is 60 and the minimum 50
+        (83, 40, 50, 100, True, 100),  # Kia/Cupra: rounded up to 10 like the plan's limit (93 -> 100)
+        (90, 40, 50, 90, True, 80),
+        (80, 75, 50, 80, True, None),  # 90 is above the maximum, 70 below the battery level
+    ],
+)
+def test_the_limit_asked_for_is_10_percent_from_the_cars_own(current, battery, low, high, ten, expected) -> None:
+    rounding = (lambda value: -(-value // 10) * 10) if ten else (lambda value: value)
+    assert limit_test_value(current, battery, low, high, rounding) == expected
+
+
+@pytest.mark.parametrize(
+    ("current", "battery", "published", "own", "expected"),
+    [
+        (95, None, None, None, None),  # an unknown battery level never allows a lower limit
+        (80, None, None, None, 90),  # higher is always fine
+        (80, 40, 90, None, 70),  # the plan publishes 90 already: no change for the automation
+        (70, 40, None, 80, 60),  # 80 is the car's own from before the test: putting it back would be no change
+        (80, 40, 90, 70, None),
+    ],
+)
+def test_the_limit_asked_for_avoids_unknown_levels_and_values_that_send_nothing(current, battery, published, own, expected) -> None:
+    assert limit_test_value(current, battery, 50, 100, lambda value: value, published, own) == expected
+
+
+def _test_limit(hass: HomeAssistant) -> float:
+    """The limit the step asks for: 10 % above the car's 80 %, unless the plan publishes that already (then 10 % below)."""
+    return 70.0 if hass.states.get(ACTION).attributes.get("charging_limit") == 90 else 90.0
+
+
+def _car_limit(hass: HomeAssistant) -> float:
+    return float(hass.states.get(EV_LIMIT).state)
+
+
+def _limits_while_held(limits: list, test: float, own: float) -> None:
+    """The test limit and then the car's own were published with the action unchanged: the automation sends a changed
+    limit only on its own (or with a new charge), never together with a stop."""
+    published = [(action, limit) for action, limit in limits if limit is not None]
+    test_at = next(index for index, (_, limit) in enumerate(published) if limit == test)
+    back_at = next(index for index, (_, limit) in enumerate(published) if index > test_at and limit == own)
+    assert published[test_at - 1][0] == published[test_at][0], published
+    assert published[back_at - 1][0] == published[back_at][0], published
+
+
+async def test_the_car_takes_the_limit_and_gets_its_own_back(hass, charger_entry, fast_runner) -> None:
+    limits: list = []
+    wire_charger(hass, limits=limits)
+    test = _test_limit(hass)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    step = _steps_of(hass)["limit"]
+    assert step["status"] == "ok" and (step["limit_from"], step["limit_to"], step["limit_seen"]) == (80, test, test)
+    assert _car_limit(hass) == 80
+    assert state.attributes["limit_put_back"] == {"ok": True, "limit": 80}
+    assert "80 %" in state.attributes["markdown"]
+    _limits_while_held(limits, test, 80)
+    assert charger_entry.runtime_data.engine._charger_saved is None
+
+
+async def test_a_car_that_does_not_take_the_limit_fails_the_step(hass, charger_entry, fast_runner) -> None:
+    limits: list = []
+    wire_charger(hass, limit_follows=lambda value: False, limits=limits)
+    test = _test_limit(hass)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    step = _steps_of(hass)["limit"]
+    assert step["status"] == "fail" and step["limit_seen"] == 80 and step["limit_to"] == test
+    # still the car's own when CJP looked, but the test limit may still reach the car (a slow cloud): not confirmed
+    assert hass.states.get(RESULT).attributes["limit_put_back"] == {"ok": False, "limit": 80}
+    assert "⚠️" in hass.states.get(RESULT).attributes["markdown"].split("\n\n")[-2]
+
+
+async def test_a_limit_that_is_not_seen_back_tells_the_user_to_check_the_car(hass, charger_entry, fast_runner) -> None:
+    wire_charger(hass, limit_follows=lambda value: value != 80)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    assert _steps_of(hass)["limit"]["status"] == "ok"
+    assert state.attributes["limit_put_back"] == {"ok": False, "limit": 80}
+    assert "⚠️" in state.attributes["markdown"].split("\n\n")[-2] and "80 %" in state.attributes["markdown"]
+
+
+async def test_stopping_during_the_limit_step_puts_the_cars_limit_back_before_the_plan(hass, charger_entry) -> None:
+    """The switch turned off while the car is slow to take the limit: the car's own limit is published again with the
+    held action, before the release puts the plan's action back."""
+    coordinator = charger_entry.runtime_data
+    limits: list = []
+    wire_charger(hass, limit_follows=lambda value: False, limits=limits)
+    test = _test_limit(hass)
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 0.5), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
+    ):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        for _ in range(3000):
+            await asyncio.sleep(0.01)
+            if (coordinator.engine._charger_hold or {}).get("limit") == test:
+                break
+        assert (coordinator.engine._charger_hold or {}).get("limit") == test
+        await hass.services.async_call("switch", "turn_off", {"entity_id": SWITCH}, blocking=True)
+        await _finished(hass)
+    state = hass.states.get(RESULT)
+    assert state.state == "stopped"
+    assert state.attributes["steps"][-1]["reason"] == "not_reached"
+    _limits_while_held(limits, test, 80)
+    assert coordinator.engine._charger_hold is None and coordinator.engine._charger_saved is None
+
+
+async def test_a_car_that_is_full_during_the_limit_step_still_gets_its_own_limit_back(hass, charger_entry) -> None:
+    """The car reports completed while it is at the test's limit: the put-back has no charger status check."""
+    coordinator = charger_entry.runtime_data
+    limits: list = []
+    wire_charger(hass, limit_follows=lambda value: value != 80 or hass.states.get(CHARGER_STATUS).state == "completed", limits=limits)
+    test = _test_limit(hass)
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 2), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
+    ):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        for _ in range(3000):
+            await asyncio.sleep(0.01)
+            if _car_limit(hass) == test:
+                break
+        assert _car_limit(hass) == test
+        hass.states.async_set(CHARGER_STATUS, "completed")
+        await _finished(hass)
+    assert _car_limit(hass) == 80
+    assert hass.states.get(RESULT).attributes["limit_put_back"] == {"ok": True, "limit": 80}
+    _limits_while_held(limits, test, 80)
+
+
+async def test_the_limit_from_before_the_test_is_put_back(hass, charger_entry) -> None:
+    """The charge steps may send the plan's limit (70 here): the car gets 80, its own from before the test, back."""
+    coordinator = charger_entry.runtime_data
+    wire_charger(hass)
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 2), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
+    ):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        for _ in range(3000):
+            await asyncio.sleep(0.01)
+            if (coordinator.engine._charger_hold or {}).get("kind") == "charge":
+                break
+        assert (coordinator.engine._charger_hold or {}).get("kind") == "charge"
+        hass.states.async_set(EV_LIMIT, "70", hass.states.get(EV_LIMIT).attributes)
+        await _finished(hass)
+    step = _steps_of(hass)["limit"]
+    # from the car's 70: 80 would be its own (no change when put back), so 60 (or 80 + … when 60 is not allowed)
+    assert step["status"] == "ok" and step["limit_from"] == 70 and step["limit_to"] not in (70, 80)
+    assert _car_limit(hass) == 80
+    assert hass.states.get(RESULT).attributes["limit_put_back"] == {"ok": True, "limit": 80}
+
+
+async def test_a_restart_during_the_limit_step_tells_the_user_to_check_the_car(hass, charger_entry) -> None:
+    """HA stopped with the test limit out: the restored result says the car's own limit may not be back."""
+    coordinator = charger_entry.runtime_data
+    coordinator.async_restore_charger_test({"status": "running", "steps": [], "limit_put_back": {"ok": None, "limit": 80}})
+    state = coordinator.charger_test_state
+    assert state["status"] == "stopped" and state["reason"] == "stopped"
+    assert state["limit_put_back"] == {"ok": False, "limit": 80}
+    assert "80 %" in state["markdown"]
+    # a test that was running without a test limit out is not restored (as before)
+    coordinator._init_charger_test()
+    coordinator.async_restore_charger_test({"status": "running", "steps": [], "limit_put_back": None})
+    assert coordinator.charger_test_state["status"] == "idle"
+
+
+async def test_a_restart_during_the_limit_step_is_restored_by_the_sensor(hass) -> None:
+    """Through the sensor's own restore: a saved "running" state with the test limit out comes back as stopped."""
+    from homeassistant.core import State  # noqa: PLC0415
+    from pytest_homeassistant_custom_component.common import mock_restore_cache  # noqa: PLC0415
+
+    mock_restore_cache(hass, [State(RESULT, "running", {"steps": [], "limit_put_back": {"ok": None, "limit": 80}})])
+    set_source_states(hass, charger_status="charging")
+    entry = make_entry(options=MOCK_OPTIONS)
+    await async_setup(hass, entry)
+    state = hass.states.get(RESULT)
+    assert state.state == "stopped"
+    assert state.attributes["limit_put_back"] == {"ok": False, "limit": 80}
+    note = state.attributes["markdown"].split("\n\n")[-2]  # the legend (last) has ⚠️ too
+    assert "⚠️" in note and "80 %" in note
+    await async_unload_and_join(hass, entry)
+
+
+async def test_an_unknown_battery_level_never_allows_a_lower_test_limit(hass, charger_entry) -> None:
+    """The car at 95 %: only 85 % is left, and without a battery level it is not asked for (0 % would allow it)."""
+    engine = charger_entry.runtime_data.engine
+    hass.states.async_set(EV_LIMIT, "95", hass.states.get(EV_LIMIT).attributes)
+    with patch.object(type(engine), "battery_level", lambda self, real=False, unknown=0.0: unknown):
+        plan = (await charger_entry.runtime_data.async_run_job("charger_test_limit_plan")).value
+    assert plan["current"] == 95 and plan["test"] is None
+
+
+async def test_unloading_during_the_limit_step_publishes_the_limit_back_without_waiting(hass, charger_entry) -> None:
+    """The entry is unloaded while the car has not taken the test limit: the car's own is published back at once (no
+    minutes of waiting for the car), and the result says to check it."""
+    coordinator = charger_entry.runtime_data
+    limits: list = []
+    wire_charger(hass, limit_follows=lambda value: False, limits=limits)
+    test = _test_limit(hass)
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 60), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
+    ):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        for _ in range(3000):
+            await asyncio.sleep(0.01)
+            if (coordinator.engine._charger_hold or {}).get("limit") == test:
+                break
+        assert (coordinator.engine._charger_hold or {}).get("limit") == test
+        # the car shows neither the test limit nor its own: a put-back that waited for it would wait the 60 s
+        hass.states.async_set(EV_LIMIT, "75", hass.states.get(EV_LIMIT).attributes)
+        await asyncio.wait_for(coordinator.async_unload_charger_test(), 10)
+    published = [limit for _, limit in limits if limit is not None]
+    assert 80 in published[published.index(test):]  # the car's own, published after the test limit
+    assert coordinator.charger_test_state["limit_put_back"] == {"ok": False, "limit": 80}
+
+
+async def test_a_lost_hold_before_the_test_limit_leaves_nothing_to_put_back(hass, charger_entry, fast_runner) -> None:
+    """charger_test_limit finds no hold: no test limit was published, so no "could not confirm" either."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    wire_charger(hass)
+    with patch.object(type(engine), "charger_test_limit", lambda self, value, car_limit, seconds: {"status": "no_hold"}), patch(FOUND, return_value=[]):
+        await _start(hass)
+    step = _steps_of(hass)["limit"]
+    assert step["status"] == "skip" and step["reason"] == "not_ready"
+    assert hass.states.get(RESULT).attributes["limit_put_back"] is None
+
+
+async def test_the_pending_put_back_is_not_shown_while_the_test_runs(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    coordinator._publish_charger_test(status="running", steps=[], limit_put_back={"ok": None, "limit": 80})
+    assert "80 %" not in coordinator.charger_test_state["markdown"]
+
+
+async def test_without_steps_for_the_charge_limit_it_is_not_tried(hass, charger_entry, fast_runner) -> None:
+    limits: list = []
+    wire_charger(hass, limits=limits)
+    inputs = [{"start_actions": [{"action": "x"}], "stop_actions": [{"action": "y"}]}]
+    with patch(FOUND, return_value=inputs):
+        await _start(hass)
+    step = _steps_of(hass)["limit"]
+    assert step["status"] == "skip" and step["reason"] == "no_steps"
+    assert _test_limit(hass) not in {limit for _, limit in limits}
+    assert _car_limit(hass) == 80 and hass.states.get(RESULT).attributes["limit_put_back"] is None
+
+
+async def test_a_car_limit_without_a_number_is_not_tested(hass, charger_entry, fast_runner) -> None:
+    limits: list = []
+    hass.states.async_set(EV_LIMIT, "unavailable")
+    wire_charger(hass, limits=limits)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    step = _steps_of(hass)["limit"]
+    assert step["status"] == "skip" and step["reason"] == "limit_no_data"
+    assert _test_limit(hass) not in {limit for _, limit in limits} and hass.states.get(RESULT).attributes["limit_put_back"] is None
+
+
+async def test_a_car_without_a_charge_limit_entity_has_no_limit_step(hass, fast_runner) -> None:
+    set_source_states(hass, charger_status="charging")
+    entry = make_entry(options={**MOCK_OPTIONS, "charging_limit_entity_id": ""})
+    await async_setup(hass, entry)
+    wire_charger(hass)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    assert list(_steps_of(hass)) == ["max", "stop"]
+    await async_unload_and_join(hass, entry)
+
+
+async def test_a_hold_that_ran_out_during_the_limit_step_publishes_the_cars_own_limit(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    wire_charger(hass, limit_follows=lambda value: False)
+    await coordinator.async_run_job("charger_test_hold", "stop", 0, 0, 600)
+    await coordinator.async_run_job("charger_test_limit", 90, 80, 600)
+    assert hass.states.get(ACTION).attributes["charging_limit"] == 90
+    coordinator.engine._charger_hold["until"] -= datetime.timedelta(hours=1)
+    await coordinator.async_run_job("charger_test_published")
+    assert coordinator.engine._charger_hold is None
+    assert hass.states.get(ACTION).attributes["charging_limit"] == 80
+
+
+async def test_the_limit_is_only_published_while_a_test_holds_the_charger(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    before = hass.states.get(ACTION).attributes.get("charging_limit")
+    assert (await coordinator.async_run_job("charger_test_limit", 90, 80, 600)).value == {"status": "no_hold"}
+    assert hass.states.get(ACTION).attributes.get("charging_limit") == before
+
+
+async def test_a_restored_result_keeps_the_limit_step_and_the_put_back(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    step = {
+        "name": "limit", "status": "ok", "reason": None, "phases": 0, "configured_amps": 0, "amps": 0, "watt": 0, "expected_w": 0,
+        "attempts": [], "seconds": 30, "limit_from": 80, "limit_to": 90, "limit_seen": 90,
+    }
+    coordinator.async_restore_charger_test({"status": "done", "steps": [step], "limit_put_back": {"ok": False, "limit": 80}})
+    assert coordinator.charger_test_state["status"] == "done"
+    assert coordinator.charger_test_state["limit_put_back"] == {"ok": False, "limit": 80}
+    note = coordinator.charger_test_state["markdown"].split("\n\n")[-2]  # the legend (last) has ⚠️ too
+    assert "⚠️" in note and "80 %" in note
+    coordinator._init_charger_test()
+    coordinator.async_restore_charger_test({"status": "done", "steps": [{**step, "limit_to": "lots"}]})
+    assert coordinator.charger_test_state["status"] == "idle"
+    coordinator.async_restore_charger_test({"status": "done", "steps": [step], "limit_put_back": {"ok": "yes", "limit": 80}})
+    assert coordinator.charger_test_state["limit_put_back"] is None

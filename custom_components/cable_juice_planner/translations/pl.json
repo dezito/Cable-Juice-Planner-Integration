@@ -365,9 +365,9 @@
           "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "margin": "Odejmowany od bezpiecznika.",
           "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
-          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
           "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
         }
       },
@@ -765,9 +765,9 @@
           "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "margin": "Odejmowany od bezpiecznika.",
           "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
-          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu (np. licznik HAN/P1). Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
           "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
         }
       },

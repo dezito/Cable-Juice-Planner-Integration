@@ -137,6 +137,8 @@ daily minimum, or the max. recommended limit.
 - **Solcast missing:** the solar forecast uses CJP's own history.
 - **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the max.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.
-- **The charger doesn't charge although it should:** `charger_enabled` is toggled off and on (up to 3
-  times), with notifications along the way.
+- **The charger doesn't charge although it should:** it is stopped and started again (or `charger_enabled`
+  toggled off and on), up to 3 times, with notifications along the way. Then, as a fail-safe, the action is
+  `charge` at max. current in every hour until it charges, is done or the cable is unplugged
+  ([details](charger-control.md)).
 - **The integration stops or hangs:** covered by the [blueprint's fail-safe](charger-control.md#fail-safe).

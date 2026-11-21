@@ -301,8 +301,9 @@ have edited the file yourself), a repair shows up after restart under *Settings 
 
 If several cars charge on the same grid connection, add one **Shared grid connection**
 (**Add integration → Cable Juice Planner → Shared grid connection**) with the main fuse per phase and
-optionally the house's phase sensors. Each car gets a priority and a phase order, and together they never
-use more current per phase than the fuse. Chargers sharing one circuit limit (e.g. Easee chargers behind a
+optionally the house's phase sensors. Each car gets a priority and a phase order, and together they are kept
+within the fuse per phase: current a car ahead doesn't use goes to the next car, and an overloaded phase limits
+the last car at once. Chargers sharing one circuit limit (e.g. Easee chargers behind a
 master) can be linked, so the master's automation sets the circuit for all of them. See
 [Multiple cars](docs/load-balancing.md).
 

@@ -120,7 +120,8 @@ class CJPActionSensor(CJPSensor):
 class CJPChargerTestSensor(CJPUpdatingEntity, SensorEntity, RestoreEntity):
     """The test of the user's charger automation: its status, and the result of every step as markdown in the attributes.
 
-    The result of the last finished test is kept over a restart. A test that was running is not: it did not finish."""
+    The result of the last finished test is kept over a restart. A test that was running is not (it did not finish),
+    unless it had changed the car's charge limit: then it is kept as stopped, with the note to check the limit."""
 
     _unrecorded_attributes = frozenset({MATCH_ALL})
     _attr_device_class = SensorDeviceClass.ENUM
@@ -131,7 +132,7 @@ class CJPChargerTestSensor(CJPUpdatingEntity, SensorEntity, RestoreEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        if (last := await self.async_get_last_state()) is not None and last.state in ("done", "stopped", "failed"):
+        if (last := await self.async_get_last_state()) is not None and last.state in ("done", "stopped", "failed", "running"):
             self.coordinator.async_restore_charger_test({**last.attributes, "status": last.state})
 
     @property
@@ -144,6 +145,7 @@ class CJPChargerTestSensor(CJPUpdatingEntity, SensorEntity, RestoreEntity):
         return {
             "markdown": state["markdown"], "steps": state["steps"], "reason": state["reason"], "finished": state["finished"],
             "automation": state["automation"], "amps_control": state["amps_control"], "car_phases": state["car_phases"],
+            "limit_put_back": state.get("limit_put_back"),
         }
 
 

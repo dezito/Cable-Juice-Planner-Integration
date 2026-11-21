@@ -3,7 +3,8 @@
 A switch starts the test (and stops it). One current after the other is published on the charger action sensor, the
 charger's power sensor is read, and the result of every step is published as markdown on the charger_test sensor. The
 runner is a background task; the engine holds the current (engine/control/charger_test.py), so a runner that dies can
-not leave the charger at a forced current: the hold ends by itself. Nothing but the published action and amps is changed.
+not leave the charger at a forced current: the hold ends by itself. Nothing but the published action and amps is changed,
+and with a charge limit entity the published charge limit for a moment (the car's own from before the test is put back).
 """
 from __future__ import annotations
 
@@ -52,6 +53,14 @@ STARTED_AMPS = 5
 CONFIRM_MIN_AMPS = 6
 # a car that stays at one power is advised the highest current within this share above it (the noise of the reading)
 AMPS_AT_SLACK = 0.02
+# the charge limit step: a car's integration often polls its cloud, so the car is given minutes to report the new limit
+LIMIT_TIMEOUT = 300
+LIMIT_SAMPLE_SECONDS = 10
+# after a held action of its own (no step held the charger), before the limit is changed: the automation then sends the
+# limit in a run of its own (a limit that changes together with a stop is never sent)
+LIMIT_PAUSE_SECONDS = 15
+LIMIT_TOLERANCE = 0.5
+LIMIT_INPUTS = ("car_limit_actions",)
 
 
 class CoordinatorChargerTest:
@@ -61,19 +70,36 @@ class CoordinatorChargerTest:
         # automation: "found" when the automation made from the blueprint was found in automations.yaml, else "unknown"
         self.charger_test_state: dict[str, Any] = {
             "status": "idle", "steps": [], "reason": None, "finished": None, "markdown": "", "automation": None, "amps_control": None,
-            "car_phases": None,
+            "car_phases": None, "limit_put_back": None,
         }
         self._charger_test_task: asyncio.Task | None = None
+        # {"entity", "limit": the car's own, "seen": the car showed the test limit} while the limit step has published a test
+        # limit and the car's own is not back yet
+        self._charger_test_limit_pending: dict[str, Any] | None = None
+        self._charger_test_unloading = False
 
     @callback
     def async_restore_charger_test(self, attributes: dict[str, Any]) -> None:
-        """The result of the last test, from before the restart. A test that was running did not finish."""
+        """The result of the last test, from before the restart. A test that was running did not finish: it is only kept when
+        the limit step had changed the car's charge limit (as stopped, with the note to check the limit)."""
         steps, status = attributes.get("steps"), attributes.get("status")
+        put_back = attributes.get("limit_put_back")
+        running = status == "running"
+        if running:
+            if not (isinstance(put_back, dict) and put_back.get("ok") in (None, True, False) and isinstance(put_back.get("limit"), (int, float))
+                    and not isinstance(put_back.get("limit"), bool)):
+                return
+            # HA stopped during the limit step: the test limit may still be in the car, and nothing can put it back now
+            ok = put_back["ok"] is True
+            status, attributes = "stopped", {**attributes, "reason": "stopped", "limit_put_back": {"ok": ok, "limit": put_back["limit"]}}
         if status not in ("done", "stopped", "failed") or not isinstance(steps, list):
-            return
+            if not running:
+                return
+            steps = []
         number = (int, float, type(None))
         if not all(
-            isinstance(step, dict) and step.get("name") in ("max", "min", "single_max", "single_min", "stop")
+            isinstance(step, dict) and step.get("name") in ("max", "min", "single_max", "single_min", "stop", "limit")
+            and all(isinstance(step.get(key), number) for key in ("limit_from", "limit_to", "limit_seen", "seconds"))
             and step.get("status") in ("ok", "adjusted", "fail", "skip")
             and (step.get("reason") in SKIP_REASONS if step.get("status") == "skip" else step.get("reason") in (None, "overdraw"))
             and all(isinstance(step.get(key), number) for key in ("amps", "configured_amps", "watt", "expected_w", "phases", "judged_phases"))
@@ -82,14 +108,20 @@ class CoordinatorChargerTest:
                     for attempt in step.get("attempts") or [])
             for step in steps
         ):
-            return
+            if not running:
+                return
+            steps = []  # the note on the car's limit matters more than steps that can't be shown
         car_phases, automation, amps_control = attributes.get("car_phases"), attributes.get("automation"), attributes.get("amps_control")
         reason = attributes.get("reason")
+        put_back = attributes.get("limit_put_back")
+        if not (isinstance(put_back, dict) and isinstance(put_back.get("ok"), bool) and isinstance(put_back.get("limit"), (int, float))):
+            put_back = None
         self.charger_test_state = {
             "status": status, "steps": steps, "reason": reason if reason in STOP_REASONS else None, "finished": attributes.get("finished"),
             "markdown": "", "automation": automation if automation in ("found", "unknown") else None,
             "amps_control": amps_control if isinstance(amps_control, bool) else None,
             "car_phases": car_phases if isinstance(car_phases, int) and 0 < car_phases < 3 else None,
+            "limit_put_back": {"ok": put_back["ok"], "limit": put_back["limit"]} if put_back else None,
         }
         self.charger_test_state["markdown"] = build_charger_test_markdown(self.t, self.charger_test_state)
 
@@ -98,7 +130,9 @@ class CoordinatorChargerTest:
         """Start the test. Nothing happens while one runs or before CJP has started."""
         if self.charger_test_state["status"] == "running" or not self.started or self.engine is None:
             return
-        self._publish_charger_test(status="running", steps=[], reason=None, finished=None, automation=None, amps_control=None, car_phases=None)
+        self._publish_charger_test(
+            status="running", steps=[], reason=None, finished=None, automation=None, amps_control=None, car_phases=None, limit_put_back=None
+        )
         self._charger_test_task = task = self.entry.async_create_background_task(
             self.hass, self._async_charger_test(), name=f"{self.object_prefix}_charger_test"
         )
@@ -120,8 +154,11 @@ class CoordinatorChargerTest:
         """Called when the entry is unloaded: stop the test and put the plan back before the worker is shut down."""
         task = self._charger_test_task
         if task and not task.done():
+            # the car's limit is still put back, but not waited for: the unload must not wait minutes for the car
+            self._charger_test_unloading = True
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+            self._charger_test_unloading = False
 
     def _publish_charger_test(self, **changes: Any) -> None:
         state = {**self.charger_test_state, **changes}
@@ -156,6 +193,12 @@ class CoordinatorChargerTest:
             self._publish_charger_test(automation="found" if found else "unknown", amps_control=amps_control)
             plan = [step for step in begin["steps"] if amps_control or step["name"] == "max"]
             planned = [*plan, stop_step]
+            # the charge limit: only with the car's charge limit entity (last, so a changed limit can't affect a current step)
+            limit = (await self.async_run_job("charger_test_limit_plan")).value or {}
+            # own: the car's limit before the test, what is put back (the charge steps may send the plan's limit)
+            limit_step = {"name": "limit", "phases": 0, "amps": 0, "expected_w": 0, **limit, "own": limit.get("current")} if limit.get("entity") else None
+            if limit_step:
+                planned.append(limit_step)
             # a car that already charges proves no start: the first step that charges says so
             before = self._charger_power(begin["power_entity"])
             already_charging = before is not None and before >= STARTED_AMPS * begin["voltage"]
@@ -184,17 +227,27 @@ class CoordinatorChargerTest:
                     if stop:
                         status, reason = "stopped", stop
                 self._publish_charger_test(steps=list(steps))
+                if limit_step and status != "stopped":
+                    if has_steps(found, *LIMIT_INPUTS) is False:
+                        steps.append(self._skipped(limit_step, "no_steps"))
+                    else:
+                        steps.append(await self._async_limit_step(limit_step))
+                    self._publish_charger_test(steps=list(steps))
         except asyncio.CancelledError:
             status, reason = "stopped", "stopped"
         except Exception:  # noqa: BLE001
             _LOGGER.exception("The charger test failed")
             status, reason = "failed", "internal_error"
         finally:
+            # the car's own charge limit first, while the action is still the held one (the release changes the action, and
+            # a limit that changes together with a stop is never sent)
+            await self._async_limit_put_back()
             await self._async_charger_test_release()
             if amps_control and begin and amps_unproven(steps, begin["voltage"], STARTED_AMPS * begin["voltage"]):
                 # the power was the same whatever the amps: a current that "worked" may be the one the charger always uses
                 steps = [
-                    {**step, "status": "skip", "reason": "amps_unproven"} if step["name"] != "stop" and step["status"] in ("ok", "adjusted") else step
+                    {**step, "status": "skip", "reason": "amps_unproven"}
+                    if step["name"] not in ("stop", "limit") and step["status"] in ("ok", "adjusted") else step
                     for step in steps
                 ]
             if status == "stopped":  # the steps that were not run are shown, not left out
@@ -423,3 +476,94 @@ class CoordinatorChargerTest:
             "attempts": [], "seconds": taken,
         }
         return {**record, "status": "ok" if verdict == "ok" else "fail"}, None
+
+    # ------------------------------------------------------------------ #
+    # The charge limit in the car
+    # ------------------------------------------------------------------ #
+
+    def _car_limit(self, entity_id: str) -> float | None:
+        """The car's charge limit now, None without a number (the car asleep, the integration offline)."""
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in ENTITY_UNAVAILABLE_STATES:
+            return None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return None
+        return None if value != value or abs(value) == float("inf") else value
+
+    async def _async_wait_for_limit(self, entity_id: str, value: float) -> tuple[str, float | None, int]:
+        """Read the car's limit until it is value or the time is up: ("ok" | "fail" | "no_data", the last number, seconds)."""
+        started = time.monotonic()
+        last: float | None = None
+        while True:
+            current = self._car_limit(entity_id)
+            if current is not None:
+                last = current
+                if abs(current - value) <= LIMIT_TOLERANCE:
+                    return "ok", current, round(time.monotonic() - started)
+            if time.monotonic() - started >= LIMIT_TIMEOUT:
+                return ("no_data" if last is None else "fail"), last, round(time.monotonic() - started)
+            await asyncio.sleep(LIMIT_SAMPLE_SECONDS)
+
+    async def _async_limit_step(self, step: dict) -> dict[str, Any]:
+        """The charge limit: CJP publishes a limit 10 % from the car's limit now (limit_test_value) and reads the car's charge
+        limit entity until it shows it. The car's own limit from before the test is put back afterwards
+        (_async_limit_put_back), also when the test is stopped during the step."""
+        # the car's limit now, not at the start: the steps before it held charges, and the automation sends the plan's limit
+        # with a new charge, so the car may have another limit than at the start. What is put back is the one from the start
+        own = step.get("own")
+        step = {**step, **((await self.async_run_job("charger_test_limit_plan", own)).value or {})}
+        entity_id, current, test = step["entity"], step.get("current"), step.get("test")
+        if not entity_id or current is None:
+            return self._skipped(step, "limit_no_data")
+        if test is None:
+            return self._skipped(step, "no_limit", limit_from=current)
+        own = current if own is None else own
+        seconds = 2 * LIMIT_TIMEOUT + HOLD_MARGIN_SECONDS
+        if (await self.async_run_job("charger_test_published")).value is None:
+            # no step held the charger (no steps for the start): hold a stop of its own first, and change the limit in a later
+            # run of the automation
+            held = (await self.async_run_job("charger_test_hold", "stop", 0, 0, seconds, include_forecast=True)).value
+            if held["status"] != "ok":
+                return self._skipped(step, "not_ready")
+            await asyncio.sleep(LIMIT_PAUSE_SECONDS)
+        self._charger_test_limit_pending = pending = {"entity": entity_id, "limit": own, "seen": False}
+        # kept on the result sensor: a restart before the put-back shows that the car's limit may still be the test's
+        self._publish_charger_test(limit_put_back={"ok": None, "limit": own})
+        if (await self.async_run_job("charger_test_limit", test, own, seconds)).value["status"] != "ok":
+            # nothing was published (no hold any more): nothing to put back
+            self._charger_test_limit_pending = None
+            self._publish_charger_test(limit_put_back=None)
+            return self._skipped(step, "not_ready")
+        verdict, seen, taken = await self._async_wait_for_limit(entity_id, test)
+        pending["seen"] = verdict == "ok"
+        record = {
+            "name": "limit", "reason": None, "phases": 0, "configured_amps": 0, "amps": 0, "watt": 0, "expected_w": 0, "attempts": [],
+            "seconds": taken, "limit_from": current, "limit_to": test, "limit_seen": seen,
+        }
+        if verdict == "no_data":
+            return {**self._skipped(step, "limit_no_data"), "limit_from": current, "limit_to": test}
+        return {**record, "status": "ok" if verdict == "ok" else "fail"}
+
+    async def _async_limit_put_back(self) -> None:
+        """Put the car's own charge limit back after the limit step, with the held action unchanged, and wait for the car to
+        show it (not when the entry is unloaded or HA stops). Also runs when the test was stopped during the limit step.
+
+        Only confirmed when the car showed the test limit first: a car that never showed it still shows its own limit, and
+        the test limit may still reach it (a slow cloud) after CJP looked."""
+        pending, self._charger_test_limit_pending = self._charger_test_limit_pending, None
+        if pending is None:
+            return
+        entity_id, car_limit = pending["entity"], pending["limit"]
+        ok = False
+        try:
+            result = await asyncio.shield(self.async_run_job("charger_test_limit", car_limit, car_limit, 2 * LIMIT_TIMEOUT + HOLD_MARGIN_SECONDS))
+            if result.value["status"] == "ok" and not self._charger_test_unloading and not self.hass.is_stopping:
+                back = (await self._async_wait_for_limit(entity_id, car_limit))[0] == "ok"
+                ok = back and pending["seen"]
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            _LOGGER.debug("The charger test stopped waiting for the car's charge limit", exc_info=True)
+        if not ok:
+            _LOGGER.warning("The charger test could not confirm the car's charge limit back at %s %%; check it in the car", car_limit)
+        self._publish_charger_test(limit_put_back={"ok": ok, "limit": car_limit})

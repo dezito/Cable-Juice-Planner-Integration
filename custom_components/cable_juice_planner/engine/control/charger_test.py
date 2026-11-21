@@ -3,7 +3,8 @@
 CJP never sends a command; the user's automation (the charger blueprint) does, when the action sensor and its phase
 attributes change. To test it CJP publishes a chosen current on one or three phases on ``sensor.<prefix>_charger_action``,
 on purpose, and the coordinator reads the charger's power sensor to see what the charger then does. Only the published
-action and amps are held: the plan, the settings and the rules are not touched.
+action and amps are held, and with a charge limit entity the published charge limit for a moment (the car's own is put
+back after it): the plan, the settings and the rules are not touched.
 
 * The steps are the maximum first (does charging work at all), then the lowest and highest steps of the solar calculation
   (``charging_power_dict``). A step that fails is searched two amps at a time towards the middle of its group and then
@@ -26,6 +27,7 @@ from __future__ import annotations
 import datetime
 import logging
 
+from ...utils.helpers import round_up
 from ...const import CHARGER_CHARGING_STATUS, CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,7 +46,9 @@ STOP_REASONS = (
     "not_configured", "unavailable", "not_connected", "completed", "not_ready", "other_ev", "running", "stopped", "no_charging",
     "overdraw", "internal_error",
 )
-SKIP_REASONS = ("no_steps", "no_data", "site_limited", "no_baseline", "not_ready", "not_reached", "amps_unproven")
+SKIP_REASONS = ("no_steps", "no_data", "site_limited", "no_baseline", "not_ready", "not_reached", "amps_unproven", "no_limit", "limit_no_data")
+# the charge limit step asks the car for a limit this much from its own
+LIMIT_STEP = 10.0
 # more than the published amps give by this much is a charger that ignores the amps or the phases (load balancing risk)
 OVERDRAW_SHARE = 0.25
 OVERDRAW_MIN_W = 500.0
@@ -109,6 +113,29 @@ def amps_unproven(steps: list[dict], voltage: float, threshold_w: float) -> bool
     return all(max(w for _, w in group) - min(w for _, w in group) <= tolerance_w(max(w for _, w in group)) for group in judged)
 
 
+def limit_test_value(
+    current: float, battery: float | None, low: float, high: float, rounding, published: float | None = None, own: float | None = None
+) -> float | None:
+    """The charge limit the test asks the car for, None when there is none to ask for.
+
+    LIMIT_STEP above the car's limit now first: a higher limit never ends a charge. Else LIMIT_STEP below, only while that
+    is above a known battery level (a limit under it makes the car stop or report completed, and the test would end with
+    the car at the test's limit; an unknown level never allows it). Rounded like the plan rounds the car's limit
+    (verify_charge_limit), within low..high, never the car's limit now (that would prove nothing), never the limit
+    published already (the automation only sends a change) and never the car's own from before the test (own: putting
+    it back would then be no change either)."""
+    for candidate in (current + LIMIT_STEP, current - LIMIT_STEP):
+        value = float(rounding(candidate))
+        if abs(value - current) < 0.5 or not low <= value <= high:
+            continue
+        if any(other is not None and abs(value - other) < 0.5 for other in (published, own)):
+            continue
+        if value < current and (battery is None or value <= battery + 1.0):
+            continue
+        return value
+    return None
+
+
 def build_steps(power_dict: dict, max_amp: float, phases: int, voltage: float, solar_steps: bool) -> list[dict]:
     """The steps of the test, in the order they are run, from the solar calculation and the charger's maximum.
 
@@ -168,7 +195,9 @@ class ChargerTest:
         if self.now() >= hold["until"]:
             _LOGGER.warning("The charger test hold ran out and is dropped")
             self._charger_hold, self._charger_abort = None, "expired"
+            self._charger_test_released_at = self.now()
             self._charger_test_restore()
+            self._charger_restart_reset(full=False)
             return False
         return True
 
@@ -178,6 +207,10 @@ class ChargerTest:
         saved, self._charger_saved = self._charger_saved, None
         if saved is None:
             return
+        if saved.get("car_limit") is not None:
+            # the car's own limit from before the limit step. The runner puts it back on its own first (with the action
+            # unchanged, so the automation sends it); here, with the action changing too, the automation may not send it
+            self._publish_test_limit(saved["car_limit"])
         self.charger_action, self.charger_enabled = saved["action"], saved["enabled"]
         self._publish_charger_action()
         self.set_charger_phase_limits(saved["circuit"], saved["charger"])
@@ -249,6 +282,9 @@ class ChargerTest:
         requested = amps_list(amps, phases) if kind == "charge" else [0, 0, 0]
         now = self.now()
         if self._charger_saved is None or not self.charger_hold_active():
+            # a restart (is_charging) in progress ends: the test decides what is published, and the charger is not left
+            # disabled by the restart (enabled before it is saved)
+            self._charger_restart_reset(full=False)
             # what the plan asked for: with a site the published amps are the clamped ones, and putting those back would
             # keep the car at them when the site has more again (the site's own job applies the requested amps). Only for a
             # charge: a plan the site had stopped asked for amps it was not given, and "stop" with them would start a
@@ -267,6 +303,61 @@ class ChargerTest:
         self._charger_test_publish()
         return {"status": "ok", "requested": requested, "published": [int(a) for a in self.current_charging_amps]}
 
+    def _publish_test_limit(self, value: float) -> None:
+        """The charge limit on the sensor and the action (in the decision, so the automation sees the change)."""
+        self.set_state("charging_limit", value)
+        self.set_attr("charger_action", "charging_limit", value)
+
+    def charger_test_limit_plan(self, own: float | None = None) -> dict:
+        """The charge limit step: {"entity": the car's charge limit entity ("" without one: no step), "current": its limit
+        now (None without a number), "test": the limit to ask for (None when there is none, limit_test_value)}. own: the
+        car's limit from before the test, which the test value must not be either."""
+        ids = self.config["ev_car"]["entity_ids"]
+        entity_id = ids["charging_limit_entity_id"] if self.is_ev_configured() and self.is_entity_configured(ids["charging_limit_entity_id"]) else ""
+        out = {"entity": entity_id, "current": None, "test": None}
+        if not entity_id:
+            return out
+        current = self.get_state(entity_id, try_history=False, float_type=True, error_state=None)
+        if not isinstance(current, (int, float)) or current != current or abs(current) == float("inf"):
+            return out
+        out["current"] = float(current)
+        attributes = self.get_attr(entity_id, error_state={}) or {}
+
+        def bound(key, default):
+            value = attributes.get(key)
+            return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+
+        low = max(bound("min", 0.0), float(self.get_min_charge_limit_battery_level()))
+        high = min(bound("max", 100.0), 100.0)
+        rounding_ten = self.get_integration(entity_id) in ("kia_uvo", "cupra_we_connect")
+
+        def rounding(value):  # like verify_charge_limit
+            return round_up(value / 10) * 10 if rounding_ten else value
+
+        published = self.sensor_states.get("charging_limit")
+        published = float(published) if isinstance(published, (int, float)) and not isinstance(published, bool) else None
+        battery = self.battery_level(unknown=None)  # no level is no level, not 0 % (that would allow a lower limit)
+        battery = float(battery) if isinstance(battery, (int, float)) and battery == battery else None
+        out["test"] = limit_test_value(out["current"], battery, low, high, rounding, published, own)
+        return out
+
+    def charger_test_limit(self, value: float, car_limit: float, seconds: float) -> dict:
+        """Publish the charge limit value while the test holds the charger, with the held action and amps unchanged (the
+        automation only sends a changed limit on its own, or with a new charge). The hold is kept for the next seconds.
+
+        No charger status check: putting the car's own limit car_limit back must also work when the car is full or
+        unplugged. car_limit is kept for the restore of a hold that runs out. {"status": "ok" | "no_hold"}."""
+        if not self.charger_hold_active():
+            return {"status": "no_hold"}
+        if self._charger_saved is not None:
+            self._charger_saved.setdefault("car_limit", car_limit)
+        hold = self._charger_hold
+        hold["until"] = max(hold["until"], self.now() + datetime.timedelta(seconds=seconds))
+        hold["limit"] = value
+        self._publish_test_limit(value)
+        self._charger_test_publish()
+        return {"status": "ok"}
+
     def charger_test_release(self) -> None:
         """End the hold, put back what was published before, and let the plan publish its own action and amps again.
 
@@ -274,7 +365,12 @@ class ChargerTest:
         hash ignores most settings."""
         self._charger_hold = None
         self._charger_abort = None
+        # the test may have ended on a stop, and the charger takes a while to start again on the plan's action: no restart
+        # (is_charging) for the grace after a new session, and none from a mark set before the test (the restarts made and
+        # a give-up are kept: a test is no reason to notify again)
+        self._charger_test_released_at = self.now()
         self._charger_test_restore()
+        self._charger_restart_reset(full=False)
         self.charge_trigger(force=True)
 
 
@@ -287,10 +383,17 @@ def build_charger_test_markdown(t, state: dict) -> str:
         return t("ui.charger_test.not_run")
     icons = {"ok": "✅", "adjusted": "⚠️", "fail": "❌", "skip": "🔧"}
     lines = [f"**{t('ui.charger_test.status.' + state['status'])}**", ""]
+    # the car's own charge limit after the limit step (ok None: the test limit is out and not put back yet, shown once the
+    # test has ended, also after a restart during it)
+    put_back = state.get("limit_put_back")
+    limit_note: list[str] = []
+    if isinstance(put_back, dict) and put_back.get("limit") is not None and isinstance(put_back.get("ok"), bool):
+        key = "limit_put_back" if put_back["ok"] else "limit_not_put_back"
+        limit_note = ["", t(f"ui.charger_test.{key}", limit=round(put_back["limit"]))]
     if not state["steps"] and state["status"] != "running":
         if state.get("reason"):
             lines += [t(f"ui.charger_test.stop_reason.{state['reason']}"), ""]
-        return "\n".join([*lines, t("ui.charger_test.put_back"), "", t("ui.charger_test.legend")])
+        return "\n".join([*lines, t("ui.charger_test.put_back"), *limit_note, "", t("ui.charger_test.legend")])
     lines += [f"| | {t('ui.charger_test.column_step')} | {t('ui.charger_test.column_result')} |", "|:-:|:--|:--|"]
     counts = {"ok": 0, "adjusted": 0, "fail": 0, "skip": 0}
     for step in state["steps"]:
@@ -312,7 +415,7 @@ def build_charger_test_markdown(t, state: dict) -> str:
         if counts["fail"]:
             lines.append(t("ui.charger_test.fail_hint"))
         lines.append(t("ui.charger_test.put_back"))
-    lines += ["", t("ui.charger_test.legend")]
+    lines += [*limit_note, "", t("ui.charger_test.legend")]
     return "\n".join(lines)
 
 
@@ -323,6 +426,9 @@ def charger_step_text(t, step: dict) -> str:
     values["tried_amps"] = max([round(attempt.get("amps") or 0) for attempt in step.get("attempts") or []] + [values["configured_amps"]])
     if step["status"] == "skip":
         return t(f"ui.charger_test.skip.{step['reason']}", **values)
+    if step["name"] == "limit":
+        limits = {key: round(step.get(key) or 0) for key in ("limit_from", "limit_to", "limit_seen")}
+        return t(f"ui.charger_test.{'ok' if step['status'] == 'ok' else 'fail'}.limit", seconds=round(step.get("seconds") or 0), **limits)
     if step.get("judged_phases"):  # the car charges on fewer phases: the power was expected on those
         values["phases"] = round(step["judged_phases"])
     if step["status"] in ("ok", "adjusted"):

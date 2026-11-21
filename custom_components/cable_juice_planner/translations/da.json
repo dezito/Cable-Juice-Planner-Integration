@@ -365,9 +365,9 @@
           "fuse_l3": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "margin": "Trækkes fra sikringen, så der er luft til korte spidser.",
           "voltage": "Bruges når fase-sensorerne måler effekt (W) i stedet for strøm (A).",
-          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
+          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
           "urgent_trip_hours": "En planlagt tur inden for så mange timer giver bilen forrang."
         }
       },
@@ -765,9 +765,9 @@
           "fuse_l3": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "margin": "Trækkes fra sikringen, så der er luft til korte spidser.",
           "voltage": "Bruges når fase-sensorerne måler effekt (W) i stedet for strøm (A).",
-          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
+          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
           "urgent_trip_hours": "En planlagt tur inden for så mange timer giver bilen forrang."
         }
       },

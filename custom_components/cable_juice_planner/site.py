@@ -8,11 +8,13 @@ here and asks for its capacity before each job (event loop, no I/O):
   fixed priority of the instance, then the prefix
 * planned capacity per hour = fuse - margin - forecast house current (hour of day mean
   of the last week, without the cars) - reservations of the cars ahead
-* live capacity = fuse - margin - house current now - what the cars ahead draw now
+* live capacity = fuse - margin - house current now - what the cars ahead draw now (without phase
+  sensors from their charger power sensors; without a reading, or just after a raise, what they were given)
 
 Phases are grid phases here; every car maps its charger L1/L2/L3 onto them with its
 phase order. When a car ahead changes its plan, the cars behind it are recalculated.
-With phase sensors an overloaded phase immediately limits the last charging car.
+An overloaded phase immediately limits the last charging car: measured by the phase sensors, or
+without them the sum of the chargers' power sensors.
 
 Circuits: chargers sharing one circuit limit (e.g. Easee chargers behind a master) are
 lists of HA devices in the site options. A car belongs to a circuit through the devices
@@ -25,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import math
 import time
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -33,10 +36,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_change,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
-from .const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUITS, PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
+from .const import CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS, CIRCUIT_ENTITY_KEYS, CONF_CIRCUITS, PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
 from .utils.helpers import float_or_none
 
 if TYPE_CHECKING:
@@ -46,6 +54,15 @@ _LOGGER = logging.getLogger(__name__)
 
 RECALCULATE_DELAY = 15  # s, the cars behind a changed plan are recalculated after this
 OVERLOAD_THROTTLE = 20  # s between two overload reactions for the same car
+RAMP_UP = 120  # s after a car ahead got more current, before only its measured draw counts (no phase sensors)
+OVERDRAW_SHARE = 0.1  # charger power up to this share above what it was given is the voltage, not an overdraw
+# a charger status or power sensor that has not reported for this long frees no current (a lost cloud push keeps the
+# last value: a car that starts would not be seen)
+STALE_SECONDS = 300
+FORECAST_UNITS = {"power": "W", "electric_current": "A"}  # the house forecast asks the statistics in these
+STALE_CHECK_SECONDS = 30  # how often the overload check runs without a sensor event (a sensor that went stale)
+# charger statuses that surely mean "not charging": only then does a car's measured power free current (no phase sensors)
+SETTLED_STATUS = (*CHARGER_COMPLETED_STATUS, *CHARGER_NOT_READY_STATUS, "ready_to_charge", "awaiting_start", "awaiting_authorization")
 FORECAST_DAYS = 7
 POWER_UNITS = {"W": 1.0, "kW": 1000.0}
 
@@ -108,12 +125,18 @@ class CJPSite:
         self.urgent: dict[str, bool] = {}
         self.house_forecast: dict[int, list[float]] = {}  # hour of day -> grid phases
         self.house_now: list[float] = [0.0, 0.0, 0.0]
+        self._last_house: list[float] = [0.0, 0.0, 0.0]  # the last house current measured by the phase sensors
+        self._house_measured = False  # whether _last_house is a measurement (not the start value)
+        self._was_metered = False  # the phase sensors measured at the last phase event
         self.available_now: dict[str, list[float]] = {}
         self.circuits: list[list[str]] = [list(group) for group in entry.options.get(CONF_CIRCUITS) or [] if isinstance(group, list)]
         self.devices: dict[str, set[str]] = {}  # entry id -> charger devices
         self._unsubs: list = []
         self._pending: dict[str, Any] = {}
         self._last_overload: dict[str, float] = {}
+        self._raised_at: dict[str, float] = {}  # entry id -> monotonic time its requested current was last raised
+        self._power_unsub = None
+        self._overload_recheck = None
         self._startup_ready = asyncio.Event()
 
     # ------------------------------------------------------------------ #
@@ -153,6 +176,12 @@ class CJPSite:
             unsub()
         self._unsubs.clear()
         self._pending.clear()
+        if self._power_unsub is not None:
+            self._power_unsub()
+            self._power_unsub = None
+        if self._overload_recheck is not None:
+            self._overload_recheck()
+            self._overload_recheck = None
         members = list(self.members.values())
         self.members.clear()
         for coordinator in members:
@@ -161,6 +190,7 @@ class CJPSite:
     def register(self, coordinator: CJPCoordinator) -> None:
         self.members[coordinator.entry.entry_id] = coordinator
         self.devices[coordinator.entry.entry_id] = charger_devices(self.hass, _charger_entities(coordinator))
+        self._track_car_power()
         _LOGGER.info("Site: %s joined (priority %s, phase order %s)", coordinator.prefix, coordinator.site_priority, coordinator.site_phase_order)
 
     def unregister(self, entry_id: str) -> None:
@@ -169,6 +199,8 @@ class CJPSite:
         self.reservations.pop(entry_id, None)
         self.requests.pop(entry_id, None)
         self.urgent.pop(entry_id, None)
+        self._raised_at.pop(entry_id, None)
+        self._track_car_power()
         self.recalculate_all()
 
     # ------------------------------------------------------------------ #
@@ -215,11 +247,15 @@ class CJPSite:
         return members if len(members) > 1 else []
 
     def circuit_amps(self, members: list[str]) -> list[int]:
-        """Circuit limit per grid phase: the sum of what the circuit's cars charge with."""
+        """Circuit limit per grid phase: the sum of what the circuit's cars charge with, at most the fuse.
+
+        The sum can be above the fuse when a car behind got the current a car ahead doesn't draw: the circuit then
+        keeps both within the fuse if the car ahead starts after all.
+        """
         total = [0.0, 0.0, 0.0]
         for entry_id in members:
             total = [a + b for a, b in zip(total, self.requests.get(entry_id) or [0.0, 0.0, 0.0])]
-        return [int(round(value)) for value in total]
+        return [min(int(round(value)), int(math.floor(fuse))) for value, fuse in zip(total, self.fuse())]
 
     def circuit_phases(self, entry_id: str) -> int | None:
         """Phases the circuit allows this car: those of the first charging car ahead on it.
@@ -254,7 +290,8 @@ class CJPSite:
 
     def _amps(self, entity_id: str, voltage: float) -> float | None:
         state = self.hass.states.get(entity_id) if entity_id else None
-        if state is None or (value := float_or_none(state.state)) is None:
+        if state is None or (value := float_or_none(state.state)) is None or not math.isfinite(value):
+            # nan/inf is no reading either (it would make every capacity nan)
             return None
         unit = state.attributes.get("unit_of_measurement")
         if unit in POWER_UNITS:
@@ -264,15 +301,34 @@ class CJPSite:
         return abs(value)
 
     def _measured(self) -> list[float] | None:
+        """The phase sensors now; None when one has no number or has not reported within STALE_SECONDS (a meter that hangs
+        at a low value would free current, and hide an overload)."""
         voltage = float(self.config.get("voltage") or 230.0)
-        values = [self._amps(entity_id, voltage) for entity_id in self.phase_entities]
+        values = []
+        for entity_id in self.phase_entities:
+            state = self.hass.states.get(entity_id) if entity_id else None
+            values.append(self._amps(entity_id, voltage) if state is not None and self._fresh(state) else None)
         return None if any(value is None for value in values) else values
 
-    def _car_draw(self, coordinator: CJPCoordinator) -> list[float]:
-        """What the car draws now per grid phase (from its charger power sensor)."""
+    def _car_draw(self, coordinator: CJPCoordinator, fallback: list[float] | None = None) -> list[float]:
+        """What the car draws now per grid phase (from its charger power sensor, with phase sensors).
+
+        Without a fresh reading in W/kW (no number, another unit, not reported within STALE_SECONDS) fallback counts
+        when given: the car's request for a car ahead (a power sensor that hangs at 0 W must not free its current).
+        Without fallback (the house) a stale reading counts at most what the car was given per phase: a reading that
+        hangs high on a car the plan stopped must not make the house smaller, and a car that charges steadily (a
+        sensor that only reports a change) must not count its own charging as the house."""
         charger = coordinator.config["charger"]
         voltage = float(charger["power_voltage"]) or 230.0
-        watt = self._amps(charger["entity_ids"]["charger_power_entity_id"], 1.0) or 0.0
+        entity_id = self._power_entity(coordinator)
+        state = self.hass.states.get(entity_id) if entity_id else None
+        watt = self._watt(entity_id)
+        fresh = watt is not None and self._fresh(state)
+        if not fresh and fallback is not None:
+            return list(fallback)
+        if watt is None or (not fresh and self._status_says_not_charging(coordinator)):
+            # a stale reading of a charger whose fresh status says it doesn't charge (full, paused) is no draw
+            return [0.0, 0.0, 0.0]
         request = self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0]
         phases = sum(1 for value in request if value > 0) or int(charger["charging_phases"])
         per_phase = watt / voltage / phases
@@ -280,17 +336,157 @@ class CJPSite:
         for i, grid_phase in enumerate(self._order(coordinator)):
             if i < phases:
                 grid[grid_phase] += per_phase
-        return grid
+        return grid if fresh else [min(draw, given) for draw, given in zip(grid, request)]
 
     def _house(self) -> list[float]:
-        """House current per grid phase now, without the cars."""
+        """House current per grid phase now, without the cars.
+
+        Without phase sensors 0 A (the fuse is the cars' budget). With phase sensors that measure nothing now (no number,
+        not reported within STALE_SECONDS) the house is not 0 A but the higher of its last measured value and the hour's
+        forecast (the highest hour of the forecast when this hour has none), per phase: a missing measurement must not
+        free the house's current. Without any of them (after a start, before the meter reported) the house counts as the
+        whole budget: no current for the cars until the meter reports (user choice)."""
+        if not self.has_phase_sensors:
+            return [0.0, 0.0, 0.0]
         measured = self._measured()
         if measured is None:
-            return [0.0, 0.0, 0.0]
+            forecast = self.house_forecast.get(dt_util.now().hour)
+            if forecast is None and self.house_forecast:
+                forecast = [max(hour[i] for hour in self.house_forecast.values()) for i in range(3)]
+            if forecast is None and not self._house_measured:
+                return list(self.fuse())
+            return [max(last, hour) for last, hour in zip(self._last_house, forecast or [0.0, 0.0, 0.0])]
         cars = [0.0, 0.0, 0.0]
         for coordinator in self.members.values():
             cars = [a + b for a, b in zip(cars, self._car_draw(coordinator))]
-        return [max(m - c, 0.0) for m, c in zip(measured, cars)]
+        self._last_house = [max(m - c, 0.0) for m, c in zip(measured, cars)]
+        self._house_measured = True
+        return list(self._last_house)
+
+    # Without phase sensors the chargers' power sensors are the measurement
+
+    def _power_entity(self, coordinator: CJPCoordinator) -> str:
+        return coordinator.config["charger"]["entity_ids"].get("charger_power_entity_id") or ""
+
+    def _watt(self, entity_id: str) -> float | None:
+        """A charger power reading in W; None without a number or with a unit that is not W/kW (never guessed)."""
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if state is None or (value := float_or_none(state.state)) is None or not math.isfinite(value):
+            return None
+        factor = POWER_UNITS.get(state.attributes.get("unit_of_measurement"))
+        return None if factor is None else abs(value) * factor
+
+    def _worst_case(self, members: list[CJPCoordinator], watt: float, careful: bool = True) -> list[float]:
+        """The most the cars on one power sensor can draw per grid phase with this power.
+
+        Not more on a phase than they were given there while the charger keeps to that, but all of the power may be
+        on one phase: a car can charge on fewer phases than it was given. Power clearly above all they were given is
+        spread over the phases their chargers can use (an overdraw on fewer phases than given is not seen this way). A car drawing without having been given
+        current (charging without a rule, which the plan stops) counts with all of it on each of its phases when
+        careful (the budget of the cars behind it), else spread over its phases (the overload check, which would
+        otherwise limit another car for a draw that is not there).
+        """
+        request = [0.0, 0.0, 0.0]
+        for coordinator in members:
+            request = [a + b for a, b in zip(request, self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0])]
+        amps = watt / (float(members[0].config["charger"]["power_voltage"]) or 230.0)
+        total = sum(request)
+        if total > 0:
+            measured = amps - total * OVERDRAW_SHARE  # up to this share more is the real voltage above the configured one
+            if measured <= total:
+                return [min(given, amps) if given > 0 else 0.0 for given in request]
+            # a charger that takes clearly more than it was given in all (one that did not follow a limit yet): the power is
+            # spread over the phases its charger can use (also those it was given nothing on: a charger that did not switch
+            # to one phase), never less than it was given on a phase
+            phases_of = set()
+            for coordinator in members:
+                phases = max(int(coordinator.config["charger"]["charging_phases"]), 1)
+                phases_of.update(grid_phase for i, grid_phase in enumerate(self._order(coordinator)) if i < phases)
+            phases_of.update(i for i, given in enumerate(request) if given > 0)
+            spread = measured / len(phases_of)
+            return [max(given, spread) if i in phases_of else given for i, given in enumerate(request)]
+        grid = [0.0, 0.0, 0.0]
+        for coordinator in members:
+            phases = max(int(coordinator.config["charger"]["charging_phases"]), 1)
+            for i, grid_phase in enumerate(self._order(coordinator)):
+                if i < phases:
+                    grid[grid_phase] = max(grid[grid_phase], amps if careful else amps / phases)
+        return grid
+
+    def _settled(self, coordinator: CJPCoordinator) -> bool:
+        """The car's measured power may free its current: past the ramp-up after a raise (the charger needs a moment
+        to start), and a charger status that surely is not charging (SETTLED_STATUS). A power sensor that hangs at
+        0 W while the car charges must not give its current away, so a status that may also mean charging (on,
+        connected, ready …), an unknown one or none counts as charging. Both the status and the power sensor must have
+        reported within STALE_SECONDS (a lost cloud push leaves the last values)."""
+        if time.monotonic() - self._raised_at.get(coordinator.entry.entry_id, float("-inf")) < RAMP_UP:
+            return False
+        status_id = coordinator.config["charger"]["entity_ids"].get("status_entity_id") or ""
+        state = self.hass.states.get(status_id) if status_id else None
+        if state is None or state.state not in SETTLED_STATUS or not self._fresh(state):
+            return False
+        # the power sensor too: a stale 0 W is no proof that the car doesn't draw
+        power = self.hass.states.get(self._power_entity(coordinator)) if self._power_entity(coordinator) else None
+        return power is not None and self._fresh(power)
+
+    def _status_says_not_charging(self, coordinator: CJPCoordinator) -> bool:
+        """The charger's status reported within STALE_SECONDS and surely means not charging (SETTLED_STATUS)."""
+        status_id = coordinator.config["charger"]["entity_ids"].get("status_entity_id") or ""
+        state = self.hass.states.get(status_id) if status_id else None
+        return state is not None and state.state in SETTLED_STATUS and self._fresh(state)
+
+    @staticmethod
+    def _fresh(state) -> bool:
+        """The sensor reported (also an unchanged value) within STALE_SECONDS."""
+        reported = getattr(state, "last_reported", None) or state.last_updated
+        return (dt_util.utcnow() - reported).total_seconds() <= STALE_SECONDS
+
+    def _ahead_draw(self, coordinator: CJPCoordinator) -> list[float]:
+        """What a car ahead takes from the budget per grid phase, without phase sensors.
+
+        Its charger power sensor shows what it really draws, so current it was given but doesn't use (a car that
+        doesn't start, a full battery) goes to the cars behind. It counts with what it was given without a reading,
+        on a power sensor it shares with another car (that shows the other car too, e.g. the asking car), or while not
+        :meth:`_settled`.
+        """
+        request = list(self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0])
+        entity_id = self._power_entity(coordinator)
+        shared = any(self._power_entity(other) == entity_id for other in self.members.values() if other is not coordinator)
+        if not entity_id or shared or (watt := self._watt(entity_id)) is None:
+            return request
+        worst = self._worst_case([coordinator], watt)
+        if not self._settled(coordinator):
+            return [max(a, b) for a, b in zip(worst, request)]
+        return worst
+
+    def _cars_draw(self) -> list[float]:
+        """The cars' draw per grid phase from their power sensors (each sensor once), for the overload check.
+
+        Like the budget: a sensor without a reading, or with a car on it that is not :meth:`_settled`, counts with at
+        least what its cars were given. So a car whose current went to the car behind and that starts after all (its
+        status says charging, or it got more current) is an overload at once, also when its power sensor is slow."""
+        total = [0.0, 0.0, 0.0]
+        by_entity: dict[str, list[CJPCoordinator]] = {}
+        for coordinator in self.members.values():
+            by_entity.setdefault(self._power_entity(coordinator), []).append(coordinator)
+        for entity_id, members in by_entity.items():
+            request = [0.0, 0.0, 0.0]
+            for coordinator in members:
+                request = [a + b for a, b in zip(request, self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0])]
+            watt = self._watt(entity_id) if entity_id else None
+            if watt is None:
+                draw = request
+            else:
+                draw = self._worst_case(members, watt, careful=False)
+                if not all(self._settled(coordinator) for coordinator in members):
+                    draw = [max(a, b) for a, b in zip(draw, request)]
+            total = [a + b for a, b in zip(total, draw)]
+        return total
+
+    def _metered(self) -> bool:
+        """The phase sensors measure now. Configured but without a number, the chargers' power sensors are the measurement,
+        as without phase sensors, and the house counts with its last measured value or the forecast (_house)."""
+        return self.has_phase_sensors and self._measured() is not None
 
     # ------------------------------------------------------------------ #
     # Capacity for one car (called by the coordinator before each job)
@@ -301,10 +497,11 @@ class CJPSite:
         fuse = self.fuse()
         ahead = [self.members[e] for e in self.ahead(entry_id) if e in self.members]
         self.house_now = house = self._house()
+        metered = self._metered()
         live = list(fuse)
         for other in ahead:
-            # with phase sensors the real draw counts, else what the car was told
-            draw = self._car_draw(other) if self.has_phase_sensors else (self.requests.get(other.entry.entry_id) or [0.0, 0.0, 0.0])
+            # with phase sensors the real draw counts (they measure it), else the charger power sensor (_ahead_draw)
+            draw = self._car_draw(other, self.requests.get(other.entry.entry_id) or [0.0, 0.0, 0.0]) if metered else self._ahead_draw(other)
             live = [a - b for a, b in zip(live, draw)]
         live = [max(a - h, 0.0) for a, h in zip(live, house)]
         self.available_now[entry_id] = live
@@ -336,9 +533,16 @@ class CJPSite:
         changed_order = self.urgent.get(entry_id) != urgent
         # the live request counts too: a car ahead that draws more (or less) changes what is left
         changed_plan = self.reservations.get(entry_id) != reservation or self.requests.get(entry_id) != request
+        raised = any(new > old for new, old in zip(request, self.requests.get(entry_id) or [0.0, 0.0, 0.0]))
+        if raised:
+            self._raised_at[entry_id] = time.monotonic()
         self.reservations[entry_id] = reservation
         self.requests[entry_id] = request
         self.urgent[entry_id] = urgent
+        if raised and not self._metered():
+            # a car ahead that gets back the current a car behind took over: the car behind is limited at once, not first
+            # when the car ahead's power shows it
+            self._check_overload()
         # the other cars of the circuit publish the new sum at once (the master may be one of them)
         for other in self.circuit_members(entry_id):
             if other != entry_id and self.circuit_patch(self.members[other]):
@@ -374,12 +578,75 @@ class CJPSite:
 
     @callback
     def _phase_changed(self, _event: Event) -> None:
-        measured = self._measured()
+        metered = self._metered()
+        if metered and not self._was_metered:
+            # the meter measures again (or for the first time since the start): the cars were limited by the house's
+            # estimate, or got nothing without any house data, until their next calculation
+            self._house()
+            self.recalculate_all()
+        self._was_metered = metered
+        self._check_overload()
+
+    @callback
+    def _car_power_changed(self, _event: Event) -> None:
+        """A charger's power or status changed: without (working) phase sensors these are the measurement (a car that
+        starts to draw, or whose status now says it charges)."""
+        if not self._metered():
+            self._check_overload()
+
+    @callback
+    def _check_overload(self) -> None:
+        if self._metered():
+            self._limit_on_overload(self._measured())
+        else:
+            # the house too, when phase sensors are configured but measure nothing now (_house)
+            self._limit_on_overload([car + house for car, house in zip(self._cars_draw(), self._house())])
+
+    def _schedule_overload_recheck(self) -> None:
+        """Check again once the throttle has passed: a sensor that doesn't change again sends no new event."""
+        if self._overload_recheck is not None:
+            return
+
+        @callback
+        def _run(_now) -> None:
+            self._overload_recheck = None
+            self._check_overload()
+
+        self._overload_recheck = async_call_later(self.hass, OVERLOAD_THROTTLE + 1, _run)
+
+    def _track_car_power(self) -> None:
+        """Follow the members' charger power and status sensors (the measurement when the phase sensors measure nothing)."""
+        if self._power_unsub is not None:
+            self._power_unsub()
+            self._power_unsub = None
+        entities = sorted({
+            c.config["charger"]["entity_ids"].get(key) or "" for c in self.members.values() for key in ("charger_power_entity_id", "status_entity_id")
+        } - {""})
+        if entities:
+            unsubs = [
+                async_track_state_change_event(self.hass, entities, self._car_power_changed),
+                # a sensor that goes silent sends no event: its car counts with its request again once it is stale
+                # (_settled), so the check also runs on a timer
+                async_track_time_interval(self.hass, self._car_power_changed, datetime.timedelta(seconds=STALE_CHECK_SECONDS)),
+            ]
+
+            def _unsub() -> None:
+                for unsub in unsubs:
+                    unsub()
+
+            self._power_unsub = _unsub
+
+    def _limit_on_overload(self, measured: list[float] | None) -> None:
+        """A phase above the fuse limits the last charging car at once."""
         if measured is None:
             return
         fuses = [float(self.config.get(f"fuse_l{i}") or 0.0) for i in (1, 2, 3)]
         if not any(m > f for m, f in zip(measured, fuses)):
             return
+        # still above the fuse after the reaction (or throttled): check again, while there is a car to limit (the house
+        # alone above the fuse is nothing CJP can change)
+        if any(sum(self.requests.get(entry_id) or [0]) > 0 for entry_id in self.members):
+            self._schedule_overload_recheck()
         for entry_id in reversed(self.order()):
             if sum(self.requests.get(entry_id) or [0]) <= 0:
                 continue
@@ -410,7 +677,11 @@ class CJPSite:
         chargers = {e: c.config["charger"]["entity_ids"]["charger_power_entity_id"] for e, c in self.members.items()}
         ids = {*self.phase_entities, *(c for c in chargers.values() if c)}
         try:
-            stats = await get_instance(self.hass).async_add_executor_job(statistics_during_period, self.hass, start, end, ids, "hour", None, {"mean"})
+            # fixed units: without them HA converts to the state's unit now, which may not be the recorded one (kW read as W
+            # would make the forecast, the fallback for a meter that measures nothing, 1000 times too low)
+            stats = await get_instance(self.hass).async_add_executor_job(
+                statistics_during_period, self.hass, start, end, ids, "hour", FORECAST_UNITS, {"mean"}
+            )
             metadata = await get_instance(self.hass).async_add_executor_job(partial(get_metadata, self.hass, statistic_ids=ids))
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Site: could not load statistics: %s", err)
@@ -428,11 +699,17 @@ class CJPSite:
             return result
 
         def unit_factor(entity_id):
-            # the unit the statistics were recorded in; the state is not there yet right after a restart
-            if unit := units.get(entity_id):
-                return unit
-            state = self.hass.states.get(entity_id)
-            return state.attributes.get("unit_of_measurement") if state else None
+            # the unit the statistics come in: power and current are converted to FORECAST_UNITS by HA. The recorded unit
+            # says which; the state is not there yet right after a restart
+            unit = units.get(entity_id)
+            if not unit:
+                state = self.hass.states.get(entity_id)
+                unit = state.attributes.get("unit_of_measurement") if state else None
+            if unit in POWER_UNITS:
+                return FORECAST_UNITS["power"]
+            if unit in ("A", "mA"):
+                return FORECAST_UNITS["electric_current"]
+            return unit
 
         phases = []
         for entity_id in self.phase_entities:
@@ -441,7 +718,7 @@ class CJPSite:
                 # W read as A would leave no current for the cars: keep the previous forecast
                 _LOGGER.debug("Site: unit of %s unknown, house forecast not updated", entity_id)
                 return
-            factor = (POWER_UNITS[unit] / voltage) if unit in POWER_UNITS else (0.001 if unit == "mA" else 1.0)
+            factor = (POWER_UNITS[unit] / voltage) if unit in POWER_UNITS else 1.0  # W or A (FORECAST_UNITS)
             phases.append(series(entity_id, lambda v, f=factor: abs(v) * f))
         cars = []
         for entry_id, entity_id in chargers.items():

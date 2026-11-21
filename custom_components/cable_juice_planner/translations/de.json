@@ -365,9 +365,9 @@
           "fuse_l3": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "margin": "Wird von der Sicherung abgezogen.",
           "voltage": "Wenn die Phasensensoren Leistung (W) statt Strom (A) messen.",
-          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
+          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
           "urgent_trip_hours": "Eine geplante Fahrt innerhalb dieser Stunden gibt dem Auto Vorrang."
         }
       },
@@ -765,9 +765,9 @@
           "fuse_l3": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "margin": "Wird von der Sicherung abgezogen.",
           "voltage": "Wenn die Phasensensoren Leistung (W) statt Strom (A) messen.",
-          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
+          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
           "urgent_trip_hours": "Eine geplante Fahrt innerhalb dieser Stunden gibt dem Auto Vorrang."
         }
       },

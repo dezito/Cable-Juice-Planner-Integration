@@ -365,9 +365,9 @@
           "fuse_l3": "The main fuse (or the limit the cars may use together) per phase.",
           "margin": "Subtracted from the fuse to leave room for short peaks.",
           "voltage": "Used when the phase sensors measure power (W) instead of current (A).",
-          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
+          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
           "urgent_trip_hours": "A planned trip within this many hours gives the car precedence."
         }
       },
@@ -765,9 +765,9 @@
           "fuse_l3": "The main fuse (or the limit the cars may use together) per phase.",
           "margin": "Subtracted from the fuse to leave room for short peaks.",
           "voltage": "Used when the phase sensors measure power (W) instead of current (A).",
-          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
+          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
           "urgent_trip_hours": "A planned trip within this many hours gives the car precedence."
         }
       },

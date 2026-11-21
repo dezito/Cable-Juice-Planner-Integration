@@ -9,7 +9,7 @@ entities, and your automation does it – easiest with the blueprint that comes 
 |---|---|
 | `sensor.cjp_<prefix>_charger_action` | `charge` or `stop`: whether the charger should charge now |
 | ↳ attribute `charger_enabled` | whether the charger should be enabled |
-| ↳ attribute `stop_request` | counts up each time CJP sees charging without a rule and asks for stop again (0 after a restart); while it is above 0 it is also in `decision` (`…, stop request 3`) |
+| ↳ attribute `stop_request` | counts up each time CJP sees charging without a rule and asks for stop again (0 after a restart of Home Assistant; CJP's own restart of a charger that doesn't start doesn't count it); while it is above 0 it is also in `decision` (`…, stop request 3`) |
 | ↳ attributes `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | the charging current per phase in A (0 = phase not used) – so an automation only needs `charger_action` |
 | ↳ attributes `circuit_phase_1_amps` … `_3_amps` | the circuit's limit per phase (e.g. Easee's circuit limit); on a [shared circuit](load-balancing.md#shared-circuit-eg-easee-master) the sum per grid phase of all its chargers |
 | ↳ attribute `decision` | the action, enabled, mode, amps, circuit and charge limit in one text, e.g. `charge, enabled, mode normal, 16/16/16 A, circuit 24/24/24 A, limit 80 %` – trigger on it to run once per change |
@@ -165,6 +165,37 @@ power without a rule (⚠️), it counts `stop_request` up on every calculation 
 sends **Stop charging**, **Stop charging in the car** and the current (0 A) once more – and **Disable the
 charger** when it should be disabled. Update the blueprint (Repairs) to get this.
 
+**A charger that doesn't start:** CJP restarts a charger itself when the action has been `charge` for more
+than two update intervals (10 minutes by default) and the charger's status still is ready (e.g.
+`awaiting_start`) or `error`, while *Charging power* shows no charging, now and on average. Without a power
+reading there is no restart: a status alone can be stuck. That includes no history of the power sensor
+(the recorder off, or the sensor excluded from it): the average needs one. The two intervals
+are counted from when CJP first saw it waiting with a current to charge at (a new charge, the site giving
+current again, or the power stopping), the end of a charger test and the last restart. One interval later,
+still so, the action becomes `stop` at 0 A – or `charger_enabled` false, with an *enabled* entity – and you
+get a notification. One interval after that the charger is enabled again and the plan publishes `charge`.
+After three restarts it gives up and notifies you once more (on the alarm channel). As a fail-safe the action
+is then `charge` at full power (the charger's maximum current; the charge limit is the plan's, or the max
+recommended level if that is higher), whatever the plan says – also in hours the plan wouldn't charge, and
+from the grid in the solar modes – so the car charges as soon as it can; the site's load balancing still
+limits the current, and the cars behind it get what it doesn't draw (see
+[Multiple cars](load-balancing.md#how-it-works)). The charging rule shows why and the fail-safe. It lasts, and no new restart is tried,
+until the charger reports charging (with power, when the power can be read) or done, *Charging power* shows
+charging (also when the status stays ready), or the cable has been unplugged – not after the hour shift, a stop of the plan or a charger test. Then the plan
+decides again (and may stop it at once if the hour is expensive). With an *enabled* entity, a charger the restart has disabled may report `off` or
+`disconnected`; that isn't taken as an unplug (or the status back as a plug-in) until the entity is on again and
+two update intervals, at least 10 minutes, have passed – at most an hour after the restart. An unplug in that
+time is handled when it is over, if the status still says so; an unplug and plug-in within it isn't seen. A car that
+stops by itself (e.g. at its own charge limit) while the charger reports ready and gives no power can be
+restarted this way too. With an update interval above 15 minutes the restart is slow (the update runs at
+least every 15 minutes, the intervals are counted with the setting).
+
+The blueprint's own *Restart when not charging* (below) runs as well: with its default **Restart after** (10
+minutes) it comes before CJP's first stop, and each CJP stop makes it count from the start again (with an
+*enabled* entity the action stays `charge`, so it doesn't). The two don't block each other: a blueprint start
+in CJP's pause only shortens the pause. Turn the blueprint's restart off, or set it above an hour, if you
+want CJP's alone.
+
 ### Restart when not charging
 
 Actions that run when the action has been `charge` for a while (**Restart after**, e.g. 10 minutes) without
@@ -195,11 +226,31 @@ the charger's power sensor, and shows the result as a table under the switch (th
 | Highest 1-phase step | the highest single phase step | the same on one phase |
 | Lowest 1-phase step | the lowest single phase step | the same on one phase |
 | Stop | stop | under 100 W (the last current that worked is published again first, and the stop is only tried when the charger then charges at 1 kW or more) |
+| Charge limit in the car | only with the car's *charge limit* entity: a charge limit 10 percentage points from the car's limit | the car's charge limit entity shows it within 5 minutes (the power is not judged) |
+
+**The charge limit step** runs last, while the action of the step before is still held, so the automation sends the
+new limit in a run of its own (*Set charge limit in the car*; a limit that changes together with a stop is never sent).
+The limit asked for is 10 percentage points above the car's limit now, or 10 below it while that is still above a
+known battery level (a lower limit would make the car stop or report *completed*; no level never allows it, while the
+car's last level of up to 24 hours ago counts as known),
+within the entity's own minimum and maximum, the *min. charge limit* setting and 100 %, and rounded to 10 % for the
+integrations the plan rounds for (Kia/Hyundai, Cupra). It is never the limit the plan published already, nor the car's
+limit from before the test (the automation only sends a change). When no such limit exists, or the entity has no number
+(the car asleep, its integration offline), the step is not tested; without steps in *Set charge limit in the car* it is
+not tried. The charge steps before it may already have sent the plan's limit to the car (the automation sends it with
+every new charge). Afterwards CJP publishes the car's limit **from before the test** again – also when the test is
+stopped during the step – and waits up to 5 minutes for the car to show it, before the plan's action is put back.
+
+The result says the limit is back only when the car showed the test limit first and then its own again. Otherwise –
+the car never showed the test limit (it may still arrive from a slow cloud), its own limit was not seen back, Home
+Assistant unloaded CJP or stopped during the step (the limit is published back but not waited for), or restarted
+before it was put back – the result tells you to check the limit in the car.
 
 The solar steps are those of the solar charging calculation (the amps CJP can pick from, on one phase and on all
 phases, between the minimum and maximum amps of solar charging in the settings). Without solar charging, or when the
 blueprint has nothing in *Set charging current*, *Set charging current in the car* or *Set circuit current*, there are
-no steps to follow and only the maximum (it passes when the charger starts) and the stop are tried. A charger that pauses
+no steps to follow and only the maximum (it passes when the charger starts) and the stop are tried (and the charge
+limit, with its entity). A charger that pauses
 at 0 A can be started and stopped by *Set charging current* alone, so those steps count for the start and the stop too.
 
 The power must be within 5 % (at least 150 W) of the expected power, so the voltage in the charger specs has to be
@@ -261,16 +312,20 @@ What the test does and does not do:
 
 - It charges the car for a few minutes at currents the plan may not have chosen. The load balancing still limits the
   current, and a shared circuit sees the request. During the stop step the circuit current stays open, like the plan's
-  own stop. The plan and the settings are not changed. If the plan was not charging, the energy the test charges may be
-  missing from the charging history and the estimated battery level.
+  own stop. The plan and the settings are not changed. With a charge limit entity, the car's charge limit is changed for a
+  few minutes and then set back (see the charge limit step). If the plan was not charging, the energy the test charges
+  may be missing from the charging history and the estimated battery level.
 - The plan does not run while a current is held: no restart of the charger, no *charging without a rule*. The heartbeat
   `updated` is kept, so the blueprint's fail-safe does not start. A car that pauses after a current it does not take is
   therefore not restarted by CJP during the test.
 - Turning the switch off stops the test: the action, enabled and amps from before the test are put back, and the plan is
-  calculated again at once (also with a setting changed during the test). The test ends at once if the cable is pulled
-  out or the car becomes full. A test is never resumed after a restart; the plan publishes again when CJP starts. If the
-  test itself is lost, the held current is dropped by the first calculation after 4½ minutes.
-- A whole test takes about 5 minutes with a charger that follows, and up to an hour if every step needs the full search.
+  calculated again at once (also with a setting changed during the test). The charge steps end at once if the cable is
+  pulled out or the car becomes full (the charge limit step only waits for the car's limit, which also works then). A test is never resumed after a restart; the plan publishes again when CJP starts. If the
+  test itself is lost, the held current is dropped by the first calculation after 4½ minutes (during the charge limit
+  step after up to 12 minutes). The car's limit from before the test is then published together with the plan's action:
+  the automation sends it when the action stays the same, but not with a change to *stop*, and a plan that charges sends
+  its own limit instead – check the limit in the car then.
+- A whole test takes about 5 minutes (up to 10 more with the charge limit step) with a charger that follows, and up to an hour if every step needs the full search.
 - The result of the last finished test is kept over a restart.
 
 ## Your own automations
