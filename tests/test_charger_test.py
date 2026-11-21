@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,11 +17,14 @@ from homeassistant.helpers.event import async_track_state_change_event
 from custom_components.cable_juice_planner.const import CHARGER_TEST_STATUSES, build_config
 from custom_components.cable_juice_planner.engine.control.charger_test import (
     MAX_ADJUSTMENTS,
+    SKIP_REASONS,
     STOP_REASONS,
     amps_list,
+    amps_unproven,
     build_charger_test_markdown,
     build_steps,
     car_phases_of,
+    charger_step_text,
     judge_power,
     next_amps,
     overdraw_w,
@@ -142,6 +146,48 @@ def test_power_that_does_not_rise_with_the_amps_is_a_limit_of_the_car_or_the_cha
     assert not power_is_capped(1, _watts((6, 3000, False)), None, threshold)  # one current says nothing
 
 
+def _record(name: str, phases: int, *triples, status: str = "adjusted") -> dict:
+    return {"name": name, "status": status, "phases": phases, "attempts": _watts(*triples)}
+
+
+def test_the_amps_are_not_proven_when_the_power_was_the_same_at_every_current() -> None:
+    threshold = 5 * VOLTAGE
+    stuck = [  # a charger that stays at 6 A on three phases whatever is published
+        _record("max", 3, (16, 4140, False), (14, 4140, False), (12, 4140, False)),
+        _record("min", 3, (6, 4140, True), status="ok"),
+        {"name": "stop", "status": "ok", "phases": 0, "attempts": []},
+    ]
+    assert amps_unproven(stuck, VOLTAGE, threshold)
+    capped = [_record("max", 3, (16, 7360, False), (11, 7360, True)), _record("min", 3, (6, 4140, True), status="ok")]
+    assert not amps_unproven(capped, VOLTAGE, threshold)  # a car that limits the power at the top: the lowest step follows the amps
+    assert not amps_unproven([_record("max", 3, (16, 11040, True), status="ok")], VOLTAGE, threshold)  # one power asked for proves nothing
+    paused = [_record("max", 3, (16, 4140, False), (14, 0, False)), _record("min", 3, (6, 4140, True), status="ok")]
+    assert amps_unproven(paused, VOLTAGE, threshold)  # a current that gave nothing is not a power that followed the amps
+    skipped = [_record("max", 3, (16, 4140, False)), _record("min", 3, (6, 2000, False), status="skip")]
+    assert not amps_unproven(skipped, VOLTAGE, threshold)  # a step that was not judged does not count
+    switching = [  # a charger that switches the phases but stays at 6 A: other powers on one and three phases, none per amps
+        _record("max", 3, (16, 4140, False), (14, 4140, False)), _record("min", 3, (6, 4140, True), status="ok"),
+        _record("single_max", 1, (16, 1380, False), (14, 1380, False)), _record("single_min", 1, (6, 1380, True), status="ok"),
+    ]
+    assert amps_unproven(switching, VOLTAGE, threshold)
+    one_group_follows = [*switching[:2], _record("single_max", 1, (16, 3680, True), status="ok"), switching[3]]
+    assert not amps_unproven(one_group_follows, VOLTAGE, threshold)
+
+
+def test_a_limited_step_tells_the_highest_current_and_what_a_car_that_always_takes_less_needs() -> None:
+    texts = _texts("en")
+    t = lambda key, **fmt: translate(texts, key, **fmt)  # noqa: E731
+    top = {"name": "max", "status": "adjusted", "limited": True, "phases": 3, "configured_amps": 25, "amps": 16, "watt": 11040,
+           "expected_w": 11040, "attempts": _watts((25, 11040, False), (23, 11040, False))}
+    text = charger_step_text(t, top)
+    assert "11040 W" in text and "25 A" in text and "16 A" in text and "full or cold" in text
+    low = {**top, "name": "min", "configured_amps": 6, "amps": 6, "watt": 3000, "attempts": _watts((6, 3000, False), (8, 3000, False), (10, 3000, False))}
+    text = charger_step_text(t, low)
+    assert "from 6 A to 10 A" in text and "maximum" not in text  # a car that takes less than the lowest step: no maximum to lower
+    unproven = {**top, "status": "skip", "reason": "amps_unproven", "watt": 4140}
+    assert "4140 W" in charger_step_text(t, unproven)
+
+
 def test_the_search_stays_in_the_group_and_gives_up_after_a_few() -> None:
     low = {"search": 1, "low": 6, "high": 9}
     assert next_amps(low, _tries((6, False), (8, False))) == 9  # the jump is cut at the top of the group
@@ -222,11 +268,14 @@ STEP_RESULTS = [
     for name in ("max", "min", "single_max", "single_min", "stop")
     for status, reason in (
         ("ok", None), ("adjusted", None), ("fail", None), ("fail", "overdraw"),
-        *(("skip", r) for r in ("no_steps", "no_data", "site_limited", "no_baseline", "not_ready", "not_reached")),
+        *(("skip", r) for r in SKIP_REASONS),
     )
 ] + [
     {**STEP_BASE, "status": "adjusted", **extra}
-    for STEP_BASE in [{"name": "max", "reason": None, "phases": 3, "configured_amps": 16, "amps": 12, "watt": 8000, "expected_w": 8280, "attempts": []}]
+    for STEP_BASE in [
+        {"name": name, "reason": None, "phases": 3, "configured_amps": 16, "amps": 12, "watt": 8000, "expected_w": 8280, "attempts": []}
+        for name in ("max", "min", "single_max", "single_min")
+    ]
     for extra in ({"limited": True}, {"already_charging": True}, {"limited": True, "already_charging": True}, {"judged_phases": 1})
 ]
 
@@ -299,12 +348,13 @@ def fast_runner():
 
 def wire_charger(
     hass: HomeAssistant, max_amp: int = 16, min_amp: int = 6, working: bool = True, car_phases: int = 3, cap_w: float | None = None,
-    three_phases_always: bool = False,
+    three_phases_always: bool = False, power_at=None,
 ):
     """The user's automation and charger: the power follows the published action and amps, like a charger would.
 
     car_phases: the phases the car's on-board charger uses. cap_w: the car takes no more (a full or cold battery).
-    three_phases_always: an automation that does not switch the charger to one phase."""
+    three_phases_always: an automation that does not switch the charger to one phase. power_at(amps, phases): the power
+    of a charge instead (a charger that does something else)."""
     seen: list[tuple] = []
 
     def update(_event=None) -> None:
@@ -319,6 +369,7 @@ def wire_charger(
             phases = min(3 if three_phases_always else phases, car_phases)
             power = 0.0 if per_phase < min_amp else min(per_phase, max_amp) * phases * VOLTAGE
             power = power if cap_w is None else min(power, cap_w)
+            power = power if power_at is None else float(power_at(per_phase, phases))
         hass.states.async_set(CHARGER_POWER, str(power), {"unit_of_measurement": "W", "device_class": "power"})
 
     async_track_state_change_event(hass, ACTION, update)
@@ -509,6 +560,115 @@ async def test_a_car_that_limits_the_power_is_not_told_to_change_the_setting(has
     assert steps["min"]["status"] == "ok" and steps["stop"]["status"] == "ok"
 
 
+async def test_a_car_that_limits_the_power_where_fewer_phases_would_be_is_not_one_on_fewer_phases(hass, solar_entry, fast_runner) -> None:
+    """7360 W is 16 A on two phases, but the power stays there at lower currents too: the car's limit, not two phases."""
+    wire_charger(hass, cap_w=16 * 2 * VOLTAGE)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "done" and state.attributes["car_phases"] is None
+    assert steps["max"]["status"] == "adjusted" and steps["max"]["limited"] and not steps["max"].get("judged_phases")
+    assert steps["min"]["status"] == "ok"  # judged on three phases, as the car charges
+
+
+@pytest.fixture
+async def big_charger_entry(hass: HomeAssistant):
+    """A 25 A charger with solar."""
+    set_source_states(hass, charger_status="charging")
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "charging_max_amp": 25.0})
+    await async_setup(hass, entry)
+    yield entry
+    if entry.state is ConfigEntryState.LOADED:
+        await async_unload_and_join(hass, entry)
+
+
+async def test_an_11_kw_car_on_a_bigger_charger_is_told_the_current_it_takes(hass, big_charger_entry, fast_runner) -> None:
+    """11040 W matches 25 A and 23 A on two phases within the tolerance, at the same power: not two phases."""
+    wire_charger(hass, max_amp=25, cap_w=16 * 3 * VOLTAGE)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.attributes["car_phases"] is None
+    assert steps["max"]["status"] == "adjusted" and steps["max"]["limited"] and steps["max"]["amps"] == 16
+    assert steps["min"]["status"] == "ok"
+    assert "16 A" in state.attributes["markdown"] and "25 A" in state.attributes["markdown"]
+
+
+async def test_a_car_on_two_phases_is_found_on_two_currents(hass, solar_entry, fast_runner) -> None:
+    wire_charger(hass, car_phases=2)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.attributes["car_phases"] == 2
+    assert steps["max"]["status"] == "ok" and steps["max"]["amps"] == 16 and steps["max"]["judged_phases"] == 2
+    assert [attempt["amps"] for attempt in steps["max"]["attempts"]] == [16, 14]  # the second current confirms the phases
+    assert steps["min"]["status"] == "ok"
+
+
+@pytest.fixture
+async def three_phase_solar_entry(hass: HomeAssistant):
+    """Solar without 1-phase steps: only the maximum and the lowest step on three phases."""
+    set_source_states(hass, charger_status="charging")
+    hass.states.async_set("sensor.solar", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "charging_single_phase_max_amp": 0.0})
+    await async_setup(hass, entry)
+    yield entry
+    if entry.state is ConfigEntryState.LOADED:
+        await async_unload_and_join(hass, entry)
+
+
+async def test_a_charger_stuck_at_one_current_is_not_counted_as_working(hass, three_phase_solar_entry, fast_runner) -> None:
+    """An automation that never sets the current: the charger stays at 6 A, which happens to be near the lowest step."""
+    wire_charger(hass, power_at=lambda amps, phases: 6 * 3 * VOLTAGE)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert list(steps) == ["max", "min", "stop"]
+    assert all(steps[name]["status"] == "skip" and steps[name]["reason"] == "amps_unproven" for name in ("max", "min"))
+    assert steps["stop"]["status"] == "ok"  # the charger does stop: that is proven
+    assert "1 af 3" in state.attributes["markdown"] and "4140 W" in state.attributes["markdown"]
+
+
+async def test_a_charger_that_switches_the_phases_but_not_the_current_is_not_counted_as_working(hass, solar_entry, fast_runner) -> None:
+    wire_charger(hass, power_at=lambda amps, phases: 6 * phases * VOLTAGE)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert all(steps[name]["reason"] == "amps_unproven" for name in ("max", "min", "single_max", "single_min")), steps
+    assert steps["stop"]["status"] == "ok"
+
+
+async def test_a_car_on_fewer_phases_is_confirmed_below_a_maximum_that_is_the_only_step(hass, charger_entry, fast_runner) -> None:
+    """Without solar steps the maximum is the only current of its step: one lower current confirms the phases."""
+    wire_charger(hass, car_phases=1)
+    found = [{"amps_actions": [{"action": "test.amps"}], "start_actions": [{"action": "test.start"}], "stop_actions": [{"action": "test.stop"}]}]
+    with patch(FOUND, return_value=found):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert list(steps) == ["max", "stop"] and state.attributes["car_phases"] == 1
+    assert steps["max"]["status"] == "ok" and steps["max"]["amps"] == 16 and steps["max"]["judged_phases"] == 1
+    assert [attempt["amps"] for attempt in steps["max"]["attempts"]] == [16, 14]
+    assert steps["stop"]["status"] == "ok"
+
+
+async def test_a_maximum_that_charged_once_is_not_a_charger_that_does_not_charge(hass, solar_entry, fast_runner) -> None:
+    """The first current gave power (another than asked for), the next nothing: the test goes on."""
+    wire_charger(hass, power_at=lambda amps, phases: 5000.0 if amps == 16 else 0.0)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.attributes["reason"] != "no_charging"
+    assert steps["max"]["status"] == "fail" and len(steps["max"]["attempts"]) > 2
+    assert steps["min"]["reason"] != "not_reached"
+
+
 async def test_a_car_that_already_charges_does_not_prove_the_start(hass, charger_entry, fast_runner) -> None:
     wire_charger(hass)
     await hass.async_block_till_done()  # the charger has seen the stop of wire_charger
@@ -599,12 +759,158 @@ async def test_the_held_current_survives_the_cron_and_the_plans_stop(hass, charg
 
 async def test_a_hold_that_ran_out_is_dropped_by_the_next_calculation(hass, charger_entry) -> None:
     coordinator = charger_entry.runtime_data
+    await coordinator.async_run_job("charge_trigger", include_forecast=True)
+    before = _published(hass)
     await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
     coordinator.engine._charger_hold["until"] = coordinator.engine._charger_hold["since"]  # it ended
     await coordinator.async_run_job("charge_trigger", include_forecast=True)
     assert coordinator.engine._charger_hold is None and coordinator.engine._charger_abort == "expired"
     assert coordinator.engine._charger_saved is None
-    assert [hass.states.get(ACTION).attributes[f"phase_{i}_amps"] for i in (1, 2, 3)] != [10, 10, 10]
+    assert _published(hass) == before and before[2] != (10, 10, 10)
+
+
+@contextmanager
+def _site(engine, live: list[int]):
+    """A site whose live capacity for this car is live (amps per phase), changed by the test; the real clamp is used."""
+    site = {"live": list(live), "hour_capacity": {}, "urgent_hours": 12.0}
+    with patch.object(type(engine), "site_active", lambda self: True), patch.object(type(engine), "_site", lambda self: site):
+        yield site
+
+
+async def test_a_held_charge_the_site_has_no_current_for_is_published_as_stop(hass, charger_entry) -> None:
+    """A blueprint starts the charger on "charge" also with 0 A: the site's stop must not be lost while a test holds a current."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [16, 16, 16]) as site:
+        held = (await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)).value
+        assert held["published"] == [10, 10, 10] and _published(hass) == ("charge", True, (10, 10, 10))
+        site["live"] = [0, 0, 0]  # another car or the house takes it all: the site's own job applies the limit
+        await coordinator.async_run_job("site_limit")
+        assert _published(hass) == ("stop", True, (0, 0, 0))
+        await coordinator.async_run_job("charge_trigger", include_forecast=True)  # the cron while held: still a stop
+        assert _published(hass) == ("stop", True, (0, 0, 0))
+        site["live"] = [16, 16, 16]
+        await coordinator.async_run_job("site_limit")
+        assert _published(hass) == ("charge", True, (10, 10, 10))
+        held = (await coordinator.async_run_job("charger_test_hold", "charge", 16, 3, 600)).value
+        site["live"] = [0, 0, 0]
+        held = (await coordinator.async_run_job("charger_test_hold", "charge", 16, 3, 600)).value
+        assert held["published"] == [0, 0, 0] and _published(hass) == ("stop", True, (0, 0, 0))  # also on the hold itself
+        await coordinator.async_run_job("charger_test_release", include_forecast=True)
+
+
+async def test_a_site_stop_of_a_hold_ends_when_the_site_is_gone(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [0, 0, 0]):
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        assert _published(hass)[0] == "stop"
+    await coordinator.async_run_job("charge_trigger", include_forecast=True)  # the site entry was unloaded
+    assert _published(hass) == ("charge", True, (10, 10, 10))
+    await coordinator.async_run_job("charger_test_release", include_forecast=True)
+
+
+async def test_the_release_after_a_plan_the_site_had_stopped_puts_back_the_stop_without_amps(hass, charger_entry) -> None:
+    """The plan asked for 16 A, the site gave none: the stop must not come back with the 16 A the site has later."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [0, 0, 0]) as site:
+        await coordinator.async_run_job("start_charging")
+        await coordinator.async_run_job("set_charger_phase_limits", [16, 16, 16], [16, 16, 16])
+        assert _published(hass)[0] == "stop" and _published(hass)[2] == (0, 0, 0)
+        site["live"] = [16, 16, 16]
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        with patch.object(type(engine), "other_ev_connected", return_value=True):
+            await coordinator.async_run_job("charger_test_release", include_forecast=True)
+        assert _published(hass)[0] == "stop" and _published(hass)[2] == (0, 0, 0)
+
+
+async def test_the_release_does_not_put_back_requested_amps_the_site_never_saw(hass, charger_entry) -> None:
+    """The site came after the plan's last run: requested_* are still zeros, the published amps are the plan's."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("start_charging")
+    await coordinator.async_run_job("set_charger_phase_limits", [16, 16, 16], [16, 16, 16])  # no site yet
+    engine.requested_charger_amps, engine.requested_circuit_amps = [0, 0, 0], [0, 0, 0]
+    with _site(engine, [16, 16, 16]):
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        with patch.object(type(engine), "other_ev_connected", return_value=True):
+            await coordinator.async_run_job("charger_test_release", include_forecast=True)
+        assert _published(hass) == ("charge", True, (16, 16, 16))
+
+
+async def test_a_test_with_a_site_that_has_no_current_never_publishes_charge_without_amps(hass, charger_entry, fast_runner) -> None:
+    seen = wire_charger(hass)
+    engine = charger_entry.runtime_data.engine
+    with _site(engine, [0, 0, 0]), patch(FOUND, return_value=[]):
+        start = len(seen)
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert steps["max"]["status"] == "skip" and steps["max"]["reason"] == "site_limited"
+    assert steps["stop"]["reason"] == "no_baseline"
+    assert ("charge", (0, 0, 0)) not in seen[start:]
+
+
+async def test_the_wait_ends_at_once_when_the_site_limits_the_published_amps(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    hass.states.async_set(CHARGER_POWER, "11040", {"unit_of_measurement": "W"})
+    coordinator.attributes["charger_action"] = {**(coordinator.attributes.get("charger_action") or {}), "phase_1_amps": 6, "phase_2_amps": 6, "phase_3_amps": 6}
+    assert coordinator._published_amps() == [6, 6, 6]  # read at once: a calculation of the plan may publish its own later
+    with (
+        patch("custom_components.cable_juice_planner.coordinator.charger_test.SAMPLE_SECONDS", 0.01),
+        patch("custom_components.cable_juice_planner.coordinator.charger_test.SETTLE_SECONDS", 0),
+        patch.object(coordinator, "_published_amps", return_value=[6, 6, 6]),
+    ):
+        verdict, _mean, _seconds = await coordinator._async_wait_for_power(CHARGER_POWER, lambda value: True, None, [16, 16, 16])
+        assert verdict == "limited"
+        verdict, _mean, _seconds = await coordinator._async_wait_for_power(CHARGER_POWER, lambda value: True, None, [6, 6, 6])
+        assert verdict != "limited"
+
+
+async def test_power_above_the_overdraw_never_passes_a_check_that_is_a_lower_bound(hass, charger_entry) -> None:
+    """With the real order of the times (settle, the first possible pass, the overdraw): a start or the stop step's charging
+    that takes clearly more than it was given is an overdraw, not a pass."""
+    coordinator = charger_entry.runtime_data
+    hass.states.async_set(CHARGER_POWER, "20000", {"unit_of_measurement": "W"})
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 3.0), patch(f"{base}.SETTLE_SECONDS", 0.1), patch(f"{base}.SAMPLE_SECONDS", 0.02),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0.5),
+    ):
+        verdict, mean, seconds = await coordinator._async_wait_for_power(CHARGER_POWER, lambda value: value >= 1000, 5000.0)
+        assert verdict == "over" and mean == 20000.0
+        verdict, _mean, _seconds = await coordinator._async_wait_for_power(CHARGER_POWER, lambda value: value >= 1000, 25000.0)
+        assert verdict == "ok"  # under the overdraw it passes as before
+
+
+async def test_a_hold_that_ran_out_while_the_site_applies_its_limit_puts_back_the_plans_amps(hass, charger_entry) -> None:
+    """The site's job read the test's amps before the hold was dropped: it must publish what was there before the test."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [16, 16, 16]):
+        await coordinator.async_run_job("start_charging")
+        await coordinator.async_run_job("set_charger_phase_limits", [16, 16, 16], [16, 16, 16])
+        before = _published(hass)
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        engine._charger_hold["until"] = engine._charger_hold["since"]
+        await coordinator.async_run_job("site_limit")
+        assert engine._charger_hold is None and _published(hass) == before == ("charge", True, (16, 16, 16))
+
+
+async def test_the_release_puts_back_what_the_plan_asked_for_not_what_the_site_allowed_then(hass, charger_entry) -> None:
+    """With another car on the charger the plan returns early: the site's job must find the plan's amps, not the clamped ones."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [6, 6, 6]) as site:
+        await coordinator.async_run_job("start_charging")
+        await coordinator.async_run_job("set_charger_phase_limits", [16, 16, 16], [16, 16, 16])
+        assert engine.current_charging_amps == [6, 6, 6]
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        with patch.object(type(engine), "other_ev_connected", return_value=True):
+            await coordinator.async_run_job("charger_test_release", include_forecast=True)
+            site["live"] = [16, 16, 16]
+            await coordinator.async_run_job("site_limit")
+        assert engine.requested_charger_amps == [16, 16, 16] and engine.current_charging_amps == [16, 16, 16]
 
 
 def _published(hass: HomeAssistant) -> tuple:

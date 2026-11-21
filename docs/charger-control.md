@@ -207,25 +207,39 @@ right: it is what CJP plans with, too. A step is judged on two readings 10 secon
 after the current was published, from the average of three readings.
 
 The **maximum comes first**: it shows that the charger charges at all. If the power stays under what a start needs
-(5 A), the other steps are not tried. If it charges, but not at the maximum, the test goes on.
+(5 A) at every current tried, the other steps are not tried. If it charges, but not at the maximum, the test goes on.
 
 If a step fails (the maximum too), CJP searches for the current that works. It goes two amps towards the middle of the
 group (up for the *lowest* steps, down for the *highest*), and when that works it tries the one amp in between, so the
 result is the current closest to the step that works: *6 A: 0 W, 8 A: 1 840 W, 7 A: 0 W* means 8 A is the lowest that
-works. At most four currents are tried after the step's own, and never outside the group's steps.
+works. At most four currents are tried after the step's own, and never outside the group's steps (except the one lower
+current that confirms a car on fewer phases, below).
 
 What the power shows besides a pass or a fail:
 
-- **The power does not rise with the amps** (*16 A: 8 000 W, 14 A: 8 000 W, 12 A: 8 000 W*): the car (a full or cold
-  battery) or the charger limits it. The step is shown with ⚠️ and the power it stayed at, not as a setting to change.
+- **The power does not rise with the amps** (*16 A: 8 000 W, 14 A: 8 000 W, 12 A: 8 000 W*): the car or the charger
+  limits it. The step is shown with ⚠️, the power it stayed at and the current that gives that power. A full or cold
+  battery does that for a while: leave the setting. A car that never takes more (an on-board charger smaller than the
+  charger, such as an 11 kW car on a 22 kW charger) needs the maximum amps setting lowered to that current, or the plan
+  counts on power the car does not take.
+- **The power is the same at every current of every step** (*16 A: 4 140 W … 6 A: 4 140 W*), judged on three phases
+  and on one phase separately: nothing shows that the charger follows the amps. A charger the automation never sets stays
+  at one current, which may happen to match a step (also when it does switch the phases). The steps that charged are
+  then shown with 🔧 (not proven) and are not counted as working.
 - **The car charges on fewer phases** than asked (a car with a 1- or 2-phase on-board charger on a 3-phase charger): the
-  power matches the amps on fewer phases. From then on every step is judged on the car's phases, and the result says so.
+  power matches the amps on fewer phases. This is only believed when two currents match the fewer phases at clearly
+  different powers (a car that limits its power can match fewer phases at one current); when the step has no other
+  current to try (for example the maximum without solar steps), two amps less than the lowest tried confirms it, once.
+  From then on every step is judged
+  on the car's phases, and the result says so.
 - **The charger takes clearly more than it was given** (more than 25 %, at least 500 W, for a whole minute), for example
   an automation that does not switch the phases: the test stops at once. The load balancing counts on the published
-  amps, so it would plan with too little.
+  amps, so it would plan with too little. An average above that limit never passes a step, also not a step that only
+  needs the charger to start.
 - **The car was already charging** when the test began: the first step that charges is shown with ⚠️, because the start
   is not proven.
-- **The load balancing limits the car during a step**: the step is not tested.
+- **The load balancing limits the car during a step**: the step ends at once and is not tested. When the site has no
+  current left for the car, CJP publishes *stop* (with 0 A), like the plan does, also while the test holds a current.
 
 - ✅ **Worked** at the step's current.
 - ⚠️ **Worked, see the note:** at another current (the lowest or highest current the charger and the car accept is not
@@ -235,8 +249,9 @@ What the power shows besides a pass or a fail:
   amps of the action, and that the charger took the command. The power also differs when the real voltage is not the
   voltage setting.
 - 🔧 **Not tested:** the load balancing gives the car less than the step asks for (a step is never pushed past it), the
-  power sensor had no number or had not reported for 3 minutes, the automation has no steps for it, or a stop could not be
-  proven because the charger was not charging just before.
+  power sensor had no number or had not reported for 3 minutes, the automation has no steps for it, a stop could not be
+  proven because the charger was not charging just before, or the power was the same at every current, so the amps are
+  not proven.
 
 CJP reads `automations.yaml` (only reads it) for the automation made from the blueprint that uses this action sensor, to
 see which fields have steps. An automation kept in a package or in YAML mode is not found; the result then says so, and

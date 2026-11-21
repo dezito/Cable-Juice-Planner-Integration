@@ -109,6 +109,10 @@ class ControlActions:
         charger_amps = self._max_amps() if charger_amps is None else charger_amps
         if self.site_active():
             circuit_amps, charger_amps = self._apply_site_limit(list(circuit_amps), list(charger_amps))
+        elif held is not None and self._charger_hold.get("site_stop"):
+            # the site is gone (unloaded or reloaded) during a hold: its stop no longer applies to the held amps
+            self._charger_hold["site_stop"] = False
+            self._publish_charger_action()
         for entity_id in self.config["charger"]["entity_ids"].values():
             if isinstance(entity_id, str) and self.is_entity_configured(entity_id):
                 self.is_entity_available(entity_id)
@@ -123,11 +127,19 @@ class ControlActions:
         self.requested_charger_amps = list(charger_amps)
         limited = self.site_clamp(charger_amps)
         text = self.site_text(charger_amps, limited)
+        stopped = sum(charger_amps) > 0 and sum(limited) <= 0
+        held = self._charger_hold if self.charger_hold_active() else None
         if limited != [int(a) for a in charger_amps]:
             _LOGGER.info("Site limit: %s A -> %s A per phase", [int(a) for a in charger_amps], limited)
             circuit_amps = [min(int(c), a) if a > 0 else 0 for c, a in zip(circuit_amps, limited)]
-            if sum(charger_amps) > 0 and sum(limited) <= 0 and self.charger_action == "charge":
+            if stopped and held is None and self.charger_action == "charge":
                 self.stop_charging()
+        if held is not None and bool(held.get("site_stop")) != stopped:
+            # a held charge the site has no current for is published as stop, like the plan's (a blueprint starts the charger
+            # on "charge" also with 0 A), and as charge again when the site has current. Decided on every limit, also by the
+            # site's own job, which publishes nothing else
+            held["site_stop"] = stopped
+            self._publish_charger_action()
         self.set_attr("charger_action", "site_limited", bool(text))
         self.set_attr("charger_action", "site_available", [int(a) for a in self._site().get("live", [0, 0, 0])])
         if text != self.site_charging_text:

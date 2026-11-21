@@ -157,6 +157,9 @@ class Site:
 
     def site_limit(self) -> None:
         """Job: the site is overloaded or capacity changed, apply the live limit again."""
+        # a test hold that ran out is put back first: the action and the requested amps read below are then the plan's,
+        # not the test's (the restore applies the plan's amps itself)
+        self.charger_hold_active()
         if self.charger_action == "charge":
             self.set_charger_phase_limits(self.requested_circuit_amps, self.requested_charger_amps)
         self.publish_site()

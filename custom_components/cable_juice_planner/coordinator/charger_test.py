@@ -20,16 +20,19 @@ from homeassistant.util import dt as dt_util
 from ..const import CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS, ENTITY_UNAVAILABLE_STATES
 from ..engine.control.charger_test import (
     HOLD_MARGIN_SECONDS,
+    MAX_ADJUSTMENTS,
     MOVED_W,
     SKIP_REASONS,
     STOP_REASONS,
     STOPPED_W,
+    amps_unproven,
     build_charger_test_markdown,
     car_phases_of,
     judge_power,
     next_amps,
     overdraw_w,
     power_is_capped,
+    tolerance_w,
 )
 from ..management.automation_inputs import AMPS_INPUTS, START_INPUTS, STOP_INPUTS, automations_using_blueprint, has_steps
 
@@ -45,6 +48,10 @@ STALE_SECONDS = 180  # a power sensor that has not reported for this long is not
 OVERDRAW_AFTER_SECONDS = 60  # a slow charger may still be coming down from the step before until then
 # a charger without a way to set the current only has to start: this many amps of power
 STARTED_AMPS = 5
+# the lowest current tried to confirm that a car charges on fewer phases (the least a car takes, IEC 61851)
+CONFIRM_MIN_AMPS = 6
+# a car that stays at one power is advised the highest current within this share above it (the noise of the reading)
+AMPS_AT_SLACK = 0.02
 
 
 class CoordinatorChargerTest:
@@ -132,6 +139,8 @@ class CoordinatorChargerTest:
         stop_step = {"name": "stop", "phases": 0, "amps": 0, "expected_w": 0}
         planned: list[dict] = []  # every step the test would have run, for the ones that were not reached
         charging_at: tuple[int, int] | None = None  # (amps, phases) of the last current that worked
+        begin: dict | None = None
+        amps_control = False
         try:
             begin = (await self.async_run_job("charger_test_begin")).value
             if not begin or not begin["ok"]:
@@ -182,6 +191,12 @@ class CoordinatorChargerTest:
             status, reason = "failed", "internal_error"
         finally:
             await self._async_charger_test_release()
+            if amps_control and begin and amps_unproven(steps, begin["voltage"], STARTED_AMPS * begin["voltage"]):
+                # the power was the same whatever the amps: a current that "worked" may be the one the charger always uses
+                steps = [
+                    {**step, "status": "skip", "reason": "amps_unproven"} if step["name"] != "stop" and step["status"] in ("ok", "adjusted") else step
+                    for step in steps
+                ]
             if status == "stopped":  # the steps that were not run are shown, not left out
                 steps.extend(self._skipped(step, "not_reached") for step in planned[len(steps):])
             self._publish_charger_test(status=status, steps=steps, reason=reason, finished=dt_util.now().isoformat(timespec="seconds"))
@@ -230,13 +245,22 @@ class CoordinatorChargerTest:
             return "completed"
         return None
 
-    async def _async_wait_for_power(self, entity_id: str, check, over_w: float | None = None) -> tuple[str, float | None, int]:
+    def _published_amps(self) -> list[int]:
+        """The amps per phase on the action sensor now (the load balancing may have limited them since the hold)."""
+        attributes = self.attributes.get("charger_action") or {}
+        return [int(attributes.get(f"phase_{index}_amps") or 0) for index in (1, 2, 3)]
+
+    async def _async_wait_for_power(
+        self, entity_id: str, check, over_w: float | None = None, requested: list[int] | None = None
+    ) -> tuple[str, float | None, int]:
         """Read the power until check(mean) holds twice in a row, or the time is up.
 
-        Returns ("ok" | "fail" | "no_data" | "ended" | "over", the last mean in W, seconds). The first SETTLE_SECONDS do not
-        count, and a reading the sensor did not have (lost, stale) starts the averaging again. "over": every reading of the
-        average above over_w after OVERDRAW_AFTER_SECONDS (the charger takes more than it was given, and it is not a charger
-        that is still coming down from the step before)."""
+        Returns ("ok" | "fail" | "no_data" | "ended" | "over" | "limited", the last mean in W, seconds). The first
+        SETTLE_SECONDS do not count, and a reading the sensor did not have (lost, stale) starts the averaging again.
+        * "over": every reading of the average above over_w after OVERDRAW_AFTER_SECONDS (the charger takes more than it was
+          given, and it is not a charger that is still coming down from the step before). An average above over_w never
+          passes, also not a check that is a lower bound (a start, the stop step's charging): it waits for the overdraw.
+        * "limited": the published amps are no longer the requested ones (the load balancing limited or stopped the car)."""
         started = time.monotonic()
         readings: list[float] = []
         passes = 0
@@ -246,6 +270,8 @@ class CoordinatorChargerTest:
             elapsed = time.monotonic() - started
             if self._ended_by_the_charger():
                 return "ended", last, round(elapsed)
+            if requested is not None and self._published_amps() != requested:
+                return "limited", last, round(elapsed)
             value = self._charger_power(entity_id)
             if value is None:
                 readings, passes, last = [], 0, None
@@ -258,7 +284,7 @@ class CoordinatorChargerTest:
             last = sum(readings) / len(readings)
             if over_w is not None and elapsed >= OVERDRAW_AFTER_SECONDS and min(readings) > over_w:
                 return "over", last, round(elapsed)
-            passes = passes + 1 if check(last) else 0
+            passes = passes + 1 if check(last) and (over_w is None or last <= over_w) else 0
             if passes >= PASSES_NEEDED:
                 return "ok", last, round(elapsed)
         return ("no_data" if last is None else "fail"), last, round(time.monotonic() - started)
@@ -272,13 +298,15 @@ class CoordinatorChargerTest:
         next_amps), so the result is the current closest to the step that works. The maximum is the test that charging works
         at all: when it gives (almost) no power, the rest is not tried (the stop reason no_charging).
         * Power clearly above the published amps ends the test at once (overdraw): the load balancing counts on them.
-        * A car that charges on fewer phases is found on the first attempt that matches them (context["car_phases"]), and
-          from then on every step is judged on those phases.
+        * A car that charges on fewer phases is found when two currents at clearly other powers match them (context
+          ["car_phases"]; a lower current is tried to confirm it when the step has no other), and from then on every step
+          is judged on those phases.
         * Power that does not rise with the amps is the car's or the charger's limit (limited), not a setting to change."""
         voltage = begin["voltage"]
         amps, attempts, seconds = step["amps"], [], 0
         threshold = STARTED_AMPS * voltage
         record = {"name": step["name"], "reason": None, "phases": step["phases"], "configured_amps": step["amps"], "attempts": attempts}
+        phase_matches: dict[int, list[dict]] = {}  # the attempts that matched fewer phases, per number of phases
         while True:
             held = (await self.async_run_job(
                 "charger_test_hold", "charge", amps, step["phases"], ATTEMPT_TIMEOUT + HOLD_MARGIN_SECONDS, include_forecast=True
@@ -291,12 +319,16 @@ class CoordinatorChargerTest:
             phases = min(step["phases"], context["car_phases"] or step["phases"])
             expected = amps * phases * voltage
             check = (lambda mean, e=expected: judge_power(e, mean)) if amps_control else (lambda mean: mean >= threshold)
-            verdict, mean, taken = await self._async_wait_for_power(begin["power_entity"], check, overdraw_w(amps * step["phases"] * voltage))
+            verdict, mean, taken = await self._async_wait_for_power(
+                begin["power_entity"], check, overdraw_w(amps * step["phases"] * voltage), held["requested"]
+            )
             seconds += taken
             if verdict == "ended":
                 return self._skipped(step, "not_ready", attempts=attempts), self._ended_by_the_charger()
             if verdict == "no_data":
                 return self._skipped(step, "no_data", attempts=attempts), None
+            if verdict == "limited":  # the load balancing limited or stopped the car during the step
+                return self._skipped(step, "site_limited", attempts=attempts), None
             if verdict == "over":
                 attempts.append({"amps": amps, "watt": round(mean or 0), "ok": False})
                 record.update(reason="overdraw", amps=amps, watt=round(mean or 0), expected_w=amps * step["phases"] * voltage, seconds=seconds)
@@ -304,15 +336,29 @@ class CoordinatorChargerTest:
             if (await self.async_run_job("charger_test_published")).value not in (None, held["requested"]):
                 # the load balancing limited the car during the step: the power says nothing about the automation
                 return self._skipped(step, "site_limited", attempts=attempts), None
-            ok = verdict == "ok"
-            if not ok and amps_control and context["car_phases"] is None and mean is not None and (found := car_phases_of(amps, phases, voltage, mean)):
-                context["car_phases"] = phases = found
-                ok = True
-            attempts.append({"amps": amps, "watt": round(mean or 0), "ok": ok})
+            attempt = {"amps": amps, "watt": round(mean or 0), "ok": verdict == "ok"}
+            attempts.append(attempt)
+            if not attempt["ok"] and amps_control and context["car_phases"] is None and mean is not None and (found := car_phases_of(amps, phases, voltage, mean)):
+                # fewer phases is only believed when another current matches them too, at a clearly other power: a car that
+                # limits its power where fewer phases would be (an 11 kW car at 16 A on a 25 A charger) gives the same power
+                matches = phase_matches.setdefault(found, [])
+                if any(abs(other["watt"] - attempt["watt"]) > tolerance_w(max(other["watt"], attempt["watt"])) for other in matches):
+                    context["car_phases"] = phases = found
+                    for earlier in attempts:  # judged again on the car's phases, so the search goes on from what really worked
+                        earlier["ok"] = judge_power(earlier["amps"] * found * voltage, earlier["watt"])
+                matches.append(attempt)
             working = [attempt for attempt in attempts if attempt["ok"]]
-            # a maximum that gives (almost) no power does not charge at all: another current will not help
-            dead = step["name"] == "max" and not working and (mean or 0) < threshold
+            # a maximum that gave (almost) no power at any current does not charge at all: another current will not help
+            dead = step["name"] == "max" and not working and max(attempt["watt"] for attempt in attempts) < threshold
             following = None if dead or not amps_control else next_amps(step, attempts)
+            if following is None and amps_control and not dead and not working and phase_matches and len(attempts) <= MAX_ADJUSTMENTS:
+                # fewer phases matched but could not be confirmed in the step's group (a maximum alone, without solar steps):
+                # one lower current confirms them. Lower is never more than the step, and the car takes it
+                lowest = min(attempt["amps"] for attempt in attempts)
+                lower = lowest - 2
+                # once: a current below the group is only that confirmation
+                if lowest >= step["low"] and lower >= CONFIRM_MIN_AMPS and lower not in {attempt["amps"] for attempt in attempts}:
+                    following = lower
             if following is not None:
                 amps = following
                 continue
@@ -325,9 +371,13 @@ class CoordinatorChargerTest:
                 record.update(amps=best["amps"], watt=best["watt"], expected_w=best["amps"] * phases * voltage if amps_control else 0, limited=limited)
                 return {**record, "status": "ok" if best["amps"] == step["amps"] else "adjusted"}, None
             if amps_control and power_is_capped(step["search"], attempts, None, threshold):
-                lowest = min(attempts, key=lambda attempt: attempt["amps"])
+                # no current gave its own power: the amps are those of the power it stayed at (what a car that always takes no
+                # more should be set to). Whether the power followed the amps at all is judged over every step (amps_unproven)
                 watt = round(sum(attempt["watt"] for attempt in attempts) / len(attempts))
-                record.update(amps=lowest["amps"], watt=watt, expected_w=lowest["amps"] * phases * voltage, limited=True)
+                # the highest current whose power the car takes (2 % for the noise of the reading), never one above it
+                # (not below the least a car takes: a car under that is limited by a full or cold battery, not its charger)
+                amps_at = max(CONFIRM_MIN_AMPS, min(step["high"], int(watt * (1 + AMPS_AT_SLACK) // (phases * voltage))))
+                record.update(amps=amps_at, watt=watt, expected_w=amps_at * phases * voltage, limited=True)
                 return {**record, "status": "adjusted"}, None
             record.update(amps=step["amps"], watt=attempts[0]["watt"], expected_w=step["amps"] * phases * voltage if amps_control else 0)
             return {**record, "status": "fail"}, "no_charging" if dead else None
@@ -346,10 +396,12 @@ class CoordinatorChargerTest:
         if held["published"] != held["requested"]:
             return self._skipped(step, "site_limited"), None
         verdict, mean, taken = await self._async_wait_for_power(
-            begin["power_entity"], lambda value: value >= MOVED_W, overdraw_w(amps * phases * begin["voltage"])
+            begin["power_entity"], lambda value: value >= MOVED_W, overdraw_w(amps * phases * begin["voltage"]), held["requested"]
         )
         if verdict == "ended":
             return self._skipped(step, "not_ready"), self._ended_by_the_charger()
+        if verdict == "limited":
+            return self._skipped(step, "site_limited"), None
         if verdict == "over":
             record = {
                 "name": "stop", "reason": "overdraw", "phases": phases, "configured_amps": 0, "amps": amps, "watt": round(mean or 0),
