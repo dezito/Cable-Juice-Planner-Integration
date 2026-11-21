@@ -8,15 +8,18 @@ action and amps are held: the plan, the settings and the rules are not touched.
 * The steps are the maximum first (does charging work at all), then the lowest and highest steps of the solar calculation
   (``charging_power_dict``). A step that fails is searched two amps at a time towards the middle of its group and then
   one amp back (next_amps), so the result is the current closest to the step that works.
-* Power that does not rise with more amps is the car's or the charger's limit, not a setting to change (power_is_capped),
-  and a car that charges on fewer phases than asked is judged on its own phases (car_phases_of).
+* Power that does not rise with more amps is the car's or the charger's limit (power_is_capped). A car that charges on
+  fewer phases than asked is judged on its own phases (car_phases_of), once two currents at clearly other powers matched
+  them (a car that limits its power can match fewer phases at one current). When the power was the same at every current
+  of every step, no step proves that the amps are set (amps_unproven), and the steps that "worked" are not counted.
 * Power clearly above what was published ends the test at once: the load balancing counts on the published amps.
 * Without a way to set the current (no steps for the current in the blueprint, or no solar steps) only the maximum
   and the stop are tried.
 * The hold is engine state that every path publishing the action reads: the cron, a forced calculation, a changed
   setting and the load balancing. It is dropped by the first publish after hold seconds (a lost runner can not leave the
   charger at a forced current), and the action, enabled and amps from before the test are put back. Load balancing
-  still limits the amps (a limited step is not tested, never pushed past the fuse).
+  still limits the amps (a limited step is not tested, never pushed past the fuse), and a held charge the site has no
+  current for is published as stop (site_stop, set by the load balancing in actions.py).
 """
 from __future__ import annotations
 
@@ -41,7 +44,7 @@ STOP_REASONS = (
     "not_configured", "unavailable", "not_connected", "completed", "not_ready", "other_ev", "running", "stopped", "no_charging",
     "overdraw", "internal_error",
 )
-SKIP_REASONS = ("no_steps", "no_data", "site_limited", "no_baseline", "not_ready", "not_reached")
+SKIP_REASONS = ("no_steps", "no_data", "site_limited", "no_baseline", "not_ready", "not_reached", "amps_unproven")
 # more than the published amps give by this much is a charger that ignores the amps or the phases (load balancing risk)
 OVERDRAW_SHARE = 0.25
 OVERDRAW_MIN_W = 500.0
@@ -85,6 +88,25 @@ def power_is_capped(direction: int, attempts: list[dict], best: dict | None, thr
         return direction < 0 and bool(higher) and all(abs(attempt["watt"] - best["watt"]) <= tolerance_w(best["watt"]) for attempt in higher)
     watts = [attempt["watt"] for attempt in attempts]
     return len(watts) > 1 and min(watts) >= threshold_w and max(watts) - min(watts) <= tolerance_w(max(watts))
+
+
+def amps_unproven(steps: list[dict], voltage: float, threshold_w: float) -> bool:
+    """Whether no step shows that the power follows the amps: within every number of phases that was published, every
+    current that charged gave the same power, although different currents were asked for. A charger stuck at one current
+    (an automation that never sets it) then looks like one that works at the step that happens to match, and like a car
+    that limits the power at the others. It is judged per number of phases: a charger that switches the phases but not
+    the current gives other powers on one and on three phases. One current asked for proves nothing either way."""
+    groups: dict[int, list[tuple[int, float]]] = {}
+    for step in steps:
+        if step["name"] == "stop" or step["status"] == "skip":
+            continue
+        for attempt in step.get("attempts") or []:
+            if attempt["watt"] >= threshold_w:
+                groups.setdefault(int(step["phases"]), []).append((attempt["amps"], attempt["watt"]))
+    judged = [group for group in groups.values() if len({amps for amps, _ in group}) >= 2]
+    if not judged:
+        return False
+    return all(max(w for _, w in group) - min(w for _, w in group) <= tolerance_w(max(w for _, w in group)) for group in judged)
 
 
 def build_steps(power_dict: dict, max_amp: float, phases: int, voltage: float, solar_steps: bool) -> list[dict]:
@@ -169,7 +191,10 @@ class ChargerTest:
         return list(self._charger_hold["amps"]) if self.charger_hold_active() else None
 
     def charger_hold_action(self) -> str | None:
-        return self._charger_hold["kind"] if self.charger_hold_active() else None
+        """The held action as it is published: a held charge the site has no current for is a stop (site_stop)."""
+        if not self.charger_hold_active():
+            return None
+        return "stop" if self._charger_hold.get("site_stop") else self._charger_hold["kind"]
 
     def _charger_test_publish(self) -> None:
         """Publish the held action and amps (the load balancing may still limit them)."""
@@ -224,9 +249,16 @@ class ChargerTest:
         requested = amps_list(amps, phases) if kind == "charge" else [0, 0, 0]
         now = self.now()
         if self._charger_saved is None or not self.charger_hold_active():
+            # what the plan asked for: with a site the published amps are the clamped ones, and putting those back would
+            # keep the car at them when the site has more again (the site's own job applies the requested amps). Only for a
+            # charge: a plan the site had stopped asked for amps it was not given, and "stop" with them would start a
+            # charger that is set by its current alone (the site's job only acts on a charge)
+            # requested_* is only set by the load balancing: zeros when the site came after the plan's last run
+            site = self.site_active() and self.charger_action == "charge" and sum(self.requested_charger_amps) > 0
             self._charger_saved = {
                 "action": self.charger_action, "enabled": self.charger_enabled,
-                "circuit": list(self.current_circuit_amps), "charger": list(self.current_charging_amps),
+                "circuit": list(self.requested_circuit_amps if site else self.current_circuit_amps),
+                "charger": list(self.requested_charger_amps if site else self.current_charging_amps),
             }
         self._charger_hold = {"kind": kind, "amps": requested, "until": now + datetime.timedelta(seconds=seconds), "since": now}
         self._charger_abort = None
@@ -286,13 +318,17 @@ def build_charger_test_markdown(t, state: dict) -> str:
 
 def charger_step_text(t, step: dict) -> str:
     """The result column of a step: what the charger delivered, the amps that were tried, or why it was not tested."""
-    if step["status"] == "skip":
-        return t(f"ui.charger_test.skip.{step['reason']}")
     values = {key: round(step.get(key) or 0) for key in ("amps", "configured_amps", "watt", "expected_w", "phases")}
+    # the highest current that was asked for (a lowest step searches upwards from its own)
+    values["tried_amps"] = max([round(attempt.get("amps") or 0) for attempt in step.get("attempts") or []] + [values["configured_amps"]])
+    if step["status"] == "skip":
+        return t(f"ui.charger_test.skip.{step['reason']}", **values)
     if step.get("judged_phases"):  # the car charges on fewer phases: the power was expected on those
         values["phases"] = round(step["judged_phases"])
     if step["status"] in ("ok", "adjusted"):
-        kind = "stop" if step["name"] == "stop" else "limited" if step.get("limited") else "started" if not step.get("expected_w") else step["status"]
+        # a lowest step that stays at one power: the car takes less than that step, so no maximum to lower
+        limited = "limited_low" if step["name"] in ("min", "single_min") else "limited"
+        kind = "stop" if step["name"] == "stop" else limited if step.get("limited") else "started" if not step.get("expected_w") else step["status"]
         text = t(f"ui.charger_test.ok.{kind}", **values)
         return f"{text} {t('ui.charger_test.ok.already_charging')}" if step.get("already_charging") else text
     if step.get("reason") == "overdraw":
