@@ -40,7 +40,7 @@ from .management.health_checks import async_remove_health_store
 from .management.dashboard_cards import async_dismiss_card_notification
 from .management.debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
 from .utils.helpers import float_or_none
-from .site import CJPSite, phase_units_issue_id
+from .site import CJPSite, fuse_issue_id, phase_units_issue_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -320,6 +320,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None
     if entry.data.get(CONF_SITE):
         # the site's own repair (an unload keeps it, like every repair)
         ir.async_delete_issue(hass, DOMAIN, phase_units_issue_id(entry.entry_id))
+        ir.async_delete_issue(hass, DOMAIN, fuse_issue_id(entry.entry_id))
         return
     from .management.storage import CJPStorage  # noqa: PLC0415
 

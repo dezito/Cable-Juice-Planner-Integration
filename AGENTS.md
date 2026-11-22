@@ -408,6 +408,14 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
     sensor in the budget, is not seen.
   - The circuit sum (`circuit_amps`) is capped at the fuse minus margin; the
     cap ignores the house and cars outside the circuit.
+- The site repair `site_fuse_exceeded` (`fuse_issue_id`, information only):
+  judged in the house forecast from the phases' hourly means before the cars
+  are subtracted, against the raw `fuse_lN` (not minus margin). Raised when a
+  phase has at least `FUSE_OVER_HOURS` hours above `FUSE_OVER_FACTOR` × fuse
+  in the last `FORECAST_DAYS`; removed only when every phase has
+  `FUSE_MIN_HOURS` hours of data and none is over, or the site has no phase
+  sensors. A forecast that returns early judges nothing. An unload keeps it;
+  removing the site deletes it (`async_remove_entry`).
 - Shared circuit (Easee master): user choices: chargers are picked as HA
   devices on each car's load balancing page; the circuit is stored once in the
   site options (`circuits`), so a change from one car applies to all of it; a
@@ -534,7 +542,9 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 - `management/health_checks.py` (`HealthWatcher`) raises the repairs
   `entities_missing`, `entity_units`, `blueprint_automation_lost`,
-  `charger_status_unknown` and `charger_not_following`. They only inform; none
+  `charger_status_unknown`, `charger_not_following` and the value scale
+  repairs below (`power_without_unit`, `battery_level_fraction`,
+  `price_unit_scale`). They only inform; none
   of them controls anything. Thresholds are the module constants
   (`STATUS_UNKNOWN_MINUTES`, `STATUS_UNKNOWN_DAYS`, `NOT_FOLLOWING_EVENTS`,
   `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the existing
@@ -563,6 +573,28 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   engine through `JobResult.charger_problems`. Events while a charger test
   holds the charger and within `NOT_FOLLOWING_AFTER_TEST` minutes
   (`engine/control/schedule.py`) after it are not counted.
+- Value scale repairs (decided with the user: inform only, no fix flow and no
+  conversion, because the blueprint reads the charger power itself):
+  `power_without_unit` (a power or charger power sensor without a unit whose
+  values over `POWER_SCALE_DAYS` stay at most `KW_LOOKING_MAX` with fractions,
+  so kW read as W), `battery_level_fraction` (home battery or car level, every
+  value 0..1 with fractions) and `price_unit_scale` (a price entity in a
+  subunit, per MWh or per Wh, judged by its unit only, through
+  `CombinedPriceProvider.price_unit_problems`). The verdicts are in
+  `management/value_checks.py`, the same file as in BattMind (change both
+  together, with `tests/test_value_checks.py`): True, False or None, and None
+  never clears a repair. History is read in the recorder's executor, at most
+  once per `VALUE_RECHECK` per sensor, and only for a sensor whose current
+  state could be in the wrong scale. The flagged sensors are kept in the
+  `.health` store (`scale_flagged`); with a known list the repair goes when no
+  sensor is flagged any more. A repair's list is known only when it was read
+  intact from the store or one check judged every sensor of that repair (True
+  or False), or when the repair is not in the issue registry (nothing to
+  forget: a fresh start knows its empty list). A lost store or an unreadable
+  stored value while the repair is open leaves it unknown, and then every
+  sensor must be judged fine before the repair goes. A sensor that
+  is no longer configured is dropped from the list. Phase sensors are not in these checks (a unitless phase sensor is
+  read as amps, which no value range can tell from kW).
 
 ### Power units
 
@@ -618,6 +650,13 @@ not depend on the run being slow: wait for real conditions or real time, not a
 fixed number of `sleep(0)` yields. When calling the test venv's Python
 directly, put `../ha-dev/windows` (shims) on `PYTHONPATH`. Test the PyScript
 import with `../ha-dev/dev.ps1 import-legacy` before adding the integration.
+
+Keep test runs short (user decision). While fixing, run only the test files
+that cover the change (`'-n' '0'` for a single file); after a failure rerun
+only what failed (`--lf`, `-x` to stop at the first failure). Run the full
+suite once, after the last change and before reporting the task done: not
+after every fix or review round, and in a multi-agent task only once, by the
+main agent, not by each subagent. `--durations=25` shows the slowest tests.
 
 The devcontainer, the seven seeded car profiles (for missing-entity and
 single-provider cases), the Windows venv and its shims, debugging in one

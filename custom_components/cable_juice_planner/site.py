@@ -29,6 +29,7 @@ import datetime
 import logging
 import math
 import time
+from decimal import ROUND_CEILING, Decimal
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
@@ -57,6 +58,7 @@ from .const import (
     SITE_DEFAULTS,
     SITE_HOURS_AHEAD,
 )
+from .management.value_checks import number_text
 from .utils.helpers import float_or_none
 from .utils.power import POWER_UNITS, power_factor_to_w, statistic_power_factor_to_w
 
@@ -77,6 +79,12 @@ STALE_SECONDS = 300
 FORECAST_UNITS = {"power": "W", "electric_current": "A"}
 # the repair for phase sensors in an energy unit (Wh, kWh ...): an energy is no current, it can't be read
 ISSUE_PHASE_UNITS = "site_phase_units"
+# the repair for a main fuse that the house and the cars exceed for hours (the house forecast's hourly means, fuse_over_lines).
+# A warning only: the overload check protects the fuse, the repair points at its setting or at the phase sensors
+ISSUE_FUSE_EXCEEDED = "site_fuse_exceeded"
+FUSE_OVER_FACTOR = 1.25  # an hourly mean above this times the raw main fuse counts as over it
+FUSE_OVER_HOURS = 3  # this many such hours in the forecast's days raise the repair
+FUSE_MIN_HOURS = 24  # hours of data per phase before a positive answer (the repair goes)
 STALE_CHECK_SECONDS = 30  # how often the overload check runs without a sensor event (a sensor that went stale)
 # charger statuses that surely mean "not charging": only then does a car's measured power free current (no phase sensors)
 SETTLED_STATUS = (*CHARGER_COMPLETED_STATUS, *CHARGER_NOT_READY_STATUS, "ready_to_charge", "awaiting_start", "awaiting_authorization")
@@ -85,6 +93,55 @@ FORECAST_DAYS = 7
 
 def phase_units_issue_id(entry_id: str) -> str:
     return f"{entry_id}_{ISSUE_PHASE_UNITS}"
+
+
+def fuse_issue_id(entry_id: str) -> str:
+    return f"{entry_id}_{ISSUE_FUSE_EXCEEDED}"
+
+
+def _decimal_mark(text: str, language: str | None) -> str:
+    """A number's text with a decimal comma unless the language is English (the same rule as value_checks.number_text)."""
+    return text if (language or "en").lower().startswith("en") else text.replace(".", ",")
+
+
+def _amps(value: float, language: str | None) -> str:
+    """A limit or a fuse in amps with up to two decimals, so 31.25 stays 31.25 (number_text keeps three significant digits)."""
+    return _decimal_mark(f"{value:.2f}".rstrip("0").rstrip("."), language)
+
+
+def _highest_mean(value: float, language: str | None) -> str:
+    """The highest hourly mean with one decimal, rounded up: the shown maximum is never below the real one, so it can't look equal
+    to a limit it is above (20.01 shows 20.1, not 20.0)."""
+    return _decimal_mark(str(Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_CEILING)), language)
+
+
+def fuse_over_lines(phases: list[dict[float, float]], fuses: list[float], language: str | None = None) -> tuple[str, ...] | None:
+    """The repair's lines for the grid phases whose hourly mean current was above their raw main fuse times FUSE_OVER_FACTOR for
+    FUSE_OVER_HOURS hours or more. Empty: none is, and every phase has FUSE_MIN_HOURS hours of data (a positive answer). None:
+    can't tell (a phase with no fuse, 0, is not judged, nor is one with too few hours; nothing over is then not a fix).
+
+    phases: per grid phase the hourly mean current in amps (hour timestamp -> amps), the house and the cars both. A line reads
+    "- L1: 25 A → 32.0 A (3 h > 31.25 A)": the main fuse, the highest hourly mean, and the hours above the limit (the fuse times
+    FUSE_OVER_FACTOR) with that limit. language: the decimal mark of the numbers."""
+    lines: list[str] = []
+    complete = True
+    for index, (series, fuse) in enumerate(zip(phases, fuses)):
+        if fuse <= 0:
+            complete = False
+            continue
+        means = list(series.values())
+        if len(means) < FUSE_MIN_HOURS:
+            complete = False
+        limit = fuse * FUSE_OVER_FACTOR
+        above = sum(1 for mean in means if mean > limit)
+        if above >= FUSE_OVER_HOURS:
+            lines.append(
+                f"- L{index + 1}: {_amps(fuse, language)} A → {_highest_mean(max(means), language)} A "
+                f"({above} h > {_amps(limit, language)} A)"
+            )
+    if lines:
+        return tuple(lines)
+    return () if complete else None
 
 
 def _energy_unit(unit) -> bool:
@@ -168,6 +225,8 @@ class CJPSite:
         self._startup_ready = asyncio.Event()
         # (entity id, energy unit) of the phase sensors in the repair; None: not judged yet
         self._phase_units_wrong: tuple[tuple[str, str], ...] | None = None
+        # the lines of the main fuse repair (fuse_over_lines): empty = none over, None = not judged yet
+        self._fuse_verdict: tuple[str, ...] | None = None
         self._forecast_energy_warned: set[str] = set()  # phase statistics in an energy unit already warned about
 
     # ------------------------------------------------------------------ #
@@ -199,6 +258,7 @@ class CJPSite:
             else:
                 # no phase sensors (any more): nothing to judge, a positive answer
                 self._set_phase_units_issue(())
+                self._set_fuse_issue(())
         finally:
             # Cars starting on the same homeassistant_started event must not
             # calculate against a half-initialized site forecast.
@@ -683,6 +743,38 @@ class CJPSite:
             translation_placeholders={"entities": "\n".join(f"- {entity_id} ({unit})" for entity_id, unit in wrong)},
         )
 
+    def _check_fuse(self, phases: list[dict[float, float]]) -> None:
+        """Judges the main fuse repair on the hourly means of the phases (see fuse_over_lines). Not judged: nothing changes."""
+        fuses = [float(self.config.get(f"fuse_l{i}") or 0.0) for i in (1, 2, 3)]
+        verdict = fuse_over_lines(phases, fuses, self.hass.config.language)
+        if verdict is not None:
+            self._set_fuse_issue(verdict)
+
+    @callback
+    def _set_fuse_issue(self, lines: tuple[str, ...]) -> None:
+        """lines: the phases over their fuse (the repair names them); empty removes the repair. Only a change touches the registry."""
+        if lines == self._fuse_verdict:
+            return
+        self._fuse_verdict = lines
+        issue_id = fuse_issue_id(self.entry.entry_id)
+        if not lines:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_FUSE_EXCEEDED,
+            translation_placeholders={
+                "phases": "\n".join(lines),
+                "factor": number_text(FUSE_OVER_FACTOR, self.hass.config.language),
+                "hours": str(FUSE_OVER_HOURS),
+                "days": str(FORECAST_DAYS),
+            },
+        )
+
     @callback
     def _car_power_changed(self, _event: Event) -> None:
         """A charger's power or status changed: without (working) phase sensors these are the measurement (a car that
@@ -830,6 +922,12 @@ class CJPSite:
             watt = statistic_power_factor_to_w(unit) if unit else None
             factor = watt / voltage if watt is not None else 1.0
             phases.append(series(entity_id, lambda v, f=factor: abs(v) * f))
+        # the repair for a main fuse the house and the cars exceed: judged on the phases before the cars are taken off (the fuse
+        # carries both). Information only: an error is logged and never holds the forecast up
+        try:
+            self._check_fuse(phases)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Site: the main fuse check failed")
         cars = []
         for entry_id, entity_id in chargers.items():
             coordinator = self.members[entry_id]

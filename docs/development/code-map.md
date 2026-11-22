@@ -41,6 +41,7 @@ tests/                                   Pytest suite
 ├── test_site.py / test_charging_loss_model.py  Site and charging-loss calculations
 ├── test_analysis.py / test_config_flow.py      Analysis and setup/options
 ├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
+├── test_health_checks.py / test_value_checks.py / test_value_checks_recorder.py / test_site_fuse_check.py  Repairs: health checks, scale of values, main fuse
 ├── test_dashboard.py                    Dashboard generation and content
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests

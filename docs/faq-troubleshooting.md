@@ -113,6 +113,10 @@ shown again.
 |---|---|---|
 | Entities … are disabled or missing | A configured entity is disabled, or it is neither in the entity registry nor in the states (renamed or deleted). An entity that is only unavailable is not listed: the notification after 30 minutes covers that. | The entities are enabled or found again. |
 | Sensors with a unit … | A power sensor has a unit the code can't read (accepted: mW, W, kW, MW, GW; a unit with an h, such as Wh or kWh, is read as the unit without it, so kWh is read as kW, and one without a unit is read as W), the charger power sensor has a unit other than W or kW while the repair to update the charger blueprint is open (the older blueprint reads only those), a battery level sensor has a unit other than %, or a kWh meter has a unit other than kWh. | Every such sensor has an accepted unit again. An unavailable sensor is not judged and keeps its last result. |
+| Power sensors without a unit are read as W | A power sensor has no unit, its values over the last 3 days never went above 50, and some of them are decimal numbers. It is then most likely in kW, and read as W it is 1000 times too small. | Each flagged sensor has a unit, or its values show watts (a value above 50). The rule for the power and battery repairs is in the section below. |
+| Battery levels that look like a share, not a percentage | A battery level sensor (in % or without a unit) has only values between 0 and 1 over the last 3 days, with some decimal numbers: 0.85 is meant as 85 %, but it is read as 0.85 %. | Each flagged sensor reports another unit, or reports 0 to 100 (a value above 1). |
+| Price sensors in a subunit, per MWh or per Wh | A price sensor's unit is a subunit of its currency (øre, cent), per MWh or per Wh. No price is converted, so the prices are 100 or 1000 times too large, or 1000 times too small (per Wh). | No price sensor is in a subunit, per MWh or per Wh any more. |
+| The house and the cars draw more than the main fuse (load balancing) | On a phase of the shared grid connection, the hourly mean current of the house and the cars was more than 1.25 × the main fuse for 3 hours or more in the last 7 days. | The next forecast no longer finds it. |
 | The charger automation … is disabled or gone | The automation made from the charger blueprint was on, and is now off or no longer in `automations.yaml`. The repair is only raised after the automation was seen on, so an automation you wrote yourself, a blueprint you don't use, or an automation kept in another file (packages, YAML mode) or an automation without an `id` is never reported. | The automation is on again. |
 | The charger status is a value … | The charger's status is a value Cable Juice Planner doesn't know (its ready, not ready, charging, completed and error statuses are known), and it has been held for 10 minutes. | No such value has been seen for 7 days. |
 | The charger did not follow the plan … | The restarts of the charger gave up, or the charger charged without a rule, 3 times within 7 days. Each of these also has its own notification. Events within 60 minutes after a charger test, and while a test holds the charger, are not counted. | Fewer than 3 such events are left in the last 7 days. |
@@ -134,6 +138,77 @@ energy unit* names the sensors. It disappears by itself when no phase sensor rep
 connection has no phase sensors. An unavailable sensor is not judged and keeps its last result. Removing the shared grid
 connection deletes the repair. If the house forecast still isn't updated after the fix, the statistics of the sensor are
 still kept as an energy: fix the recorder's own repair for them (Developer tools → Statistics); the log says so once.
+
+### Sensor values in the wrong scale: how the power and battery repairs work
+
+The power and battery repairs below judge the values of a sensor, not only its unit (the price repair judges the unit only).
+The verdict uses the state now and the states of the last 3 days. That history is read at most every 6 hours, and only while the current value could be
+in the wrong scale. A sensor is flagged only with at least 10 readings in those days, with at least two different values: whole numbers only
+(or only 0 and 1 for a battery level) tell nothing. One value above the limit (50 for a power sensor, 1 for a battery level)
+in the current state clears the flag at the next hourly check; a value above it in the history is seen at the next read (about 6 to 7 hours later).
+Each repair names the sensors it flags, with their highest value (the number after ≤: the highest value seen, without sign,
+rounded up).
+
+The list of flagged sensors is known once it was read intact from the stored state, or once one check judged every sensor
+of the repair (each one fine or flagged), or while the repair has not been raised yet (a fresh start). Only a known list is kept in the state of the checks, so a restart keeps the
+repair until the flagged sensors are judged fine.
+
+The repair disappears when no sensor is flagged any more and the list is known. A sensor that can't be judged, for example
+a meter in whole watts that stays below 50, or one that is unavailable, does not keep the repair of a known list. While the
+list is not known (the stored state was lost while the repair was open), the repair
+goes only when every sensor is judged fine, so a sensor that is unavailable or can't be judged keeps it. An unavailable
+sensor is not judged. When the history can't be read (no recorder, or an error), the verdicts stay; an error is logged once
+as a warning, and the history is not read again for 6 hours.
+
+### Power sensors without a unit are read as W
+
+A power sensor without a unit is read in watts. If its values over the last 3 days never went above 50 and some of them are
+decimal numbers, it most likely reports kilowatts (a template sensor that lost its unit, for example). Read as W it is 1000
+times too small, and the plan uses far too little power. Give the sensor its unit: `unit_of_measurement: kW` on a template
+sensor, or the unit its integration provides. If the values really are watts, choose **Ignore** on the repair.
+
+Possible false positive: a sensor in W without a unit that stays under 50 W with decimal numbers for 3 days (for example a
+small consumer that never reaches 50 W). The repair then appears; choose **Ignore**.
+
+### Battery levels that look like a share, not a percentage
+
+A battery level is read in percent. If every value of the sensor over the last 3 days lay between 0 and 1 (with some decimal
+numbers), the sensor reports a share: 0.85 means 85 %, but read as percent it is 0.85 %, so the plan works with a battery
+level that is 100 times too low. Make the sensor report 0 to 100, for example by multiplying by 100 in a template sensor, and
+select that sensor in the settings. If the values really are percent, choose **Ignore**.
+
+Possible false positive: a battery level in % that stays between 0 and 1 for 3 days (a battery that is at 0 to 1 %). Choose
+**Ignore** then.
+
+### Price sensors in a subunit, per MWh or per Wh
+
+Cable Juice Planner reads prices per kWh in the currency (kr, DKK, EUR). A price whose unit is a subunit of the currency (øre,
+cent) or per MWh is 100 or 1000 times too large, and a price per Wh is 1000 times too small. No price is converted. Only the
+unit of each configured price sensor is judged, not the size of the prices.
+
+In Energi Data Service turn off *Show prices in cent* and set *Price calculated in* to kWh (the Danish labels are *Vis priser
+i øre* and *Pris beregnes i*, the German ones *Preise in Cent anzeigen* and *Preis wird berechnet in*; the Polish and
+Ukrainian interface has only the English labels). Or select a sensor whose unit is the currency per kWh, for example kr/kWh.
+The repair disappears once every price sensor is in the currency per kWh. While the price provider is not set up yet, or a
+price sensor is unavailable without a unit, the repair is not judged.
+
+### The house and the cars draw more than the main fuse (load balancing)
+
+The house forecast of the shared grid connection is built from the hourly mean current of each phase sensor, and the house
+and the cars together have to stay under the main fuse. If a phase's hourly mean was more than 1.25 × its raw main fuse (the
+safety margin is not taken off) for at least 3 hours in the last 7 days, the repair gets one line per such phase, for example
+`- L1: 25 A → 32.0 A (3 h > 31.25 A)`. Each line reads: the phase, its main fuse → the highest hourly mean current (the hours
+above the limit > the limit, which is 1.25 × the fuse). Numbers use a decimal comma in languages other than English.
+
+A fuse of that size is unlikely to carry that for an hour. So either the main fuse on the shared grid connection page is set
+too low (the cars then get less current than they could: correct it there), or a phase sensor measures something else: the
+phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors.
+If the fuse really is that large and the values are right, choose **Ignore**.
+
+The repair disappears by itself when the next forecast no longer finds such hours. Every phase needs 24 hours of data before
+the forecast can say that nothing is over: a phase with less data can still raise the repair, but it can't clear it. A phase
+without a fuse (0) is not judged, and nothing changes while it is not judged. The forecast is not judged while it can't be
+read either.
 
 ## Report a problem
 
