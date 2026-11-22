@@ -207,6 +207,10 @@ class ChargerTest:
         saved, self._charger_saved = self._charger_saved, None
         if saved is None:
             return
+        # the plan's rule from before the test, until the plan's next run sets its own (a hold that ran out outside a
+        # calculation would otherwise leave the test's rule up to a cron interval). Without one (a rule the test made
+        # obsolete): that the test has ended, until the plan's next run
+        self.set_charging_rule(saved.get("rule") or self.t("ui.charger_test.rule_ended"), fresh=False)
         if saved.get("car_limit") is not None:
             # the car's own limit from before the limit step. The runner puts it back on its own first (with the action
             # unchanged, so the automation sends it); here, with the action changing too, the automation may not send it
@@ -228,6 +232,22 @@ class ChargerTest:
         if not self.charger_hold_active():
             return None
         return "stop" if self._charger_hold.get("site_stop") else self._charger_hold["kind"]
+
+    def _charger_test_rule(self) -> None:
+        """The rule while a test holds the charger: 🧪 with what is published (a stop, or the requested amps and phases;
+        the load balancing may still give fewer amps, which the charger_action attributes show)."""
+        hold = self._charger_hold
+        if hold is None:
+            return
+        amps = [int(a) for a in hold["amps"] if a > 0]
+        if hold["kind"] == "stop" or hold.get("site_stop") or not amps:
+            action = self.t("ui.charger_test.step.stop")
+        else:
+            action = self.t("ui.charger_test.rule_charge", amps=max(amps), phases=len(amps))
+        if hold.get("limit") is not None:
+            # the charge limit step (and the put-back of the car's own limit): the limit that is published with the action
+            action = self.t("ui.charger_test.rule_limit", action=action, limit=round(hold["limit"]))
+        self.set_charging_rule(f"🧪{self.t('ui.charger_test.rule', action=action)}")
 
     def _charger_test_publish(self) -> None:
         """Publish the held action and amps (the load balancing may still limit them)."""
@@ -282,9 +302,15 @@ class ChargerTest:
         requested = amps_list(amps, phases) if kind == "charge" else [0, 0, 0]
         now = self.now()
         if self._charger_saved is None or not self.charger_hold_active():
+            restarting = self.restarting_charger
             # a restart (is_charging) in progress ends: the test decides what is published, and the charger is not left
             # disabled by the restart (enabled before it is saved)
             self._charger_restart_reset(full=False)
+            rule = self.last_charging_rule_text
+            if rule.startswith("🧪") or (restarting and self._charger_restart_rule and rule.startswith(self._charger_restart_rule)):
+                # never the rule of an earlier test (one that ran out before the plan had set its own again), nor the
+                # text of a restart the test has just ended (a give-up is kept, and so is its rule)
+                rule = ""
             # what the plan asked for: with a site the published amps are the clamped ones, and putting those back would
             # keep the car at them when the site has more again (the site's own job applies the requested amps). Only for a
             # charge: a plan the site had stopped asked for amps it was not given, and "stop" with them would start a
@@ -293,6 +319,7 @@ class ChargerTest:
             site = self.site_active() and self.charger_action == "charge" and sum(self.requested_charger_amps) > 0
             self._charger_saved = {
                 "action": self.charger_action, "enabled": self.charger_enabled,
+                "rule": rule,
                 "circuit": list(self.requested_circuit_amps if site else self.current_circuit_amps),
                 "charger": list(self.requested_charger_amps if site else self.current_charging_amps),
             }

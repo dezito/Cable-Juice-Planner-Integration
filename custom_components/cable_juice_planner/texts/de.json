@@ -259,6 +259,10 @@
     "charger_test": {
       "car_phases": "Das Auto lud nur auf {phases} Phase(n), daher wurden die Schritte mit {phases} Phase(n) bewertet. Das ist normal für ein Auto mit kleinerem Bordlader; lädt das Auto dreiphasig, prüfe, ob die Automation die Phasen umschaltet.",
       "not_run": "Der Test wurde noch nicht ausgeführt. Schalte **Meine Ladeautomation testen** ein, um ihn zu starten.",
+      "rule": "Test deiner Ladeautomation: {action}",
+      "rule_charge": "{amps} A auf {phases} Phase(n)",
+      "rule_limit": "{action}, Ladelimit im Auto {limit} %",
+      "rule_ended": "Der Test der Ladeautomation ist beendet. Der Plan zeigt seine eigene Regel bei der nächsten Berechnung.",
       "status": {
         "idle": "Der Test läuft nicht",
         "running": "Der Test läuft…",

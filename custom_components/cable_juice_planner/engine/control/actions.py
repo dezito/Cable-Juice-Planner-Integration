@@ -170,6 +170,9 @@ class ControlActions:
         self.set_state("charger_action", held or self.charger_action)
         self.set_attr("charger_action", "charger_enabled", True if held else self.charger_enabled)
         self.set_attr("charger_action", "stop_request", self.charger_stop_request)
+        if held:
+            # the rule says what the test publishes, also when the load balancing turns the held charge into a stop
+            self._charger_test_rule()
 
     def start_charging(self, entities=None, force=False) -> None:
         """Charge (or with entities=['enabled']: only enable the charger)."""

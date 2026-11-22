@@ -318,6 +318,12 @@ What the test does and does not do:
 - The plan does not run while a current is held: no restart of the charger, no *charging without a rule*. The heartbeat
   `updated` is kept, so the blueprint's fail-safe does not start. A car that pauses after a current it does not take is
   therefore not restarted by CJP during the test.
+- While a current is held, `sensor.<prefix>_current_charging_rule` shows *🧪Testing your charger automation: …* with
+  the current and phases the step asks for (the load balancing may give fewer, shown on the 🚧 line and in the amps
+  of the action), or *Stop charging* (also when the load balancing has no current for the car). During the charge
+  limit step it also shows the charge limit that is published. No other text replaces it while the test holds the
+  charger. When the test ends, the plan's own rule comes back. If the rule from before the test was a restart of the
+  charger that the test ended, the rule says that the test has ended until the plan's next calculation.
 - Turning the switch off stops the test: the action, enabled and amps from before the test are put back, and the plan is
   calculated again at once (also with a setting changed during the test). The charge steps end at once if the cable is
   pulled out or the car becomes full (the charge limit step only waits for the car's limit, which also works then). A test is never resumed after a restart; the plan publishes again when CJP starts. If the

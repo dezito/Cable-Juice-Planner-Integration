@@ -592,6 +592,11 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
     # ------------------------------------------------------------------ #
 
     def set_charging_rule(self, text: str = "", fresh: bool = True) -> None:
+        if not text.startswith("🧪") and getattr(self, "_charger_hold", None) is not None and self.charger_hold_active():
+            # the test of the charger automation holds the charger: its rule stays (other jobs, e.g. a notification that
+            # checks whether the car is ready, would replace it). The plan's rule comes back when the test ends; a hold
+            # that ran out is dropped here first (charger_hold_active), so the newer text then wins
+            return
         self.rule_set_this_run = self.rule_set_this_run or fresh
         self.last_charging_rule_text = text
         extra = f"\n🚧{self.powerwall_charging_text}" if self.powerwall_charging_text else ""

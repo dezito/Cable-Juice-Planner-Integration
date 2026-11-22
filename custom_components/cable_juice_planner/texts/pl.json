@@ -259,6 +259,10 @@
     "charger_test": {
       "car_phases": "Samochód ładował tylko na mniejszej liczbie faz ({phases}), więc kroki oceniono dla tej liczby faz ({phases}). To normalne dla samochodu z mniejszą ładowarką pokładową; jeśli samochód ładuje na trzech fazach, sprawdź, czy automatyzacja przełącza fazy.",
       "not_run": "Test nie został jeszcze uruchomiony. Włącz **Przetestuj moją automatyzację ładowarki**, aby go rozpocząć.",
+      "rule": "Test Twojej automatyzacji ładowarki: {action}",
+      "rule_charge": "{amps} A na {phases} faz(ach)",
+      "rule_limit": "{action}, limit ładowania w samochodzie {limit} %",
+      "rule_ended": "Test automatyzacji ładowarki zakończył się. Plan pokaże własną regułę przy następnym obliczeniu.",
       "status": {
         "idle": "Test nie jest uruchomiony",
         "running": "Test trwa…",
