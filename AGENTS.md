@@ -19,60 +19,11 @@ automations or the included blueprint.
 
 ## Code map
 
-```text
-custom_components/cable_juice_planner/  The HA integration (HACS payload)
-├── __init__.py                          Integration setup and platform forwarding
-├── coordinator/                         Shared data, refresh, events, and lifecycle
-├── config_flow.py / flow/               Setup/options flow, pages, and schemas
-├── const/                               Configuration, settings, and site constants
-├── engine/                              Charging plans, calculations, and current actions
-│   ├── engine.py / planning.py          Calculation orchestration
-│   ├── planner/                         Charge plan and price-level decisions
-│   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
-│   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
-│   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
-│   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
-│   ├── energy/                          Prices, solar, forecasts, and power inputs
-│   ├── history/                         Charging sessions, consumption, cost, and efficiency
-│   ├── analysis/                        Economy/forecast analysis and published results
-│   ├── economy.py                       Monthly charging economy comparison
-│   ├── pricing.py / state.py            Price helpers (incl. `sell_value()`) and engine state
-│   ├── debug.py                         Engine debug information
-│   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
-│   └── public_charging.py / distance.py Public sessions and driving-distance calculations
-├── prices/                              Price providers; CombinedPriceProvider is the only entry point
-├── management/                          Storage, backups, dashboard, and blueprint setup
-├── utils/                               Shared utilities and datetime/time platform implementations
-├── sensor.py / number.py / switch.py    Main HA entity platforms
-├── select.py / button.py / binary_sensor.py  Other HA entity platforms
-├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base
-├── repairs.py / site.py                 Repairs and site-related entities
-├── translations/ texts/                 HA strings and user-facing descriptions
-├── dashboard/ blueprints/               Bundled dashboard and automation blueprint
-│   └── dashboard/prices/                One price chart per price integration (the key of PROVIDER_CLASSES)
-└── manifest.json                        HA integration metadata
-
-tests/                                   Pytest suite
-├── conftest.py                          Shared fixtures and simulated HA entities
-├── test_engine.py / test_economy.py     Engine and cost/economy behavior
-├── test_site.py / test_charging_loss_model.py  Site and charging-loss calculations
-├── test_analysis.py / test_config_flow.py      Analysis and setup/options
-├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
-├── test_dashboard.py                    Dashboard generation and content
-├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
-├── fixtures/                            Legacy PyScript config for the import tests
-└── debug_replay.py                      Debug/replay helper
-
-docs/                                    User documentation and behavior details
-.github/workflows/validate.yml           CI: hassfest and HACS validation
-.github/workflows/release.yml            Attaches cable_juice_planner.zip to published releases
-.github/workflows/release-notes.yml      Draft release with notes written by Claude
-pytest.ini / requirements_test.txt       Pytest configuration and pinned test deps
-```
-
-Use this as a map, not an exhaustive inventory; check the current files before
-editing. Prefer the narrowest relevant module and test file over changing a
-broad layer for a local behavior change.
+The module and test map is in `docs/development/code-map.md`; read it before
+working in an unfamiliar part of the code. Use it as a guide, not an exhaustive
+inventory; check the current files before editing. Prefer the narrowest
+relevant module and test file over changing a broad layer for a local behavior
+change.
 
 Read the relevant documentation before changing behavior. In particular:
 
@@ -198,8 +149,8 @@ These rules apply to code, tests, documentation, and the dashboard.
 - Clearly distinguish historical hindsight from a realistic forecast. Do not
   present an optimistic backtest result as expected savings, earnings, or
   payback time.
-- Add regression tests for bugs found and for scenarios with missing or
-  incomplete data.
+- Add regression tests for bugs found (write the test first and confirm it
+  fails without the fix) and for scenarios with missing or incomplete data.
 - Use Home Assistant data for validation when an environment is available and
   access is approved. Keep credentials and sensitive data out of code, logs,
   and reports.
@@ -229,26 +180,14 @@ private agent memory). Update or remove a note when it stops being true.
 - README/docs audience: first-time installs, possibly migrating from PyScript. The HACS integration is new, so no release notes or "changed since" text
   about removed/renamed entities between development versions. Detailed docs
   live in `docs/` (English); the README is a short landing page that links into
-  it. Anchor links to emoji headings need a leading hyphen.
-- Releases: `hacs.json` has `zip_release` with
-  `filename: cable_juice_planner.zip`, so HACS installs from that release asset
-  (its download count is the install count). `.github/workflows/release.yml`
-  builds it from `custom_components/cable_juice_planner/` (files at the zip
-  root) when a release is published; run it by hand with a tag for a release
-  that lacks the zip. It sets `manifest.json` `version` in the zip from the
-  tag (`v1.0.9` -> `1.0.9`), so the version in the repository need not be
-  bumped by hand. `.github/workflows/release-notes.yml` (*Draft release*, run
-  by hand; with an empty tag it suggests the next one from the git tags via
-  `.github/next_version.py`, using the *beta* checkbox and the *bump* choice;
-  covered by `tests/test_next_version.py`, keep the copy in BattMind in sync)
-  lets Claude write the notes from the changes since
-  the previous release and creates or updates a draft release; it never
-  touches a published one. It needs the secret `CLAUDE_CODE_OAUTH_TOKEN`. Keep
-  its prompt in sync with the BattMind copy. A tag with a letter (`-beta.1`,
-  `b1`, `rc1`) becomes a pre-release, compared with the latest release; a
-  stable tag is compared with the latest stable release. Both workflows run
-  `.github/check_version.py`, which rejects versions Home Assistant won't load
-  (e.g. `1.0.7.1-beta.1`; use `1.0.7.1b1`).
+  it. Anchor links to emoji headings need a leading hyphen. `docs/development/`
+  is for contributors and coding agents, not for users.
+- Releases (`hacs.json` `zip_release`, `.github/workflows/release.yml` and
+  `release-notes.yml`, `.github/next_version.py`, `.github/check_version.py`):
+  read `docs/development/releases.md` before changing them. Keep
+  `next_version.py` and the release-notes prompt in sync with the BattMind
+  copies. Do not bump `manifest.json` `version` by hand: the release workflow
+  sets it in the zip from the tag.
 - What-if Scenario A (CJP against Smart and charging at once): the CJP column is
   not replayed. It is what CJP booked in the charging history (kWh, battery
   percent and cost, with solar and the home battery at CJP's own value), without
@@ -370,7 +309,7 @@ place and extend them to new code:
   help texts leave out `min_charge_limit_battery_level` (`hidden_settings()` in
   `const/config.py`; the entity still exists). `max_recommended_charge_limit_battery_level`
   stays visible: the plan charges up to it with or without the car's limit
-  (user decision 2026-11-05).
+  (user decision).
 - Battery level simulation (`simulate_battery_level_while_charging`, EV page):
   user choices: it uses the virtual EV's `number.<prefix>_battery_level` (other
   name/help via `EV_TEXT_KEYS`), counts the charger's kWh meter regardless of
@@ -381,7 +320,7 @@ place and extend them to new code:
 
 ### Sell price (`calculate_sell_price()` in `prices/base.py`)
 
-Decided with the user (2026-11-08, same as BattMind): selling a kWh costs the **sell fee + Energinet's net
+Decided with the user (same as BattMind): selling a kWh costs the **sell fee + Energinet's net
 tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 
 `sell price = price − every tariff/tax/surcharge in the price − (sell_fee + transmissions_nettarif + systemtarif)`
@@ -391,9 +330,11 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   once more as selling costs. Key mapping as Energi Data Service: distribution -> `tariffs`, nettariff ->
   `transmissions_nettarif`. The distribution sensor only has today's periods; other days use the same time of
   day from the latest known day (0 = too high a sell price). It is still 0 without a distribution sensor, when
-  it is unavailable, or for a time before its first row on the latest known day.
+  it is unavailable, when its `prices` attribute has no valid rows, or for a time before its first row on the
+  latest known day (`_get_distribution_price()` in `prices/stromligning.py`).
 - Missing tariff sensors (unavailable at startup) count as 0, which makes the sell price too high: net and system
-  tariff are in the price and subtracted again as selling costs. Open fail-safe gap, same as in BattMind.
+  tariff are in the price and subtracted again as selling costs. Both are a known, unfixed breach of the
+  no-favourable-default rule, same as in BattMind.
 - Energi Data Service: a sell sensor with a `tariffs` attribute includes them. A sell sensor without it is a raw
   price (tariffs in the price = 0); the selling costs (net and system tariff) then come from the buy sensor's
   `tariffs` attribute (`get_sell_costs()` / `eds_sell_costs()`).
@@ -403,7 +344,7 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `kwh_avg_prices_db["history_sell"]` averages stored before this fix used the old sign (too high) and only
   phase out as new days are stored.
 - The forecast adder (`PRICE_ADDER_DAY_BETWEEN_DIVIDER`) makes a forecast sale worth less (decided with the
-  user 2026-11-08, same as BattMind): it is subtracted from a forecast SELL price, and added with a fixed solar
+  user, same as BattMind): it is subtracted from a forecast SELL price, and added with a fixed solar
   sell price (`sell_adder_sign()` in `prices/base.py`; used by the providers, `get_sell_forecast_prices(adder=False)`
   and `Pricing._database_prices` for `history_sell`). A forecast buy price is raised.
 - Default `sell_fee` is 0.03 (like BattMind); it is always subtracted.
@@ -537,14 +478,10 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 ### Debug export
 
-- `management/debug_export.py`, service `cable_juice_planner.export_debug`,
-  diagnostic button `export_debug`, and a discreet "Problem or error?" section
-  at the bottom of the dashboard's Settings view (not an overview badge).
-  Writes `<config>/cable_juice_planner_debug/<prefix>_debug_<ts>.json.gz`
-  (newest 5 kept) plus a persistent notification with a signed 24 h link and a
-  prefilled `.github/ISSUE_TEMPLATE/bug_report.yml` link. CJP snapshots carry
-  prices only once an hour, so the export adds `price_data`.
-- Keep this file in sync with the BattMind copy.
+- The export is offered in the dashboard's Settings view, not as an overview
+  badge. Where it is written, why it adds `price_data`, and how to replay a
+  file handed in by the user: `docs/development/debug-export.md`.
+- Keep `management/debug_export.py` in sync with the BattMind copy.
 - Besides the coordinator data the export holds `blueprints` (the bundled
   blueprint's automations from `automations.yaml`, read only, with inputs and
   automation state; the installed blueprint files with their content only
@@ -556,8 +493,9 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   (`number.set_value`), except `notify`/`script` services. Since 2026.10 a
   device has `config_entry_id`; `config_entries` is deprecated, so support
   both (minimum is 2025.1).
-- To analyse a file handed in by the user, run from the repo root:
-  `PYTHONPATH=../ha-dev/windows %LOCALAPPDATA%/ha-dev-tests/venv/Scripts/python.exe tests/debug_replay.py <file> [failed|planning|<index>]`.
+
+### Planning notes
+
 - An hour with no price from any price integration and none in the price
   history is not planned; it is never given another hour's price. A price that
   is not a finite number (`nan`, `inf`) is dropped like a missing hour, also
@@ -671,73 +609,26 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 ## Tests and validation
 
-### Devcontainer
+On Windows run the suite with `../ha-dev/run_tests_windows.ps1 cjp
+[pytest args]`; the Docker run `../ha-dev/dev.ps1 test cjp [pytest args]` is
+the reference, and in the devcontainer `python -m pytest` works directly. Run
+the focused test file(s) first, then the full suite when practical. Do not
+create the venv on a network drive; it installs extremely slowly. Tests must
+not depend on the run being slow: wait for real conditions or real time, not a
+fixed number of `sleep(0)` yields. When calling the test venv's Python
+directly, put `../ha-dev/windows` (shims) on `PYTHONPATH`. Test the PyScript
+import with `../ha-dev/dev.ps1 import-legacy` before adding the integration.
 
-`../.devcontainer/devcontainer.json` opens the workspace folder (both
-integration repos and `ha-dev`) in a container with Home Assistant installed.
-Inside it, run `python -m pytest` from the repository root; it is Linux, so no
-shims are needed. The dev HA runs on `http://localhost:8123`; after a code
-change run `bash ha-dev/devcontainer/restart.sh`, and
-`bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates seven car profiles, each with its own prefix ("Car with
-everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
-without car entities, "Car without climate entity"/`car_no_climate` without the
-climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
-updates every 30 minutes with the battery level simulation on, "Car without
-Energi Data Service"/`car_no_eds` with only Strømligning as price provider, and two
-cars with load balancing priority 1 and 2 (`car_priority_1`, `car_priority_2`) each with
-its own charger power sensor) plus the shared site entry. Use them to test
-missing-entity and single-provider cases. The dev HA, the dev user's profile
-and the seeded entries are in English.
-
-The seed data and simulator entities are in `../ha-dev/devcontainer/seed.py`
-(`SIM_ENTITIES`/`SEEDS`), the simulator in
-`../ha-dev/config/packages/simulator.yaml`, synthetic history and backups in
-`../ha-dev/devcontainer/history.py`, and HA config in
-`../ha-dev/devcontainer/configuration.yaml`. Test the PyScript import with
-`../ha-dev/dev.ps1 import-legacy` before adding the integration.
-
-### Outside the devcontainer, on Windows
-
-Run the suite with `../ha-dev/run_tests_windows.ps1 cjp
-[pytest args]`. The first run installs Python 3.14 and the test requirements
-in `%LOCALAPPDATA%\ha-dev-tests\venv`; the shims in `../ha-dev/windows`
-(fcntl, resource, a pytest plugin that disables the socket guard and linecache's
-file-staleness check) must be on `PYTHONPATH` when calling that venv directly.
-The runner executes the suite in parallel with pytest-xdist; pass `'-n' '0'`
-(quoted, otherwise PowerShell reads it as a script parameter) to debug in one
-process with `-x`, `-s` or `--pdb`. Tests must not depend on the run being slow:
-wait for real conditions or real time, not a fixed number of `sleep(0)` yields.
-The system Python 3.11 lacks
-HA/astral. Do not create the venv on a network drive; it installs extremely
-slowly. The Docker run `../ha-dev/dev.ps1 test cjp [pytest args]` is the
-reference. The dev HA runs locally in Docker Desktop, not on a remote server;
-see `../ha-dev/README.md` (`ha-dev/dev.ps1 up|restart|reset|test`).
+The devcontainer, the seven seeded car profiles (for missing-entity and
+single-provider cases), the Windows venv and its shims, debugging in one
+process (`'-n' '0'`), the pinned test dependencies, and where the ha-dev seed
+and simulator data live: `docs/development/testing.md`.
 
 Test pitfalls: never use the `freezer` fixture (FakeDatetime breaks the
 strict-type `in_between`); advance timers with
 `async_fire_time_changed(utcnow() + n)` or `async_advance()` from
 `tests/conftest.py`. Cron triggers reschedule from the fired time, so advance
 cron k by k × 300 s. Engine snapshots need `astral`.
-
-The test configuration is in `pytest.ini`; test dependencies are pinned in
-`requirements_test.txt`. Those dependencies target the Home Assistant
-2026.10.x / Python 3.14 environment noted in that file.
-
-From the repository root, run the focused test file(s) first, then the full
-suite when practical:
-
-```bash
-python -m pytest tests/test_<area>.py
-python -m pytest
-```
-
-If test dependencies are not installed, install the repository's declared
-test requirements in the active environment:
-
-```bash
-python -m pip install -r requirements_test.txt
-```
 
 The GitHub validation workflow runs Home Assistant `hassfest` and the HACS
 integration validation action. Run the relevant checks when available for
