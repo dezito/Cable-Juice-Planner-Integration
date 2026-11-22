@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from ..const import CURRENCY_PRICE_SCALE, CURRENCY_UNIT_ALIASES, PRICE_PROVIDER_KEYS, PRICE_PROVIDER_PRIORITY
-from .base import is_price_per_mwh, price_unit_divisor  # noqa: F401 (price_unit_divisor: the converter of the providers and the history)
+from .base import _is_subunit_code, is_price_per_mwh, is_price_subunit, price_unit_divisor, price_unit_error  # noqa: F401 (the converter of the providers and the history, the unit checks)
 from .factory import PROVIDER_CLASSES
 
 
@@ -51,28 +51,6 @@ PRICE_SENSOR_KEYS = (
     "energypriceforecast_buy_entity_id",
     "energypriceforecast_sell_entity_id",
 )
-_SUBUNITS = {
-    "c", "ct", "cts", "cent", "cents", "eurocent", "eurocents", "c€", "¢", "p", "pence", "penny", "gbx",
-    "øre", "ore", "öre", "snt", "gr", "grosz", "groszy", "rp", "rappen", "bani", "st", "stotinki",
-}
-
-
-def _is_subunit_code(currency: str) -> bool:
-    """GBp, EUr...: an ISO code of the table with a lower-case last letter (the currency code spelled as its subunit)."""
-    return len(currency) > 1 and currency[:-1].isupper() and currency[-1].islower() and currency.upper() in CURRENCY_PRICE_SCALE
-
-
-def is_price_subunit(unit: Any) -> bool:
-    """A price per kWh in a subunit of the currency (ct/kWh, p/kWh, GBp/kWh, EURct/kWh): 100 times the price in the currency.
-
-    price_scale_of_unit() is None for these (they are not a currency), this tells that apart from a unit it just does not know."""
-    if not isinstance(unit, str) or "/" not in unit:
-        return False
-    currency, per = (part.strip() for part in unit.rsplit("/", 1))
-    if per.lower() not in ("kwh", "mwh") or not currency:
-        return False
-    token = currency.lower()
-    return token in _SUBUNITS or token.endswith(("ct", "cent", "cents")) or _is_subunit_code(currency)
 
 
 def is_forecast_only(state: Any) -> bool:
@@ -117,6 +95,23 @@ def energypriceforecast_entities(prices: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(prices.get(key) for key in ("energypriceforecast_buy_entity_id", "energypriceforecast_sell_entity_id") if prices.get(key)))
 
 
+def price_unit_sensors(prices: Mapping[str, Any]) -> dict[str, str]:
+    """{entity_id: config key} of the configured price sensors whose unit is judged (PRICE_SENSOR_KEYS)."""
+    return {prices[key]: key for key in PRICE_SENSOR_KEYS if prices.get(key)}
+
+
+def wrong_unit_sensors(get_state: Callable[[str], Any], sensors: Mapping[str, str]) -> dict[str, str]:
+    """{entity_id: unit} of the price sensors whose unit makes their prices 100 or 1000 times too large (price_unit_error).
+    The unit attribute stays while a sensor is down, so it is judged then too; a sensor that is not there has none."""
+    found: dict[str, str] = {}
+    for entity_id, key in sensors.items():
+        state = get_state(entity_id)
+        unit = getattr(state, "attributes", {}).get("unit_of_measurement") if state is not None else None
+        if price_unit_error(key, unit):
+            found[entity_id] = str(unit)
+    return found
+
+
 def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], Any]) -> dict[str, str]:
     """Errors of the price sensors a price page has just been given (field -> translation key), for a sensor that is loaded.
 
@@ -134,7 +129,7 @@ def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], An
         unit = attributes.get("unit_of_measurement")
         loaded = getattr(state, "state", None) not in ("unavailable", "unknown")
         # a price per MWh is converted for Energy Price Forecast (price_unit_divisor); Energi Data Service's own price type is kWh
-        if is_price_subunit(unit) or (is_price_per_mwh(unit) and key.startswith("energidataservice_")):
+        if price_unit_error(key, unit):
             errors[key] = "price_unit_subunit"  # judged also while the sensor is down: it keeps its unit attribute
         elif loaded and key == "energypriceforecast_buy_entity_id" and isinstance(attributes.get("raw_today"), list) and "retail_source" not in attributes:
             errors[key] = "price_sensor_not_retail"

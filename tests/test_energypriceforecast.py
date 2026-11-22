@@ -449,7 +449,8 @@ def test_the_combined_provider_names_the_sensors_whose_history_is_per_mwh() -> N
     # a sensor that is not in Home Assistant has no known unit: its history is left out (None), never read as kWh
     assert combined.price_unit_divisors({}.get) == {BUY: None, SELL: None}
     other = create_price_provider(_config(energidataservice_buy_entity_id="sensor.eds"))
-    assert other.price_unit_divisors({"sensor.eds": _State("0.2", {"unit_of_measurement": "EUR/MWh"}), BUY: states[BUY]}.get) == {}  # only this provider converts
+    # only Energy Price Forecast converts: a price per MWh of Energi Data Service is refused, its history is left out (None)
+    assert other.price_unit_divisors({"sensor.eds": _State("0.2", {"unit_of_measurement": "EUR/MWh"}), BUY: states[BUY]}.get) == {"sensor.eds": None}
 
 
 def test_the_unit_is_judged_while_the_sensor_is_down_but_the_retail_check_is_not() -> None:
@@ -498,3 +499,87 @@ def test_the_energy_price_forecast_sensors_of_a_setup() -> None:
     assert energypriceforecast_entities({**prices, "energypriceforecast_sell_entity_id": BUY}) == [BUY]
     assert energypriceforecast_entities({"energypriceforecast_buy_entity_id": "", "energypriceforecast_sell_entity_id": None}) == []
     assert not is_forecast_only(None) and not is_forecast_only(_State("unknown", {"raw_forecast": [1]}))
+
+
+def _eds(attributes: dict):
+    provider = EnergiDataServicePriceProvider(build_config({**default_options(), "energidataservice_buy_entity_id": "sensor.eds"}))
+    provider.shared_data = {"attributes": attributes, "values": {}, "version": 1}
+    provider.now, provider.tz = NOW, COPENHAGEN
+    provider.update_prices()
+    return provider
+
+
+def test_a_sensor_in_the_wrong_unit_gives_no_prices_while_running() -> None:
+    """A price sensor that changed its unit after the setup (ct/kWh, p/kWh; per MWh for Energi Data Service) gives no prices
+    at all: the next provider or the stored prices fill in, never a price 100 or 1000 times too high."""
+    rows = _rows(TODAY, lambda m: 1.0)
+    for unit in ("ct/kWh", "p/kWh", "GBp/kWh", "øre/kWh"):
+        provider = _provider({BUY: {"unit_of_measurement": unit, "raw_today": rows}})
+        assert provider.buy_real_prices == {} and provider.sell_real_prices == {}, unit
+    assert _provider({BUY: {"unit_of_measurement": "EUR/kWh", "raw_today": rows}}).buy_real_prices[_at(8)] == 1.0
+    assert _provider({BUY: {"unit_of_measurement": "EUR/MWh", "raw_today": rows}}).buy_real_prices[_at(8)] == 0.001  # converted, not refused
+
+    eds_rows = [{"hour": _at(hour).isoformat(), "price": 2.0} for hour in range(24)]
+    assert _eds({"sensor.eds": {"unit_of_measurement": "DKK/kWh", "raw_today": eds_rows}}).buy_real_prices[_at(8)] == 2.0
+    for unit in ("DKK/MWh", "øre/kWh"):
+        provider = _eds({"sensor.eds": {"unit_of_measurement": unit, "raw_today": eds_rows}})
+        assert provider.buy_real_prices == {} and provider.sell_real_prices == {}, unit
+    # a sensor that says nothing about its unit is read as it is (kWh)
+    assert _eds({"sensor.eds": {"raw_today": eds_rows}}).buy_real_prices[_at(8)] == 2.0
+
+
+def test_the_history_of_a_sensor_in_the_wrong_unit_is_left_out() -> None:
+    combined = create_price_provider(_config())
+    assert combined.price_unit_divisors({BUY: _State("25", {"unit_of_measurement": "ct/kWh"})}.get) == {BUY: None}
+    eds = create_price_provider(build_config({**default_options(), "energidataservice_buy_entity_id": "sensor.eds"}))
+    assert eds.price_unit_divisors({"sensor.eds": _State("2", {"unit_of_measurement": "DKK/MWh"})}.get) == {"sensor.eds": None}
+    assert eds.price_unit_divisors({"sensor.eds": _State("2", {"unit_of_measurement": "DKK/kWh"})}.get) == {}
+    assert eds.price_unit_divisors({"sensor.eds": _State("2", {"unit_of_measurement": "DKK/Wh"})}.get) == {"sensor.eds": None}
+    assert eds.price_unit_divisors({}.get) == {}  # a sensor that is not there: Energi Data Service keeps its history as it was
+
+
+def test_the_economy_sell_history_follows_the_sell_sensor_the_live_prices_use() -> None:
+    """Without a sell sensor the live prices sell at the buy sensor's price, and the history the what-if reads is its history."""
+    assert create_price_provider(_config()).sell_price_entity_ids() == [BUY]
+    assert create_price_provider(_config(energypriceforecast_sell_entity_id=SELL)).sell_price_entity_ids() == [SELL]
+    eds = create_price_provider(build_config({**default_options(), "energidataservice_buy_entity_id": "sensor.eds"}))
+    assert eds.sell_price_entity_ids() == ["sensor.eds"]
+
+
+def test_the_forecast_and_a_separate_sell_sensor_in_the_wrong_unit_give_no_prices() -> None:
+    forecast = _rows(DAY_3, lambda m: 1.0)
+    assert _provider({BUY: {"unit_of_measurement": "ct/kWh", "raw_forecast": forecast}}).buy_forecast_prices == {}
+    assert _provider({BUY: {"unit_of_measurement": "EUR/kWh", "raw_forecast": forecast}}).buy_forecast_prices  # the same rows in the right unit
+    rows = _rows(TODAY, lambda m: 1.0)
+    separate = _provider(
+        {BUY: {"unit_of_measurement": "EUR/kWh", "raw_today": rows}, SELL: {"unit_of_measurement": "ct/kWh", "raw_today": rows}},
+        energypriceforecast_sell_entity_id=SELL,
+    )
+    assert separate.buy_real_prices and separate.sell_real_prices == {}  # the buy prices stay
+    eds_forecast = [{"hour": _at(hour, day=DAY_3).isoformat(), "price": 2.0} for hour in range(24)]
+    assert _eds({"sensor.eds": {"unit_of_measurement": "DKK/kWh", "forecast": eds_forecast}}).buy_forecast_prices
+    for unit in ("DKK/MWh", "DKK/Wh"):
+        assert _eds({"sensor.eds": {"unit_of_measurement": unit, "forecast": eds_forecast}}).buy_forecast_prices == {}, unit
+
+
+def test_energi_data_service_per_wh_is_refused_too() -> None:
+    """A price per Wh is 1000 times too small: it rounds to 0 and would look like free electricity."""
+    states = {"sensor.w": _State("0.002", {"unit_of_measurement": "DKK/Wh", "raw_today": []})}
+    assert price_sensor_errors({"energidataservice_buy_entity_id": "sensor.w"}, states.get) == {"energidataservice_buy_entity_id": "price_unit_subunit"}
+    assert price_sensor_errors({"energypriceforecast_sell_entity_id": "sensor.w"}, {}.get) == {}
+    eds_rows = [{"hour": _at(hour).isoformat(), "price": 0.002} for hour in range(24)]
+    assert _eds({"sensor.eds": {"unit_of_measurement": "DKK/Wh", "raw_today": eds_rows}}).buy_real_prices == {}
+
+
+def test_no_prices_at_all_is_no_error_and_a_wrong_unit_on_the_sell_sensor_keeps_the_buy_prices() -> None:
+    """Every sensor in the wrong unit: an empty result, not a ValueError (the engine plans on the cached prices or the price
+    history). The prices of the other kind stay."""
+    rows = _rows(TODAY, lambda m: 1.0)
+    combined = create_price_provider(_config(energypriceforecast_sell_entity_id=SELL))
+    combined.set_now(NOW, COPENHAGEN)
+    assert combined.prices_loaded() is False
+    combined.set_snapshot({"attributes": {BUY: {"unit_of_measurement": "ct/kWh", "raw_today": rows}, SELL: {"unit_of_measurement": "ct/kWh", "raw_today": rows}}, "values": {}})
+    assert combined.prices_loaded() is True
+    assert combined.get_buy_prices() == {} and combined.get_sell_prices() == {} and combined.buy_prices_available() is False
+    combined.set_snapshot({"attributes": {BUY: {"unit_of_measurement": "EUR/kWh", "raw_today": rows}, SELL: {"unit_of_measurement": "ct/kWh", "raw_today": rows}}, "values": {}})
+    assert combined.buy_prices_available() is True and combined.get_buy_prices() and combined.get_sell_prices() == {}

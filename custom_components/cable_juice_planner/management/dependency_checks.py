@@ -7,7 +7,8 @@ history instead. The repair names the sensors and goes away by itself when they 
 other integrations.
 
 A third repair names the Energy Price Forecast sensors that have only a forecast and no published prices (a market
-where it publishes none): the hours of today that have passed then have no price.
+where it publishes none): the hours of today that have passed then have no price. A fourth names the price sensors whose
+unit makes their prices 100 or 1000 times too large (ct/kWh): their prices are not used.
 """
 from __future__ import annotations
 
@@ -26,7 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import DOMAIN
 from ..prices import stromligning_problems
-from ..prices.currency import forecast_only_sensors
+from ..prices.currency import forecast_only_sensors, wrong_unit_sensors
 from ..utils.solcast import SOLCAST_PLATFORM, SOLCAST_UNIQUE_IDS, strip_forecast_suffix
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 ISSUE_STROMLIGNING = "stromligning_entities"
 ISSUE_SOLCAST = "solcast_entities"
 ISSUE_FORECAST_ONLY = "energypriceforecast_forecast_only"
+ISSUE_PRICE_UNIT = "price_sensor_unit"
 # an Energy Price Forecast sensor with only a forecast gets the repair when it has been so on two checks an hour apart
 # (the hourly check comes a moment after a full hour): prices that are only late (just after midnight, an outage of
 # the published prices) make none
@@ -112,7 +114,7 @@ def _lines(entity_ids: list[str]) -> str:
 @callback
 def remove_issues(hass: HomeAssistant, entry_id: str) -> None:
     """Delete the repairs of a config entry (it was removed, or it no longer uses Strømligning, Solcast or Energy Price Forecast)."""
-    for issue in (ISSUE_STROMLIGNING, ISSUE_SOLCAST, ISSUE_FORECAST_ONLY):
+    for issue in (ISSUE_STROMLIGNING, ISSUE_SOLCAST, ISSUE_FORECAST_ONLY, ISSUE_PRICE_UNIT):
         ir.async_delete_issue(hass, DOMAIN, f"{entry_id}_{issue}")
 
 
@@ -128,6 +130,7 @@ class DependencyWatcher:
         forecast_entity: str,
         solcast_endings: list[str],
         price_forecast_entities: list[str] | tuple[str, ...] = (),
+        price_unit_sensors: Mapping[str, str] | None = None,
     ) -> None:
         self.hass = hass
         self.entry = entry
@@ -136,6 +139,7 @@ class DependencyWatcher:
         self.forecast_entity = forecast_entity
         self.solcast_endings = list(solcast_endings)
         self.price_forecast_entities = list(price_forecast_entities)
+        self.price_unit_sensors = dict(price_unit_sensors or {})
         self._forecast_only_since: dict[str, datetime.datetime] = {}
         self._unsubs: list[CALLBACK_TYPE] = []
         self._later: CALLBACK_TYPE | None = None
@@ -147,7 +151,7 @@ class DependencyWatcher:
 
     @callback
     def start(self) -> None:
-        if not self.stromligning_entities and not self.forecast_entity and not self.price_forecast_entities:
+        if not self.stromligning_entities and not self.forecast_entity and not self.price_forecast_entities and not self.price_unit_sensors:
             remove_issues(self.hass, self.entry.entry_id)  # nothing to watch any more: no repair about it either
             return
         if (unsub := async_at_started(self.hass, self._started)) is not None:
@@ -203,6 +207,7 @@ class DependencyWatcher:
         self._check_stromligning()
         self._check_solcast()
         self._check_forecast_only()
+        self._check_price_unit()
 
     def _set_issue(self, issue: str, problems: dict[str, list[str]], placeholders: Callable[[dict[str, list[str]]], dict[str, str]]) -> None:
         issue_id = self._issue_id(issue)
@@ -276,3 +281,19 @@ class DependencyWatcher:
         else:
             return
         self._set_issue(ISSUE_FORECAST_ONLY, {"entities": shown}, lambda problems: {"entities": _lines(problems["entities"])})
+
+    def _check_price_unit(self) -> None:
+        """Price sensors whose unit makes their prices 100 or 1000 times too large (a subunit such as ct/kWh, or per MWh or Wh for
+        Energi Data Service, see price_unit_error). The providers use no prices from such a sensor; this names it. The price page
+        refuses such a sensor, this is for one whose unit changed later. The unit stays while a sensor is down, so it is judged
+        then too. A unit does not flap, so there is no grace time. One the user ignored stays ignored (Home Assistant keeps that
+        over an update)."""
+        found = wrong_unit_sensors(self.hass.states.get, self.price_unit_sensors)
+        if not found:
+            ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(ISSUE_PRICE_UNIT))
+            return
+        self._set_issue(
+            ISSUE_PRICE_UNIT,
+            {"entities": [f"{entity_id} ({unit})" for entity_id, unit in found.items()]},
+            lambda problems: {"entities": _lines(problems["entities"])},
+        )

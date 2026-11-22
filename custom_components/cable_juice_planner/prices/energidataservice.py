@@ -63,6 +63,8 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         attr = self._get_entity_attr(entity_id)
         prices = {ts: p for ts, p in self._rows(attr.get("raw_today", [])) if days_between(current_hour, ts) == 0}
         if attr.get("tomorrow_valid"):
@@ -73,6 +75,8 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         prices = {}
         for timestamp, price in self._rows(self._get_entity_attr(entity_id).get("forecast", [])):
             if days_between(current_hour, timestamp) > 0:

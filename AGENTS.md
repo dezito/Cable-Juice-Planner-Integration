@@ -434,6 +434,19 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   unknown, no price rows yet) is never judged: it neither creates nor removes the repair. A repair the user ignored stays
   ignored (do not delete and recreate it). A restored state of a sensor that Energy Price Forecast no longer provides
   does not count while its entry runs. Do not use the `freezer` fixture to test it: the clock is `_utcnow()`.
+- A price sensor whose unit makes its prices 100 or 1000 times off (`price_unit_error()`: a subunit such as ct/kWh on any price
+  key, per MWh or per Wh on an Energi Data Service key; Energy Price Forecast converts its own per MWh) is refused on the price
+  page and, while running, gives no prices (`_wrong_unit()` in the providers: the next provider or the stored prices fill in,
+  never a price that is too high). Its recorded history is left out of the what-if (`price_unit_divisors()` returns None), and the
+  repair `price_sensor_unit` names it (no grace time, an ignored repair stays ignored).
+- Without a sell sensor (a restored backup may lack it) the economy's and the what-if's sell history is the history of the
+  effective sell sensor of the provider (`get_sell_price_entity_id()`: the sell sensor, else the buy sensor), like the live prices.
+- No online buy prices after the first price snapshot (every price sensor is down or in the wrong unit) is no error: the price
+  providers return empty dicts (`_combine_or_empty()`, per kind, so a dead sell sensor keeps the buy prices), the plan runs on
+  the cached prices (up to 2 hours), then the price history (offline prices, `get_hour_prices()`), and the charging is booked at
+  the price of the hour from there (`current_buy_price()`, refund added back for a history price), never at 0. With neither
+  cached prices nor history `cheap_grid_charge_hours()` raises and `charge_if_needed` is in the error mode, as before. The
+  history and the economy still store only real prices.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - The dashboard's sell price chart subtracts the configured fee (`@@sell_fee_value@@`, set in
   `render_dashboard()`); keep it in sync with `calculate_sell_price()`.
@@ -617,6 +630,13 @@ suite when practical:
 python -m pytest tests/test_<area>.py
 python -m pytest
 ```
+
+Keep test runs short (user decision). While fixing, run only the test files
+that cover the change; after a failure rerun only what failed (`--lf`, `-x` to
+stop at the first failure). Run the full suite once, after the last change and
+before reporting the task done: not after every fix or review round, and in a
+multi-agent task only once, by the main agent, not by each subagent.
+`--durations=25` shows the slowest tests.
 
 If test dependencies are not installed, install the repository's declared
 test requirements in the active environment:

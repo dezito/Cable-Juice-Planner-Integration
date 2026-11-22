@@ -80,7 +80,7 @@ class Pricing:
                 database["corrections"] = corrections
                 database["using_offline_prices"] = False
         except Exception as err:  # noqa: BLE001
-            if "last_update" in database and minutes_between(database["last_update"], now) <= 120:
+            if "prices" in database and "last_update" in database and minutes_between(database["last_update"], now) <= 120:
                 hour_prices = deepcopy(database["prices"])
                 _LOGGER.warning("Can't get online %s prices, using last successful: %s", "sell" if sell_prices else "grid", err)
             else:

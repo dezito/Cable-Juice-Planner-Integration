@@ -79,7 +79,7 @@ prices are rounded to 3 decimals instead of 2. Your own settings are never chang
 suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
 to prices in another currency, check the *Sell fee*. A sensor without a known unit
 leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
-this. The price pages of Energi Data Service and Energy Price Forecast refuse a sensor in cents or pence (and Energi Data Service one per MWh; Energy Price Forecast converts a price per MWh to kWh), and every
+this. The price pages of Energi Data Service and Energy Price Forecast refuse a sensor in cents or pence (and Energi Data Service one per MWh or Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). Every
 price sensor must be in the same currency (a backup provider in another currency is refused). The rates are rough: they only set the size of the limits, no price is ever converted between currencies. Currencies worth
 much less than a krone (CZK, HUF, ISK) are not recognised yet.
 

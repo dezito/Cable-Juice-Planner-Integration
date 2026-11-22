@@ -416,7 +416,7 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
@@ -830,7 +830,7 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
@@ -1446,6 +1446,10 @@
     "energypriceforecast_forecast_only": {
       "title": "Energy Price Forecast-sensorer, som Cable Juice Planner bruger, har ingen offentliggjorte priser ({prefix})",
       "description": "Cable Juice Planner ({prefix}) bruger Energy Price Forecast-sensorer, der i mindst en time ikke har haft offentliggjorte priser for i dag eller i morgen, kun en prognose:\n{entities}\n\nUden en pris for i dag har de timer, der er gået, ingen pris, så de mangler i ladehistorikken og prishistorikken.\n\nHvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden). Ellers er priserne blot forsinket.\n\nDenne reparation forsvinder af sig selv, når sensorerne har offentliggjorte priser igen."
+    },
+    "price_sensor_unit": {
+      "title": "Prissensorer som Cable Juice Planner bruger giver prisen i en forkert enhed ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) bruger prissensorer, der giver prisen i en underenhed af valutaen (fx ct/kWh eller p/kWh) eller, for Energi Data Service, pr. MWh eller Wh:\n{entities}\n\nDeres priser er 100 eller 1000 gange forkerte, så Cable Juice Planner bruger dem ikke: den planlægger i stedet på de gemte priser. Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh) i prisindstillingerne, eller sæt sensorens enhed tilbage.\n\nDenne reparation forsvinder af sig selv, når sensorerne igen giver prisen pr. kWh."
     },
     "stromligning_entities": {
       "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",

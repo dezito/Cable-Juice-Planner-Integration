@@ -78,6 +78,8 @@ class EnergyPriceForecastPriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         return dict(sorted(self._published(entity_id, current_hour).items()))
 
     def _published(self, entity_id, current_hour) -> dict:
@@ -96,6 +98,8 @@ class EnergyPriceForecastPriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         real = self._published(entity_id, current_hour)
         published_hours = {reset_time_to_hour(timestamp) for timestamp in real}
         prices = {}

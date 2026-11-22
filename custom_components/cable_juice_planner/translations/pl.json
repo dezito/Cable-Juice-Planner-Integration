@@ -416,7 +416,7 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
@@ -830,7 +830,7 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh).",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
@@ -1446,6 +1446,10 @@
     "energypriceforecast_forecast_only": {
       "title": "Czujniki Energy Price Forecast używane przez Cable Juice Planner nie mają opublikowanych cen ({prefix})",
       "description": "Cable Juice Planner ({prefix}) używa czujników Energy Price Forecast, które od co najmniej godziny nie mają opublikowanych cen na dziś ani na jutro, tylko prognozę:\n{entities}\n\nBez ceny na dziś minione godziny nie mają ceny, więc brakuje ich w historii ładowania i w historii cen.\n\nJeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen). W przeciwnym razie ceny są tylko opóźnione.\n\nTa naprawa zniknie sama, gdy czujniki znów będą miały opublikowane ceny."
+    },
+    "price_sensor_unit": {
+      "title": "Czujniki cen używane przez Cable Juice Planner podają cenę w złej jednostce ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) używa czujników cen, które podają cenę w podjednostce waluty (np. ct/kWh lub p/kWh) lub, dla Energi Data Service, za MWh lub Wh:\n{entities}\n\nIch ceny są błędne o czynnik 100 lub 1000, więc Cable Juice Planner ich nie używa: planuje na podstawie zapisanych cen. Wybierz w ustawieniach cen czujnik z ceną za kWh w walucie (np. EUR/kWh) albo przywróć jednostkę czujnika.\n\nTa naprawa zniknie sama, gdy czujniki znów będą podawać cenę za kWh."
     },
     "stromligning_entities": {
       "title": "Czujniki Strømligning potrzebne dla Cable Juice Planner są niedostępne ({prefix})",

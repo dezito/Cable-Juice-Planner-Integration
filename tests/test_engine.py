@@ -2419,3 +2419,59 @@ def test_startup_publishes_the_charging_amps_table_with_solar() -> None:
     assert result.error is None
     assert result.states["charging_amps_table"] == engine.charging_amps_table()
     assert result.value["amps_report"] == engine.charging_amps_table()
+
+
+def _engine_with_a_price_sensor_in_ct(history: bool):
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+    snap.price_data["attributes"]["sensor.price"]["unit_of_measurement"] = "øre/kWh"
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()} if history else {}).error is None
+    return engine, snap
+
+
+def test_a_price_sensor_in_the_wrong_unit_is_planned_on_the_price_history_and_booked_at_its_price() -> None:
+    """The only price sensor gives øre/kWh: no online prices. The plan runs on the price history (offline prices), the charger
+    is not in the error mode, and the charging is booked at the price of the hour from the history, never at 0."""
+    engine, snap = _engine_with_a_price_sensor_in_ct(history=True)
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_mode != "error"
+    assert engine.grid_price_cache["using_offline_prices"] is True
+    assert charge_hours(engine)
+    assert engine.run_job(snap, engine.calc_kwh_price).value > 0.0
+
+
+def test_a_price_sensor_in_the_wrong_unit_without_any_price_history_is_the_error_mode_as_before() -> None:
+    engine, snap = _engine_with_a_price_sensor_in_ct(history=False)
+    engine.run_job(snap, engine.charge_if_needed, True)
+    assert engine.charger_mode == "error"
+
+
+def test_the_booking_at_a_history_price_does_not_take_the_refund_off_twice() -> None:
+    """The price history is stored net of the refund: booked at it, the charging costs the history price, not less."""
+    expected = {}
+    for refund in (0.0, 0.5):
+        now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+        snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+        snap.price_data["attributes"]["sensor.price"]["unit_of_measurement"] = "øre/kWh"
+        engine = CJPEngine(const.build_config({**OPTIONS, "refund": refund}), "cjp_test", TEXTS)
+        assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+        assert engine.run_job(snap, engine.get_grid_prices, True).error is None
+        assert engine.grid_price_cache["using_offline_prices"] is True
+        expected[refund] = engine.run_job(snap, engine.calc_kwh_price).value
+    assert expected[0.0] == pytest.approx(2.0 + DAY.weekday() / 10, abs=0.01)
+    assert expected[0.5] == pytest.approx(expected[0.0], abs=0.01)
+
+
+def test_without_any_price_the_second_call_fails_like_the_first_not_with_a_key_error() -> None:
+    """The last successful prices are only used when there are any: the sell side without prices and without history used to
+    answer the first call with an error and the next ones with a KeyError that the planner swallowed (no plan, no error)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    snap.price_data = {"attributes": {}, "values": {}}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    engine.run_job(snap, engine.startup, {})
+    for _ in range(2):
+        result = engine.run_job(snap, engine.get_hour_prices, True, True)
+        assert isinstance(result.error, ValueError), repr(result.error)  # not the KeyError of a missing cached price

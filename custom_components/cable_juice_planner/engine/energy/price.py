@@ -79,6 +79,22 @@ class EnergyPrice:
         total_cost = sum(powerwall_total_cost)
         return total_cost / total_kwh if total_kwh > 0.0 else 0.0
 
+    def current_buy_price(self) -> float:
+        """The buy price of now: the provider's (real, else forecast), else the price of the hour from get_grid_prices (the cached
+        prices or the price history) when there are no online prices at all, e.g. every price sensor is down or in the wrong unit.
+        A missing price would book the charging at 0; the price of the history is an estimate, not marked as one in the charging
+        history."""
+        try:
+            return self.price_provider.get_buy_price()
+        except ValueError:
+            result = self.price_provider.get_price_at_timestamp(self.get_grid_prices(), self.now())
+            if result is None:
+                raise
+            price = result["price"]
+            if self.grid_price_cache.get("sources", {}).get(result["price_timestamp"]) in ("database", "offline"):
+                price += self.price_provider.refund  # the price history is stored net of the refund (append_kwh_prices), calc_kwh_price takes it off
+            return price
+
     def calc_kwh_price(self, period=60, update_entities=False, solar_period_current_hour=False) -> float:
         ev_total_price_kwh = 0.0
         valuta = self.t("ui.common.valuta")
@@ -104,7 +120,7 @@ class EnergyPrice:
             ev_grid_watt = round(max(ev_used_consumption - watts_from_local_energy, 0.0), 3)
 
             refund = self.price_provider.refund
-            grid_kwh_price = self.price_provider.get_buy_price() - refund
+            grid_kwh_price = self.current_buy_price() - refund
             solar_kwh_price = self.get_solar_sell_price(set_entity_attr=update_entities)
             powerwall_kwh_price = self.get_powerwall_kwh_price()
 
@@ -131,7 +147,7 @@ class EnergyPrice:
                 _LOGGER.debug("kWh cost price %s", ev_total_price_kwh)
                 self.set_state(key, ev_total_price_kwh)
                 if not self.is_solar_configured():
-                    raw_price = self.price_provider.get_buy_price()
+                    raw_price = self.current_buy_price()
                     self.set_attr(key, "raw_price", f"{raw_price:.2f} {valuta_kwh}")
                     self.set_attr(key, "refund", f"{refund:.2f} {valuta_kwh}")
                     self.set_attr(key, "price", f"{raw_price - refund:.2f} {valuta_kwh}")

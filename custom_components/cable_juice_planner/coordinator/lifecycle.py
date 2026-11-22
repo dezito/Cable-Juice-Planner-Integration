@@ -25,7 +25,7 @@ from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
 from ..prices import stromligning_entities_to_watch
-from ..prices.currency import energypriceforecast_entities
+from ..prices.currency import energypriceforecast_entities, price_unit_sensors
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none
@@ -83,6 +83,7 @@ class CoordinatorLifecycle:
         watcher = DependencyWatcher(
             self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7),
             price_forecast_entities=energypriceforecast_entities(self.config["prices"]["entity_ids"]),
+            price_unit_sensors=price_unit_sensors(self.config["prices"]["entity_ids"]),
         )
         watcher.start()
         self.entry.async_on_unload(watcher.stop)

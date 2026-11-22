@@ -416,7 +416,7 @@
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
-      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh oder Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
       "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
@@ -830,7 +830,7 @@
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
-      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh oder Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
       "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
@@ -1446,6 +1446,10 @@
     "energypriceforecast_forecast_only": {
       "title": "Energy-Price-Forecast-Sensoren, die Cable Juice Planner nutzt, haben keine veröffentlichten Preise ({prefix})",
       "description": "Cable Juice Planner ({prefix}) nutzt Energy-Price-Forecast-Sensoren, die seit mindestens einer Stunde keine veröffentlichten Preise für heute oder morgen haben, nur eine Prognose:\n{entities}\n\nOhne einen Preis für heute haben die vergangenen Stunden keinen Preis, daher fehlen sie im Ladeverlauf und im Preisverlauf.\n\nWenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht). Andernfalls sind die Preise nur verspätet.\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren wieder veröffentlichte Preise haben."
+    },
+    "price_sensor_unit": {
+      "title": "Preissensoren, die Cable Juice Planner nutzt, geben den Preis in der falschen Einheit an ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) nutzt Preissensoren, die den Preis in einer Untereinheit der Währung (z. B. ct/kWh oder p/kWh) oder, bei Energi Data Service, pro MWh oder Wh angeben:\n{entities}\n\nIhre Preise sind um den Faktor 100 oder 1000 falsch, daher nutzt Cable Juice Planner sie nicht: Es plant stattdessen mit den gespeicherten Preisen. Wähle in den Preiseinstellungen einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh) oder stelle die Einheit des Sensors zurück.\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren den Preis wieder pro kWh angeben."
     },
     "stromligning_entities": {
       "title": "Strømligning-Sensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",

@@ -18,6 +18,7 @@ from custom_components.cable_juice_planner.management import dependency_checks
 from custom_components.cable_juice_planner.prices.currency import forecast_only_sensors
 from custom_components.cable_juice_planner.management.dependency_checks import (
     ISSUE_FORECAST_ONLY,
+    ISSUE_PRICE_UNIT,
     ISSUE_SOLCAST,
     ISSUE_STROMLIGNING,
     RECHECK_DELAY,
@@ -497,3 +498,61 @@ async def test_a_sensor_seen_once_with_only_a_forecast_then_not_judged_starts_it
     await clock.next_hour()
     assert issue(hass, entry, ISSUE_FORECAST_ONLY)
     watched.stop()
+
+
+UNIT_SENSORS = {"sensor.epf_retail": "energypriceforecast_buy_entity_id", "sensor.eds": "energidataservice_buy_entity_id"}
+
+
+def _unit_watcher(hass: HomeAssistant, entry: MockConfigEntry) -> DependencyWatcher:
+    watched = DependencyWatcher(hass, entry, "bm", [], "", [], price_unit_sensors=UNIT_SENSORS)
+    watched.start()
+    return watched
+
+
+async def test_a_price_sensor_in_the_wrong_unit_gets_a_repair_at_once_and_it_goes_when_fixed(hass: HomeAssistant) -> None:
+    """Only a sensor with a subunit (ct/kWh), or per MWh for Energi Data Service, is named; Energy Price Forecast converts its
+    own price per MWh. An entry with only price sensors (no Strømligning, no Solcast) is watched as well."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set("sensor.epf_retail", "25", {"unit_of_measurement": "EUR/MWh"})
+    hass.states.async_set("sensor.eds", "2.0", {"unit_of_measurement": "DKK/MWh"})
+    watched = _unit_watcher(hass, entry)
+
+    repair = issue(hass, entry, ISSUE_PRICE_UNIT)
+    assert repair and not repair.is_fixable and repair.translation_key == ISSUE_PRICE_UNIT
+    assert repair.translation_placeholders == {"prefix": "bm", "entities": "- sensor.eds (DKK/MWh)"}
+
+    hass.states.async_set("sensor.epf_retail", "2500", {"unit_of_measurement": "ct/kWh"})
+    watched.check()
+    assert issue(hass, entry, ISSUE_PRICE_UNIT).translation_placeholders["entities"] == "- sensor.epf_retail (ct/kWh)\n- sensor.eds (DKK/MWh)"
+
+    hass.states.async_set("sensor.epf_retail", "0.25", {"unit_of_measurement": "EUR/kWh"})
+    hass.states.async_set("sensor.eds", "2.0", {"unit_of_measurement": "DKK/kWh"})
+    watched.check()
+    assert issue(hass, entry, ISSUE_PRICE_UNIT) is None
+    watched.stop()
+
+
+async def test_the_wrong_unit_is_judged_while_the_sensor_is_down_and_an_ignored_repair_stays_ignored(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set("sensor.eds", "unavailable", {"unit_of_measurement": "øre/kWh"})  # the unit stays while the sensor is down
+    watched = _unit_watcher(hass, entry)
+    assert issue(hass, entry, ISSUE_PRICE_UNIT)
+    ir.async_ignore_issue(hass, DOMAIN, f"{entry.entry_id}_{ISSUE_PRICE_UNIT}", True)
+
+    hass.states.async_set("sensor.epf_retail", "2500", {"unit_of_measurement": "ct/kWh"})  # another sensor goes wrong too
+    watched.check()
+    repair = issue(hass, entry, ISSUE_PRICE_UNIT)
+    assert repair.dismissed_version is not None and "sensor.epf_retail" in repair.translation_placeholders["entities"]
+
+    hass.states.async_remove("sensor.eds")  # a sensor that is not there has no unit
+    hass.states.async_remove("sensor.epf_retail")
+    watched.check()
+    assert issue(hass, entry, ISSUE_PRICE_UNIT) is None
+    hass.states.async_set("sensor.eds", "2.0", {"unit_of_measurement": "ct/kWh"})
+    watched.check()
+    assert issue(hass, entry, ISSUE_PRICE_UNIT).dismissed_version is None, "a new episode is shown again"
+    watched.stop()
+    remove_issues(hass, entry.entry_id)
+    assert issue(hass, entry, ISSUE_PRICE_UNIT) is None
