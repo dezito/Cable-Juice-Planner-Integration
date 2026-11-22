@@ -36,11 +36,12 @@ from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix, strip_removed_op
 from .management.blueprint_install import async_install_blueprints
 from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
 from .management.dependency_checks import remove_issues
+from .management.voltage_issue import async_check_voltage, async_remove_voltage_issue
 from .management.health_checks import async_remove_health_store
 from .management.dashboard_cards import async_dismiss_card_notification
 from .management.debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
 from .utils.helpers import float_or_none
-from .site import CJPSite, phase_units_issue_id
+from .site import CJPSite, fuse_issue_id, phase_units_issue_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -202,6 +203,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool:
     await coordinator.async_setup()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    # checked on every setup: a changed voltage reloads the entry (management/voltage_issue.py)
+    async_check_voltage(hass, entry)
     if coordinator.config.get("dashboard"):
         await _async_run_after_home_assistant_started(
             hass,
@@ -320,11 +323,13 @@ async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None
     if entry.data.get(CONF_SITE):
         # the site's own repair (an unload keeps it, like every repair)
         ir.async_delete_issue(hass, DOMAIN, phase_units_issue_id(entry.entry_id))
+        ir.async_delete_issue(hass, DOMAIN, fuse_issue_id(entry.entry_id))
         return
     from .management.storage import CJPStorage  # noqa: PLC0415
 
     async_dismiss_card_notification(hass, entry)
     remove_issues(hass, entry.entry_id)
+    async_remove_voltage_issue(hass, entry.entry_id)
     try:
         await async_remove_health_store(hass, entry.entry_id)
     except Exception:  # noqa: BLE001 - a health store that can't be deleted must not stop the backup below

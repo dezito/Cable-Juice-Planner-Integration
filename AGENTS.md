@@ -408,6 +408,14 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
     sensor in the budget, is not seen.
   - The circuit sum (`circuit_amps`) is capped at the fuse minus margin; the
     cap ignores the house and cars outside the circuit.
+- The site repair `site_fuse_exceeded` (`fuse_issue_id`, information only):
+  judged in the house forecast from the phases' hourly means before the cars
+  are subtracted, against the raw `fuse_lN` (not minus margin). Raised when a
+  phase has at least `FUSE_OVER_HOURS` hours above `FUSE_OVER_FACTOR` × fuse
+  in the last `FORECAST_DAYS`; removed only when every phase has
+  `FUSE_MIN_HOURS` hours of data and none is over, or the site has no phase
+  sensors. A forecast that returns early judges nothing. An unload keeps it;
+  removing the site deletes it (`async_remove_entry`).
 - Shared circuit (Easee master): user choices: chargers are picked as HA
   devices on each car's load balancing page; the circuit is stored once in the
   site options (`circuits`), so a change from one car applies to all of it; a
@@ -461,6 +469,23 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `limit_put_back {"ok": None}` is published before the test limit, so a
   restored `running` state (`sensor.py` passes it on) becomes `stopped` with
   the "check the limit" note. A normal running test is not restored.
+
+### Charger test: parts and voltage
+
+- The default grid voltage is 230 V. A car entry with exactly 240 V gets the
+  fixable repair `voltage_old_default` (`management/voltage_issue.py`). It is
+  not migrated automatically, because a deliberate 240 V (UK, PyScript
+  imports) can't be told apart from the old default.
+- The test has three independent parts: the charging steps, the stop and the
+  charge limit. A stop reason ends the charging steps (the rest of them and the
+  stop are `not_reached`). The charge limit step still runs, with a stop held
+  first. Only the switch or an internal error ends the whole test.
+- `charger_test_hold("stop")` is accepted over the test's own hold whatever
+  the charger status, so a held charge never stays published after
+  `completed` or `not_connected`.
+- The shown steps are `_judged(raw)`: they are judged again at the measured
+  voltage from the raw steps after every step. `already_charging` is applied
+  after the judging.
 
 ### PyScript import
 
@@ -534,11 +559,42 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 - `management/health_checks.py` (`HealthWatcher`) raises the repairs
   `entities_missing`, `entity_units`, `blueprint_automation_lost`,
-  `charger_status_unknown` and `charger_not_following`. They only inform; none
+  `charger_status_unknown`, `charger_not_following`, `consumption_frozen` and the value scale
+  repairs below (`power_without_unit`, `battery_level_fraction`,
+  `price_unit_scale`). They only inform; none
   of them controls anything. Thresholds are the module constants
   (`STATUS_UNKNOWN_MINUTES`, `STATUS_UNKNOWN_DAYS`, `NOT_FOLLOWING_EVENTS`,
-  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the existing
-  persistent notification after 30 minutes covers it.
+  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the planner's own notification covers it
+  (`Engine.is_entity_available`, `engine/engine.py`). It comes only for an entity with an entity registry entry (its platform is
+  read once at setup, `coordinator/lifecycle.py`), when the planner reads the entity and finds no number for it in the last 24
+  hours (`get_state` falls back to the history), and once the entity has stayed unavailable for more than 30 minutes at those
+  reads (the 30 minutes are counted per integration). The house sensor is read at the end of each hour (`hour_end`, minute 59), and with solar also in each charge-hour calculation (`cheap_grid_charge_hours` -> `local_energy_prediction` ->
+  `inverter_available`, every planner cron, `min(cron_interval, 15)` minutes). It is also read when a charger charges without a
+  rule (the charging-without-a-rule alarm in `engine/control/schedule.py`, which lists the unavailable entities through `get_all_unavailable_entities`; `configured_entity_ids()` includes the house sensor).
+- `consumption_frozen` judges only the house consumption power sensor
+  (`home.entity_ids.power_consumption_entity_id`), not solar, battery flow or
+  charger power, which are legitimately 0 for hours. It is raised when the value
+  has not changed for `FROZEN_AFTER` (6 hours, by `last_changed`), checked hourly,
+  so the repair appears 6 to 7 hours after the last change. The frozen value and
+  its start are kept in the `.health` store (`consumption_frozen`), so a restart
+  keeps the repair.
+- Startup grace: for `CONSUMPTION_GRACE` (30 minutes) after a start or reload of
+  the entry, until the next check (in practice up to about an hour), nothing is
+  deleted, the stored value and time are not replaced, no baseline is taken from a
+  lost store, and the state listener ignores the sensor. An open repair is shown
+  again from its stored value (`async_create_issue` keeps its Ignore); a new one is
+  raised by the 6 hours only while no such repair is open. The grace ends at the
+  first check that is at least 30 minutes after the start and reads a number, or
+  finds no house sensor or another one.
+- After the grace the repair is deleted only on a positive answer: a finite number
+  other than the stored one, no house sensor configured, another one configured, a
+  repair that names another sensor while the stored value is lost, or a change the
+  state listener saw to another number since the last check (decided by that check).
+  Unavailable, unknown or text keeps the repair as it is.
+- Without a readable stored value (lost or malformed store), a repair that names
+  this sensor takes the value of the first check after the grace as its baseline;
+  without such a repair, the value is the baseline once it has been the same for
+  `FROZEN_AFTER`.
 - Delete an issue only on a positive answer (the problem is gone), never on an
   unclear one (unavailable/unknown state, unreadable `automations.yaml`).
   Delete + create resets the user's "Ignore", while `async_create_issue` on an
@@ -563,6 +619,28 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   engine through `JobResult.charger_problems`. Events while a charger test
   holds the charger and within `NOT_FOLLOWING_AFTER_TEST` minutes
   (`engine/control/schedule.py`) after it are not counted.
+- Value scale repairs (decided with the user: inform only, no fix flow and no
+  conversion, because the blueprint reads the charger power itself):
+  `power_without_unit` (a power or charger power sensor without a unit whose
+  values over `POWER_SCALE_DAYS` stay at most `KW_LOOKING_MAX` with fractions,
+  so kW read as W), `battery_level_fraction` (home battery or car level, every
+  value 0..1 with fractions) and `price_unit_scale` (a price entity in a
+  subunit, per MWh or per Wh, judged by its unit only, through
+  `CombinedPriceProvider.price_unit_problems`). The verdicts are in
+  `management/value_checks.py`, the same file as in BattMind (change both
+  together, with `tests/test_value_checks.py`): True, False or None, and None
+  never clears a repair. History is read in the recorder's executor, at most
+  once per `VALUE_RECHECK` per sensor, and only for a sensor whose current
+  state could be in the wrong scale. The flagged sensors are kept in the
+  `.health` store (`scale_flagged`); with a known list the repair goes when no
+  sensor is flagged any more. A repair's list is known only when it was read
+  intact from the store or one check judged every sensor of that repair (True
+  or False), or when the repair is not in the issue registry (nothing to
+  forget: a fresh start knows its empty list). A lost store or an unreadable
+  stored value while the repair is open leaves it unknown, and then every
+  sensor must be judged fine before the repair goes. A sensor that
+  is no longer configured is dropped from the list. Phase sensors are not in these checks (a unitless phase sensor is
+  read as amps, which no value range can tell from kW).
 
 ### Power units
 
@@ -618,6 +696,13 @@ not depend on the run being slow: wait for real conditions or real time, not a
 fixed number of `sleep(0)` yields. When calling the test venv's Python
 directly, put `../ha-dev/windows` (shims) on `PYTHONPATH`. Test the PyScript
 import with `../ha-dev/dev.ps1 import-legacy` before adding the integration.
+
+Keep test runs short (user decision). While fixing, run only the test files
+that cover the change (`'-n' '0'` for a single file); after a failure rerun
+only what failed (`--lf`, `-x` to stop at the first failure). Run the full
+suite once, after the last change and before reporting the task done: not
+after every fix or review round, and in a multi-agent task only once, by the
+main agent, not by each subagent. `--durations=25` shows the slowest tests.
 
 The devcontainer, the seven seeded car profiles (for missing-entity and
 single-provider cases), the Windows venv and its shims, debugging in one

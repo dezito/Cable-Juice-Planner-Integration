@@ -98,6 +98,13 @@ overloaded phase limits the last car at once.
   without having been given current counts with its power spread over its phases here, so another car is not
   limited for a draw that may not be there.
 
+- **Main fuse check:** the house forecast's hourly mean current of each phase is compared with the raw main fuse (the
+  margin is not taken off here). A phase with a mean of more than 1.25 × its fuse for 3 hours or more in the last 7 days
+  raises the repair *The house and the cars draw more than the main fuse (load balancing)*, which names the phase: either the
+  main fuse is set too low, or a phase sensor measures something else. It is a warning only, nothing is limited by it, and it
+  goes when the next forecast no longer finds it. See
+  [Repairs from the health checks](faq-troubleshooting.md#repairs-from-the-health-checks).
+
 **Example:** a 25 A fuse with 1 A margin, two cars with 3 × 16 A. Car 1 (priority 1) charges at 16 A. The
 house uses 5 A on L1. Car 2 gets 25 − 1 − 5 − 16 = 3 A on L1 – too little, so it is planned in other hours
 (or with fewer amps once car 1 is done).

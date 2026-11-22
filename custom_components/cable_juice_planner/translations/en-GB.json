@@ -1421,6 +1421,17 @@
         }
       }
     },
+    "voltage_old_default": {
+      "title": "The grid voltage of {name} is the old default {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Set the grid voltage of {name} to {default} V",
+            "description": "The grid voltage of **{name}** (under *Charger - specifications* in the options) is {voltage} V, the default of earlier versions of Cable Juice Planner. The default is now {default} V, the nominal voltage in most of Europe. CJP counts the charging power of the plan and of the solar steps with it, and turns the charger's measured power into amps for the load balancing: a voltage set too high counts a car's current too low.\n\nSelect **Submit** to set it to {default} V (the entry is reloaded). If your grid really has {voltage} V, ignore this repair. You can change the voltage at any time in the options."
+          }
+        }
+      }
+    },
     "stromligning_entities": {
       "title": "Strømligning sensors that Cable Juice Planner needs are not available ({prefix})",
       "description": "Cable Juice Planner ({prefix}) uses Strømligning sensors that are disabled or that Strømligning does not provide. A missing sell tariff counts as 0, which makes the calculated sell price too high, and without the price sensors the stored prices are used.\n\nDisabled in Home Assistant (Strømligning disables its excl. VAT sensors by default – enable them under **Settings → Devices & services → Entities**, with *Show disabled entities*):\n{disabled}\n\nNot provided by Strømligning (e.g. the price forecasts are off in its options):\n{not_provided}\n\nThis repair disappears by itself when the sensors work again."
@@ -1448,6 +1459,26 @@
     "charger_status_unknown": {
       "title": "The charger status is a value Cable Juice Planner does not know ({prefix})",
       "description": "The status of the charger has been one of these values for at least {minutes} minutes. Cable Juice Planner does not know them: they are neither a ready, not ready, charging, completed nor error status. The last time each was seen is shown:\n{values}\n\nWhile the status has such a value, the plan goes on as if the charger were ready. Cable Juice Planner does not restart a charger that does not charge, does not see a car being plugged in (so manual and forced charging are not reset and the car is not woken up), does not count the charger's kWh meter for the battery level simulation, and counts the charger as charging in the load balancing.\n\nIf the value is a normal status of your charger, report it with **Export debug info** on the device. Otherwise check the charger integration. Then run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when no such value has been seen for {days} days."
+    },
+    "power_without_unit": {
+      "title": "Power sensors without a unit are read as W ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these power sensors in watts (W), because they have no unit:\n{entities}\n\nThe number after ≤ is the highest value seen (without sign).\n\nOver the last {days} days their values never went above {max}, and some of them are decimal numbers, so they look like kilowatts (kW). Read as W they are 1000 times too small, and the plan uses far too little power.\n\nFix it at the sensor: give it its unit, for example `unit_of_measurement: kW` on a template sensor, or the unit that its integration provides. If the values really are watts, choose **Ignore** on this repair. This repair disappears by itself once the sensors have a unit, or their values show that they are watts."
+    },
+    "battery_level_fraction": {
+      "title": "Battery levels that look like a share, not a percentage ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these battery levels as percent:\n{entities}\n\nThe number after ≤ is the highest value seen (without sign).\n\nOver the last {days} days every value of these sensors was between 0 and 1, so they look like a share (0.85 means 85 %). Read as percent, 0.85 is 0.85 %, so the plan works with a battery level that is 100 times too low.\n\nFix it at the sensor: make it report 0 to 100, for example by multiplying by 100 in a template sensor, and select that sensor in the settings. If the values really are percent and only happen to be below 1, choose **Ignore** on this repair. This repair disappears by itself once the sensors report 0 to 100, or their values show percent."
+    },
+    "price_unit_scale": {
+      "title": "Price sensors in a subunit, per MWh or per Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these price sensors as prices per kWh in the currency, but their unit is a subunit of the currency (øre or cent), per MWh or per Wh:\n{entities}\n\nNo price is converted, so the prices are 100 or 1000 times too large (subunit, per MWh) or 1000 times too small (per Wh), and the plan and the savings calculation are wrong. Only the unit is judged, not the size of the prices.\n\nFix it at the source: in Energi Data Service turn off **Show prices in cent** and set **Price calculated in** to kWh in the options of the integration, or select a sensor whose unit is the currency per kWh (e.g. kr/kWh). If the unit really is correct, choose **Ignore** on this repair. This repair disappears by itself once every price sensor is in the currency per kWh (e.g. kr/kWh)."
+    },
+    "consumption_frozen": {
+      "title": "House consumption sensor shows the same value for 6 hours ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) uses the house consumption sensor {entity} for the house consumption in the plan. It has shown {value} since {since}: at least 6 hours without a change.\n\nThe plan uses this sensor for the house, so a sensor that stays the same gives it a wrong house consumption. Check the integration or the device that delivers the sensor: it may have stopped sending values. If the value really is constant, choose **Ignore** on this repair.\n\nThis repair disappears by itself once the sensor reports a different value. An unavailable sensor keeps the repair as it is. The planner's notification about an unavailable sensor only covers a sensor with an entity registry entry (for example from an integration, made in the UI, or YAML with a unique ID)."
+    },
+    "site_fuse_exceeded": {
+      "title": "The house and the cars draw more than the main fuse (load balancing)",
+      "description": "In the last {days} days the hourly mean current on these phases was above {factor} times the main fuse for {hours} hours or more. Each line shows the phase, its main fuse → the highest hourly mean current (hours above the limit > the limit, which is the main fuse times {factor}):\n{phases}\n\nA fuse of that size is unlikely to carry such a current for an hour. So either the main fuse on the shared grid connection page is set too low (the cars then get less current than they could), or a phase sensor measures something else: phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors. If the fuse really is that large and the values are correct, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the next forecast no longer finds it: after the fuse is corrected, at the latest when these hours are out of the last {days} days."
     },
     "charger_not_following": {
       "title": "The charger did not follow the plan {count} times in {days} days ({prefix})",

@@ -29,6 +29,7 @@ from ..engine.control.charger_test import (
     amps_unproven,
     build_charger_test_markdown,
     car_phases_of,
+    judge_at_measured_voltage,
     judge_power,
     next_amps,
     overdraw_w,
@@ -103,7 +104,10 @@ class CoordinatorChargerTest:
             and all(isinstance(step.get(key), number) for key in ("limit_from", "limit_to", "limit_seen", "seconds"))
             and step.get("status") in ("ok", "adjusted", "fail", "skip")
             and (step.get("reason") in SKIP_REASONS if step.get("status") == "skip" else step.get("reason") in (None, "overdraw"))
-            and all(isinstance(step.get(key), number) for key in ("amps", "configured_amps", "watt", "expected_w", "phases", "judged_phases"))
+            and all(
+                isinstance(step.get(key), number) and not isinstance(step.get(key), bool)
+                for key in ("amps", "configured_amps", "watt", "expected_w", "phases", "judged_phases", "voltage", "voltage_setting")
+            )
             and isinstance(step.get("attempts") or [], list)
             and all(isinstance(attempt, dict) and isinstance(attempt.get("amps"), number) and isinstance(attempt.get("watt"), number)
                     for attempt in step.get("attempts") or [])
@@ -172,8 +176,11 @@ class CoordinatorChargerTest:
     # ------------------------------------------------------------------ #
 
     async def _async_charger_test(self) -> None:
-        steps: list[dict[str, Any]] = []
+        raw: list[dict[str, Any]] = []  # the steps as they were measured (judged at the voltage setting)
+        steps: list[dict[str, Any]] = []  # what is shown: raw judged again at the measured voltage (_judged)
         status, reason = "done", None
+        ended: str | None = None
+        already_charging = False
         stop_step = {"name": "stop", "phases": 0, "amps": 0, "expected_w": 0}
         planned: list[dict] = []  # every step the test would have run, for the ones that were not reached
         charging_at: tuple[int, int] | None = None  # (amps, phases) of the last current that worked
@@ -204,38 +211,44 @@ class CoordinatorChargerTest:
             before = self._charger_power(begin["power_entity"])
             already_charging = before is not None and before >= STARTED_AMPS * begin["voltage"]
             context: dict[str, Any] = {"car_phases": None}
+            # the parts of the test end on their own: the charging steps end at the first stop reason (the other charging
+            # steps and the stop, which needs a charge before it, are then not reached), the stop ends itself. The charge limit
+            # in the car depends on neither and is still tested; only the switch (cancel) and an error end the whole test
             for step in plan:
                 if has_steps(found, *START_INPUTS) is False:
-                    steps.append(self._skipped(step, "no_steps"))
+                    raw.append(self._skipped(step, "no_steps"))
+                    steps = self._judged(raw, begin["voltage"], amps_control, already_charging)
                     self._publish_charger_test(steps=list(steps))
                     continue
                 record, stop = await self._async_charge_step(step, begin, amps_control, context)
-                if already_charging and record["status"] in ("ok", "adjusted"):
-                    record, already_charging = {**record, "status": "adjusted", "already_charging": True}, False
-                steps.append(record)
+                raw.append(record)
+                # judged again from the raw steps each time: a voltage the later attempts no longer confirm is not kept
+                steps = self._judged(raw, begin["voltage"], amps_control, already_charging)
                 self._publish_charger_test(steps=list(steps), car_phases=context["car_phases"])
-                if record["status"] in ("ok", "adjusted"):
-                    charging_at = (record["amps"], record["phases"])
+                charging_at = self._last_charge(steps, charging_at)
                 if stop:
-                    status, reason = "stopped", stop
+                    ended = stop
                     break
-            else:
+            if ended is None:
                 if has_steps(found, *STOP_INPUTS) is False:
-                    steps.append(self._skipped(stop_step, "no_steps"))
+                    raw.append(self._skipped(stop_step, "no_steps"))
                 else:
-                    record, stop = await self._async_stop_step(stop_step, begin, charging_at)
-                    steps.append(record)
-                    if stop:
-                        status, reason = "stopped", stop
+                    record, ended = await self._async_stop_step(stop_step, begin, charging_at)
+                    raw.append(record)
+                steps = self._judged(raw, begin["voltage"], amps_control, already_charging)
                 self._publish_charger_test(steps=list(steps))
-                if limit_step and status != "stopped":
-                    if has_steps(found, *LIMIT_INPUTS) is False:
-                        steps.append(self._skipped(limit_step, "no_steps"))
-                    else:
-                        steps.append(await self._async_limit_step(limit_step))
-                    self._publish_charger_test(steps=list(steps))
+            if limit_step:
+                if has_steps(found, *LIMIT_INPUTS) is False:
+                    raw.append(self._skipped(limit_step, "no_steps"))
+                else:
+                    raw.append(await self._async_limit_step(limit_step, ended))
+                steps = self._judged(raw, begin["voltage"], amps_control, already_charging)
+                self._publish_charger_test(steps=list(steps))
+            if ended:
+                status, reason = "stopped", ended
         except asyncio.CancelledError:
-            status, reason = "stopped", "stopped"
+            # a part that ended early (an overdraw, for example) is still the reason shown
+            status, reason = "stopped", ended or "stopped"
         except Exception:  # noqa: BLE001
             _LOGGER.exception("The charger test failed")
             status, reason = "failed", "internal_error"
@@ -244,6 +257,8 @@ class CoordinatorChargerTest:
             # a limit that changes together with a stop is never sent)
             await self._async_limit_put_back()
             await self._async_charger_test_release()
+            if begin and begin.get("ok"):
+                steps = self._judged(raw, begin["voltage"], amps_control, already_charging)
             if amps_control and begin and amps_unproven(steps, begin["voltage"], STARTED_AMPS * begin["voltage"]):
                 # the power was the same whatever the amps: a current that "worked" may be the one the charger always uses
                 steps = [
@@ -251,9 +266,31 @@ class CoordinatorChargerTest:
                     if step["name"] not in ("stop", "limit") and step["status"] in ("ok", "adjusted") else step
                     for step in steps
                 ]
-            if status == "stopped":  # the steps that were not run are shown, not left out
-                steps.extend(self._skipped(step, "not_reached") for step in planned[len(steps):])
+            if status == "stopped":  # the steps that were not run are shown, not left out, in the order they would have run
+                run = {step["name"]: step for step in steps}
+                steps = [run.get(step["name"]) or self._skipped(step, "not_reached") for step in planned]
             self._publish_charger_test(status=status, steps=steps, reason=reason, finished=dt_util.now().isoformat(timespec="seconds"))
+
+    @staticmethod
+    def _judged(raw: list[dict], voltage: float, amps_control: bool, already_charging: bool) -> list[dict]:
+        """The steps as shown: with control of the current judged again at the measured voltage (a voltage setting that is
+        not the grid's fails currents the charger took exactly), and, for a car that already charged at the start, the first
+        charge step that worked marked as proving no start (after the judging, which may make a failed step work)."""
+        steps = judge_at_measured_voltage(raw, voltage, STARTED_AMPS * voltage) if amps_control else list(raw)
+        if already_charging:
+            for index, step in enumerate(steps):
+                if step["name"] not in ("stop", "limit") and step["status"] in ("ok", "adjusted"):
+                    steps[index] = {**step, "status": "adjusted", "already_charging": True}
+                    break
+        return steps
+
+    @staticmethod
+    def _last_charge(steps: list[dict], charging_at: tuple[int, int] | None) -> tuple[int, int] | None:
+        """(amps, phases) of the last charge step that worked: the current the stop step charges at before it stops."""
+        for step in reversed(steps):
+            if step["name"] not in ("stop", "limit") and step["status"] in ("ok", "adjusted"):
+                return step["amps"], step["phases"]
+        return charging_at
 
     async def _async_charger_test_release(self) -> None:
         """Put the plan's own action and amps back. Also run when the test is stopped or the entry is unloaded."""
@@ -300,18 +337,25 @@ class CoordinatorChargerTest:
             return "completed"
         return None
 
+    def _unplugged(self) -> str | None:
+        """Why the stop can not be judged: only a cable pulled out. After CJP's own stop a charger that reports completed or
+        waiting is what a stop looks like (an automation that stops the charging in the car makes the charger report
+        completed, like for a full car)."""
+        return "not_connected" if self._charger_status() in CHARGER_NOT_READY_STATUS else None
+
     def _published_amps(self) -> list[int]:
         """The amps per phase on the action sensor now (the load balancing may have limited them since the hold)."""
         attributes = self.attributes.get("charger_action") or {}
         return [int(attributes.get(f"phase_{index}_amps") or 0) for index in (1, 2, 3)]
 
     async def _async_wait_for_power(
-        self, entity_id: str, check, over_w: float | None = None, requested: list[int] | None = None
+        self, entity_id: str, check, over_w: float | None = None, requested: list[int] | None = None, ended=None
     ) -> tuple[str, float | None, int]:
         """Read the power until check(mean) holds twice in a row, or the time is up.
 
         Returns ("ok" | "fail" | "no_data" | "ended" | "over" | "limited", the last mean in W, seconds). The first
         SETTLE_SECONDS do not count, and a reading the sensor did not have (lost, stale) starts the averaging again.
+        * "ended": ended() gave a reason (default _ended_by_the_charger: the cable was pulled out or the car is full).
         * "over": every reading of the average above over_w after OVERDRAW_AFTER_SECONDS (the charger takes more than it was
           given, and it is not a charger that is still coming down from the step before). An average above over_w never
           passes, also not a check that is a lower bound (a start, the stop step's charging): it waits for the overdraw.
@@ -320,10 +364,11 @@ class CoordinatorChargerTest:
         readings: list[float] = []
         passes = 0
         last: float | None = None
+        ended = ended or self._ended_by_the_charger
         while time.monotonic() - started < ATTEMPT_TIMEOUT:
             await asyncio.sleep(SAMPLE_SECONDS)
             elapsed = time.monotonic() - started
-            if self._ended_by_the_charger():
+            if ended():
                 return "ended", last, round(elapsed)
             if requested is not None and self._published_amps() != requested:
                 return "limited", last, round(elapsed)
@@ -468,9 +513,10 @@ class CoordinatorChargerTest:
         held = (await self.async_run_job("charger_test_hold", "stop", 0, 0, ATTEMPT_TIMEOUT + HOLD_MARGIN_SECONDS, include_forecast=True)).value
         if held["status"] != "ok":
             return self._skipped(step, "not_ready"), self._ended_by_the_charger() or "not_connected"
-        verdict, mean, taken = await self._async_wait_for_power(begin["power_entity"], lambda value: value <= STOPPED_W)
+        # after the stop only a pulled cable ends the step: completed or waiting is the stop itself, and the power judges it
+        verdict, mean, taken = await self._async_wait_for_power(begin["power_entity"], lambda value: value <= STOPPED_W, ended=self._unplugged)
         if verdict == "ended":
-            return self._skipped(step, "not_ready"), self._ended_by_the_charger()
+            return self._skipped(step, "not_ready"), "not_connected"
         if verdict == "no_data":
             return self._skipped(step, "no_data"), None
         record = {
@@ -508,10 +554,15 @@ class CoordinatorChargerTest:
                 return ("no_data" if last is None else "fail"), last, round(time.monotonic() - started)
             await asyncio.sleep(LIMIT_SAMPLE_SECONDS)
 
-    async def _async_limit_step(self, step: dict) -> dict[str, Any]:
+    async def _async_limit_step(self, step: dict, ended: str | None = None) -> dict[str, Any]:
         """The charge limit: CJP publishes a limit 10 % from the car's limit now (limit_test_value) and reads the car's charge
         limit entity until it shows it. The car's own limit from before the test is put back afterwards
-        (_async_limit_put_back), also when the test is stopped during the step."""
+        (_async_limit_put_back), also when the test is stopped during the step.
+
+        ended: why the charging steps or the stop ended early (a stop reason). The held charge is then stopped first, so the
+        limit is not tested on the charge of the step that ended the test, nor on one a car that stopped itself may resume
+        (without a stop reason the limit changes on the action the step before held).
+        A stop over the test's own hold is always taken; without a hold, a charger that is not ready skips the step."""
         # the car's limit now, not at the start: the steps before it held charges, and the automation sends the plan's limit
         # with a new charge, so the car may have another limit than at the start. What is put back is the one from the start
         own = step.get("own")
@@ -523,9 +574,10 @@ class CoordinatorChargerTest:
             return self._skipped(step, "no_limit", limit_from=current)
         own = current if own is None else own
         seconds = 2 * LIMIT_TIMEOUT + HOLD_MARGIN_SECONDS
-        if (await self.async_run_job("charger_test_published")).value is None:
-            # no step held the charger (no steps for the start): hold a stop of its own first, and change the limit in a later
-            # run of the automation
+        published = (await self.async_run_job("charger_test_published")).value
+        if published is None or ended:
+            # no step held the charger (no steps for the start), or the charging ended early: hold a stop of its own first,
+            # and change the limit in a later run of the automation
             held = (await self.async_run_job("charger_test_hold", "stop", 0, 0, seconds, include_forecast=True)).value
             if held["status"] != "ok":
                 return self._skipped(step, "not_ready")

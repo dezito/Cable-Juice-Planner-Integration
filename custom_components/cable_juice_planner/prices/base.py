@@ -7,7 +7,8 @@ import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER
+from ..const import ENTITY_UNAVAILABLE_STATES, PRICE_ADDER_DAY_BETWEEN_DIVIDER
+from ..management.value_checks import price_unit_wrong
 from ..utils.helpers import days_between, float_or_none, reset_time_to_hour
 
 _LOGGER = logging.getLogger(__name__)
@@ -254,6 +255,26 @@ class CombinedPriceProvider(BasePriceProvider):
     def price_entity_ids(self) -> list[str]:
         """Every configured price entity (each once)."""
         return list(dict.fromkeys(entity_id for entity_id in self.entity_ids.values() if entity_id))
+
+    def price_unit_problems(self, get_state: GetState) -> tuple[list[tuple[str, str]], bool]:
+        """The price entities in a unit the prices are not read in (a subunit such as øre or ct, per MWh or per Wh: price_unit_wrong).
+
+        Returns (entity id, unit) of each such entity, and whether every entity was judged. A state that is missing, or
+        unavailable or unknown without a unit, is not judged."""
+        problems: list[tuple[str, str]] = []
+        judged = True
+        for entity_id in self.price_entity_ids():
+            state = get_state(entity_id)
+            if state is None:
+                judged = False
+                continue
+            unit = state.attributes.get("unit_of_measurement")
+            if unit is None and state.state in ENTITY_UNAVAILABLE_STATES:
+                judged = False
+                continue
+            if price_unit_wrong(unit):
+                problems.append((entity_id, unit))
+        return problems, judged
 
     def buy_price_entity_ids(self) -> list[str]:
         """The buy price entities of the providers, in priority order."""

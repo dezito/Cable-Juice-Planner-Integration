@@ -1421,6 +1421,17 @@
         }
       }
     },
+    "voltage_old_default": {
+      "title": "Napięcie sieci dla {name} to stara wartość domyślna {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Ustaw napięcie sieci dla {name} na {default} V",
+            "description": "Napięcie sieci dla **{name}** (w *Ładowarka - parametry* w opcjach) wynosi {voltage} V, czyli wartość domyślną wcześniejszych wersji Cable Juice Planner. Teraz domyślnie jest {default} V, napięcie znamionowe w większości Europy. CJP liczy z nim moc ładowania planu i stopni solarnych oraz przelicza zmierzoną moc ładowarki na ampery dla zarządzania obciążeniem: zbyt wysokie napięcie zaniża prąd samochodu.\n\nWybierz **Zatwierdź**, aby ustawić {default} V (wpis zostanie ponownie wczytany). Jeśli Twoja sieć naprawdę ma {voltage} V, zignoruj tę naprawę. Napięcie możesz zmienić w każdej chwili w opcjach."
+          }
+        }
+      }
+    },
     "stromligning_entities": {
       "title": "Czujniki Strømligning potrzebne dla Cable Juice Planner są niedostępne ({prefix})",
       "description": "Cable Juice Planner ({prefix}) używa czujników Strømligning, które są wyłączone lub których Strømligning nie udostępnia. Brakująca taryfa sprzedaży liczy się jako 0, przez co obliczona cena sprzedaży jest za wysoka, a bez czujników cen używane są zapisane ceny.\n\nWyłączone w Home Assistant (Strømligning domyślnie wyłącza czujniki bez VAT – włącz je w **Ustawienia → Urządzenia i usługi → Encje** z opcją *Pokaż wyłączone encje*):\n{disabled}\n\nNiedostarczane przez Strømligning (np. prognozy cen są wyłączone w jego opcjach):\n{not_provided}\n\nTa naprawa zniknie sama, gdy czujniki znów będą działać."
@@ -1448,6 +1459,26 @@
     "charger_status_unknown": {
       "title": "Stan ładowarki ma wartość, której Cable Juice Planner nie zna ({prefix})",
       "description": "Stan ładowarki przez co najmniej {minutes} minut miał jedną z tych wartości, których Cable Juice Planner nie zna. Nie są ani gotowością, ani brakiem gotowości, ani ładowaniem, ani zakończeniem, ani błędem. Przy każdej podano, kiedy była ostatnio widziana:\n{values}\n\nDopóki stan ma taką wartość, plan działa tak, jakby ładowarka była gotowa. Cable Juice Planner nie uruchamia jednak ponownie ładowarki, która nie ładuje, nie widzi podłączenia samochodu (ładowanie ręczne i wymuszone nie są resetowane, samochód nie zostaje obudzony), nie liczy licznika kWh ładowarki przy symulacji poziomu baterii i traktuje ładowarkę jako ładującą w rozdziale mocy.\n\nJeśli wartość jest normalnym stanem twojej ładowarki, zgłoś ją przyciskiem **Eksportuj informacje debug** na urządzeniu. W przeciwnym razie sprawdź integrację ładowarki. Następnie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy przez {days} dni nie zauważono takiej wartości."
+    },
+    "power_without_unit": {
+      "title": "Czujniki mocy bez jednostki są odczytywane jako W ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te czujniki mocy w watach (W), bo nie mają jednostki:\n{entities}\n\nLiczba po ≤ to najwyższa zaobserwowana wartość (bez znaku).\n\nW ciągu ostatnich dni ({days}) ich wartości nigdy nie przekroczyły {max}, a niektóre są liczbami ułamkowymi, więc wyglądają na kilowaty (kW). Odczytane jako W są 1000 razy za małe, a plan używa zbyt małej mocy.\n\nNapraw to na czujniku: nadaj mu jednostkę, np. `unit_of_measurement: kW` w czujniku szablonowym, albo jednostkę, którą podaje jego integracja. Jeśli wartości są naprawdę w watach, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy czujniki mają jednostkę albo ich wartości pokazują, że są w watach."
+    },
+    "battery_level_fraction": {
+      "title": "Poziomy baterii wyglądające na udział, a nie na procenty ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te poziomy baterii jako procenty:\n{entities}\n\nLiczba po ≤ to najwyższa zaobserwowana wartość (bez znaku).\n\nW ciągu ostatnich dni ({days}) wszystkie wartości tych czujników mieściły się między 0 a 1, więc wyglądają na udział (0,85 oznacza 85 %). Odczytane jako procenty, 0,85 to tylko 0,85 %, więc plan liczy z poziomem baterii 100 razy za niskim.\n\nNapraw to na czujniku: niech podaje wartości od 0 do 100, np. mnożąc przez 100 w czujniku szablonowym, i wybierz ten czujnik w ustawieniach. Jeśli wartości są naprawdę w procentach i tylko leżą poniżej 1, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy czujniki podają wartości od 0 do 100 albo ich wartości pokazują procenty."
+    },
+    "price_unit_scale": {
+      "title": "Czujniki cen w podjednostce, za MWh lub za Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te czujniki cen jako ceny za kWh w walucie, ale ich jednostka to podjednostka waluty (øre lub cent), cena za MWh albo cena za Wh:\n{entities}\n\nŻadna cena nie jest przeliczana, więc ceny są 100 lub 1000 razy za duże (podjednostka, za MWh) albo 1000 razy za małe (za Wh), a plan i rachunek oszczędności są błędne. Oceniana jest tylko jednostka, nie wielkość cen.\n\nNapraw to u źródła: w Energi Data Service (opcje są tylko po angielsku) wyłącz **Show prices in cent** i ustaw **Price calculated in** na kWh w opcjach integracji, albo wybierz czujnik, którego jednostka to waluta za kWh (np. kr/kWh). Jeśli jednostka jest naprawdę poprawna, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy wszystkie czujniki cen są w walucie za kWh (np. kr/kWh)."
+    },
+    "consumption_frozen": {
+      "title": "Czujnik zużycia domu pokazuje przez 6 godzin tę samą wartość ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) używa czujnika zużycia domu {entity} do zużycia domu w planie. Od {since} pokazuje wartość {value}, czyli co najmniej 6 godzin bez zmiany.\n\nPlan używa tego czujnika dla domu, więc czujnik, który stoi w miejscu, daje błędne zużycie domu. Sprawdź integrację lub urządzenie, które dostarcza czujnik: może przestało wysyłać wartości. Jeśli wartość naprawdę jest stała, wybierz przy tej naprawie **Ignoruj**.\n\nTa naprawa znika sama, gdy czujnik pokaże inną wartość. Niedostępny czujnik zostawia naprawę bez zmian. Powiadomienie planu o niedostępnym czujniku dotyczy tylko czujnika z wpisem w rejestrze encji (na przykład z integracji, utworzonego w interfejsie albo z YAML z unikalnym ID)."
+    },
+    "site_fuse_exceeded": {
+      "title": "Dom i samochody pobierają więcej niż bezpiecznik główny (rozdział mocy)",
+      "description": "W ciągu ostatnich dni ({days}) godzinowa średnia prądu na tych fazach była przez co najmniej {hours} h powyżej bezpiecznika głównego pomnożonego przez {factor}. Każda linia pokazuje fazę, jej bezpiecznik główny → najwyższą godzinową średnią prądu (godziny powyżej limitu > limit, czyli bezpiecznik główny razy {factor}):\n{phases}\n\nBezpiecznik tej wielkości raczej nie wytrzymałby takiego prądu przez godzinę. Więc albo bezpiecznik główny we wspólnym przyłączu jest ustawiony za nisko (samochody dostają wtedy mniej prądu, niż mogłyby), albo czujnik fazy mierzy coś innego: fazy w złej kolejności, czujnik, który nie jest fazą sieci, albo zła jednostka. Sprawdź wielkość bezpiecznika i czujniki faz. Jeśli bezpiecznik jest naprawdę tak duży, a wartości są poprawne, wybierz przy tej naprawie **Ignoruj**.\n\nNaprawa znika sama, gdy kolejna prognoza jej już nie znajduje: po poprawieniu bezpiecznika, najpóźniej gdy te godziny wypadną z ostatnich dni ({days})."
     },
     "charger_not_following": {
       "title": "Ładowarka nie stosowała się do planu {count} razy w ciągu {days} dni ({prefix})",

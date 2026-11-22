@@ -35,6 +35,9 @@ class HistoryRecalculate:
                 return False
             if len(sorted_keys) > 1:
                 for i in range(1, min(len(sorted_keys), 20)):
+                    if "public_charging" in (db[sorted_keys[i]].get("charging_type") or []):
+                        # a public charge booked at its own end time in this hour is no part of the charge at home
+                        break
                     if hours_between(now, sorted_keys[i]) == 0 and now.hour == sorted_keys[i].hour:
                         start = sorted_keys[i]
                         _LOGGER.info("Found another charging session in current hour %s: %s", start, db[start])

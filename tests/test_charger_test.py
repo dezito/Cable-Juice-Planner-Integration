@@ -26,8 +26,10 @@ from custom_components.cable_juice_planner.engine.control.charger_test import (
     build_steps,
     car_phases_of,
     charger_step_text,
+    judge_at_measured_voltage,
     judge_power,
     limit_test_value,
+    measured_voltage,
     next_amps,
     overdraw_w,
     power_is_capped,
@@ -146,6 +148,69 @@ def test_power_that_does_not_rise_with_the_amps_is_a_limit_of_the_car_or_the_cha
     assert power_is_capped(1, flat, None, threshold)
     assert not power_is_capped(1, _watts((6, 0, False), (8, 0, False)), None, threshold)  # does not charge at all
     assert not power_is_capped(1, _watts((6, 3000, False)), None, threshold)  # one current says nothing
+
+
+def test_the_voltage_is_measured_when_the_power_follows_the_amps_at_another_voltage() -> None:
+    threshold = 5 * VOLTAGE
+    # a debug export: the 1-phase steps of a Tesla on an Easee charger, 240 V set, the grid gave about 223 V under the load
+    real = _watts((16, 3563, False), (14, 3131, False), (12, 2669, False), (10, 2246, False), (8, 1776, True), (6, 1348, True))
+    assert measured_voltage(real, 1, 240.0, threshold) == pytest.approx(223.3, abs=0.5)
+    # attempts that gave nothing do not count
+    assert measured_voltage(_watts((16, 0, False), (12, 2669, True), (6, 1348, True)), 1, 240.0, threshold) == pytest.approx(223.5, abs=0.6)
+    # a charger that always gives one amp less: the power per amp drifts with the amps
+    short = _watts(*((amps, (amps - 1) * VOLTAGE, False) for amps in (16, 14, 12, 10, 8)))
+    assert measured_voltage(short, 1, VOLTAGE, threshold) is None
+    # two currents close together can't tell an amp short from a voltage
+    assert measured_voltage(_watts((16, 15 * VOLTAGE, False), (14, 13 * VOLTAGE, False)), 1, VOLTAGE, threshold) is None
+    assert measured_voltage(_watts((16, 3400, False)), 1, VOLTAGE, threshold) is None
+    # a car that limits its power
+    assert measured_voltage(_watts((16, 8000, False), (14, 8000, False), (12, 8000, True), (8, 5520, True)), 3, VOLTAGE, threshold) is None
+    # a voltage far from the setting: a car on fewer phases than published, not the grid
+    assert measured_voltage(_watts((16, 16 * VOLTAGE, False), (8, 8 * VOLTAGE, False)), 3, VOLTAGE, threshold) is None
+
+
+def _export_step(name: str, phases: int, configured: int, *triples, status: str = "ok") -> dict:
+    attempts = _watts(*triples)
+    best = attempts[-1]
+    return {
+        "name": name, "status": status, "reason": None, "phases": phases, "configured_amps": configured, "amps": best["amps"], "watt": best["watt"],
+        "expected_w": best["amps"] * phases * 240.0, "attempts": attempts, "seconds": 60, "limited": False,
+    }
+
+
+# a debug export: 240 V set, the grid gave about 229 V on three phases and 223 V on one; the 1-phase maximum ended on 8 A
+EXPORT_STEPS = [
+    _export_step("max", 3, 16, (16, 10967, True)),
+    _export_step("min", 3, 6, (6, 4137, True)),
+    _export_step("single_max", 1, 16, (16, 3563, False), (14, 3131, False), (12, 2669, False), (10, 2246, False), (8, 1776, True), status="adjusted"),
+    _export_step("single_min", 1, 6, (6, 1348, True)),
+    {"name": "stop", "status": "ok", "reason": None, "phases": 0, "configured_amps": 0, "amps": 0, "watt": 0, "expected_w": 0, "attempts": []},
+]
+
+
+def test_the_steps_are_judged_again_at_the_measured_voltage() -> None:
+    threshold = 5 * 240.0
+    judged = {step["name"]: step for step in judge_at_measured_voltage(EXPORT_STEPS, 240.0, threshold)}
+    single = judged["single_max"]
+    assert single["status"] == "ok" and single["amps"] == 16 and single["watt"] == 3563 and not single["limited"]
+    assert single["voltage"] == pytest.approx(223.3, abs=0.5) and single["voltage_setting"] == 240.0
+    assert judge_power(single["expected_w"], single["watt"]) and all(attempt["ok"] for attempt in single["attempts"])
+    assert judged["single_min"]["status"] == "ok" and judged["single_min"]["voltage"] == single["voltage"]
+    assert judged["max"]["status"] == "ok" and judged["max"]["voltage"] == pytest.approx(229.2, abs=0.5)
+    assert judged["stop"] == EXPORT_STEPS[4]
+    assert EXPORT_STEPS[2]["status"] == "adjusted" and "voltage" not in EXPORT_STEPS[2]  # a copy, not changed in place
+    assert judge_at_measured_voltage(list(judged.values()), 240.0, threshold) == list(judged.values())  # judged once is judged
+
+
+def test_a_voltage_near_the_setting_or_a_step_that_proves_nothing_is_left_as_it_is() -> None:
+    threshold = 5 * VOLTAGE
+    near = [_export_step("max", 3, 16, (16, 16 * 3 * 227, True)), _export_step("min", 3, 6, (6, 6 * 3 * 227, True))]
+    assert judge_at_measured_voltage(near, VOLTAGE, threshold) == near  # 227 V is within 2 % of 230 V
+    started = {**EXPORT_STEPS[0], "status": "adjusted", "already_charging": True}
+    overdraw = {**EXPORT_STEPS[2], "status": "fail", "reason": "overdraw", "attempts": _watts((16, 11000, False))}
+    judged = {step["name"]: step for step in judge_at_measured_voltage([started, EXPORT_STEPS[1], overdraw, EXPORT_STEPS[3]], 240.0, 5 * 240.0)}
+    assert judged["max"]["status"] == "adjusted" and judged["max"]["voltage"]  # a start that is not proven stays a note
+    assert judged["single_max"] == overdraw and "voltage" not in judged["single_min"]  # one current on one phase proves nothing
 
 
 def _record(name: str, phases: int, *triples, status: str = "adjusted") -> dict:
@@ -278,7 +343,16 @@ STEP_RESULTS = [
         {"name": name, "reason": None, "phases": 3, "configured_amps": 16, "amps": 12, "watt": 8000, "expected_w": 8280, "attempts": []}
         for name in ("max", "min", "single_max", "single_min")
     ]
-    for extra in ({"limited": True}, {"already_charging": True}, {"limited": True, "already_charging": True}, {"judged_phases": 1})
+    for extra in (
+        {"limited": True}, {"already_charging": True}, {"limited": True, "already_charging": True}, {"judged_phases": 1},
+        {"voltage": 223.3, "voltage_setting": 240.0}, {"voltage": 223.3, "voltage_setting": 240.0, "judged_phases": 1},
+    )
+] + [
+    {**STEP_BASE, "status": "ok", "voltage": 229.2, "voltage_setting": 240.0}
+    for STEP_BASE in [
+        {"name": name, "reason": None, "phases": 3, "configured_amps": 16, "amps": 16, "watt": 10967, "expected_w": 11002, "attempts": []}
+        for name in ("max", "single_max")
+    ]
 ] + [
     {"name": "limit", "status": status, "reason": reason, "phases": 0, "configured_amps": 0, "amps": 0, "watt": 0, "expected_w": 0,
      "attempts": [], "seconds": 40, "limit_from": 80, "limit_to": 90, "limit_seen": 80}
@@ -340,6 +414,15 @@ def test_the_markdown_shows_a_row_per_step_and_what_was_tried() -> None:
     assert "1 af 3" in markdown
 
 
+def test_the_markdown_tells_the_measured_voltage_once_per_number_of_phases() -> None:
+    texts = _texts("da")
+    t = lambda key, **fmt: translate(texts, key, **fmt)  # noqa: E731
+    steps = judge_at_measured_voltage(EXPORT_STEPS, 240.0, 5 * 240.0)
+    markdown = build_charger_test_markdown(t, {"status": "done", "steps": steps, "reason": None, "automation": "found", "amps_control": True})
+    assert "Ret indstillingen" not in markdown
+    assert markdown.count("229 V") >= 2 and markdown.count("223 V") >= 2 and markdown.count("240 V") == 2  # in the steps and the notes
+
+
 # --- the runner, with a charger that follows the published action -----------------------------------------------
 
 
@@ -357,6 +440,7 @@ def fast_runner():
 def wire_charger(
     hass: HomeAssistant, max_amp: int = 16, min_amp: int = 6, working: bool = True, car_phases: int = 3, cap_w: float | None = None,
     three_phases_always: bool = False, power_at=None, limit_follows=lambda value: True, limits: list | None = None, on_limit=None,
+    status_on_stop: str | None = None, status_on_charge: str | None = None,
 ):
     """The user's automation and charger: the power follows the published action and amps, like a charger would.
 
@@ -364,14 +448,33 @@ def wire_charger(
     three_phases_always: an automation that does not switch the charger to one phase. power_at(amps, phases): the power
     of a charge instead (a charger that does something else). limit_follows(value): whether the car takes a published
     charge limit (the automation's *Set charge limit in the car*); limits gets (action, charge limit) of every publish, and
-    on_limit(value) is called when the car took one."""
+    on_limit(value) is called when the car took one. status_on_stop: the charger status after a stop that follows a charge
+    (an automation that stops the charging in the car: the charger then reports what it reports for a full car).
+    status_on_charge: the status at the test's first charge, which then gives no power (a car that is full at once)."""
     seen: list[tuple] = []
+    test_charges: list[bool] = []
 
     def update(_event=None) -> None:
         state = hass.states.get(ACTION)
         if state is None:
             return
         amps = [int(state.attributes.get(f"phase_{index}_amps") or 0) for index in (1, 2, 3)]
+        held = [
+            getattr(entry.runtime_data.engine, "_charger_hold", None)
+            for entry in hass.config_entries.async_entries(DOMAIN) if getattr(entry, "runtime_data", None)
+        ]
+        if status_on_stop is not None and any(held):
+            # only the test's own charge and stop (not the plan's before the test). This runs in a worker thread (a plain
+            # function), and the status has listeners in the event loop
+            if state.state == "charge":
+                test_charges.append(True)
+                hass.loop.call_soon_threadsafe(hass.states.async_set, CHARGER_STATUS, "charging")
+            elif test_charges:
+                hass.loop.call_soon_threadsafe(hass.states.async_set, CHARGER_STATUS, status_on_stop)
+        full = status_on_charge is not None and (bool(test_charges) or (state.state == "charge" and any(held)))
+        if full and not test_charges:
+            test_charges.append(True)
+            hass.loop.call_soon_threadsafe(hass.states.async_set, CHARGER_STATUS, status_on_charge)
         seen.append((state.state, tuple(amps)))
         limit = state.attributes.get("charging_limit")
         if limits is not None:
@@ -385,7 +488,7 @@ def wire_charger(
             if on_limit is not None:
                 on_limit(limit)
         power = 0.0
-        if state.state == "charge" and working:
+        if state.state == "charge" and working and not full:
             per_phase, phases = max(amps), sum(1 for value in amps if value)
             phases = min(3 if three_phases_always else phases, car_phases)
             power = 0.0 if per_phase < min_amp else min(per_phase, max_amp) * phases * VOLTAGE
@@ -479,7 +582,9 @@ async def test_the_search_finds_the_current_that_works_at_both_ends(hass, solar_
 
 async def test_a_charger_that_does_not_charge_at_the_maximum_ends_the_test_there(hass, solar_entry, fast_runner) -> None:
     """The maximum is the test that charging works at all: nothing else is tried on a charger that gives no power."""
-    wire_charger(hass, working=False)
+    limits: list = []
+    wire_charger(hass, working=False, limits=limits)
+    test = _test_limit(hass)
     with patch(FOUND, return_value=[]):
         await _start(hass)
     state = hass.states.get(RESULT)
@@ -487,6 +592,9 @@ async def test_a_charger_that_does_not_charge_at_the_maximum_ends_the_test_there
     assert state.state == "stopped" and state.attributes["reason"] == "no_charging"
     assert steps["max"]["status"] == "fail" and len(steps["max"]["attempts"]) == 1  # no search on a dead charger
     assert all(steps[name]["status"] == "skip" and steps[name]["reason"] == "not_reached" for name in ("min", "single_max", "single_min", "stop"))
+    # the charge limit does not depend on the charging: it is still tested, with the charging stopped first
+    assert list(steps) == ["max", "min", "single_max", "single_min", "stop", "limit"] and steps["limit"]["status"] == "ok"
+    assert {action for action, limit in limits if limit == test} == {"stop"}
     assert solar_entry.runtime_data.engine._charger_hold is None
 
 
@@ -546,7 +654,9 @@ async def test_a_charger_that_pauses_at_0_amps_is_tested_with_its_current_alone(
 
 async def test_an_automation_that_does_not_switch_to_one_phase_ends_the_test_at_once(hass, solar_entry, fast_runner) -> None:
     """The load balancing counts on the published amps: a charger taking three phases at "16 A on one phase" is a risk."""
-    wire_charger(hass, three_phases_always=True)
+    limits: list = []
+    wire_charger(hass, three_phases_always=True, limits=limits)
+    test = _test_limit(hass)
     with patch(FOUND, return_value=[]):
         await _start(hass)
     state = hass.states.get(RESULT)
@@ -555,7 +665,123 @@ async def test_an_automation_that_does_not_switch_to_one_phase_ends_the_test_at_
     assert steps["single_max"]["status"] == "fail" and steps["single_max"]["reason"] == "overdraw"
     assert len(steps["single_max"]["attempts"]) == 1  # no search, and never more amps
     assert steps["single_min"]["reason"] == "not_reached" and steps["stop"]["reason"] == "not_reached"
+    # the charge limit is still tested, but never while the charger that took too much is held at a charge
+    assert steps["limit"]["status"] == "ok"
+    assert {action for action, limit in limits if limit == test} == {"stop"}
     assert solar_entry.runtime_data.engine._charger_hold is None
+
+
+async def test_after_an_overdraw_a_stop_that_is_refused_skips_the_charge_limit(hass, solar_entry, fast_runner) -> None:
+    """The engine refuses the stop (it takes one over the test's own hold, so this is the defensive path): the overdrawing
+    charge is not kept up for the charge limit, the step is skipped."""
+    wire_charger(hass, three_phases_always=True)
+    engine = solar_entry.runtime_data.engine
+    hold = type(engine).charger_test_hold
+
+    def refuse_stop(self, kind, *args):
+        if kind == "stop":
+            return {"status": "not_ready", "requested": [0, 0, 0], "published": [0, 0, 0]}
+        return hold(self, kind, *args)
+
+    with patch(FOUND, return_value=[]), patch.object(type(engine), "charger_test_hold", refuse_stop):
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert hass.states.get(RESULT).attributes["reason"] == "overdraw"
+    assert steps["limit"]["status"] == "skip" and steps["limit"]["reason"] == "not_ready"
+    assert engine._charger_hold is None
+
+
+async def test_a_car_that_stops_itself_on_the_stop_passes_it_and_the_charge_limit_is_tested(hass, charger_entry, fast_runner) -> None:
+    """The automation stops the charging in the car: the charger then says completed, like for a full car. After CJP's
+    own stop that is what a stop looks like, and the power shows it."""
+    wire_charger(hass, status_on_stop="completed")
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "done" and state.attributes["reason"] is None, steps
+    assert steps["stop"]["status"] == "ok" and steps["limit"]["status"] == "ok"
+
+
+async def test_a_car_that_is_full_during_a_charge_step_has_its_limit_tested_at_a_stop(hass, charger_entry, fast_runner) -> None:
+    """The charger reports completed during the charging: the held charge is replaced by a stop before the limit step (the
+    engine takes a stop over the test's own hold whatever the status), so the car can't resume on the test's charge."""
+    limits: list = []
+    wire_charger(hass, status_on_charge="completed", limits=limits)
+    test = _test_limit(hass)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "stopped" and state.attributes["reason"] == "completed", steps
+    assert steps["max"]["status"] == "skip" and steps["stop"]["reason"] == "not_reached"
+    assert steps["limit"]["status"] == "ok"
+    assert {action for action, limit in limits if limit == test} == {"stop"}
+    assert charger_entry.runtime_data.engine._charger_hold is None
+
+
+async def test_a_car_unplugged_after_the_stop_does_not_prove_the_stop(hass, charger_entry, fast_runner) -> None:
+    wire_charger(hass, status_on_stop="disconnected")
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "stopped" and state.attributes["reason"] == "not_connected"
+    assert steps["stop"]["status"] == "skip" and steps["stop"]["reason"] == "not_ready"
+    assert steps["limit"]["status"] == "ok"  # the car's limit is set in the car, not through the cable
+
+
+async def test_a_grid_voltage_below_the_setting_is_measured_not_told_as_other_amps(hass, solar_entry, fast_runner) -> None:
+    """The power follows every current, at 93 % of amps x the voltage setting: the voltage is wrong, not the automation."""
+    wire_charger(hass, power_at=lambda amps, phases: amps * phases * VOLTAGE * 0.93)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "done", steps
+    for name in ("max", "min", "single_max", "single_min"):
+        assert steps[name]["status"] == "ok" and steps[name]["amps"] == steps[name]["configured_amps"], steps[name]
+        assert steps[name]["voltage"] == pytest.approx(VOLTAGE * 0.93, abs=0.5)
+    assert steps["stop"]["status"] == "ok"  # the stop is tried at a current that worked
+    assert "Ret indstillingen" not in state.attributes["markdown"] and "214 V" in state.attributes["markdown"]
+
+
+async def test_a_voltage_the_later_steps_do_not_confirm_is_not_kept(hass, solar_entry, fast_runner) -> None:
+    """The 1-phase maximum alone gives one voltage, the 1-phase minimum another: the steps are judged from what was
+    measured again, so the maximum is not left at a voltage the minimum disproves."""
+    def power(amps, phases):
+        return amps * phases * VOLTAGE * (0.93 if phases == 1 and amps > 6 else 1.0)
+
+    wire_charger(hass, power_at=power)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert steps["single_min"]["status"] == "ok" and "voltage" not in steps["single_min"]
+    assert steps["single_max"]["status"] == "adjusted" and steps["single_max"]["amps"] < 16 and "voltage" not in steps["single_max"], steps["single_max"]
+    assert steps["max"]["status"] == "ok" and "voltage" not in steps["max"]
+
+
+async def test_a_car_that_already_charges_marks_the_first_step_that_works_at_the_measured_voltage(hass, solar_entry, fast_runner) -> None:
+    """The maximum fails at the voltage setting and works at the measured voltage: it is the first step that charged, so it
+    is the one that does not prove the start (not the 1-phase step that happened to pass at the setting)."""
+    wire_charger(hass, power_at=lambda amps, phases: amps * phases * VOLTAGE * 0.93)
+    await hass.async_block_till_done()
+    hass.states.async_set(CHARGER_POWER, "7000", {"unit_of_measurement": "W", "device_class": "power"})
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert steps["max"]["status"] == "adjusted" and steps["max"]["already_charging"] and steps["max"]["voltage"], steps["max"]
+    assert [name for name, step in steps.items() if step.get("already_charging")] == ["max"]
+    assert steps["single_max"]["status"] == "ok"
+
+
+async def test_a_charger_that_always_gives_an_amp_less_is_not_explained_by_the_voltage(hass, solar_entry, fast_runner) -> None:
+    wire_charger(hass, power_at=lambda amps, phases: (amps - 1) * phases * VOLTAGE)
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    steps = _steps_of(hass)
+    assert steps["max"]["status"] == "fail" and steps["min"]["status"] != "ok"
+    assert not any(step.get("voltage") for step in steps.values())
 
 
 async def test_a_car_that_charges_on_one_phase_is_judged_on_one_phase(hass, solar_entry, fast_runner) -> None:
@@ -727,6 +953,8 @@ async def test_a_car_that_is_unplugged_during_the_test_ends_it(hass, charger_ent
         await _finished(hass)
     state = hass.states.get(RESULT)
     assert state.state == "stopped" and state.attributes["reason"] == "not_connected"
+    assert _steps_of(hass)["stop"]["reason"] == "not_reached"
+    assert _steps_of(hass)["limit"]["status"] == "ok"  # the car's limit is set in the car, not through the cable
     assert coordinator.engine._charger_hold is None
 
 
@@ -1161,7 +1389,10 @@ async def test_the_last_result_is_restored_but_a_broken_one_is_not(hass, charger
     assert coordinator.charger_test_state["status"] == "idle"
     coordinator.async_restore_charger_test({"status": "done", "steps": ["garbage"]})
     assert coordinator.charger_test_state["status"] == "idle"
-    for broken in ({"watt": "lots"}, {"attempts": [{"amps": "x", "watt": 1}]}, {"attempts": "x"}, {"name": "other"}, {"status": "skip", "reason": "made_up"}):
+    for broken in (
+        {"watt": "lots"}, {"attempts": [{"amps": "x", "watt": 1}]}, {"attempts": "x"}, {"name": "other"}, {"status": "skip", "reason": "made_up"},
+        {"voltage": "low"}, {"voltage_setting": [240]},
+    ):
         coordinator.async_restore_charger_test({"status": "done", "steps": [{**step, **broken}]})
         assert coordinator.charger_test_state["status"] == "idle", broken
     coordinator.async_restore_charger_test({"status": "done", "steps": [step], "reason": "made_up", "automation": "unknown", "car_phases": 1})
@@ -1170,6 +1401,9 @@ async def test_the_last_result_is_restored_but_a_broken_one_is_not(hass, charger
     coordinator._init_charger_test()
     coordinator.async_restore_charger_test({"status": "done", "steps": [step], "reason": None})
     assert coordinator.charger_test_state["status"] == "done" and "✅" in coordinator.charger_test_state["markdown"]
+    measured = {**step, "watt": 10967, "voltage": 229.2, "voltage_setting": 240.0}
+    coordinator.async_restore_charger_test({"status": "done", "steps": [measured], "reason": None})
+    assert coordinator.charger_test_state["steps"] == [measured] and "229 V" in coordinator.charger_test_state["markdown"]
 
 
 async def test_the_power_of_a_sensor_that_stopped_reporting_is_not_believed(hass, charger_entry) -> None:
@@ -1306,6 +1540,34 @@ async def test_stopping_during_the_limit_step_puts_the_cars_limit_back_before_th
     assert state.attributes["steps"][-1]["reason"] == "not_reached"
     _limits_while_held(limits, test, 80)
     assert coordinator.engine._charger_hold is None and coordinator.engine._charger_saved is None
+
+
+async def test_stopping_during_the_limit_step_after_an_overdraw_still_tells_the_overdraw(hass, solar_entry) -> None:
+    """The charging steps ended on an overdraw, and the switch is turned off during the charge limit step: the reason shown
+    is still the overdraw (what the user must fix), not the switch."""
+    coordinator = solar_entry.runtime_data
+    wire_charger(hass, three_phases_always=True, limit_follows=lambda value: False)
+    test = _test_limit(hass)
+    base = "custom_components.cable_juice_planner.coordinator.charger_test"
+    with (
+        patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 0.5), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
+    ):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        for _ in range(3000):
+            await asyncio.sleep(0.01)
+            if (coordinator.engine._charger_hold or {}).get("limit") == test:
+                break
+        assert (coordinator.engine._charger_hold or {}).get("limit") == test
+        assert coordinator.engine._charger_hold["kind"] == "stop"  # never the overdrawing charge
+        await hass.services.async_call("switch", "turn_off", {"entity_id": SWITCH}, blocking=True)
+        await _finished(hass)
+    state = hass.states.get(RESULT)
+    steps = _steps_of(hass)
+    assert state.state == "stopped" and state.attributes["reason"] == "overdraw"
+    assert steps["single_max"]["reason"] == "overdraw" and steps["limit"]["reason"] == "not_reached"
+    assert coordinator.engine._charger_hold is None
 
 
 async def test_a_car_that_is_full_during_the_limit_step_still_gets_its_own_limit_back(hass, charger_entry) -> None:

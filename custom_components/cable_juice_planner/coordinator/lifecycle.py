@@ -110,13 +110,23 @@ class CoordinatorLifecycle:
             battery_entities=[home["powerwall_battery_level_entity_id"], ev["usable_battery_level_entity_id"] if self.ev_configured else ""],
             energy_entities=[charger["kwh_meter_entity_id"], charger["lifetime_kwh_meter_entity_id"]],
             status_entity=charger["status_entity_id"],
+            consumption_entity=home["power_consumption_entity_id"],
             action_sensor=f"sensor.{self.object_prefix}_charger_action",
             automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
+            price_problems=self._price_unit_problems,
         )
         await watcher.async_load()
         watcher.start()
         self.entry.async_on_unload(watcher.stop)
         self.health_watcher = watcher
+
+    def _price_unit_problems(self) -> tuple[list[tuple[str, str]], bool] | None:
+        """The price entities in a wrong unit (CombinedPriceProvider.price_unit_problems); None while there is no price provider
+        yet, so the repair is not judged. Only reads the states."""
+        provider = self.price_provider
+        if provider is None:
+            return None
+        return provider.price_unit_problems(self.hass.states.get)
 
     @callback
     def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:

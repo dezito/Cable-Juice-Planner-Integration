@@ -33,7 +33,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "cable_connected_entity_id": "",
             "other_ev_using_this_charger_entity_ids": [],
         },
-        "power_voltage": 240.0,
+        "power_voltage": 230.0,
         "charging_phases": 3.0,
         "charging_max_amp": 16.0,
         "charging_loss": -0.05,
