@@ -295,6 +295,48 @@ def test_stop_before_the_clock_went_back_does_not_hide_charging(monkeypatch: pyt
     assert engine.charging_no_rule_count == 1
 
 
+def test_a_charging_without_rule_is_noted_once_per_run_of_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The alarm runs on every cron of one run of charging without a rule: the health checks count the run once."""
+    start = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine, kwargs = _no_rule_engine(monkeypatch, start)
+    engine.charging_no_rule_count = 0
+    noted: list[str] = []
+
+    def crons(first: int, count: int, **power) -> None:
+        for step in range(count):
+            at = start + datetime.timedelta(minutes=first + 5 * step)
+            result = engine.run_job(snapshot(at, **{**kwargs, **power}), engine.charging_without_rule)
+            assert result.error is None, result.error
+            noted.extend(result.charger_problems)
+
+    crons(0, 8)  # the alarm from the fifth cron on, every cron after it too
+    assert engine.charging_no_rule_count == 4 and noted == ["no_rule"]
+
+    crons(40, 2, power=0)  # the charger stops using power: the run is over
+    assert engine.charging_no_rule_count == 0
+    crons(50, 8)  # a new run is one event again
+    assert noted == ["no_rule", "no_rule"]
+
+
+def test_a_charger_problem_is_not_noted_during_a_test_or_the_hour_after_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine, kwargs = _no_rule_engine(monkeypatch, now)
+
+    def problems() -> list[str]:
+        return engine.run_job(snapshot(now, **kwargs), lambda: engine._note_charger_problem("gave_up")).charger_problems
+
+    assert problems() == ["gave_up"]
+    engine._charger_test_released_at = now - datetime.timedelta(minutes=59)
+    assert problems() == [], "the charger may still charge from the test"
+    engine._charger_test_released_at = now - datetime.timedelta(minutes=60)
+    assert problems() == ["gave_up"]
+    engine._charger_hold = {"entity_id": "sensor.charger_action"}
+    assert problems() == [], "a test holds the charger"
+    engine._charger_hold = None
+    engine._note_charger_problem("gave_up")  # outside a job there is nothing to publish to: no error
+    assert engine.run_job(snapshot(now, **kwargs), engine.stop_charging).charger_problems == []
+
+
 def test_charger_decision_without_stop_request_is_unchanged() -> None:
     from custom_components.cable_juice_planner.sensor import charger_decision
 

@@ -412,7 +412,7 @@ See [FAQ and troubleshooting](docs/faq-troubleshooting.md). In short:
 
 1. **Settings → Devices & services → Cable Juice Planner**: delete each entry with **⋮ → Delete**. Cable Juice Planner first saves the
    entry's data to `cable_juice_planner_backups/<prefix>_<time>_deleted.json`, so it can be imported again in a new entry, and then
-   removes its databases and its dashboard.
+   removes its databases, the state of its repairs and its dashboard.
    The load balancing entry has no data of its own.
 2. Delete the automations that control the charger, or switch them to other entities: they stop working without
    Cable Juice Planner's entities.

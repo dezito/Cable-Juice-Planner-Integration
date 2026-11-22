@@ -171,6 +171,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self.economy_db: dict = {"windows": []}
         self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
         self.charging_no_rule_count = 0
+        # the charging without a rule was noted for this run of it (it is one event, not one per cron; control/schedule.py)
+        self._charging_no_rule_noted = False
         self.error_count = 0
         self.forecast_type = "ema"
         # with the switch auto_forecast_type the type each forecast uses (engine/pricing.get_forecast_type)

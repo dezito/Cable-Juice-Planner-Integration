@@ -36,6 +36,7 @@ from ..engine.control.charger_test import (
     tolerance_w,
 )
 from ..management.automation_inputs import AMPS_INPUTS, START_INPUTS, STOP_INPUTS, automations_using_blueprint, has_steps
+from ..utils.power import power_to_w
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -275,7 +276,8 @@ class CoordinatorChargerTest:
         return state.state if state else "unavailable"
 
     def _charger_power(self, entity_id: str) -> float | None:
-        """The power of the charger now in W; None when the sensor has no number or has not reported lately."""
+        """The power of the charger now in W; None when the sensor has no number, has not reported lately, or its unit is no
+        power unit (a size is never guessed: the steps then have no reading and are not tested)."""
         state = self.hass.states.get(entity_id)
         if state is None or state.state in ENTITY_UNAVAILABLE_STATES:
             return None
@@ -287,7 +289,7 @@ class CoordinatorChargerTest:
             return None
         if (dt_util.utcnow() - state.last_reported).total_seconds() > STALE_SECONDS:
             return None
-        return abs(value) * (1000.0 if state.attributes.get("unit_of_measurement") == "kW" else 1.0)
+        return power_to_w(abs(value), state.attributes.get("unit_of_measurement"))
 
     def _ended_by_the_charger(self) -> str | None:
         """Why the test can not go on: the cable was pulled out or the car is full."""

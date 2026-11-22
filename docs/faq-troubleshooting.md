@@ -101,6 +101,40 @@ moved aside as `….corrupt.<time>` and the newest good copy is restored. The lo
 both files. Data saved after that copy was made is lost, at most about a day. Without a good copy the database is treated as missing, as on a new install. You can then import
 a full backup (see [Backup](../README.md#backup-export-and-import-of-data)).
 
+## Repairs from the health checks
+
+Cable Juice Planner checks its setup and its charger once after Home Assistant has started, every hour, and when a related
+entity or its charger automation changes. A problem is shown as a repair on the Repairs page of Home Assistant. A repair never
+changes anything: it doesn't control the charger or the car, and it doesn't change your automations. It disappears by
+itself when the problem is fixed. **Ignore** is kept while the repair stays; a repair that goes away and comes back is
+shown again.
+
+| Repair | Appears when | Disappears when |
+|---|---|---|
+| Entities … are disabled or missing | A configured entity is disabled, or it is neither in the entity registry nor in the states (renamed or deleted). An entity that is only unavailable is not listed: the notification after 30 minutes covers that. | The entities are enabled or found again. |
+| Sensors with a unit … | A power sensor has a unit the code can't read (accepted: mW, W, kW, MW, GW; a unit with an h, such as Wh or kWh, is read as the unit without it, so kWh is read as kW, and one without a unit is read as W), the charger power sensor has a unit other than W or kW while the repair to update the charger blueprint is open (the older blueprint reads only those), a battery level sensor has a unit other than %, or a kWh meter has a unit other than kWh. | Every such sensor has an accepted unit again. An unavailable sensor is not judged and keeps its last result. |
+| The charger automation … is disabled or gone | The automation made from the charger blueprint was on, and is now off or no longer in `automations.yaml`. The repair is only raised after the automation was seen on, so an automation you wrote yourself, a blueprint you don't use, or an automation kept in another file (packages, YAML mode) or an automation without an `id` is never reported. | The automation is on again. |
+| The charger status is a value … | The charger's status is a value Cable Juice Planner doesn't know (its ready, not ready, charging, completed and error statuses are known), and it has been held for 10 minutes. | No such value has been seen for 7 days. |
+| The charger did not follow the plan … | The restarts of the charger gave up, or the charger charged without a rule, 3 times within 7 days. Each of these also has its own notification. Events within 60 minutes after a charger test, and while a test holds the charger, are not counted. | Fewer than 3 such events are left in the last 7 days. |
+
+After a repair, run the charger test to check the charger's part: turn on **Test my charger automation** under *Settings* on the
+dashboard (see [Test your charger automation](charger-control.md#test-your-charger-automation)).
+
+The state of the checks is kept in a file of its own in `.storage` (`cable_juice_planner.<entry>.health`). It is not part of
+the backups, and it is deleted when the entry is removed.
+
+### Repair of the shared grid connection: phase sensors in an energy unit
+
+The shared grid connection (load balancing) checks its phase sensors when it starts and at each reading of them. A
+phase sensor that reports an energy (Wh, kWh …) instead of a current or a power is not read: an energy meter can't tell
+the current right now. The house's consumption is then counted as its last measurement or the forecast, or as the whole
+budget without either (then the cars get no current until the sensors are fixed), and the house forecast is not
+updated. The last measurement and the forecast are only an estimate, so the repair *Phase sensors in an
+energy unit* names the sensors. It disappears by itself when no phase sensor reports an energy any more, or the
+connection has no phase sensors. An unavailable sensor is not judged and keeps its last result. Removing the shared grid
+connection deletes the repair. If the house forecast still isn't updated after the fix, the statistics of the sensor are
+still kept as an energy: fix the recorder's own repair for them (Developer tools → Statistics); the log says so once.
+
 ## Report a problem
 
 When Cable Juice Planner does something wrong, create a debug file **as soon as possible** after it happened: it holds

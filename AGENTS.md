@@ -429,12 +429,12 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   to `_cars_draw` in the overload check. User choice: with no measurement
   since start and no forecast the house is the whole budget (`fuse()`), so no
   current for the cars until the meter reports. The forecast asks the
-  statistics in `FORECAST_UNITS` (W/A). A charger power reading that is stale
+  statistics in `FORECAST_UNITS` (W/A, no energy). A charger power reading that is stale
   counts the request for the cars behind (`_car_draw` fallback), and in the
   house subtraction at most the request, or 0 A when the charger's fresh
   status is in `SETTLED_STATUS` (a full car can't hide the house, a steady
-  charge with a change-only sensor doesn't limit itself); one without W/kW
-  counts 0 A there.
+  charge with a change-only sensor doesn't limit itself); one without a power
+  unit counts 0 A there.
 - Without phase sensors, or when one measures nothing, each charger's power
   sensor is the measurement (`_ahead_draw` for the budget, `_cars_draw` for
   the overload check), counted carefully:
@@ -449,7 +449,7 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
     `STALE_CHECK_SECONDS` (30 s). Tests make a sensor stale with
     `async_set(..., timestamp=...)`, not with `freezer`. Ambiguous (`on`,
     `connected`, `ready`), unknown or missing status counts as charging.
-  - No reading, a unit other than W/kW, or a power sensor shared with another
+  - No reading, a unit that is no power, or a power sensor shared with another
     member also counts the request. A shared sensor is counted once per sensor
     in the overload check.
   - `_worst_case`: the power may all be on one phase, but never more than the
@@ -591,6 +591,83 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   average of the lowest prices stay in whole hours.
 - The autumn night with two 02:00 hours shares one price key (wall-clock
   time); this is accepted (twice a year) and only covered by a test.
+
+### Health checks (repairs)
+
+- `management/health_checks.py` (`HealthWatcher`) raises the repairs
+  `entities_missing`, `entity_units`, `blueprint_automation_lost`,
+  `charger_status_unknown` and `charger_not_following`. They only inform; none
+  of them controls anything. Thresholds are the module constants
+  (`STATUS_UNKNOWN_MINUTES`, `STATUS_UNKNOWN_DAYS`, `NOT_FOLLOWING_EVENTS`,
+  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the existing
+  persistent notification after 30 minutes covers it.
+- Delete an issue only on a positive answer (the problem is gone), never on an
+  unclear one (unavailable/unknown state, unreadable `automations.yaml`).
+  Delete + create resets the user's "Ignore", while `async_create_issue` on an
+  existing issue keeps it. Stop, unload and reload never delete the issues;
+  only removing the entry does, and it also deletes the `.health` store.
+- The store `cable_juice_planner.<entry_id>.health` is deliberately not in
+  `DB_NAMES`, so it is not in CJP's own backup (`backup.py`) nor in the debug
+  export. A full Home Assistant backup still contains it.
+- Units: power sensors pass in every unit `utils/power.py` reads (mW, W, kW,
+  MW, GW; a unit with an `h` such as kWh is read as the unit without it, as
+  in BattMind). The charger power too, except while the update repair of the
+  charger blueprint (`blueprint_update_charger_control`) is open, also when
+  ignored: the installed older blueprint reads only W and kW
+  (`OLD_BLUEPRINT_POWER_UNITS`). kWh meters pass only in kWh, because the
+  history and the sessions read them raw. Battery levels pass only in %. No
+  unit passes. Keep this in line with the code that reads each sensor.
+- `blueprint_automation_lost` needs the automation to have been seen on first,
+  so users with their own automation never get it. Automations without an
+  `id` or outside `automations.yaml` (packages, YAML mode) are not found. A
+  registry-disabled automation counts as off.
+- `charger_not_following` gets its events (`gave_up`, `no_rule`) from the
+  engine through `JobResult.charger_problems`. Events while a charger test
+  holds the charger and within `NOT_FOLLOWING_AFTER_TEST` minutes
+  (`engine/control/schedule.py`) after it are not counted.
+
+### Power units
+
+- The readers of a power sensor use `utils/power.py`: `power_factor_to_w`,
+  `power_to_w` (no unit = W, h-variants read as the unit without the h,
+  anything else None: never guessed). Its factors equal `power_convert`'s
+  table (`tests/test_power_units.py`); the module imports nothing from the
+  engine (the engine imports it). Exceptions: the history's `power_convert`
+  still reads an unknown unit as W; `flow/detection.py` keeps its own
+  stricter table (synced with BattMind); load balancing takes nothing from the
+  house for a charger power in an energy unit (the fuse: never lower than
+  before). A phase sensor in an energy unit is no measurement, live and in the
+  forecast (which keeps the previous one), with the site repair
+  `site_phase_units` (`phase_units_issue_id`): raised per such sensor, removed
+  only when every phase sensor has an available state in a non-energy unit or
+  the site has no phase sensors; an unload keeps it, removing the site deletes
+  it (`async_remove_entry`). `_phase_changed` checks it after
+  `_check_overload` (information never holds the protection up). The forecast
+  judges by the statistics' recorded unit, so it can stay skipped after the
+  sensor is fixed until the recorder's own repair is resolved; that is
+  logged as a warning once per sensor. Any other non-power unit is still read
+  as amps.
+- Power statistics are asked for with `STATISTICS_POWER_UNITS`
+  (`{"power": "W", "energy": "kWh"}`): Home Assistant converts by the unit
+  class the statistic was recorded in, and a power sensor in kWh has energy
+  statistics. Convert the values with
+  `statistic_power_factor_to_w(<metadata unit>)`; raw and live states use the
+  current state unit. Exception: `coordinator/data.py` asks with
+  `units=None` and `history.get_longterm_values` converts with the current
+  unit; change both together or neither (a double conversion otherwise).
+- The blueprint has the same factor table in Jinja
+  (`tests/test_blueprint_power_units.py`), but still reads an unknown unit as
+  W, as it always did.
+- `charging_without_rule` reads the charger power in its unit, so it now also
+  fires for kW sensors (an unknown unit or an unavailable sensor without a
+  unit is 0 W: it never triggers). kW users who charge outside the plan (car
+  timer, a shared charger) now get the forced stop and notification W users
+  always had. Load balancing caps a car's draw taken from the house, live and
+  in the forecast, at `charging_max_amp × (1 + OVERDRAW_SHARE)` per phase.
+- Data stored before this rule with a mis-scaled power (a power sensor in an
+  h unit, or a statistics unit other than the state unit) is not migrated:
+  the What-if hours are reread daily, the charging loss learns from new
+  charging (a recalculation rereads older statistics).
 
 ## Tests and validation
 

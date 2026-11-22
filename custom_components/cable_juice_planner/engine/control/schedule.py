@@ -10,18 +10,22 @@ from ...const import (
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_ALLOWED_AFTER_GOTO_TIME,
+    ENTITY_UNAVAILABLE_STATES,
     EV_PLUGGED_STATES,
     POWERWALL_DISCHARGING_TRIGGER,
 )
 from ...utils.formatting import emoji_parse
 from ...utils.helpers import date_to_string, minutes_between, reset_datetime, round_up
+from ...utils.power import power_to_w, power_unit_known
 from ...prices.intervals import naive_timestamp, price_interval_at
-from ..history.history import power_convert
 
 _LOGGER = logging.getLogger(__name__)
 
 # restarts of a charger that does not charge before is_charging gives up
 CHARGER_MAX_RESTARTS = 3
+# minutes after the test of the charger automation released the charger: a charger that does not follow the plan then is
+# not noted (it may still charge from the test)
+NOT_FOLLOWING_AFTER_TEST = 60
 
 
 class ControlSchedule:
@@ -118,25 +122,34 @@ class ControlSchedule:
         minutes = self._minutes_since(moment)
         return minutes is not None and round(minutes) >= self.config["cron_interval"]
 
+    def _charger_power_readable(self, entity_id: str) -> bool:
+        """Whether the power sensor's values can be read in W now. Not when its unit is no power unit (a size is never
+        guessed), nor when the sensor is unavailable and HA has dropped its unit: its last values could be kW or mW."""
+        unit = self.history.units.get(entity_id)
+        if not power_unit_known(unit):
+            return False
+        return unit is not None or self.get_state(entity_id, try_history=False, error_state=None) not in ENTITY_UNAVAILABLE_STATES
+
     def _charger_power_idle(self) -> bool | None:
         """Whether the charger's power shows that it does not charge, now and on average (the window of
-        charging_without_rule). None when it can't be told (no power entity, unavailable): the status alone is no reason
-        to stop a charger, a status that is stuck at ready while the car charges would stop it. The state now, not the
-        last value before it became unavailable, and an average from the history: without one it can't be told."""
+        charging_without_rule). None when it can't be told (no power entity, unavailable, a unit that is no power): the
+        status alone is no reason to stop a charger, a status that is stuck at ready while the car charges would stop it.
+        The state now, not the last value before it became unavailable, and an average from the history: without one it
+        can't be told."""
         entity_id = self.config["charger"]["entity_ids"]["charger_power_entity_id"]
         if not self.is_entity_configured(entity_id):
             return None
-        power = self.get_state(entity_id, float_type=True, try_history=False, error_state=None)
+        state = self.get_state(entity_id, float_type=True, try_history=False, error_state=None)
+        power = power_to_w(state, self.history.units.get(entity_id)) if state is not None and self._charger_power_readable(entity_id) else None
         if power is None:
             return None
-        power = power_convert(power, self.history.units.get(entity_id), "W")
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
         now = self.now()
         average = self.history.get_average_value(entity_id, now - datetime.timedelta(minutes=minutes), now, convert_to="W", error_state=None)
         if average is None:
             return None
         voltage = self.config["charger"]["power_voltage"]
-        return abs(float(power)) <= voltage and abs(float(average)) <= voltage
+        return abs(power) <= voltage and abs(float(average)) <= voltage
 
     def _charger_restart_reset(self, full: bool) -> None:
         """Forget the mark and when it was first seen waiting (with full the restarts made and the give-up too: it
@@ -311,6 +324,7 @@ class ControlSchedule:
             self._charger_restart_rule = f"⛔{t('ui.is_charging.charging_failed')}\n{reason}{t('ui.is_charging.gave_up', count=restarts)}"
             self.set_charging_rule(self._charger_restart_rule)
             self._charger_restart_gave_up = True
+            self._note_charger_problem("gave_up")
             self._charger_restart_history_emoji(emoji_charging_error, replace=emoji_charging_problem)
             self.my_notify(
                 f"{t('ui.is_charging.ev_not_charging')}:\n{reason}{t('ui.is_charging.gave_up', count=restarts)}",
@@ -338,10 +352,23 @@ class ControlSchedule:
         self.my_notify(f"{t('ui.is_charging.ev_not_charging')}:\n{problem}\n{restarting}", title=f"{self.title} {t('ui.is_charging.fail_title')}", always=True, persistent_notification=True)
         return None
 
+    def _note_charger_problem(self, kind: str) -> None:
+        """Note a charger that did not follow the plan (JobResult.charger_problems, the repair of management/health_checks.py).
+
+        Not while the test of the charger automation holds the charger, nor in the hour after it released it: the charger may
+        still charge from the test then. Only in a job: the coordinator publishes the note."""
+        if self._out is None or self._charger_hold is not None:
+            return
+        minutes = self._minutes_since(self._charger_test_released_at)
+        if minutes is not None and round(minutes) < NOT_FOLLOWING_AFTER_TEST:
+            return
+        self._out.charger_problems.append(kind)
+
     def charging_without_rule(self) -> bool | None:
         if self._charger_restart_gave_up:
             # the fail-safe asks for charging (_charge_if_needed): it is not charging without a rule
             self.charging_no_rule_count = 0
+            self._charging_no_rule_noted = False
             return False
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
         now = self.now()
@@ -351,9 +378,17 @@ class ControlSchedule:
         # a stop "in the future" after the clock went back an hour doesn't count)
         if self.charger_stopped_at is not None and past < self.charger_stopped_at <= now:
             return False
+        # just released from the test of the charger automation (restored, not a stop): its charging is in the average too
+        released = self._minutes_since(self._charger_test_released_at)
+        if released is not None and 0 <= released < minutes:
+            return False
         entity_id = self.config["charger"]["entity_ids"]["charger_power_entity_id"]
-        power = abs(float(self.get_state(entity_id, float_type=True, error_state=0.0)))
-        power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3)
+        # the power in W, read in the sensor's own unit (a kW sensor reads 7.4 kW, not 7.4 W). No reading (not a power unit,
+        # or unavailable without its unit) is 0 W: it never triggers, and a size is never guessed
+        readable = self._charger_power_readable(entity_id)
+        state = self.get_state(entity_id, float_type=True, error_state=None)
+        power = abs(power_to_w(state, self.history.units.get(entity_id)) or 0.0) if readable else 0.0
+        power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3) if readable else 0.0
         trigger_count = 3
         voltage = self.config["charger"]["power_voltage"]
         if power > voltage and power_avg > voltage:
@@ -365,6 +400,9 @@ class ControlSchedule:
                 self.set_charging_rule(f"{emoji_parse({'no_rule': True})}{self.t('ui.charging_without_rule.charging_no_rule', watt=int(power_avg))}")
                 _LOGGER.warning("Charging without rule for %s power: %sW, power_avg: %sW %s times", entity_id, power, power_avg, self.charging_no_rule_count)
                 if self.charging_no_rule_count == trigger_count + 1:
+                    if not self._charging_no_rule_noted:  # the alarm runs on every cron of this run of it: noted once
+                        self._charging_no_rule_noted = True
+                        self._note_charger_problem("no_rule")
                     unavailable_entities = self.get_all_unavailable_entities()
                     if unavailable_entities:
                         lines = [f"\n\n{self.t('ui.charging_without_rule.entities_not_available')}:", *(f"\n- {entity}" for entity in unavailable_entities)]
@@ -386,6 +424,7 @@ class ControlSchedule:
             self.charging_no_rule_count += 1
         else:
             self.charging_no_rule_count = 0
+            self._charging_no_rule_noted = False
         return False
 
     def other_ev_connected(self) -> bool:

@@ -28,8 +28,14 @@ async def test_the_battery_level_and_the_charger_power_are_read_as_hourly_statis
             "sensor.power": [{"start": start, "mean": -7000.0}, {"start": datetime(2026, 10, 1, 11, tzinfo=UTC), "mean": 5.0}, {"start": datetime(2026, 10, 1, 12, tzinfo=UTC), "mean": 1.0}],
         }
 
+    def metadata(hass_, *, statistic_ids):
+        units = {"sensor.level": "%", "sensor.power": "W"}
+        return {entity_id: (n, {"unit_of_measurement": units[entity_id]}) for n, entity_id in enumerate(sorted(statistic_ids)) if entity_id in units}
+
     coordinator.ev_configured = True
-    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.dict(
+    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch(
+        "homeassistant.components.recorder.statistics.get_metadata", side_effect=metadata
+    ), patch.dict(
         coordinator.config["ev_car"]["entity_ids"], {"usable_battery_level_entity_id": "sensor.level"}
     ), patch.dict(coordinator.config["charger"]["entity_ids"], {"charger_power_entity_id": "sensor.power"}):
         data: dict = {}
@@ -39,7 +45,8 @@ async def test_the_battery_level_and_the_charger_power_are_read_as_hourly_statis
     assert data["ev_hours"] == {start.timestamp(): [61.0, 60.0, 62.0, 7000.0]}
     begin, finish, ids, period, units, kinds = seen["call"]
     assert (finish - begin).days == 403 and finish == end  # as far back as the economy keeps prices (12 months of history)
-    assert ids == {"sensor.level", "sensor.power"} and period == "hour" and units == {"power": "W"} and kinds == {"mean", "min", "max"}
+    # power statistics in W, and those of a power sensor in an h unit (energy statistics) in kWh
+    assert ids == {"sensor.level", "sensor.power"} and period == "hour" and units == {"power": "W", "energy": "kWh"} and kinds == {"mean", "min", "max"}
 
 
 async def test_without_the_entities_nothing_is_estimated_and_a_failing_read_leaves_the_key_out(hass: HomeAssistant, loaded_entry) -> None:

@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
@@ -44,8 +45,20 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .const import CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS, CIRCUIT_ENTITY_KEYS, CONF_CIRCUITS, PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
+from .const import (
+    CHARGER_COMPLETED_STATUS,
+    CHARGER_NOT_READY_STATUS,
+    CIRCUIT_ENTITY_KEYS,
+    CONF_CIRCUITS,
+    DOMAIN,
+    ENTITY_UNAVAILABLE_STATES,
+    PHASE_ORDERS,
+    SIGNAL_SITE_UPDATE,
+    SITE_DEFAULTS,
+    SITE_HOURS_AHEAD,
+)
 from .utils.helpers import float_or_none
+from .utils.power import POWER_UNITS, power_factor_to_w, statistic_power_factor_to_w
 
 if TYPE_CHECKING:
     from .coordinator import CJPCoordinator
@@ -59,12 +72,27 @@ OVERDRAW_SHARE = 0.1  # charger power up to this share above what it was given i
 # a charger status or power sensor that has not reported for this long frees no current (a lost cloud push keeps the
 # last value: a car that starts would not be seen)
 STALE_SECONDS = 300
-FORECAST_UNITS = {"power": "W", "electric_current": "A"}  # the house forecast asks the statistics in these
+# the house forecast asks the statistics in these. Not energy (unlike STATISTICS_POWER_UNITS): load balancing reads no energy
+# unit as a power, and a phase sensor in an energy unit is no measurement (ISSUE_PHASE_UNITS)
+FORECAST_UNITS = {"power": "W", "electric_current": "A"}
+# the repair for phase sensors in an energy unit (Wh, kWh ...): an energy is no current, it can't be read
+ISSUE_PHASE_UNITS = "site_phase_units"
 STALE_CHECK_SECONDS = 30  # how often the overload check runs without a sensor event (a sensor that went stale)
 # charger statuses that surely mean "not charging": only then does a car's measured power free current (no phase sensors)
 SETTLED_STATUS = (*CHARGER_COMPLETED_STATUS, *CHARGER_NOT_READY_STATUS, "ready_to_charge", "awaiting_start", "awaiting_authorization")
 FORECAST_DAYS = 7
-POWER_UNITS = {"W": 1.0, "kW": 1000.0}
+
+
+def phase_units_issue_id(entry_id: str) -> str:
+    return f"{entry_id}_{ISSUE_PHASE_UNITS}"
+
+
+def _energy_unit(unit) -> bool:
+    """Whether Home Assistant keeps statistics in this unit as energy (Wh, kWh, GJ ...): load balancing never reads them as a
+    power."""
+    from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
+
+    return isinstance(unit, str) and unit in EnergyConverter.VALID_UNITS
 
 
 def charger_devices(hass: HomeAssistant, entity_ids) -> set[str]:
@@ -138,6 +166,9 @@ class CJPSite:
         self._power_unsub = None
         self._overload_recheck = None
         self._startup_ready = asyncio.Event()
+        # (entity id, energy unit) of the phase sensors in the repair; None: not judged yet
+        self._phase_units_wrong: tuple[tuple[str, str], ...] | None = None
+        self._forecast_energy_warned: set[str] = set()  # phase statistics in an energy unit already warned about
 
     # ------------------------------------------------------------------ #
     # Setup
@@ -162,6 +193,12 @@ class CJPSite:
                 self._unsubs.append(async_track_time_change(self.hass, self._refresh_forecast, minute=7, second=0))
                 await self._async_refresh_forecast()
             self.recalculate_all()
+            # last: the repair is only information and must never hold the forecast or the calculation up
+            if self.has_phase_sensors:
+                self._check_phase_units()
+            else:
+                # no phase sensors (any more): nothing to judge, a positive answer
+                self._set_phase_units_issue(())
         finally:
             # Cars starting on the same homeassistant_started event must not
             # calculate against a half-initialized site forecast.
@@ -294,10 +331,16 @@ class CJPSite:
             # nan/inf is no reading either (it would make every capacity nan)
             return None
         unit = state.attributes.get("unit_of_measurement")
-        if unit in POWER_UNITS:
-            return abs(value) * POWER_UNITS[unit] / voltage
+        if _energy_unit(unit):
+            # an energy (Wh, kWh ...) is no current: no measurement, so the house counts with its last measurement or the
+            # forecast, or as the whole budget (the repair ISSUE_PHASE_UNITS says why)
+            return None
         if unit == "mA":
             return abs(value) / 1000
+        # a power (mW, W, kW, MW, GW) is W on the phase's voltage. Any other unit and no unit are amps as before: a phase
+        # sensor protects the fuse and is never read lower than before
+        if unit in POWER_UNITS:
+            return abs(value) * power_factor_to_w(unit) / voltage
         return abs(value)
 
     def _measured(self) -> list[float] | None:
@@ -313,7 +356,7 @@ class CJPSite:
     def _car_draw(self, coordinator: CJPCoordinator, fallback: list[float] | None = None) -> list[float]:
         """What the car draws now per grid phase (from its charger power sensor, with phase sensors).
 
-        Without a fresh reading in W/kW (no number, another unit, not reported within STALE_SECONDS) fallback counts
+        Without a fresh reading in a power unit (no number, no or another unit, not reported within STALE_SECONDS) fallback counts
         when given: the car's request for a car ahead (a power sensor that hangs at 0 W must not free its current).
         Without fallback (the house) a stale reading counts at most what the car was given per phase: a reading that
         hangs high on a car the plan stopped must not make the house smaller, and a car that charges steadily (a
@@ -332,6 +375,12 @@ class CJPSite:
         request = self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0]
         phases = sum(1 for value in request if value > 0) or int(charger["charging_phases"])
         per_phase = watt / voltage / phases
+        max_amp = float_or_none(charger.get("charging_max_amp"))
+        if fallback is None and max_amp:
+            # taken from the house: never more than the charger can draw (its max current and the voltage share). A reading
+            # far above it must not make the house smaller and free the fuse's current; for a car ahead a higher reading only
+            # counts more (conservative), so it is not capped there
+            per_phase = min(per_phase, max_amp * (1 + OVERDRAW_SHARE))
         grid = [0.0, 0.0, 0.0]
         for i, grid_phase in enumerate(self._order(coordinator)):
             if i < phases:
@@ -369,12 +418,16 @@ class CJPSite:
         return coordinator.config["charger"]["entity_ids"].get("charger_power_entity_id") or ""
 
     def _watt(self, entity_id: str) -> float | None:
-        """A charger power reading in W; None without a number or with a unit that is not W/kW (never guessed)."""
+        """A charger power reading in W; None without a number, without a unit or with a unit that is not a power unit (never
+        guessed: the car then counts with its request). An energy unit (Wh, kWh) is no reading either: it may be a meter picked
+        as the power sensor, and load balancing protects the fuse."""
         state = self.hass.states.get(entity_id) if entity_id else None
         if state is None or (value := float_or_none(state.state)) is None or not math.isfinite(value):
             return None
-        factor = POWER_UNITS.get(state.attributes.get("unit_of_measurement"))
-        return None if factor is None else abs(value) * factor
+        unit = state.attributes.get("unit_of_measurement")
+        if unit not in POWER_UNITS:
+            return None
+        return abs(value) * power_factor_to_w(unit)
 
     def _worst_case(self, members: list[CJPCoordinator], watt: float, careful: bool = True) -> list[float]:
         """The most the cars on one power sensor can draw per grid phase with this power.
@@ -586,6 +639,49 @@ class CJPSite:
             self.recalculate_all()
         self._was_metered = metered
         self._check_overload()
+        # after the overload check: the repair is only information and must never hold the protection up
+        self._check_phase_units()
+
+    @callback
+    def _check_phase_units(self) -> None:
+        """The repair for phase sensors in an energy unit. Raised for every such sensor; removed only when every phase
+        sensor has a state that is not unavailable and none is in an energy unit (an unavailable sensor keeps its verdict
+        and the unit it was judged in)."""
+        before = dict(self._phase_units_wrong or ())
+        wrong: list[tuple[str, str]] = []
+        judged = True
+        for entity_id in self.phase_entities:
+            state = self.hass.states.get(entity_id) if entity_id else None
+            if state is None or state.state in ENTITY_UNAVAILABLE_STATES:
+                if entity_id in before:
+                    wrong.append((entity_id, before[entity_id]))
+                judged = False
+                continue
+            unit = state.attributes.get("unit_of_measurement")
+            if _energy_unit(unit):
+                wrong.append((entity_id, unit))
+        if wrong or judged:
+            self._set_phase_units_issue(tuple(wrong))
+
+    @callback
+    def _set_phase_units_issue(self, wrong: tuple[tuple[str, str], ...]) -> None:
+        """wrong: (entity id, energy unit) of each phase sensor in an energy unit; empty removes the repair."""
+        if wrong == self._phase_units_wrong:
+            return  # unchanged: a phase sensor reports every few seconds
+        self._phase_units_wrong = wrong
+        issue_id = phase_units_issue_id(self.entry.entry_id)
+        if not wrong:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_PHASE_UNITS,
+            translation_placeholders={"entities": "\n".join(f"- {entity_id} ({unit})" for entity_id, unit in wrong)},
+        )
 
     @callback
     def _car_power_changed(self, _event: Event) -> None:
@@ -698,36 +794,57 @@ class CJPSite:
                     result[ts] = to_amps(float(row["mean"]))
             return result
 
-        def unit_factor(entity_id):
-            # the unit the statistics come in: power and current are converted to FORECAST_UNITS by HA. The recorded unit
-            # says which; the state is not there yet right after a restart
+        def statistic_unit(entity_id):
+            # the unit the statistics were recorded in (a power statistic comes in W, a current in A, see FORECAST_UNITS). The
+            # state is only the fallback: right after a restart it may not be there yet
             unit = units.get(entity_id)
             if not unit:
                 state = self.hass.states.get(entity_id)
                 unit = state.attributes.get("unit_of_measurement") if state else None
-            if unit in POWER_UNITS:
-                return FORECAST_UNITS["power"]
-            if unit in ("A", "mA"):
-                return FORECAST_UNITS["electric_current"]
             return unit
 
         phases = []
         for entity_id in self.phase_entities:
-            unit = unit_factor(entity_id)
-            if unit is None and stats.get(entity_id):
+            unit = statistic_unit(entity_id)
+            if not unit and stats.get(entity_id):
                 # W read as A would leave no current for the cars: keep the previous forecast
                 _LOGGER.debug("Site: unit of %s unknown, house forecast not updated", entity_id)
                 return
-            factor = (POWER_UNITS[unit] / voltage) if unit in POWER_UNITS else 1.0  # W or A (FORECAST_UNITS)
+            if _energy_unit(unit):
+                # an energy is no current (the repair ISSUE_PHASE_UNITS): keep the previous forecast. The statistics keep
+                # the unit they were recorded in until the recorder's own repair is fixed, also when the sensor now
+                # reports a current, so this is logged where the user sees it (once per sensor, the forecast runs hourly)
+                if entity_id in self._forecast_energy_warned:
+                    _LOGGER.debug("Site: %s is in the energy unit %s, house forecast not updated", entity_id, unit)
+                    return
+                self._forecast_energy_warned.add(entity_id)
+                _LOGGER.warning(
+                    "Site: the statistics of %s are in the energy unit %s, the house forecast is not updated. If the sensor "
+                    "now reports a current or a power, fix the recorder's repair for its statistics",
+                    entity_id,
+                    unit,
+                )
+                return
+            # a power statistic comes in W (FORECAST_UNITS) and is W on the phase's voltage. A current (A, mA) and any other
+            # unit are amps as before (the fuse)
+            watt = statistic_power_factor_to_w(unit) if unit else None
+            factor = watt / voltage if watt is not None else 1.0
             phases.append(series(entity_id, lambda v, f=factor: abs(v) * f))
         cars = []
         for entry_id, entity_id in chargers.items():
             coordinator = self.members[entry_id]
-            unit = unit_factor(entity_id) if entity_id else None
-            watt = POWER_UNITS.get(unit, 1.0)
+            unit = statistic_unit(entity_id) if entity_id else None
+            # a charger's power in W; no unit, an energy unit (a meter picked as the power sensor?) or another unit is no
+            # reading: nothing is subtracted, so the house forecast keeps the car's draw (conservative). Never more than the
+            # charger can draw per phase, like _car_draw
+            watt = statistic_power_factor_to_w(unit) if unit and not _energy_unit(unit) else None
             car_voltage = float(coordinator.config["charger"]["power_voltage"]) or 230.0
             car_phases = int(coordinator.config["charger"]["charging_phases"])
-            draw = series(entity_id, lambda v, w=watt, cv=car_voltage, cp=car_phases: abs(v) * w / cv / cp) if entity_id else {}
+            max_amp = float_or_none(coordinator.config["charger"].get("charging_max_amp"))
+            limit = max_amp * (1 + OVERDRAW_SHARE) if max_amp else math.inf
+            draw = series(
+                entity_id, lambda v, w=watt, cv=car_voltage, cp=car_phases, lim=limit: min(abs(v) * w / cv / cp, lim)
+            ) if watt is not None else {}
             cars.append((self._order(coordinator)[:car_phases], draw))
         sums: dict[int, list[float]] = {}
         counts: dict[int, int] = {}

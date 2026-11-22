@@ -23,6 +23,7 @@ from homeassistant.helpers.start import async_at_started
 from ..const import DOMAIN
 from ..prices import stromligning_problems
 from ..utils.solcast import SOLCAST_PLATFORM, SOLCAST_UNIQUE_IDS, strip_forecast_suffix
+from .health_checks import HEALTH_ISSUES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,7 +95,14 @@ def _lines(entity_ids: list[str]) -> str:
 
 @callback
 def remove_issues(hass: HomeAssistant, entry_id: str) -> None:
-    """Delete the repairs of a config entry (it was removed, or it no longer uses Strømligning or Solcast)."""
+    """Delete all repairs of a config entry (it was removed): these two and the ones of the health checks."""
+    for issue in (ISSUE_STROMLIGNING, ISSUE_SOLCAST, *HEALTH_ISSUES):
+        ir.async_delete_issue(hass, DOMAIN, f"{entry_id}_{issue}")
+
+
+@callback
+def _remove_dependency_issues(hass: HomeAssistant, entry_id: str) -> None:
+    """Only the two repairs of this watcher: a reload of an entry with nothing to watch keeps the health checks' repairs."""
     for issue in (ISSUE_STROMLIGNING, ISSUE_SOLCAST):
         ir.async_delete_issue(hass, DOMAIN, f"{entry_id}_{issue}")
 
@@ -125,10 +133,15 @@ class DependencyWatcher:
     def _issue_id(self, issue: str) -> str:
         return f"{self.entry.entry_id}_{issue}"
 
+    @property
+    def watched_entities(self) -> frozenset[str]:
+        """The sensors this watcher judges: the health checks leave them out (they are repaired here)."""
+        return frozenset(self._watched)
+
     @callback
     def start(self) -> None:
         if not self.stromligning_entities and not self.forecast_entity:
-            remove_issues(self.hass, self.entry.entry_id)  # nothing to watch any more: no repair about it either
+            _remove_dependency_issues(self.hass, self.entry.entry_id)  # nothing to watch any more: no repair about it either
             return
         if (unsub := async_at_started(self.hass, self._started)) is not None:
             self._unsubs.append(unsub)
