@@ -225,11 +225,21 @@ the charger's power sensor, and shows the result as a table under the switch (th
 | Lowest step | the lowest step of the solar calculation on all phases | the same for those amps |
 | Highest 1-phase step | the highest single phase step | the same on one phase |
 | Lowest 1-phase step | the lowest single phase step | the same on one phase |
-| Stop | stop | under 100 W (the last current that worked is published again first, and the stop is only tried when the charger then charges at 1 kW or more) |
+| Stop | stop | under 100 W (the last current that worked is published again first, and the stop is only tried when the charger then charges at 1 kW or more). After the stop, a charger status such as *completed* or *awaiting start* is what a stop looks like (an automation that stops the charging in the car makes the charger report *completed*, as for a full car); only an unplugged cable ends the step |
 | Charge limit in the car | only with the car's *charge limit* entity: a charge limit 10 percentage points from the car's limit | the car's charge limit entity shows it within 5 minutes (the power is not judged) |
+
+**The test has three parts that end on their own**: the charging steps, the stop and the charge limit. When the charging
+steps end early (no charging at the maximum, an overdraw, the car unplugged or full), the other charging steps and the
+stop are not reached (the stop needs a charge just before it); when the stop ends early, nothing else is lost. The
+charge limit step (when the car has a charge limit entity) depends on neither and still runs. Only the switch and an
+internal error end the whole test; a test stopped after a part ended early still shows why that part ended.
 
 **The charge limit step** runs last, while the action of the step before is still held, so the automation sends the
 new limit in a run of its own (*Set charge limit in the car*; a limit that changes together with a stop is never sent).
+After the charging steps or the stop ended early (a stop reason such as an overdraw, the car full or unplugged), CJP
+first holds a stop and waits 15 seconds, so the limit is not tested on the charge of the step that ended the test.
+Otherwise the limit is changed on the action held by the step before. That stop replaces the test's own charge also when the charger is unplugged
+or reports *completed*, so a car that resumes or is plugged in again is not charged at the test's current meanwhile.
 The limit asked for is 10 percentage points above the car's limit now, or 10 below it while that is still above a
 known battery level (a lower limit would make the car stop or report *completed*; no level never allows it, while the
 car's last level of up to 24 hours ago counts as known),
@@ -257,8 +267,20 @@ The power must be within 5 % (at least 150 W) of the expected power, so the volt
 right: it is what CJP plans with, too. A step is judged on two readings 10 seconds apart, taken 20 seconds or more
 after the current was published, from the average of three readings.
 
+**A voltage setting that is not your grid's** (240 V on a grid that gives 223–229 V under the load) fails currents the
+charger took exactly, and the search would end on a lower one that happens to fit. So CJP measures the voltage from the
+power per amp, separately on all phases and on one phase, over every step: when the currents that charged span at least
+1.5 times (16 A and 8 A, not 16 A and 14 A), their power per amp is the same within 2 %, and that voltage is more than
+2 % from the setting (and within 85–110 % of it), those steps are judged again at the measured voltage. The result
+shows *Judged at the measured … V* on the steps and a note with the voltage and your setting; set the grid voltage to
+your grid's (230 V in most of Europe). A charger that gives an amp less than asked usually does not look like this: its
+power per amp changes over the span, so its steps are judged at the setting as before. Neither does a car that limits
+its power. The steps are judged again from what was measured after each step, so a voltage that later steps no longer
+confirm is dropped, and the steps go back to their result at the setting.
+
 The **maximum comes first**: it shows that the charger charges at all. If the power stays under what a start needs
-(5 A) at every current tried, the other steps are not tried. If it charges, but not at the maximum, the test goes on.
+(5 A) at every current tried, the other charging steps and the stop are not tried (the charge limit still is). If it
+charges, but not at the maximum, the test goes on.
 
 If a step fails (the maximum too), CJP searches for the current that works. It goes two amps towards the middle of the
 group (up for the *lowest* steps, down for the *highest*), and when that works it tries the one amp in between, so the
@@ -284,7 +306,7 @@ What the power shows besides a pass or a fail:
   From then on every step is judged
   on the car's phases, and the result says so.
 - **The charger takes clearly more than it was given** (more than 25 %, at least 500 W, for a whole minute), for example
-  an automation that does not switch the phases: the test stops at once. The load balancing counts on the published
+  an automation that does not switch the phases: the charging steps stop at once. The load balancing counts on the published
   amps, so it would plan with too little. An average above that limit never passes a step, also not a step that only
   needs the charger to start.
 - **The car was already charging** when the test began: the first step that charges is shown with ⚠️, because the start

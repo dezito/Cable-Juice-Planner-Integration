@@ -1421,6 +1421,17 @@
         }
       }
     },
+    "voltage_old_default": {
+      "title": "Netspændingen for {name} er den gamle standard {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Sæt netspændingen for {name} til {default} V",
+            "description": "Netspændingen for **{name}** (under *Lader - specifikationer* i indstillingerne) er {voltage} V, standardværdien i tidligere versioner af Cable Juice Planner. Standarden er nu {default} V, den nominelle spænding i det meste af Europa. CJP regner planens og solcelletrinnenes ladeeffekt ud fra den og omregner laderens målte effekt til ampere for belastningsstyringen: en for høj spænding tæller en bils strøm for lavt.\n\nVælg **Send** for at sætte den til {default} V (posten genindlæses). Har dit net virkelig {voltage} V, så ignorer denne reparation. Du kan altid ændre spændingen i indstillingerne."
+          }
+        }
+      }
+    },
     "stromligning_entities": {
       "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",
       "description": "Cable Juice Planner ({prefix}) bruger Strømligning-sensorer, der er deaktiveret eller som Strømligning ikke leverer. En manglende salgstarif tæller som 0, hvilket gør den beregnede salgspris for høj, og uden pris-sensorerne bruges de gemte priser.\n\nDeaktiveret i Home Assistant (Strømligning deaktiverer som standard sine sensorer uden moms – aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** med *Vis deaktiverede entiteter*):\n{disabled}\n\nIkke leveret af Strømligning (f.eks. er prisprognoserne slået fra i dens indstillinger):\n{not_provided}\n\nDenne reparation forsvinder af sig selv, når sensorerne virker igen."
@@ -1460,6 +1471,10 @@
     "price_unit_scale": {
       "title": "Prissensorer i en underenhed, pr. MWh eller pr. Wh ({prefix})",
       "description": "Cable Juice Planner ({prefix}) læser disse prissensorer som priser pr. kWh i valutaen, men deres enhed er en underenhed af valutaen (øre eller cent), pr. MWh eller pr. Wh:\n{entities}\n\nIngen pris bliver omregnet, så priserne er 100 eller 1000 gange for store (underenhed, pr. MWh) eller 1000 gange for små (pr. Wh), og planen og besparelsesberegningen er forkerte. Det er kun enheden, der bedømmes, ikke størrelsen på priserne.\n\nRet det ved kilden: i Energi Data Service slås **Vis priser i øre** fra, og **Pris beregnes i** sættes til kWh i integrationens indstillinger, eller også vælges en sensor, hvis enhed er valutaen pr. kWh (fx kr/kWh). Hvis enheden virkelig er rigtig, så vælg **Ignorer** på denne reparation. Reparationen forsvinder af sig selv, når alle prissensorer er i valutaen pr. kWh (fx kr/kWh)."
+    },
+    "consumption_frozen": {
+      "title": "Husforbrugssensoren viser den samme værdi i 6 timer ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) bruger husforbrugssensoren {entity} som husforbrug i planen. Den har vist {value} siden {since}: mindst 6 timer uden ændring.\n\nPlanen bruger sensoren til huset, så en sensor der står stille giver et forkert husforbrug. Tjek integrationen eller enheden der leverer sensoren: den sender måske ikke længere værdier. Hvis værdien virkelig er konstant, så vælg **Ignorer** på denne reparation.\n\nDenne reparation forsvinder af sig selv, når sensoren viser en anden værdi. En utilgængelig sensor lader reparationen stå. Planens underretning om en utilgængelig sensor gælder kun en sensor med en registreringspost i entitetsregistret (for eksempel fra en integration, oprettet i brugerfladen eller YAML med et unikt ID)."
     },
     "site_fuse_exceeded": {
       "title": "Huset og bilerne trækker mere end hovedsikringen (lastfordeling)",

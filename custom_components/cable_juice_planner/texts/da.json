@@ -258,6 +258,7 @@
     },
     "charger_test": {
       "car_phases": "Bilen ladede kun på {phases} fase(r), så trinnene blev bedømt på {phases} fase(r). Det er normalt for en bil med en mindre indbygget lader; lader bilen på tre faser, så tjek, at automationen skifter faser.",
+      "voltage": "På {phases} fase(r) fulgte effekten hver strøm, men ved ca. {voltage} V pr. fase, ikke ved de {setting} V i indstillingen for netspænding, så de trin blev bedømt ved {voltage} V. Sæt netspændingen i CJP’s indstillinger til dit nets spænding (230 V i det meste af Europa): CJP regner ladeeffekten og belastningsstyringen ud fra den.",
       "not_run": "Testen er ikke kørt endnu. Slå **Test min laderautomation** til for at starte den.",
       "rule": "Tester din laderautomation: {action}",
       "rule_charge": "{amps} A på {phases} fase(r)",
@@ -283,7 +284,7 @@
       "running_note": "Hver strøm udsendes i op til 2½ minut og består, så snart laderens effekt passer til den. Slå kontakten fra for at stoppe; planens egen handling og ampere udsendes så igen.",
       "summary": "{ok} af {total} trin virkede, {fail} virkede ikke, {skip} kunne ikke testes.",
       "stop_reason": {
-        "overdraw": "Laderen tog klart mere strøm, end den fik, og belastningsstyringen regner med det, CJP udsender, så testen blev stoppet. Tjek, at automationen sender strøm og faser videre til laderen.",
+        "overdraw": "Laderen tog klart mere strøm, end den fik, og belastningsstyringen regner med det, CJP udsender, så ladetrinnene blev stoppet med det samme (et trin for ladegrænsen i bilen køres stadig, hvis der er et, med opladningen stoppet). Tjek, at automationen sender strøm og faser videre til laderen.",
         "not_configured": "Testen kræver laderens effektsensor.",
         "unavailable": "Laderens status er ikke tilgængelig lige nu.",
         "not_connected": "Testen kræver en bil, der er tilsluttet laderen.",
@@ -292,7 +293,7 @@
         "other_ev": "En anden bil bruger denne lader.",
         "running": "En test kører allerede.",
         "stopped": "Testen blev stoppet.",
-        "no_charging": "Laderen gav (næsten) ingen effekt ved maksimal strøm, så de andre trin blev ikke prøvet. Tjek, at bilen er tilsluttet, og at automationen starter laderen.",
+        "no_charging": "Laderen gav (næsten) ingen effekt ved maksimal strøm, så de andre ladetrin og stoppet blev ikke prøvet. Tjek, at bilen er tilsluttet, og at automationen starter laderen.",
         "internal_error": "Testen fejlede. Se Home Assistant-loggen."
       },
       "fail_hint": "For et trin, der ikke virkede: åbn laderautomationens trace og tjek, at den kørte trinnene for Set charging current med handlingens ampere, og at laderen tog imod kommandoen. En lader, der får mindre end bilens laveste ampere, eller mere end sikringen tillader, kan vise noget andet, og effekten afviger også, når den rigtige spænding ikke er spændingsindstillingen.",
@@ -309,11 +310,12 @@
         "ok": "Laderen leverede {watt} W (forventet {expected_w} W for {amps} A på {phases} fase(r)).",
         "adjusted": "Det virkede ved {amps} A ({watt} W), ikke ved trinnets {configured_amps} A. Ret indstillingen, hvis den skal være {amps} A.",
         "started": "Laderen startede: {watt} W.",
+        "voltage": "Bedømt ved de målte {voltage} V.",
         "stop": "Laderen stoppede ({watt} W).",
         "limit": "Bilen tog ladegrænsen {limit_to} % (fra {limit_from} %) efter {seconds} s."
       },
       "fail": {
-        "overdraw": "Laderen tog {watt} W, klart mere end {amps} A på {phases} fase(r) giver, så testen blev stoppet med det samme.",
+        "overdraw": "Laderen tog {watt} W, klart mere end {amps} A på {phases} fase(r) giver, så ladetrinnene blev stoppet med det samme.",
         "charge": "Laderen leverede ikke effekten for {amps} A på {phases} fase(r) (forventet {expected_w} W, så {watt} W).",
         "stop": "Laderen blev ved med at lade ({watt} W).",
         "limit": "Bilens ladegrænse blev ved {limit_seen} % i {seconds} s, selvom der blev udsendt {limit_to} %. Tjek, at automationen kører *Set charge limit in the car*, og at bilen tager imod kommandoen."
@@ -326,7 +328,7 @@
         "site_limited": "Ikke testet: belastningsstyringen giver bilen mindre strøm, end trinnet beder om.",
         "no_baseline": "Ikke bevist: laderen ladede ikke lige før, så et stop kan ikke ses.",
         "not_ready": "Ikke testet: bilen blev frakoblet eller er fuld.",
-        "not_reached": "Ikke nået: testen sluttede før dette trin.",
+        "not_reached": "Ikke nået: testen eller den del af den, trinnet hører til, sluttede før dette trin.",
         "amps_unproven": "Ikke bevist: effekten blev ved cirka {watt} W ved alle de strømme, der blev prøvet, så testen kan ikke se, at laderen følger ampere. Tjek, at automationen kører *Set charging current* med handlingens ampere; en bil, der begrænser sin effekt hele tiden, ser ens ud.",
         "no_limit": "Ikke testet: der er ingen ladegrænse 10 procentpoint fra bilens nuværende, som bilen accepterer, som ligger over batteriniveauet, og som automationen ville sende (ikke allerede planens eller bilens egen).",
         "limit_no_data": "Ikke testet: bilens ladegrænse havde ikke et tal (bilen sover, eller dens integration er offline)."
@@ -629,7 +631,7 @@
     "battery_level": "Batteriniveau",
     "planned_charging": "Planlagt ladning",
     "section_charger_test": "Test min laderautomation",
-    "help_charger_test": "CJP styrer aldrig din lader: det gør din egen automation, når CJP's handling og ampere skifter. Testen tjekker, at din automation virkelig gør det, planen beder om.\n\n* **Test min laderautomation**: slå den til for at starte (en bil skal være tilsluttet og ikke fuld). CJP udsender den maksimale strøm, derefter det laveste og højeste trin i solcelleberegningen på alle faser og på én fase, og et stop, og læser laderens effekt. Et trin består, når effekten passer til ampere. Maksimum kommer først: giver laderen (næsten) ingen effekt ved det, prøves de andre trin ikke. Når et trin fejler, prøver CJP to ampere mod midten, og hvis det virker, den ene ampere imellem, så du ser den strøm tættest på trinnet, der virker. Effekt, der ikke stiger med flere ampere, vises som bilens eller laderens grænse, og en bil, der lader på færre faser, bedømmes på sine egne faser. Er effekten den samme ved alle strømme i alle trin, viser intet, at laderen følger ampere, og de trin vises som ikke testet. Tager laderen klart mere, end den fik, stopper testen med det samme. Slå kontakten fra for at stoppe; planens egen handling og ampere udsendes så igen. Med bilens ladegrænse-entitet sat op udsender CJP til sidst en ladegrænse 10 procentpoint fra bilens grænse (over den, eller under den, så længe den stadig er over et kendt batteriniveau), tjekker, at bilen tager den inden for 5 minutter, og udsender så bilens grænse fra før testen igen; kan CJP ikke bekræfte den tilbage (også når bilen aldrig viste testens grænse, eller HA genstartede imens), siger resultatet det.\n* **Laderautomationstest**: testens status: inaktiv, kører, færdig, stoppet eller mislykket.\n* Tabellen under viser hvert trin: ✅ virkede, ⚠️ virkede, se noten, ❌ laderen leverede ikke, 🔧 ikke testet. Uden en måde at sætte strømmen på (ingen trin til *Set charging current*, *Set charging current in the car* eller *Set circuit current*) prøves kun maksimum og stop (og ladegrænsen, med dens entitet).\n\n**Vær opmærksom:** testen lader din bil i nogle minutter ved strømme, som planen måske ikke havde valgt, og den ændrer, hvad laderen gør. Belastningsstyringen begrænser stadig strømmen. Planen og indstillingerne ændres ikke; med en ladegrænse-entitet ændres bilens ladegrænse i nogle minutter og sættes så tilbage. Ladede planen ikke, kan energien, som testen lader, mangle i ladehistorikken og det beregnede batteriniveau.",
+    "help_charger_test": "CJP styrer aldrig din lader: det gør din egen automation, når CJP's handling og ampere skifter. Testen tjekker, at din automation virkelig gør det, planen beder om.\n\n* **Test min laderautomation**: slå den til for at starte (en bil skal være tilsluttet og ikke fuld). CJP udsender den maksimale strøm, derefter det laveste og højeste trin i solcelleberegningen på alle faser og på én fase, og et stop, og læser laderens effekt. Et trin består, når effekten passer til ampere ved indstillingen *Netspænding*; følger effekten hver strøm ved en anden spænding, bedømmes trinnene ved den målte spænding, og resultatet beder dig rette indstillingen. Maksimum kommer først: giver laderen (næsten) ingen effekt ved det, prøves de andre ladetrin og stoppet ikke. Når et trin fejler, prøver CJP to ampere mod midten, og hvis det virker, den ene ampere imellem, så du ser den strøm tættest på trinnet, der virker. Effekt, der ikke stiger med flere ampere, vises som bilens eller laderens grænse, og en bil, der lader på færre faser, bedømmes på sine egne faser. Er effekten den samme ved alle strømme i alle trin, viser intet, at laderen følger ampere, og de trin vises som ikke testet. Tager laderen klart mere, end den fik, stopper ladetrinnene med det samme. Ladegrænse-trinnet afhænger ikke af dem: det køres også, når ladetrinnene eller stoppet sluttede tidligt (efter for meget strøm med opladningen stoppet). Slå kontakten fra for at stoppe; planens egen handling og ampere udsendes så igen. Med bilens ladegrænse-entitet sat op udsender CJP til sidst en ladegrænse 10 procentpoint fra bilens grænse (over den, eller under den, så længe den stadig er over et kendt batteriniveau), tjekker, at bilen tager den inden for 5 minutter, og udsender så bilens grænse fra før testen igen; kan CJP ikke bekræfte den tilbage (også når bilen aldrig viste testens grænse, eller HA genstartede imens), siger resultatet det.\n* **Laderautomationstest**: testens status: inaktiv, kører, færdig, stoppet eller mislykket.\n* Tabellen under viser hvert trin: ✅ virkede, ⚠️ virkede, se noten, ❌ laderen leverede ikke, 🔧 ikke testet. Uden en måde at sætte strømmen på (ingen trin til *Set charging current*, *Set charging current in the car* eller *Set circuit current*) prøves kun maksimum og stop (og ladegrænsen, med dens entitet).\n\n**Vær opmærksom:** testen lader din bil i nogle minutter ved strømme, som planen måske ikke havde valgt, og den ændrer, hvad laderen gør. Belastningsstyringen begrænser stadig strømmen. Planen og indstillingerne ændres ikke; med en ladegrænse-entitet ændres bilens ladegrænse i nogle minutter og sættes så tilbage. Ladede planen ikke, kan energien, som testen lader, mangle i ladehistorikken og det beregnede batteriniveau.",
     "section_status": "Status",
     "section_trip": "Tur",
     "section_public_charging": "Offentlig ladning",

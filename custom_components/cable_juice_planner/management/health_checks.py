@@ -14,6 +14,8 @@ The repairs (the keys of "issues" in strings.json):
 - power_without_unit: a power sensor without a unit whose values look like kW (read as W it is 1000 times too small).
 - battery_level_fraction: a battery level sensor whose values look like a share (0..1), not a percentage.
 - price_unit_scale: a price sensor in a subunit of its currency (øre, ct), per MWh or per Wh (no price is converted).
+- consumption_frozen: the house consumption power sensor has shown the same value for FROZEN_AFTER or longer (the plan uses it for
+  the house). Only that sensor is judged: the others (solar, battery flow, charger power) are legitimately 0 for hours.
 
 The three value repairs are judged by management/value_checks.py (the same file as in BattMind): from the state, and from the
 history of the last few days, read at most once per VALUE_RECHECK. They are only raised and removed here, never fixed. The
@@ -78,6 +80,7 @@ ISSUE_NOT_FOLLOWING = "charger_not_following"
 ISSUE_POWER_UNIT = "power_without_unit"
 ISSUE_BATTERY_FRACTION = "battery_level_fraction"
 ISSUE_PRICE_SCALE = "price_unit_scale"
+ISSUE_CONSUMPTION_FROZEN = "consumption_frozen"
 HEALTH_ISSUES = (
     ISSUE_MISSING,
     ISSUE_UNITS,
@@ -87,6 +90,7 @@ HEALTH_ISSUES = (
     ISSUE_POWER_UNIT,
     ISSUE_BATTERY_FRACTION,
     ISSUE_PRICE_SCALE,
+    ISSUE_CONSUMPTION_FROZEN,
 )
 
 STORE_VERSION = 1
@@ -107,6 +111,13 @@ NOT_FOLLOWING_DAYS = 7
 # the latest events the repair lists
 NOT_FOLLOWING_LISTED = 5
 CHARGER_EVENTS = ("gave_up", "no_rule")
+# the house consumption sensor that has shown the same value this long (its last_changed) is a repair: the plan reads it for the
+# house, so a stuck sensor makes the plan wrong. Only that sensor: the solar, battery flow and charger power sensors are 0 for hours
+FROZEN_AFTER = datetime.timedelta(hours=6)
+# the startup grace of consumption_frozen: for this long after the start nothing is deleted or replaced, and the state listener
+# ignores the house sensor (a template can show 0 while Home Assistant starts). It ends at the first check, at or after this time
+# from the start, that reads a number (or that finds no sensor configured, or another one)
+CONSUMPTION_GRACE = datetime.timedelta(minutes=30)
 
 # the units the code reads. Power: every reader uses utils/power.py (mW, W, kW, MW, GW; a unit with an h such as kWh is read
 # as the unit without it, as in BattMind). The charger power too, except while the installed charger blueprint is older than
@@ -130,9 +141,34 @@ def store_key(entry_id: str) -> str:
     return f"{DOMAIN}.{entry_id}.health"
 
 
+SAVES_KEY = f"{DOMAIN}_health_saves"
+
+
+def _pending_saves(hass: HomeAssistant, entry_id: str) -> set[asyncio.Task[None]]:
+    """The saves of an entry still being written. Kept in hass.data, so that a removal or a reload can wait for them."""
+    return hass.data.setdefault(SAVES_KEY, {}).setdefault(entry_id, set())
+
+
+def _utcnow() -> datetime.datetime:
+    """The clock of the consumption_frozen checks (tests move it on: a clock that stands still would never end the startup grace)."""
+    return dt_util.utcnow()
+
+
+async def _async_wait_saves(hass: HomeAssistant, entry_id: str) -> None:
+    """Wait for the saves in progress. asyncio.wait does not cancel them when the waiting itself is cancelled (gather would)."""
+    pending = list(_pending_saves(hass, entry_id))
+    if pending:
+        await asyncio.wait(pending)
+
+
 async def async_remove_health_store(hass: HomeAssistant, entry_id: str) -> None:
-    """Delete the store of an entry that was removed (async_remove_entry)."""
-    await Store(hass, STORE_VERSION, store_key(entry_id), private=True, atomic_writes=True).async_remove()
+    """Delete the store of an entry that was removed (async_remove_entry). A save still in progress is waited for first, so it
+    can't write the file again after it was deleted. The entry's saves are forgotten afterwards."""
+    await _async_wait_saves(hass, entry_id)
+    try:
+        await Store(hass, STORE_VERSION, store_key(entry_id), private=True, atomic_writes=True).async_remove()
+    finally:
+        hass.data.get(SAVES_KEY, {}).pop(entry_id, None)
 
 
 def _finite_number(value: Any) -> float | None:
@@ -194,6 +230,33 @@ def _stored_event(event: Any) -> bool:
     return isinstance(event, dict) and event.get("kind") in CHARGER_EVENTS and _parse(event.get("at")) is not None
 
 
+def _state_number(text: Any) -> float | None:
+    """A state as a finite number, or None: unavailable, unknown, text, nan and inf are no value to judge."""
+    try:
+        value = float(text)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _frozen_since(stored: dict[str, Any], last_changed: datetime.datetime) -> datetime.datetime:
+    """The start of the frozen value: the stored one, unless the sensor's last_changed is older (then that one)."""
+    kept = _parse(stored["since"])
+    return last_changed if kept is None else min(last_changed, kept)
+
+
+def _stored_consumption(stored: Any) -> dict[str, Any] | None:
+    """The frozen house consumption sensor kept in the store (entity, value, since as an ISO time), or None when it is missing or
+    unreadable. A since that can't be read is kept as None: the check then uses the sensor's last_changed instead."""
+    if not isinstance(stored, dict):
+        return None
+    entity, value = stored.get("entity"), stored.get("value")
+    if not isinstance(entity, str) or not entity or not isinstance(value, str) or _state_number(value) is None:
+        return None
+    since = stored.get("since")
+    return {"entity": entity, "value": value, "since": since if _parse(since) is not None else None}
+
+
 class HealthWatcher:
     """Keeps the repairs of one car or battery entry up to date: at start, every hour, after a relevant entity or the charger
     automation changed, and when the engine notes a charger event."""
@@ -213,16 +276,25 @@ class HealthWatcher:
         status_entity: str,
         action_sensor: str,
         automations_path: str,
+        consumption_entity: str = "",
         price_problems: Callable[[], tuple[list[tuple[str, str]], bool] | None] | None = None,
     ) -> None:
         """entities: the configured entities (the ones DependencyWatcher judges, in watched, are left out here).
         charger_power/power/battery/energy_entities: the sensors whose unit is read, by kind; a sensor listed twice is judged by
         the first kind (the charger power's rule, which can be stricter). action_sensor: the charger's action sensor the
-        blueprint automation uses. automations_path: the automations.yaml the editor writes (read only)."""
+        blueprint automation uses. automations_path: the automations.yaml the editor writes (read only). consumption_entity:
+        the house consumption power sensor (home.entity_ids.power_consumption_entity_id), judged by _check_consumption_frozen."""
         self.hass = hass
         self.entry = entry
         self.label = label
         self._entities = sorted({entity_id for entity_id in entities if entity_id and entity_id not in watched})
+        self._consumption_entity = consumption_entity
+        # set by _consumption_changed when the house sensor went to another number after the grace (in memory only)
+        self._consumption_moved = False
+        # the startup grace of the house sensor is over (see _consumption_grace_over): until then the listener counts nothing
+        self._consumption_over = False
+        # when the watcher started (Home Assistant started): the grace is counted from it
+        self._started_at: datetime.datetime | None = None
         scope: dict[str, Callable[[str], bool]] = {}
         for accepted, entity_ids in (
             (self._charger_power_unit_ok, charger_power_entities),
@@ -259,7 +331,14 @@ class HealthWatcher:
         self._unit_verdicts: dict[str, tuple[str, bool]] = {}
         # scale_flagged: per value repair the sensors flagged, with their highest value, once the list is known (a key that is
         # there, even {}). A known list goes when nothing is flagged, whatever the unclear sensors say; an unknown one is not stored
-        self._data: dict[str, Any] = {"blueprint_seen": False, "status_unknown": {}, "charger_events": [], "scale_flagged": {}}
+        # consumption_frozen: the frozen house consumption sensor (entity, value, since) or None; kept in the store across restarts
+        self._data: dict[str, Any] = {
+            "blueprint_seen": False,
+            "status_unknown": {},
+            "charger_events": [],
+            "scale_flagged": {},
+            "consumption_frozen": None,
+        }
         self._ha_started = False
         self._stopped = False
         self._lock = asyncio.Lock()
@@ -268,6 +347,7 @@ class HealthWatcher:
 
     async def async_load(self) -> None:
         """The state kept across restarts. A file that can't be read starts over (the checks judge again)."""
+        await _async_wait_saves(self.hass, self.entry.entry_id)  # a save of the entry before a reload must be read back
         try:
             stored = await self._store.async_load()
         except Exception:  # noqa: BLE001 - a broken file must not stop the entry
@@ -284,6 +364,7 @@ class HealthWatcher:
             } if isinstance(status, dict) else {},
             "charger_events": [event for event in events if _stored_event(event)] if isinstance(events, list) else [],
             "scale_flagged": self._stored_scale_flagged(stored.get("scale_flagged")),
+            "consumption_frozen": _stored_consumption(stored.get("consumption_frozen")),
         }
         # the flagged sensors stay flagged until they are judged fine, also after a restart (an unclear one keeps its repair)
         for issue in (ISSUE_POWER_UNIT, ISSUE_BATTERY_FRACTION):
@@ -328,6 +409,8 @@ class HealthWatcher:
         self._unsubs.append(async_track_time_interval(self.hass, self._on_interval, RECHECK_INTERVAL))
         if self._status_entity:
             self._unsubs.append(async_track_state_change_event(self.hass, [self._status_entity], self._status_changed))
+        if self._consumption_entity:
+            self._unsubs.append(async_track_state_change_event(self.hass, [self._consumption_entity], self._consumption_changed))
 
     @callback
     def stop(self) -> None:
@@ -360,7 +443,14 @@ class HealthWatcher:
         if self._stopped or not self._ha_started:
             return
         async with self._lock:
-            for check in (self._check_missing, self._check_units, self._check_price_scale, self._check_not_following, self._check_status):
+            for check in (
+                self._check_missing,
+                self._check_units,
+                self._check_price_scale,
+                self._check_not_following,
+                self._check_status,
+                self._check_consumption_frozen,
+            ):
                 try:
                     check()
                 except Exception:  # noqa: BLE001
@@ -388,6 +478,7 @@ class HealthWatcher:
     @callback
     def _on_started(self, _hass: HomeAssistant) -> None:
         self._ha_started = True
+        self._started_at = _utcnow()
         self._schedule()
 
     @callback
@@ -425,6 +516,21 @@ class HealthWatcher:
         self._schedule()
 
     @callback
+    def _consumption_changed(self, event: Event) -> None:
+        """The house sensor went from one number to another after the startup grace: the next check decides about it, so that a
+        value that goes away and comes back between two checks is seen too. Unavailable or text on either side is no answer, so
+        it is not counted. During the grace nothing is counted (see _consumption_grace_over)."""
+        if not self._consumption_over:
+            return
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        if old is None or new is None:
+            return
+        before, after = _state_number(old.state), _state_number(new.state)
+        if before is None or after is None or before == after:
+            return
+        self._consumption_moved = True
+
+    @callback
     def _status_changed(self, _event: Event) -> None:
         """The status is judged again once it could have been held for STATUS_UNKNOWN_MINUTES."""
         if self._status_later is not None:
@@ -441,7 +547,13 @@ class HealthWatcher:
                 _LOGGER.exception("Health check of the charger status of %s failed", self.label)
 
     def _relevant(self) -> set[str]:
-        entities = {*self._entities, *(entity_id for entity_id, _ in self._unit_scope), self._status_entity, *self._automation_entities}
+        entities = {
+            *self._entities,
+            *(entity_id for entity_id, _ in self._unit_scope),
+            self._status_entity,
+            self._consumption_entity,
+            *self._automation_entities,
+        }
         return {entity_id for entity_id in entities if entity_id}
 
     # ------------------------------------------------------------------ #
@@ -450,6 +562,12 @@ class HealthWatcher:
 
     def _issue_raised(self, issue: str) -> bool:
         return ir.async_get(self.hass).async_get_issue(DOMAIN, f"{self.entry.entry_id}_{issue}") is not None
+
+    def _raised_entity(self) -> str | None:
+        """The house sensor that the open consumption repair names (its placeholder), or None when there is no repair or it names none."""
+        issue = ir.async_get(self.hass).async_get_issue(DOMAIN, f"{self.entry.entry_id}_{ISSUE_CONSUMPTION_FROZEN}")
+        entity = (issue.translation_placeholders or {}).get("entity") if issue is not None else None
+        return entity if isinstance(entity, str) and entity else None
 
     def _set_issue(self, issue: str, found: bool, placeholders: dict[str, str]) -> None:
         issue_id = f"{self.entry.entry_id}_{issue}"
@@ -468,7 +586,8 @@ class HealthWatcher:
 
     def _check_missing(self) -> None:
         """Configured entities that are disabled, or neither in the entity registry nor in the states. An entity that is only
-        unavailable is not listed: the persistent notification after 30 minutes covers it."""
+        unavailable is not listed: the planner's notification covers that (Engine.is_entity_available), but only for an entity
+        with an entity registry entry, and only once the planner reads it and finds no number for it in the last day."""
         registry = er.async_get(self.hass)
         disabled: list[str] = []
         missing: list[str] = []
@@ -588,6 +707,100 @@ class HealthWatcher:
             self._set_issue(ISSUE_PRICE_SCALE, True, {"entities": _lines([f"{entity_id} ({unit})" for entity_id, unit in problems])})
         elif complete:
             self._set_issue(ISSUE_PRICE_SCALE, False, {})
+
+    def _consumption_grace_over(self) -> bool:
+        """Whether the startup grace of the house sensor is over. It is over from the first check that is at or after CONSUMPTION_GRACE
+        from the start (a check that reads a number, or that finds no sensor configured, or another one), and it stays over."""
+        if not self._consumption_over and self._started_at is not None and _utcnow() - self._started_at >= CONSUMPTION_GRACE:
+            self._consumption_over = True
+        return self._consumption_over
+
+    def _check_consumption_frozen(self) -> None:
+        """The house consumption sensor that has shown the same value for FROZEN_AFTER or longer (its last_changed): the plan reads
+        it for the house, so a stuck one makes the plan wrong. The frozen value and the time it started are kept in the store: a
+        restart resets last_changed, so the repair stays until the value changes.
+
+        During the startup grace (CONSUMPTION_GRACE from the start) nothing is deleted, the stored value and time are not replaced,
+        no baseline is taken from a lost store, and the listener counts nothing. An open repair is shown again from its stored
+        value (async_create_issue keeps its Ignore); a new repair is raised by the six hours only when no repair is open.
+
+        After the grace a positive answer deletes the repair: a number other than the stored one, the sensor no longer configured,
+        another sensor configured, a repair that names another sensor while the stored value is lost, or the listener saw the sensor
+        go to another number since the last check. Unavailable, unknown or text keeps the repair as it is. A lost (or unreadable)
+        stored value is taken from the first check after the grace that reads a number, when a repair names this sensor, or else
+        once the value has been the same for FROZEN_AFTER."""
+        entity = self._consumption_entity
+        stored = self._data["consumption_frozen"]
+        exists = self._issue_raised(ISSUE_CONSUMPTION_FROZEN)
+        raised = self._raised_entity()
+        if not entity or (stored is not None and stored["entity"] != entity) or (stored is None and raised not in (None, entity)):
+            # a positive answer (no house sensor, another one, or a repair that names another one): only after the grace
+            if not self._consumption_grace_over():
+                return
+            self._clear_consumption()
+            if not entity:
+                return
+            stored, exists, raised = None, False, None
+        state = self.hass.states.get(entity)
+        if state is None or state.state in ENTITY_UNAVAILABLE_STATES:
+            return  # not judged now: the repair stays as it is
+        value = _state_number(state.state)
+        if value is None:
+            return  # a text state is no value to judge: the repair stays as it is
+        grace = not self._consumption_grace_over()
+        now = _utcnow()
+        last_changed = state.last_changed
+        moved, self._consumption_moved = self._consumption_moved, False
+        if stored is not None:
+            since = _frozen_since(stored, last_changed)
+            differs = value != _state_number(stored["value"])
+            if grace:
+                # shown from the stored value and time, which are not replaced; a repair that is not open is raised by the six hours only
+                if exists or (not differs and now - since >= FROZEN_AFTER):
+                    self._set_issue(ISSUE_CONSUMPTION_FROZEN, True, self._consumption_placeholders(state, since, stored["value"]))
+                return
+            if moved or differs:
+                # the value changed, also when it went away and came back between two checks: the frozen start is gone
+                self._clear_consumption()
+                return
+            # the same value: still frozen. The stored start is kept, unless the sensor's last_changed is older (then that one)
+            if stored["since"] != since.isoformat():
+                self._store_consumption(entity, state, since)
+            self._set_issue(ISSUE_CONSUMPTION_FROZEN, True, self._consumption_placeholders(state, since))
+            return
+        # no stored value: never stored, or lost or unreadable
+        if grace:
+            # no baseline during the grace: an open repair is kept as it is, and a new one is raised only by the six hours
+            if not exists and now - last_changed >= FROZEN_AFTER:
+                self._store_and_raise(entity, state, last_changed)
+            return
+        if raised != entity and now - last_changed < FROZEN_AFTER:
+            # not named after this sensor, or without placeholders (a restart loads a repair without them): not before the six hours
+            return
+        # a repair that names this sensor while its stored value is lost: the value now is the baseline. A value that has been the
+        # same for FROZEN_AFTER is raised and kept the same way
+        self._store_and_raise(entity, state, last_changed)
+
+    def _store_and_raise(self, entity: str, state: Any, since: datetime.datetime) -> None:
+        self._store_consumption(entity, state, since)
+        self._set_issue(ISSUE_CONSUMPTION_FROZEN, True, self._consumption_placeholders(state, since))
+
+    def _clear_consumption(self) -> None:
+        """A positive answer: the frozen value is no longer kept, and its repair goes."""
+        if self._data["consumption_frozen"] is not None:
+            self._data["consumption_frozen"] = None
+            self._save()
+        self._set_issue(ISSUE_CONSUMPTION_FROZEN, False, {})
+
+    def _store_consumption(self, entity: str, state: Any, since: datetime.datetime) -> None:
+        self._data["consumption_frozen"] = {"entity": entity, "value": state.state, "since": since.isoformat()}
+        self._save()
+
+    def _consumption_placeholders(self, state: Any, since: datetime.datetime, value: str | None = None) -> dict[str, str]:
+        """The repair's texts. value: the stored value, shown instead of the sensor's current state (the repair of a stored value)."""
+        unit = str(state.attributes.get("unit_of_measurement") or "")
+        shown = number_text(float(state.state if value is None else value), self._language())
+        return {"entity": str(state.entity_id), "value": f"{shown} {unit}".strip(), "since": _local(since)}
 
     async def _async_check_power_scale(self) -> None:
         """Power sensors without a unit whose values look like kW (read as W they are 1000 times too small)."""
@@ -756,11 +969,19 @@ class HealthWatcher:
 
     @callback
     def _save(self) -> None:
+        """A Home Assistant background task, not one of the entry: an unload cancels the entry's tasks, and a change made just
+        before an unload must still be written. No save starts after stop(); a removal waits for the saves in progress."""
         if self._stopped:
             return
-        self.entry.async_create_background_task(self.hass, self._async_save(), name=f"{DOMAIN}_{self.label}_health_save")
+        task = self.hass.async_create_background_task(self._async_save(), name=f"{DOMAIN}_{self.label}_health_save")
+        pending = _pending_saves(self.hass, self.entry.entry_id)
+        pending.add(task)
+        task.add_done_callback(pending.discard)
 
     async def _async_save(self) -> None:
         """Written at once, not delayed: a delayed write could come after the entry was removed and its store deleted."""
         async with self._save_lock:
-            await self._store.async_save(copy.deepcopy(self._data))
+            try:
+                await self._store.async_save(copy.deepcopy(self._data))
+            except Exception:  # noqa: BLE001 - a failed write is logged; the next change saves the state again
+                _LOGGER.exception("Could not save the health state of %s", self.label)

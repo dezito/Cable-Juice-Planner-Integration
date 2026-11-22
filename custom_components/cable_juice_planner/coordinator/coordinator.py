@@ -309,8 +309,14 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 _LOGGER.error("Could not save database %s: %s", name, err)
 
         if "charging_loss" in result.config_updates:
+            # set before the update (the listener may run inside it), and cleared when the options did not change: an
+            # unchanged update calls no listener, and a flag left set would swallow the next real change (the voltage
+            # repair, the settings) without the reload it needs
             self.ignore_next_update = True
-            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, "charging_loss": result.config_updates["charging_loss"]})
+            if not self.hass.config_entries.async_update_entry(
+                self.entry, options={**self.entry.options, "charging_loss": result.config_updates["charging_loss"]}
+            ):
+                self.ignore_next_update = False
         if result.request_reload:
             self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 

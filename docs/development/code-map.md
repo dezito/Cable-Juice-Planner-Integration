@@ -25,6 +25,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price providers; CombinedPriceProvider is the only entry point
 ├── management/                          Storage, backups, dashboard, and blueprint setup
+│   └── voltage_issue.py                 Fixable repair for a grid voltage still at the old 240 V default (sets 230 V)
 ├── utils/                               Shared utilities and datetime/time platform implementations
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
 ├── select.py / button.py / binary_sensor.py  Other HA entity platforms
@@ -42,6 +43,8 @@ tests/                                   Pytest suite
 ├── test_analysis.py / test_config_flow.py      Analysis and setup/options
 ├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
 ├── test_health_checks.py / test_value_checks.py / test_value_checks_recorder.py / test_site_fuse_check.py  Repairs: health checks, scale of values, main fuse
+├── test_voltage_issue.py                The old-default voltage repair and its fix flow
+├── test_charger_test.py                 Charger automation test: judging, voltage, runner parts, charge limit step
 ├── test_dashboard.py                    Dashboard generation and content
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests

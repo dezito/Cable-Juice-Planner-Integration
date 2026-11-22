@@ -110,6 +110,7 @@ class CoordinatorLifecycle:
             battery_entities=[home["powerwall_battery_level_entity_id"], ev["usable_battery_level_entity_id"] if self.ev_configured else ""],
             energy_entities=[charger["kwh_meter_entity_id"], charger["lifetime_kwh_meter_entity_id"]],
             status_entity=charger["status_entity_id"],
+            consumption_entity=home["power_consumption_entity_id"],
             action_sensor=f"sensor.{self.object_prefix}_charger_action",
             automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
             price_problems=self._price_unit_problems,

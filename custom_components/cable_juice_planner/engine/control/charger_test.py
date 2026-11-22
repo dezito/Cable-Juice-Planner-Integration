@@ -52,6 +52,12 @@ LIMIT_STEP = 10.0
 # more than the published amps give by this much is a charger that ignores the amps or the phases (load balancing risk)
 OVERDRAW_SHARE = 0.25
 OVERDRAW_MIN_W = 500.0
+# the voltage the charger really charges at, from the power per amp (the grid's voltage under the load, not the setting)
+VOLTAGE_SPREAD = 0.02  # every current's power per amp within this share: a charger an amp short drifts more over the span
+VOLTAGE_SPAN = 1.5  # the highest current at least this many times the lowest: close currents can't tell an amp short
+VOLTAGE_BAND = (0.85, 1.10)  # the share of the setting a measured voltage may be (else fewer phases, a limit, a wrong sensor)
+# the direction each charge step searches in (build_steps)
+STEP_SEARCH = {"max": -1, "single_max": -1, "min": 1, "single_min": 1}
 
 
 def amps_list(amps: float, phases: int) -> list[int]:
@@ -111,6 +117,76 @@ def amps_unproven(steps: list[dict], voltage: float, threshold_w: float) -> bool
     if not judged:
         return False
     return all(max(w for _, w in group) - min(w for _, w in group) <= tolerance_w(max(w for _, w in group)) for group in judged)
+
+
+def measured_voltage(attempts: list[dict], phases: int, voltage: float, threshold_w: float) -> float | None:
+    """The voltage per phase the charger charged at, when the power followed every current at one voltage; else None.
+
+    Only the attempts that charged (threshold_w) count. They must span currents far apart (VOLTAGE_SPAN) with the same
+    power per amp (VOLTAGE_SPREAD): a charger that gives an amp less than it is asked for has about the same power per amp
+    at two close currents, but not over a wide span. A car that limits its power has another power per amp at every
+    current. A voltage far from the setting (VOLTAGE_BAND) is no grid voltage but fewer phases or a sensor in other units.
+    voltage: the voltage setting."""
+    charged = [attempt for attempt in attempts if attempt["amps"] > 0 and attempt["watt"] >= threshold_w]
+    amps = [attempt["amps"] for attempt in charged]
+    if phases < 1 or len(set(amps)) < 2 or max(amps) < VOLTAGE_SPAN * min(amps):
+        return None
+    per_amp = [attempt["watt"] / (attempt["amps"] * phases) for attempt in charged]
+    if max(per_amp) - min(per_amp) > VOLTAGE_SPREAD * max(per_amp):
+        return None
+    measured = sum(per_amp) / len(per_amp)
+    if not VOLTAGE_BAND[0] * voltage <= measured <= VOLTAGE_BAND[1] * voltage:
+        return None
+    return round(measured, 1)
+
+
+def judge_at_measured_voltage(steps: list[dict], voltage: float, threshold_w: float) -> list[dict]:
+    """The charge steps judged again at the voltage the charger really charged at, per number of phases.
+
+    The power is compared with amps x the voltage setting, so a setting that is not the grid's voltage (240 V on a 230 V
+    grid) fails currents that the charger took exactly, and the search ends on a lower one that happens to be within the
+    tolerance. When the attempts of every step on that number of phases give one voltage (measured_voltage) that is more
+    than VOLTAGE_SPREAD from the setting, each such step is judged again at it: its result is the current closest to the
+    step that matches, with "voltage" (the measured) and "voltage_setting". Steps that were not run, an overdraw, a stop
+    and the charge limit are kept; so is a step none of whose currents match. Returns a new list; steps judged before are
+    judged the same again (from the attempts' power, not their earlier verdict)."""
+
+    def charge(step: dict) -> bool:
+        return step.get("name") in STEP_SEARCH and step.get("status") != "skip" and step.get("reason") != "overdraw"
+
+    def phases_of(step: dict) -> int:
+        return int(step.get("judged_phases") or step.get("phases") or 0)
+
+    groups: dict[int, list[dict]] = {}
+    for step in steps:
+        if charge(step):
+            groups.setdefault(phases_of(step), []).extend(step.get("attempts") or [])
+    voltages: dict[int, float] = {}
+    for phases, attempts in groups.items():
+        measured = measured_voltage(attempts, phases, voltage, threshold_w)
+        if measured is not None and abs(measured - voltage) > VOLTAGE_SPREAD * voltage:
+            voltages[phases] = measured
+    judged = []
+    for step in steps:
+        measured = voltages.get(phases_of(step)) if charge(step) else None
+        if measured is None:
+            judged.append(step)
+            continue
+        phases = phases_of(step)
+        attempts = [{**attempt, "ok": judge_power(attempt["amps"] * phases * measured, attempt["watt"])} for attempt in step.get("attempts") or []]
+        working = [attempt for attempt in attempts if attempt["ok"]]
+        if not working:
+            judged.append(step)
+            continue
+        search = STEP_SEARCH[step["name"]]
+        best = (min if search > 0 else max)(working, key=lambda attempt: attempt["amps"])
+        own = best["amps"] == step.get("configured_amps") and not step.get("already_charging")
+        judged.append({
+            **step, "attempts": attempts, "status": "ok" if own else "adjusted", "amps": best["amps"], "watt": best["watt"],
+            "expected_w": round(best["amps"] * phases * measured), "limited": power_is_capped(search, attempts, best, threshold_w),
+            "voltage": measured, "voltage_setting": voltage,
+        })
+    return judged
 
 
 def limit_test_value(
@@ -295,9 +371,10 @@ class ChargerTest:
         """Publish kind ("charge" at amps on phases phases, or "stop") for the next seconds.
 
         Returns {"status": "ok" | "not_ready", "requested": amps per phase, "published": amps per phase after the load
-        balancing}. Nothing is held when the cable is out or the car is full."""
+        balancing}. Nothing new is held when the cable is out or the car is full; a stop over a hold the test already has is
+        always taken (a stop is harmless, and the held charge must not stay published when the car resumes or is plugged in)."""
         status = self.get_state(self.config["charger"]["entity_ids"]["status_entity_id"], try_history=False, error_state="unavailable")
-        if status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS:
+        if status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS and not (kind == "stop" and self.charger_hold_active()):
             return {"status": "not_ready", "requested": [0, 0, 0], "published": [0, 0, 0]}
         requested = amps_list(amps, phases) if kind == "charge" else [0, 0, 0]
         now = self.now()
@@ -435,6 +512,13 @@ def build_charger_test_markdown(t, state: dict) -> str:
             lines.append(t(f"ui.charger_test.stop_reason.{state['reason']}"))
         if state.get("car_phases"):
             lines.append(t("ui.charger_test.car_phases", phases=state["car_phases"]))
+        # the voltage the steps were judged at, once per number of phases (judge_at_measured_voltage)
+        voltages: dict[int, tuple[float, float]] = {}
+        for step in state["steps"]:
+            if step["status"] != "skip" and step.get("voltage") and step.get("voltage_setting"):
+                voltages.setdefault(int(step.get("judged_phases") or step["phases"]), (step["voltage"], step["voltage_setting"]))
+        for phases, (measured, setting) in sorted(voltages.items(), reverse=True):
+            lines.append(t("ui.charger_test.voltage", voltage=round(measured), phases=phases, setting=round(setting)))
         if state.get("amps_control") is False:
             lines.append(t("ui.charger_test.no_amps_control"))
         if state.get("automation") == "unknown":
@@ -463,6 +547,8 @@ def charger_step_text(t, step: dict) -> str:
         limited = "limited_low" if step["name"] in ("min", "single_min") else "limited"
         kind = "stop" if step["name"] == "stop" else limited if step.get("limited") else "started" if not step.get("expected_w") else step["status"]
         text = t(f"ui.charger_test.ok.{kind}", **values)
+        if step.get("voltage") and kind in ("ok", "adjusted", "limited", "limited_low"):
+            text = f"{text} {t('ui.charger_test.ok.voltage', voltage=round(step['voltage']))}"
         return f"{text} {t('ui.charger_test.ok.already_charging')}" if step.get("already_charging") else text
     if step.get("reason") == "overdraw":
         return t("ui.charger_test.fail.overdraw", **values)

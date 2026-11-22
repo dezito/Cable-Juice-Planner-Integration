@@ -2077,10 +2077,16 @@ def test_solcast_alone_when_there_is_no_solar_history() -> None:
     assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
 
 
-def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home", location_history: list | None = None):
-    now = datetime.datetime.combine(DAY, datetime.time(12, minute))
+def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home",
+                location_history: list | None = None, odometer: float | str | None = None, when: datetime.datetime | None = None,
+                charger_meter: float | None = None):
+    now = when or datetime.datetime.combine(DAY, datetime.time(12, minute))
     snap = snapshot(now, level=level, port=port, settings={"public_charging_session_cost": cost})
     snap.states["device_tracker.ev"] = location
+    if odometer is not None:
+        snap.states["sensor.ev_odometer"] = str(odometer)
+    if charger_meter is not None:
+        snap.states["sensor.charger_kwh"] = str(charger_meter)
     if location_history is not None:
         # (minutes before now, state)
         snap.buffers = {"device_tracker.ev": [(now.replace(tzinfo=TZ).timestamp() - ago * 60, value) for ago, value in location_history]}
@@ -2109,7 +2115,7 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     # entering the first cost adds it and keeps the charge in progress
     _public_job(engine, 45, engine.add_public_charging_session, level=65, port="on", cost=120.0)
     assert engine.sensor_states["public_charging_session_done"] == "off"
-    assert engine.public_charging_sessions == [{"start_battery_level": 65.0}]
+    assert engine.public_charging_sessions == [{"start_battery_level": 65.0, "start_odometer": 25000.0}]
     assert queue() is None
     public = [row for row in engine.charging_history_db.values() if row.get("public_cost")]
     assert [(row["percentage"], row["public_cost"]) for row in public] == [(40.0, 120.0)]
@@ -2117,6 +2123,223 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     _public_job(engine, 50, engine.public_charging_session, "off", level=90, port="off")
     assert engine.sensor_states["public_charging_session_done"] == "on"
     assert [s["added_percentage"] for s in queue()] == [25]
+
+
+def _public_queue(engine: CJPEngine) -> list | None:
+    return engine.sensor_attrs.get("public_charging_session_done", {}).get("public_charging_session")
+
+
+def test_a_public_charging_session_left_open_at_home_is_not_reused_later() -> None:
+    """The car integration reported the port before the location turned home (one update, 3 ms apart): a session
+    started at home. Its end at home must drop it, so a port opened by mistake away from home days later doesn't
+    measure from that old level (59 % -> 76 % without any charging)."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on", odometer=25000)  # still not_home
+    assert len(engine.public_charging_sessions) == 1
+    _public_job(engine, 5, engine.public_charging_session, "off", level=59, port="off", location="home", odometer=25000)
+    assert engine.public_charging_sessions == []
+    # two days later: charged at home, driven 200 km, the port opened and closed by mistake at someone else's home
+    later = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(10, 37, 16))
+    _public_job(engine, 0, engine.public_charging_session, "on", level=76, port="on", odometer=25200, when=later)
+    result = _public_job(engine, 0, engine.public_charging_session, "off", level=76, port="off", odometer=25200, when=later + datetime.timedelta(seconds=10))
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+    assert not result.mobile_notifications
+
+
+def test_a_session_still_open_when_plugged_in_at_home_is_dropped() -> None:
+    """Plugged in at home while a session away from home is still open: the car charges at home, not away."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "on", level=59, port="on", location="home")
+    assert engine.public_charging_sessions == []
+
+
+@pytest.mark.parametrize(
+    ("location", "location_history", "dropped"),
+    [
+        ("unknown", [], False),
+        ("unavailable", [], False),
+        ("unavailable", [(60, "not_home")], False),  # the last known location is away: the charge ends there
+        ("unavailable", [(60, "home")], True),  # the last known location of the past day is home, like _is_not_home
+    ],
+)
+def test_a_session_still_open_is_only_dropped_when_the_car_is_known_to_be_home(location: str, location_history: list, dropped: bool) -> None:
+    """Only a car known to be home drops an open session; an unknown location changes nothing."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", location=location, location_history=location_history)
+    if dropped:
+        assert engine.public_charging_sessions == []
+    elif location_history:
+        assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+    else:
+        assert engine.public_charging_sessions == [{"start_battery_level": 30.0, "start_odometer": 25000.0}]
+
+
+def test_only_the_open_session_is_dropped_at_home() -> None:
+    """A charge waiting for its cost and a newer one still open: a port change at home drops only the open one."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off")
+    waiting = deepcopy(_public_queue(engine))
+    _public_job(engine, 40, engine.public_charging_session, "on", level=65, port="on")  # started away, location late
+    result = _public_job(engine, 45, engine.public_charging_session, "off", level=65, port="off", location="home")
+    assert engine.public_charging_sessions == waiting
+    assert _public_queue(engine) == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    assert "runtime" in result.db_saves
+
+
+def test_a_session_dropped_after_a_drive_is_saved_while_another_waits() -> None:
+    """Dropping the open session after a drive is saved, also when a finished charge still waits for its cost."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25000)
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000)
+    waiting = deepcopy(_public_queue(engine))
+    _public_job(engine, 40, engine.public_charging_session, "on", level=65, port="on", odometer=25010)
+    result = _public_job(engine, 50, engine.public_charging_session, "off", level=80, port="off", odometer=25200)
+    assert engine.public_charging_sessions == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    assert "runtime" in result.db_saves
+
+
+def test_an_unavailable_odometer_at_the_end_is_not_its_last_known_value() -> None:
+    """The odometer must be read live at both ends: a last known value from before the drive is not a drive."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25200)
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, level=70, port="off")
+    snap.states["device_tracker.ev"] = "not_home"
+    snap.states["sensor.ev_odometer"] = "unavailable"
+    snap.buffers = {"sensor.ev_odometer": [(now.replace(tzinfo=TZ).timestamp() - 3600, "25000")]}
+    assert engine.run_job(snap, engine.public_charging_session, "off").error is None
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+
+
+def test_a_public_charging_session_is_not_measured_across_a_drive() -> None:
+    """A car can't drive while it charges: a moved odometer means the session's end was missed."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on", odometer=25000)
+    # the end was never seen (the car was offline); later it ends away from home after a drive
+    result = _public_job(engine, 30, engine.public_charging_session, "off", level=76, port="off", odometer=25200)
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+    assert not result.mobile_notifications
+    # plugged in away while an old session is still open: the drive since starts a new session from the level now
+    _public_job(engine, 35, engine.public_charging_session, "on", level=59, port="on", odometer=25200)
+    _public_job(engine, 40, engine.public_charging_session, "on", level=50, port="on", odometer=25300)
+    assert engine.public_charging_sessions == [{"start_battery_level": 50.0, "start_odometer": 25300.0}]
+    _public_job(engine, 50, engine.public_charging_session, "off", level=80, port="off", odometer=25300.4)  # within the tolerance
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [30]
+
+
+@pytest.mark.parametrize("odometer", ["unavailable", "not a number"])
+def test_a_public_charging_session_without_an_odometer_is_measured(odometer: str) -> None:
+    """No odometer reading is not a drive: the session counts like before."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=odometer)
+    assert engine.public_charging_sessions == [{"start_battery_level": 30.0}]
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000)
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+
+
+def test_a_finished_public_charge_waits_for_its_cost_at_home_and_days_later() -> None:
+    """A charge that ended away from home keeps waiting for its cost: driving home, port changes at home and an
+    end away from home without an open session don't change it, and its cost can be entered days later."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25000)
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000, charger_meter=500)
+    waiting = deepcopy(_public_queue(engine))
+    assert [s["added_percentage"] for s in waiting] == [40]
+    # driven home: plugged in and unplugged at home
+    _public_job(engine, 50, engine.public_charging_session, "on", level=65, port="on", location="home", odometer=25040)
+    _public_job(engine, 55, engine.public_charging_session, "off", level=80, port="off", location="home", odometer=25040)
+    # a port closing away from home that never opened there (its opening came with an unknown location)
+    _public_job(engine, 59, engine.public_charging_session, "off", level=75, port="off", odometer=25060)
+    assert _public_queue(engine) == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    # the cost entered at home two days later
+    later = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(19, 0))
+    _public_job(engine, 0, engine.add_public_charging_session, level=60, port="on", location="home", odometer=25100, cost=120.0, when=later,
+                charger_meter=530)
+    assert engine.sensor_states["public_charging_session_done"] == "off"
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert [(row["percentage"], row["public_cost"]) for row in public.values()] == [(40.0, 120.0)]
+    # booked when the charge ended, with its own odometer and charger meter, not those of two days later
+    ended = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    assert list(public) == [ended]
+    assert public[ended]["ended"] == "12:30"
+    assert public[ended]["odometer"] == 25000
+    assert (public[ended]["start_charger_meter"], public[ended]["end_charger_meter"]) == (500.0, 500.0)
+
+
+def test_a_waiting_public_charge_stored_without_odometer_is_booked_at_its_own_time() -> None:
+    """A charge waiting from before its odometer and charger meter were stored (or restored from PyScript with an
+    ISO time): booked at its own end time without the odometer of today, which the history fills in on start."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    waiting = [{"start_battery_level": 30.0, "end_battery_level": 70.0, "added_percentage": 40.0, "timestamp": "2026-10-20T18:15:00"}]
+    runtime = {"public_charging_session_done": "on", "public_charging_session": waiting}
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {"runtime": runtime}).error is None
+    _public_job(engine, 0, engine.add_public_charging_session, level=60, port="on", location="home", odometer=25100, cost=90.0)
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert list(public) == [datetime.datetime(2026, 10, 20, 18, 15)]
+    assert "odometer" not in public[datetime.datetime(2026, 10, 20, 18, 15)]
+
+
+@pytest.mark.parametrize(
+    ("ended", "expected"),
+    [
+        ("2026-10-22T08:15:00+00:00", datetime.datetime(2026, 10, 22, 10, 15)),  # aware: converted to local time (CEST)
+        ("2026-10-23T09:00:00", None),  # in the future: booked now
+        ("not a time", None),
+        (None, None),
+    ],
+)
+def test_the_booking_time_of_a_waiting_public_charge(ended: str | None, expected: datetime.datetime | None) -> None:
+    """Without a usable end time the charge is booked when its cost is entered, like before; the charger meter then
+    comes from now too."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    waiting = [{"start_battery_level": 30.0, "end_battery_level": 70.0, "added_percentage": 40.0, "timestamp": ended}]
+    runtime = {"public_charging_session_done": "on", "public_charging_session": waiting}
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {"runtime": runtime}).error is None
+    _public_job(engine, 40, engine.add_public_charging_session, level=60, port="on", location="home", cost=90.0, charger_meter=777)
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert list(public) == [expected or datetime.datetime.combine(DAY, datetime.time(12, 40))]
+    assert next(iter(public.values()))["start_charger_meter"] == 777.0
+
+
+def test_the_recalculation_of_this_hour_leaves_a_public_charge_alone() -> None:
+    """A public charge that ended earlier in the hour of a charge at home is not merged into it."""
+    engine = _loss_engine()
+    public_key = datetime.datetime.combine(DAY, datetime.time(12, 5))
+    home_key = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    public_row = {
+        "percentage": 40.0, "kWh": 30.0, "kWh_from_public": 30.0, "kWh_from_local_energy": 0.0, "solar_kwh_of_local_energy": 0.0,
+        "powerwall_kwh_of_local_energy": 0.0, "cost": 120.0, "public_cost": 120.0, "unit": 4.0, "emoji": "🧾",
+        "start_charger_meter": 500.0, "end_charger_meter": 500.0, "ended": "12:05", "charging_type": "public_charging",
+    }
+    engine.charging_history_db[public_key] = deepcopy(public_row)
+    engine.charging_history_db[home_key] = {
+        "percentage": 5.0, "kWh": 4.0, "cost": 8.0, "unit": 2.0, "emoji": "", "ended": "12:50",
+        "start_charger_meter": 500.0, "end_charger_meter": 504.0, "charging_type": ["planned"],
+    }
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 59)))
+    snap.states["sensor.charger_kwh"] = "504"
+    assert engine.run_job(snap, engine.charging_history_recalc_price).error is None
+    assert engine.charging_history_db[public_key] == public_row
+    assert engine.charging_history_db[home_key]["start_charger_meter"] == 500.0
+
+
+def test_a_public_charge_never_overwrites_a_history_entry_at_the_same_time() -> None:
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off")
+    ended = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine.charging_history_db[ended] = {"percentage": 5.0, "kWh": 4.0, "cost": 8.0, "unit": 2.0, "emoji": "", "ended": "12:45"}
+    _public_job(engine, 40, engine.add_public_charging_session, level=70, port="off", cost=120.0)
+    assert engine.charging_history_db[ended]["cost"] == 8.0
+    assert engine.charging_history_db[ended + datetime.timedelta(seconds=1)]["public_cost"] == 120.0
 
 
 def test_an_autumn_night_with_25_price_rows_is_planned_with_one_price_for_the_repeated_hour() -> None:

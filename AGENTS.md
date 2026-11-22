@@ -470,6 +470,23 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   restored `running` state (`sensor.py` passes it on) becomes `stopped` with
   the "check the limit" note. A normal running test is not restored.
 
+### Charger test: parts and voltage
+
+- The default grid voltage is 230 V. A car entry with exactly 240 V gets the
+  fixable repair `voltage_old_default` (`management/voltage_issue.py`). It is
+  not migrated automatically, because a deliberate 240 V (UK, PyScript
+  imports) can't be told apart from the old default.
+- The test has three independent parts: the charging steps, the stop and the
+  charge limit. A stop reason ends the charging steps (the rest of them and the
+  stop are `not_reached`). The charge limit step still runs, with a stop held
+  first. Only the switch or an internal error ends the whole test.
+- `charger_test_hold("stop")` is accepted over the test's own hold whatever
+  the charger status, so a held charge never stays published after
+  `completed` or `not_connected`.
+- The shown steps are `_judged(raw)`: they are judged again at the measured
+  voltage from the raw steps after every step. `already_charging` is applied
+  after the judging.
+
 ### PyScript import
 
 Many users still run the PyScript version, so the import must keep working and
@@ -542,13 +559,42 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 - `management/health_checks.py` (`HealthWatcher`) raises the repairs
   `entities_missing`, `entity_units`, `blueprint_automation_lost`,
-  `charger_status_unknown`, `charger_not_following` and the value scale
+  `charger_status_unknown`, `charger_not_following`, `consumption_frozen` and the value scale
   repairs below (`power_without_unit`, `battery_level_fraction`,
   `price_unit_scale`). They only inform; none
   of them controls anything. Thresholds are the module constants
   (`STATUS_UNKNOWN_MINUTES`, `STATUS_UNKNOWN_DAYS`, `NOT_FOLLOWING_EVENTS`,
-  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the existing
-  persistent notification after 30 minutes covers it.
+  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the planner's own notification covers it
+  (`Engine.is_entity_available`, `engine/engine.py`). It comes only for an entity with an entity registry entry (its platform is
+  read once at setup, `coordinator/lifecycle.py`), when the planner reads the entity and finds no number for it in the last 24
+  hours (`get_state` falls back to the history), and once the entity has stayed unavailable for more than 30 minutes at those
+  reads (the 30 minutes are counted per integration). The house sensor is read at the end of each hour (`hour_end`, minute 59), and with solar also in each charge-hour calculation (`cheap_grid_charge_hours` -> `local_energy_prediction` ->
+  `inverter_available`, every planner cron, `min(cron_interval, 15)` minutes). It is also read when a charger charges without a
+  rule (the charging-without-a-rule alarm in `engine/control/schedule.py`, which lists the unavailable entities through `get_all_unavailable_entities`; `configured_entity_ids()` includes the house sensor).
+- `consumption_frozen` judges only the house consumption power sensor
+  (`home.entity_ids.power_consumption_entity_id`), not solar, battery flow or
+  charger power, which are legitimately 0 for hours. It is raised when the value
+  has not changed for `FROZEN_AFTER` (6 hours, by `last_changed`), checked hourly,
+  so the repair appears 6 to 7 hours after the last change. The frozen value and
+  its start are kept in the `.health` store (`consumption_frozen`), so a restart
+  keeps the repair.
+- Startup grace: for `CONSUMPTION_GRACE` (30 minutes) after a start or reload of
+  the entry, until the next check (in practice up to about an hour), nothing is
+  deleted, the stored value and time are not replaced, no baseline is taken from a
+  lost store, and the state listener ignores the sensor. An open repair is shown
+  again from its stored value (`async_create_issue` keeps its Ignore); a new one is
+  raised by the 6 hours only while no such repair is open. The grace ends at the
+  first check that is at least 30 minutes after the start and reads a number, or
+  finds no house sensor or another one.
+- After the grace the repair is deleted only on a positive answer: a finite number
+  other than the stored one, no house sensor configured, another one configured, a
+  repair that names another sensor while the stored value is lost, or a change the
+  state listener saw to another number since the last check (decided by that check).
+  Unavailable, unknown or text keeps the repair as it is.
+- Without a readable stored value (lost or malformed store), a repair that names
+  this sensor takes the value of the first check after the grace as its baseline;
+  without such a repair, the value is the baseline once it has been the same for
+  `FROZEN_AFTER`.
 - Delete an issue only on a positive answer (the problem is gone), never on an
   unclear one (unavailable/unknown state, unreadable `automations.yaml`).
   Delete + create resets the user's "Ignore", while `async_create_issue` on an

@@ -1421,6 +1421,17 @@
         }
       }
     },
+    "voltage_old_default": {
+      "title": "Die Netzspannung von {name} ist der alte Standardwert {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Netzspannung von {name} auf {default} V setzen",
+            "description": "Die Netzspannung von **{name}** (unter *Ladegerät - Daten* in den Optionen) ist {voltage} V, der Standardwert früherer Versionen von Cable Juice Planner. Der Standard ist jetzt {default} V, die Nennspannung in den meisten Teilen Europas. CJP berechnet damit die Ladeleistung des Plans und der Solarstufen und rechnet die gemessene Leistung der Wallbox für die Lastverteilung in Ampere um: Eine zu hoch eingestellte Spannung zählt den Strom eines Autos zu niedrig.\n\nWähle **Absenden**, um sie auf {default} V zu setzen (der Eintrag wird neu geladen). Hat dein Netz wirklich {voltage} V, ignoriere diese Reparatur. Du kannst die Spannung jederzeit in den Optionen ändern."
+          }
+        }
+      }
+    },
     "stromligning_entities": {
       "title": "Strømligning-Sensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",
       "description": "Cable Juice Planner ({prefix}) nutzt Strømligning-Sensoren, die deaktiviert sind oder die Strømligning nicht liefert. Ein fehlender Verkaufstarif zählt als 0, wodurch der berechnete Verkaufspreis zu hoch wird; ohne die Preissensoren werden die gespeicherten Preise genutzt.\n\nIn Home Assistant deaktiviert (Strømligning deaktiviert seine Sensoren ohne MwSt. standardmäßig – aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** mit *Deaktivierte Entitäten anzeigen*):\n{disabled}\n\nNicht von Strømligning geliefert (z. B. sind die Preisprognosen in dessen Optionen ausgeschaltet):\n{not_provided}\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren wieder funktionieren."
@@ -1460,6 +1471,10 @@
     "price_unit_scale": {
       "title": "Preissensoren in einer Untereinheit, pro MWh oder pro Wh ({prefix})",
       "description": "Cable Juice Planner ({prefix}) liest diese Preissensoren als Preise pro kWh in der Währung, ihre Einheit ist aber eine Untereinheit der Währung (Øre oder Cent), pro MWh oder pro Wh:\n{entities}\n\nEs wird kein Preis umgerechnet, daher sind die Preise 100- oder 1000-mal zu groß (Untereinheit, pro MWh) oder 1000-mal zu klein (pro Wh), und Plan und Ersparnisberechnung stimmen nicht. Beurteilt wird nur die Einheit, nicht die Größe der Preise.\n\nBehebe es an der Quelle: schalte in Energi Data Service die Option **Preise in Cent anzeigen** aus und stelle **Preis wird berechnet in** auf kWh, in den Optionen der Integration, oder wähle einen Sensor, dessen Einheit die Währung pro kWh ist (z. B. kr/kWh). Ist die Einheit wirklich richtig, wähle bei dieser Reparatur **Ignorieren**. Die Reparatur verschwindet von selbst, wenn alle Preissensoren in der Währung pro kWh sind (z. B. kr/kWh)."
+    },
+    "consumption_frozen": {
+      "title": "Hausverbrauchssensor zeigt 6 Stunden lang denselben Wert ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) verwendet den Hausverbrauchssensor {entity} für den Hausverbrauch im Plan. Er zeigt seit {since} den Wert {value}, also mindestens 6 Stunden ohne Änderung.\n\nDer Plan verwendet diesen Sensor für das Haus; ein Sensor, der stehen bleibt, liefert einen falschen Hausverbrauch. Prüfe die Integration oder das Gerät, das den Sensor liefert: Es sendet vielleicht keine Werte mehr. Wenn der Wert wirklich konstant ist, wähle bei dieser Reparatur **Ignorieren**.\n\nDiese Reparatur verschwindet von selbst, sobald der Sensor einen anderen Wert meldet. Ein nicht verfügbarer Sensor lässt die Reparatur, wie sie ist. Die Benachrichtigung des Plans über einen nicht verfügbaren Sensor gilt nur für einen Sensor mit Eintrag im Entitätsregister (zum Beispiel aus einer Integration, in der Oberfläche angelegt oder per YAML mit einer eindeutigen ID)."
     },
     "site_fuse_exceeded": {
       "title": "Haus und Autos ziehen mehr als die Hauptsicherung (Lastverteilung)",
