@@ -43,6 +43,7 @@ from ..const import (
     object_prefix,
 )
 from ..management.debug_export import DebugRecorder
+from ..management.health_checks import HealthWatcher
 from ..engine import CJPEngine, JobResult
 from ..prices import CombinedPriceProvider
 from ..utils.chargers import lower_priority_charger_power_entities
@@ -84,6 +85,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self.setting_limits: dict[str, dict[str, float]] = {}
         self.started = False
         self.ignore_next_update = False
+        # the repairs of the health checks (management/health_checks.py), set up in async_setup (lifecycle)
+        self.health_watcher: HealthWatcher | None = None
 
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{self.object_prefix}_worker")
         # the What-if replay (Smart and charging at once over a period) runs on a thread of its own, so the worker above,
@@ -286,6 +289,12 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
             self.async_set_setting(key, value, source="engine")
         for event_type, data in result.events:
             async_dispatcher_send(self.hass, self.signal, ("event", event_type, data))
+        if self.health_watcher is not None:
+            try:
+                for kind in result.charger_problems:
+                    self.health_watcher.record_charger_problem(kind)
+            except Exception:  # noqa: BLE001 - a repair must never stop the notifications of the job below
+                _LOGGER.exception("Could not record the charger events of %s", self.object_prefix)
 
         for message, title, notification_id in result.notifications:
             persistent_notification.async_create(self.hass, message, title=title, notification_id=notification_id)

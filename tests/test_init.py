@@ -614,7 +614,8 @@ async def test_migration_of_the_site_entry_drops_the_removed_testing_mode(hass: 
 
 
 async def test_charging_loss_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> None:
-    """The first time: raw history and hourly statistics, kW and Wh converted, the sensor published."""
+    """The first time: raw history and statistics, a kW power sensor (its statistics come in W) and a Wh meter converted,
+    the sensor published."""
     from types import SimpleNamespace  # noqa: PLC0415
 
     from homeassistant.util import dt as dt_util  # noqa: PLC0415
@@ -633,8 +634,12 @@ async def test_charging_loss_reads_the_recorder(hass: HomeAssistant, loaded_entr
         EV_LEVEL_ID: [state(EV_LEVEL_ID, ts, v) for soc, _, _ in sessions for ts, v in soc],
         CHARGER_KWH: [state(CHARGER_KWH, ts, v * 1000) for _, meter, _ in sessions for ts, v in meter],  # in Wh
     }
-    power = {CHARGER_POWER: [{"start": ts, "mean": m / 1000, "min": lo / 1000, "max": hi / 1000} for _, _, rows in sessions for ts, m, lo, hi in rows]}  # in kW
+    # a power sensor recorded in kW: asked for with STATISTICS_POWER_UNITS, Home Assistant gives its statistics in W
+    power = {CHARGER_POWER: [{"start": ts, "mean": m, "min": lo, "max": hi} for _, _, rows in sessions for ts, m, lo, hi in rows]}
     metadata = {CHARGER_POWER: (1, {"unit_of_measurement": "kW"}), CHARGER_KWH: (2, {"unit_of_measurement": "Wh"})}
+    # the raw meter states are in the unit the meter has now
+    meter_now = hass.states.get(CHARGER_KWH)
+    hass.states.async_set(CHARGER_KWH, meter_now.state if meter_now else "0", {"unit_of_measurement": "Wh"})
 
     def statistics(_hass, _start, _end, _ids, period, *_args):
         return power if period == "5minute" else {}
@@ -678,7 +683,7 @@ async def test_charging_loss_statistics_only_as_far_back_as_needed(hass: HomeAss
         patch("homeassistant.components.recorder.get_instance", return_value=recorder),
         patch("homeassistant.components.recorder.history.get_significant_states", return_value={}),
         patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
-        patch("homeassistant.components.recorder.statistics.get_metadata", return_value={}),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value={CHARGER_POWER: (1, {"unit_of_measurement": "W"})}),
     ):
         await coordinator.async_recalculate_charging_loss()
         await hass.async_block_till_done()

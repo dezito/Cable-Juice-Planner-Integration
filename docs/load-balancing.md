@@ -12,7 +12,7 @@ it (a car ahead that starts after all, the house), the last car is limited at on
 |---|---|
 | Main fuse L1/L2/L3 | the limit per phase (or the share the cars may use together) – default 25 A |
 | Safety margin | subtracted from the fuse for short peaks (default 1 A) |
-| Current/power L1/L2/L3 (optional) | the house's measured current (A) or power (W) per phase, e.g. from a HAN/P1 meter |
+| Current/power L1/L2/L3 (optional) | the house's measured current (A, mA) or power (W, kW, mW, MW, GW) per phase, e.g. from a HAN/P1 meter; not an energy (Wh, kWh) |
 | Grid voltage | converts W to A |
 | Trip soon | a trip within this many hours gives the car precedence (default 12) |
 
@@ -49,19 +49,28 @@ overloaded phase limits the last car at once.
   consumption and the hour's forecast (the forecast's highest hour when this hour has none) – in the cars'
   amps and in the overload check. With none of them (after a restart, before the meter reported, without a
   forecast) the cars get no current until the meter reports (they are recalculated then). A car's *Charging
-  power* sensor that has not reported for 5 minutes, or has no reading in W/kW, counts for the cars behind
+  power* sensor that has not reported for 5 minutes, or has no reading in a power unit (mW, W, kW, MW, GW; an
+  energy unit such as Wh or kWh is no reading here: it may be a meter picked by mistake), counts
+  for the cars behind
   with what the car was given, and a stale reading is taken from the house
   with at most that – and not at all when the car's status says it is not charging (a full car can't hide the
   house, and a car that charges steadily doesn't count its own charging as the house). One without a reading
-  in W/kW is not taken from the house.
-- **Without phase sensors** the *Charging power* sensor (W or kW) of each car is the measurement, so the
+  in a power unit is not taken from the house, and a fresh reading is taken at most as what the charger can
+  draw (its maximum current plus 10 %), also in the house forecast. A phase sensor in an energy unit (Wh,
+  kWh …) is no measurement: an energy meter can't tell the current right now. The house then counts as above
+  without a measurement (the whole budget without a last measurement or forecast, so no current for the cars;
+  otherwise only an estimate: the fuse is not protected by a measurement), the house forecast is not updated, and a repair names the sensors until no
+  phase sensor reports an energy any more. The forecast reads the unit the statistics were recorded in: after a fix
+  it is updated again once the recorder's own repair for the statistics is fixed (the log says so once). A
+  phase sensor in any other unit that is no power unit is read as amps.
+- **Without phase sensors** the *Charging power* sensor (in a power unit) of each car is the measurement, so the
   cars ahead are counted carefully. A car ahead counts with what it was given, unless **all** of these hold:
   - its current was raised more than 2 minutes ago (the charger needs a moment to start),
   - its charger status surely means not charging – *completed*, *finished*, *off*, *disconnected*,
     *ready_to_charge*, *awaiting_start* or *awaiting_authorization*. *Charging*, a status that may also mean
     charging (*on*, *connected*, *ready* …), an unknown one or none counts as charging (a power sensor that
     hangs at 0 W must not give its current away),
-  - its power sensor has a reading in W or kW,
+  - its power sensor has a reading in a power unit,
   - both its status and its power sensor reported within the last 5 minutes (also an unchanged value: a lost
     cloud connection keeps the last values, and a car that starts would not be seen). A sensor that only
     reports when its value changes therefore frees current for at most 5 minutes after its last change,

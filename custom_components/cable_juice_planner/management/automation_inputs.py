@@ -40,6 +40,31 @@ def automations_using_blueprint(path: str, action_sensor: str) -> list[dict]:
     return found
 
 
+def blueprint_automation_ids(path: str, action_sensor: str) -> list[str] | None:
+    """The ids of the automations in the file at path that use the charger blueprint for action_sensor (health checks).
+
+    Blocking file I/O, read only. [] when the file is missing or holds no such automation. None when the file exists but can't
+    be read or isn't a list of automations (an empty file included): then it is not known whether the automation is still
+    there. An automation without an id can't be found in the entity registry, so it is left out."""
+    if not os.path.isfile(path):
+        return []
+    try:
+        automations = yaml_util.load_yaml(path)
+    except (HomeAssistantError, OSError, ValueError) as err:
+        _LOGGER.debug("Could not read %s to check the charger automation: %s", path, err)
+        return None
+    if not isinstance(automations, list):
+        return None
+    ids: list[str] = []
+    for automation in automations:
+        blueprint = automation.get("use_blueprint") if isinstance(automation, dict) else None
+        if not isinstance(blueprint, dict) or blueprint.get("path") != BLUEPRINT_PATH or not isinstance(blueprint.get("input"), dict):
+            continue
+        if blueprint["input"].get(ACTION_INPUT) == action_sensor and automation.get("id") is not None:
+            ids.append(str(automation["id"]))
+    return ids
+
+
 def has_steps(inputs: list[dict], *keys: str) -> bool | None:
     """Whether any automation of inputs has steps in any of the input keys; None when no automation was found (not known).
 

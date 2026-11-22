@@ -45,5 +45,7 @@ class JobResult:
     error: BaseException | None = None
     request_reload: bool = False
     site: dict | None = None  # reservation / request / urgent for the site
+    # charger events for the repair "charger_not_following" (management/health_checks.py): "gave_up" or "no_rule"
+    charger_problems: list[str] = field(default_factory=list)
     worker_thread: str = ""
     duration: float = 0.0

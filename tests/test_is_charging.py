@@ -171,6 +171,44 @@ async def test_it_gives_up_after_the_last_restart_also_across_the_end_of_the_hou
     assert not engine._charger_restart_gave_up and engine.restarting_charger_count == 0
 
 
+async def test_a_give_up_is_handed_to_the_health_checks_once(hass, waiting_entry, notified) -> None:
+    """The give-up is one charger event for the repair of the health checks (engine JobResult -> coordinator -> watcher)."""
+    coordinator = waiting_entry.runtime_data
+    engine = coordinator.engine
+    noted: list[str] = []
+    coordinator.health_watcher.record_charger_problem = noted.append
+    for attempt in range(CHARGER_MAX_RESTARTS):
+        await _restart(coordinator, after=60 if attempt == 0 else 2 * INTERVAL + 1)
+    _pass(engine, 2 * INTERVAL + 1)
+    await _cron(coordinator)
+    _pass(engine, INTERVAL)
+    await _cron(coordinator)  # gives up
+    assert engine._charger_restart_gave_up and noted == ["gave_up"]
+    _pass(engine, 60)
+    await _cron(coordinator)  # the fail-safe goes on: not a new event
+    assert noted == ["gave_up"]
+
+
+async def test_a_failing_health_watcher_does_not_stop_the_alarm_of_the_give_up(hass, waiting_entry, notified) -> None:
+    """The events go to the health watcher before the job's notifications: an error there must not drop the alarm."""
+    coordinator = waiting_entry.runtime_data
+    engine = coordinator.engine
+
+    def broken(kind: str) -> None:
+        raise RuntimeError("the repair store is broken")
+
+    coordinator.health_watcher.record_charger_problem = broken
+    for attempt in range(CHARGER_MAX_RESTARTS):
+        await _restart(coordinator, after=60 if attempt == 0 else 2 * INTERVAL + 1)
+    _pass(engine, 2 * INTERVAL + 1)
+    await _cron(coordinator)
+    _pass(engine, INTERVAL)
+    await _cron(coordinator)  # gives up
+    assert engine._charger_restart_gave_up
+    alarms = [n for n in notified if n["data"]]
+    assert len(alarms) == 1 and alarms[0]["data"]["channel"] == "alarm_stream"
+
+
 async def test_a_charger_with_an_enabled_entity_is_disabled_for_an_interval(hass, enabled_entry) -> None:
     coordinator = enabled_entry.runtime_data
     engine = coordinator.engine

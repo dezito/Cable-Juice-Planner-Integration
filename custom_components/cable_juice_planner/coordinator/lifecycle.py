@@ -10,6 +10,7 @@ from queue import SimpleQueue
 from typing import Any
 
 from homeassistant.components import persistent_notification
+from homeassistant.config import AUTOMATION_CONFIG_PATH
 from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED, ConfigEntry, ConfigEntryChange
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CoreState, Event, State, callback
@@ -24,6 +25,7 @@ from ..management.backup import async_load_backup, async_restore_databases, pend
 from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
+from ..management.health_checks import HealthWatcher
 from ..prices import stromligning_entities_to_watch
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
@@ -59,7 +61,8 @@ class CoordinatorLifecycle:
         self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
         if self.config["home"]["ignore_cjp_chargers"]:
             self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
-        self._start_dependency_checks()
+        watched = self._start_dependency_checks()
+        await self._async_start_health_checks(watched)
 
         ent_reg = er.async_get(self.hass)
         dev_reg = dr.async_get(self.hass)
@@ -74,13 +77,46 @@ class CoordinatorLifecycle:
         await self._async_apply_restore()
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
 
-    def _start_dependency_checks(self) -> None:
-        """Repairs for Strømligning and Solcast sensors this car needs but that are disabled or not provided."""
+    def _start_dependency_checks(self) -> frozenset[str]:
+        """Repairs for Strømligning and Solcast sensors this car needs but that are disabled or not provided. Returns the sensors
+        they judge (the health checks leave them out)."""
         stromligning = stromligning_entities_to_watch(self.config["prices"]["entity_ids"])
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"] if self.solar_configured else ""
         watcher = DependencyWatcher(self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7))
         watcher.start()
         self.entry.async_on_unload(watcher.stop)
+        return watcher.watched_entities
+
+    async def _async_start_health_checks(self, watched: frozenset[str]) -> None:
+        """Repairs for what this car needs and for what went wrong with it (management/health_checks.py)."""
+        charger = self.config["charger"]["entity_ids"]
+        ev = self.config["ev_car"]["entity_ids"]
+        home = self.config["home"]["entity_ids"]
+        solar = self.config["solar"]["entity_ids"]
+        watcher = HealthWatcher(
+            self.hass,
+            self.entry,
+            self.prefix,
+            entities=[*self.configured_entities, *self.price_entities],
+            watched=watched,
+            charger_power_entities=[charger["charger_power_entity_id"]],
+            power_entities=[
+                home["power_consumption_entity_id"],
+                home["powerwall_watt_flow_entity_id"],
+                solar["production_entity_id"],
+                # the chargers of the other cars are read by the other car's entry, not here
+                *(entity_id for entity_id in home["ignore_consumption_from_entity_ids"] if entity_id not in self.auto_ignored_entities),
+            ],
+            battery_entities=[home["powerwall_battery_level_entity_id"], ev["usable_battery_level_entity_id"] if self.ev_configured else ""],
+            energy_entities=[charger["kwh_meter_entity_id"], charger["lifetime_kwh_meter_entity_id"]],
+            status_entity=charger["status_entity_id"],
+            action_sensor=f"sensor.{self.object_prefix}_charger_action",
+            automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
+        )
+        await watcher.async_load()
+        watcher.start()
+        self.entry.async_on_unload(watcher.stop)
+        self.health_watcher = watcher
 
     @callback
     def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:
