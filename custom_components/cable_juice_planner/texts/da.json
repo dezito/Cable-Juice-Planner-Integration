@@ -259,6 +259,10 @@
     "charger_test": {
       "car_phases": "Bilen ladede kun på {phases} fase(r), så trinnene blev bedømt på {phases} fase(r). Det er normalt for en bil med en mindre indbygget lader; lader bilen på tre faser, så tjek, at automationen skifter faser.",
       "not_run": "Testen er ikke kørt endnu. Slå **Test min laderautomation** til for at starte den.",
+      "rule": "Tester din laderautomation: {action}",
+      "rule_charge": "{amps} A på {phases} fase(r)",
+      "rule_limit": "{action}, ladegrænse i bilen {limit} %",
+      "rule_ended": "Testen af laderautomationen er slut. Planen viser sin egen regel ved næste beregning.",
       "status": {
         "idle": "Testen kører ikke",
         "running": "Testen kører…",

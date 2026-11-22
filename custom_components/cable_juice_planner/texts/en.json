@@ -259,6 +259,10 @@
     "charger_test": {
       "car_phases": "The car charged on {phases} phase(s) only, so the steps were judged on {phases} phase(s). That is normal for a car with a smaller on-board charger; if the car charges on three phases, check that the automation switches the phases.",
       "not_run": "The test has not been run yet. Turn on **Test my charger automation** to start it.",
+      "rule": "Testing your charger automation: {action}",
+      "rule_charge": "{amps} A on {phases} phase(s)",
+      "rule_limit": "{action}, charge limit in the car {limit} %",
+      "rule_ended": "The test of the charger automation has ended. The plan shows its own rule at the next calculation.",
       "status": {
         "idle": "Test not running",
         "running": "Running the test…",

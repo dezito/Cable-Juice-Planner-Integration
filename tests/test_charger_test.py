@@ -792,6 +792,133 @@ async def test_a_hold_that_ran_out_is_dropped_by_the_next_calculation(hass, char
     assert _published(hass) == before and before[2] != (10, 10, 10)
 
 
+RULE = "sensor.cjp_test_current_charging_rule"
+
+
+async def test_the_rule_says_that_the_test_runs_and_what_it_publishes(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("charge_trigger", include_forecast=True)
+    assert "🧪" not in hass.states.get(RULE).state
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    charging = hass.states.get(RULE).state
+    assert charging.startswith("🧪") and engine.t("ui.charger_test.rule_charge", amps=10, phases=3) in charging, charging
+    await coordinator.async_run_job("charge_trigger", include_forecast=True)  # the cron while held keeps it
+    assert hass.states.get(RULE).state == charging
+    await coordinator.async_run_job("charger_test_hold", "stop", 0, 0, 600)
+    stopping = hass.states.get(RULE).state
+    assert stopping.startswith("🧪") and engine.t("ui.charger_test.step.stop") in stopping, stopping
+    await coordinator.async_run_job("charger_test_release", include_forecast=True)
+    assert "🧪" not in hass.states.get(RULE).state  # the plan's own rule again
+
+
+async def test_a_hold_that_ran_out_outside_a_calculation_puts_the_plans_rule_back(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    with _site(engine, [16, 16, 16]):
+        await coordinator.async_run_job("charge_trigger", include_forecast=True)
+        before = hass.states.get(RULE).state
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        assert hass.states.get(RULE).state.startswith("🧪")
+        await coordinator.async_run_job("charger_test_hold", "stop", 0, 0, 600)  # a second hold keeps the plan's rule
+        engine._charger_hold["until"] = engine._charger_hold["since"]
+        await coordinator.async_run_job("site_limit")  # the site's job finds that it ran out
+        assert engine._charger_hold is None and hass.states.get(RULE).state == before
+
+
+async def test_a_hold_after_a_test_rule_was_left_never_brings_the_test_rule_back(hass, charger_entry) -> None:
+    """A hold that ran out before the plan had set its own rule again: the next test must not save the old 🧪 text."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    engine._charger_saved["rule"] = ""  # no rule of the plan before the test
+    engine._charger_hold["until"] = engine._charger_hold["since"]
+    await coordinator.async_run_job("charger_test_published")  # a job that only asks finds that it ran out
+    assert engine._charger_hold is None and not hass.states.get(RULE).state.startswith("🧪")
+    engine.last_charging_rule_text = "🧪left over"  # as if the restore had not set a rule
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    engine._charger_hold["until"] = engine._charger_hold["since"]
+    await coordinator.async_run_job("charger_test_published")
+    assert not hass.states.get(RULE).state.startswith("🧪")
+
+
+async def test_the_rule_of_the_limit_step_shows_the_published_charge_limit(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("charger_test_hold", "stop", 0, 0, 600)
+    await coordinator.async_run_job("charger_test_limit", 90.0, 80.0, 600)
+    rule = hass.states.get(RULE).state
+    assert rule.startswith("🧪") and engine.t("ui.charger_test.step.stop") in rule and "90 %" in rule, rule
+    await coordinator.async_run_job("charger_test_limit", 80.0, 80.0, 600)  # the car's own limit put back
+    assert "80 %" in hass.states.get(RULE).state
+    await coordinator.async_run_job("charger_test_release", include_forecast=True)
+    assert "🧪" not in hass.states.get(RULE).state
+
+
+async def test_other_jobs_do_not_replace_the_rule_while_a_test_holds_the_charger(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    held = hass.states.get(RULE).state
+    await coordinator.async_run_job("set_charging_rule", "⚠️another job")  # e.g. a notification checking the car's port
+    assert hass.states.get(RULE).state == held
+    await coordinator.async_run_job("charger_test_release", include_forecast=True)
+    assert "🧪" not in hass.states.get(RULE).state
+
+
+async def test_a_text_after_a_hold_ran_out_wins_although_nothing_had_noticed_it_yet(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    engine._charger_hold["until"] = engine._charger_hold["since"]  # ran out, not noticed by any job yet
+    await coordinator.async_run_job("set_charging_rule", "⚠️cable out")
+    assert engine._charger_hold is None and hass.states.get(RULE).state.startswith("⚠️cable out")
+
+
+@pytest.mark.parametrize("gave_up", [False, True])
+async def test_a_restart_the_test_ended_does_not_come_back_but_a_give_up_does(hass, charger_entry, gave_up) -> None:
+    """A restart in progress is ended by the test, so its text is obsolete; a give-up is kept, and so is its text."""
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    restart_rule = "⛔restart text"
+    engine._charger_restart_rule = restart_rule
+    engine.restarting_charger = not gave_up
+    engine._charger_restart_gave_up = gave_up
+    await coordinator.async_run_job("set_charging_rule", restart_rule)
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    engine._charger_hold["until"] = engine._charger_hold["since"]
+    await coordinator.async_run_job("charger_test_published")  # a job that only asks finds that it ran out
+    rule = hass.states.get(RULE).state
+    if gave_up:
+        assert rule.startswith(restart_rule), rule
+    else:
+        assert rule.startswith(engine.t("ui.charger_test.rule_ended")), rule
+
+
+async def test_a_hold_that_ran_out_found_by_the_cron_shows_the_plans_rule(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+    engine._charger_hold["until"] = engine._charger_hold["since"]
+    await coordinator.async_run_job("charge_trigger", include_forecast=True)
+    assert engine._charger_hold is None and not hass.states.get(RULE).state.startswith("🧪")
+
+
+async def test_a_held_charge_the_site_stops_shows_a_stop_in_the_rule(hass, charger_entry) -> None:
+    coordinator = charger_entry.runtime_data
+    engine = coordinator.engine
+    stop = engine.t("ui.charger_test.step.stop")
+    with _site(engine, [16, 16, 16]) as site:
+        await coordinator.async_run_job("charger_test_hold", "charge", 10, 3, 600)
+        assert stop not in hass.states.get(RULE).state
+        site["live"] = [0, 0, 0]
+        await coordinator.async_run_job("site_limit")
+        assert hass.states.get(RULE).state.startswith("🧪") and stop in hass.states.get(RULE).state
+        site["live"] = [16, 16, 16]
+        await coordinator.async_run_job("site_limit")
+        assert stop not in hass.states.get(RULE).state
+        await coordinator.async_run_job("charger_test_release", include_forecast=True)
+
+
 @contextmanager
 def _site(engine, live: list[int]):
     """A site whose live capacity for this car is live (amps per phase), changed by the test; the real clamp is used."""
