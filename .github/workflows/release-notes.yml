@@ -121,10 +121,10 @@ jobs:
 
             Gather the facts yourself:
             - `git log --no-merges ${{ steps.context.outputs.previous }}..HEAD` for the commits.
-            - `git diff ${{ steps.context.outputs.previous }} HEAD -- docs README.md` and the English
+            - `git diff ${{ steps.context.outputs.previous }} HEAD -- docs ':!docs/development' README.md` and the English
               texts (`custom_components/*/translations/en.json`, `custom_components/*/texts/en.json`)
               for what users see and what the settings are called in the UI.
-            - The code diff where the docs don't explain a change. AGENTS.md describes the project.
+            - The code diff where the docs don't explain a change. AGENTS.md and `docs/development/` describe the project.
             - `.release/whats-changed.md` lists the merged pull requests.
             - `.release/previous.md` is the previous release's notes: copy its style and structure,
               never its content.
