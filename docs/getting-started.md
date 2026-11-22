@@ -139,8 +139,13 @@ and the next fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
 
-**Energy Price Forecast** (for prices outside Denmark): choose its retail price sensor as the buy price – it gives
-the published prices of today and tomorrow and the forecast after them. Choose its wholesale price sensor as the sell
+**Energy Price Forecast** (for prices outside Denmark): choose its retail price sensor (*Current retail price*) as the
+buy price – it gives the published prices of today and tomorrow and the forecast after them. It only exists when
+retail pricing is turned on in Energy Price Forecast: its estimate (Germany, the Netherlands, Denmark, Austria and
+Norway) or your own formula (every market). In a market where Energy Price Forecast publishes no prices, only a
+forecast (Finland, Great Britain, SE1/SE2 and others), set a Nord Pool or ENTSO-e sensor as its own price source and
+use its own retail formula: the page refuses a buy or sell sensor with only a forecast for today, and an existing setup gets a repair when one has had only a forecast for at least an hour. Choose its wholesale price sensor
+(*Price forecast series*) as the sell
 price (required: the retail price is higher than what a sale pays, so it is refused as a sell sensor; an entry restored from a backup without one sells at the buy price less the sell fee). The sensors must give the price per kWh
 in the currency (EUR/kWh, GBP/kWh, …), not in cents or pence: CJP refuses a sensor in ct/kWh or p/kWh. A sensor in EUR/MWh (a wholesale sensor often is) is converted to kWh, also in the recorded buy price history (read in the unit the sensor has now: if you change its unit, the old history is off by 1000; a sensor that is missing from Home Assistant has its history left out). The
 currency of the sensor sets the [price scale](how-it-works.md#prices). All price sensors must be in the same

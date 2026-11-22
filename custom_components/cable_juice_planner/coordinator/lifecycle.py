@@ -25,6 +25,7 @@ from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
 from ..prices import stromligning_entities_to_watch
+from ..prices.currency import energypriceforecast_entities
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none
@@ -76,10 +77,13 @@ class CoordinatorLifecycle:
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
 
     def _start_dependency_checks(self) -> None:
-        """Repairs for Strømligning and Solcast sensors this car needs but that are disabled or not provided."""
+        """Repairs for Strømligning, Solcast and Energy Price Forecast sensors this car needs but that are disabled or not provided."""
         stromligning = stromligning_entities_to_watch(self.config["prices"]["entity_ids"])
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"] if self.solar_configured else ""
-        watcher = DependencyWatcher(self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7))
+        watcher = DependencyWatcher(
+            self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7),
+            price_forecast_entities=energypriceforecast_entities(self.config["prices"]["entity_ids"]),
+        )
         watcher.start()
         self.entry.async_on_unload(watcher.stop)
 

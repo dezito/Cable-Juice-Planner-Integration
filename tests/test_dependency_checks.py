@@ -1,6 +1,7 @@
 """Repairs for Strømligning and Solcast sensors that Cable Juice Planner needs but that are disabled or not provided."""
 from __future__ import annotations
 
+import dataclasses
 import datetime
 from pathlib import Path
 
@@ -13,7 +14,10 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.cable_juice_planner.const import DOMAIN
+from custom_components.cable_juice_planner.management import dependency_checks
+from custom_components.cable_juice_planner.prices.currency import forecast_only_sensors
 from custom_components.cable_juice_planner.management.dependency_checks import (
+    ISSUE_FORECAST_ONLY,
     ISSUE_SOLCAST,
     ISSUE_STROMLIGNING,
     RECHECK_DELAY,
@@ -308,3 +312,188 @@ async def test_a_long_list_in_a_flow_page_is_cut(hass: HomeAssistant, count: int
         assert text == "sensor.strom_00, sensor.strom_01, sensor.strom_02"
     else:
         assert text.endswith("… (+8)") and text.count("sensor.strom_") == 12
+
+
+EPF_BUY, EPF_SELL = "sensor.epf_retail", "sensor.epf_wholesale"
+ROW = {"start": "2026-10-30T10:00:00Z", "end": "2026-10-30T10:15:00Z", "value": 0.2}
+FORECAST_ONLY = {"raw_today": [], "raw_tomorrow": [], "raw_forecast": [ROW]}
+PUBLISHED = {**FORECAST_ONLY, "raw_today": [ROW]}
+
+
+class _Clock:
+    """The clock of the forecast-only repair, moved an hour at a time (the freezer fixture is not used in these tests)."""
+
+    def __init__(self, hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.hass, self.now, self.hours = hass, dt_util.utcnow(), 0
+        monkeypatch.setattr(dependency_checks, "_utcnow", lambda: self.now)
+
+    async def next_hour(self) -> None:
+        self.hours += 1
+        self.now += datetime.timedelta(hours=1, seconds=1)
+        async_fire_time_changed(self.hass, dt_util.utcnow() + datetime.timedelta(seconds=self.hours * 3601))
+        await self.hass.async_block_till_done()
+
+
+def _epf_watcher(hass: HomeAssistant, entry: MockConfigEntry, entities: list[str]) -> DependencyWatcher:
+    watched = DependencyWatcher(hass, entry, "bm", [], "", [], price_forecast_entities=entities)
+    watched.start()
+    return watched
+
+
+def _restart_registry(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """What a restart of Home Assistant leaves of a repair: inactive, without its placeholders, still ignored if it was."""
+    registry = ir.async_get(hass)
+    key = (DOMAIN, f"{entry.entry_id}_{ISSUE_FORECAST_ONLY}")
+    registry.issues[key] = dataclasses.replace(registry.issues[key], active=False, translation_placeholders=None)
+
+
+async def test_an_energy_price_forecast_sensor_with_only_a_forecast_gets_a_repair_on_the_second_check(hass: HomeAssistant, monkeypatch) -> None:
+    """A market without published prices, in an entry the price page did not judge (set up before, restored): the
+    repair comes an hour later (prices that are only late make none) and goes when published prices are back. An entry
+    with only Energy Price Forecast (no Strømligning, no Solcast) is watched as well."""
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    hass.states.async_set(EPF_SELL, "0.1", {**FORECAST_ONLY, "raw_tomorrow": [ROW]})  # tomorrow is published: fine
+    watched = _epf_watcher(hass, entry, [EPF_BUY, EPF_SELL])
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None, "the first check only notes it"
+
+    await clock.next_hour()
+    repair = issue(hass, entry, ISSUE_FORECAST_ONLY)
+    assert repair and not repair.is_fixable and repair.translation_key == ISSUE_FORECAST_ONLY
+    assert repair.translation_placeholders == {"prefix": "bm", "entities": f"- {EPF_BUY}"}
+
+    hass.states.async_set(EPF_BUY, "0.25", PUBLISHED)  # its own price source was set
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+    watched.stop()
+
+
+async def test_late_prices_make_no_forecast_only_repair(hass: HomeAssistant, monkeypatch) -> None:
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    watched = _epf_watcher(hass, entry, [EPF_BUY])
+    hass.states.async_set(EPF_BUY, "0.25", PUBLISHED)  # the late prices arrive within the hour
+    await clock.next_hour()
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)  # and are gone once more: the time starts again
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).translation_placeholders["entities"] == f"- {EPF_BUY}"
+    watched.stop()
+
+
+@pytest.mark.parametrize("not_judged", [("unavailable", FORECAST_ONLY), ("0.25", {}), ("0.25", {"raw_today": [], "raw_tomorrow": [], "raw_forecast": []})])
+async def test_a_sensor_that_cant_be_judged_keeps_the_forecast_only_repair_also_an_ignored_one(hass: HomeAssistant, monkeypatch, not_judged) -> None:
+    """Energy Price Forecast down, reloading, starting, or loaded without any rows yet: its sensors are not judged, so the
+    repair (one the user ignored too) neither goes nor comes back, and the time a sensor has had only a forecast goes on.
+    After a restart Home Assistant loads the repair inactive; it is shown again, still ignored, while the sensor has only
+    a forecast."""
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    watched = _epf_watcher(hass, entry, [EPF_BUY])
+    hass.states.async_set(EPF_BUY, *not_judged)
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)  # back, still only a forecast: its time ran on meanwhile
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY)
+    ir.async_ignore_issue(hass, DOMAIN, f"{entry.entry_id}_{ISSUE_FORECAST_ONLY}", True)
+
+    hass.states.async_set(EPF_BUY, *not_judged)
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).dismissed_version is not None, "a sensor that can't be judged is not judged"
+    watched.stop()
+
+    # a restart with Energy Price Forecast not judged yet, then with only a forecast
+    _restart_registry(hass, entry)
+    restarted = _epf_watcher(hass, entry, [EPF_BUY])
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).active is False
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    await clock.next_hour()
+    repair = issue(hass, entry, ISSUE_FORECAST_ONLY)
+    assert repair.active and repair.dismissed_version is not None and repair.translation_placeholders["entities"] == f"- {EPF_BUY}"
+    restarted.stop()
+    remove_issues(hass, entry.entry_id)
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+
+
+async def test_a_sensor_that_is_gone_or_fixed_while_another_cant_be_judged(hass: HomeAssistant, monkeypatch) -> None:
+    """A sensor removed or renamed in Energy Price Forecast has no state: it never holds the repair. One that is fixed
+    leaves the list; the repair stays while another sensor that had only a forecast can't be judged."""
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    hass.states.async_set(EPF_SELL, "0.1", FORECAST_ONLY)
+    watched = _epf_watcher(hass, entry, [EPF_BUY, EPF_SELL])
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).translation_placeholders["entities"] == f"- {EPF_BUY}\n- {EPF_SELL}"
+    hass.states.async_set(EPF_BUY, "0.25", PUBLISHED)
+    hass.states.async_set(EPF_SELL, "unavailable", FORECAST_ONLY)
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).translation_placeholders["entities"] == f"- {EPF_SELL}"
+    hass.states.async_remove(EPF_SELL)  # renamed in Energy Price Forecast
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+    watched.stop()
+
+
+async def test_an_ignored_forecast_only_repair_stays_ignored_when_its_list_changes(hass: HomeAssistant, monkeypatch) -> None:
+    """Home Assistant keeps the ignore over an update: a second sensor on the list does not show the repair again."""
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    hass.states.async_set(EPF_SELL, "0.1", PUBLISHED)
+    watched = _epf_watcher(hass, entry, [EPF_BUY, EPF_SELL])
+    await clock.next_hour()
+    ir.async_ignore_issue(hass, DOMAIN, f"{entry.entry_id}_{ISSUE_FORECAST_ONLY}", True)
+    hass.states.async_set(EPF_SELL, "0.1", FORECAST_ONLY)  # the sell sensor loses its prices as well
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY).translation_placeholders["entities"] == f"- {EPF_BUY}", "not yet for the grace time"
+    await clock.next_hour()
+    repair = issue(hass, entry, ISSUE_FORECAST_ONLY)
+    assert repair.dismissed_version is not None and repair.translation_placeholders["entities"] == f"- {EPF_BUY}\n- {EPF_SELL}"
+    watched.stop()
+
+
+async def test_which_energy_price_forecast_sensors_can_be_judged(hass: HomeAssistant) -> None:
+    """Rows: judged. No rows yet or down: not judged. Not there, or only restored while its Energy Price Forecast entry
+    runs (a leftover it no longer provides): without the problem. Restored while that entry doesn't run yet: not judged."""
+    epf = MockConfigEntry(domain="energypriceforecast", state=ConfigEntryState.LOADED)
+    epf.add_to_hass(hass)
+    registry = er.async_get(hass)
+    leftover = registry.async_get_or_create("sensor", "energypriceforecast", "old", suggested_object_id="epf_old", config_entry=epf)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    hass.states.async_set(EPF_SELL, "0.1", {"raw_today": [], "raw_forecast": []})
+    hass.states.async_set("sensor.epf_down", "unavailable", FORECAST_ONLY)
+    hass.states.async_set(leftover.entity_id, "unavailable", {"restored": True})
+    ids = [EPF_BUY, EPF_SELL, "sensor.epf_down", leftover.entity_id, "sensor.epf_gone"]
+    assert forecast_only_sensors(hass, ids) == {EPF_BUY: True, EPF_SELL: None, "sensor.epf_down": None, leftover.entity_id: False, "sensor.epf_gone": False}
+    epf.mock_state(hass, ConfigEntryState.SETUP_RETRY)
+    assert forecast_only_sensors(hass, [leftover.entity_id]) == {leftover.entity_id: None}
+
+
+async def test_a_sensor_seen_once_with_only_a_forecast_then_not_judged_starts_its_time_again(hass: HomeAssistant, monkeypatch) -> None:
+    """Only a forecast once, then down within the grace time: it is not confirmed by the time alone; the repair comes an
+    hour after it has only a forecast again."""
+    clock = _Clock(hass, monkeypatch)
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    watched = _epf_watcher(hass, entry, [EPF_BUY])
+    clock.now += datetime.timedelta(minutes=30)
+    hass.states.async_set(EPF_BUY, "unavailable", FORECAST_ONLY)
+    watched.check()  # a check between the hourly ones (an entity registry event)
+    hass.states.async_set(EPF_BUY, "0.25", FORECAST_ONLY)
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY) is None
+    await clock.next_hour()
+    assert issue(hass, entry, ISSUE_FORECAST_ONLY)
+    watched.stop()

@@ -19,7 +19,7 @@ from custom_components.cable_juice_planner.prices import (
     price_sensor_errors,
     providers_from_options,
 )
-from custom_components.cable_juice_planner.prices.currency import is_price_subunit
+from custom_components.cable_juice_planner.prices.currency import energypriceforecast_entities, is_forecast_only, is_price_subunit
 
 COPENHAGEN = zoneinfo.ZoneInfo("Europe/Copenhagen")
 UTC = datetime.timezone.utc
@@ -107,6 +107,82 @@ def test_tomorrow_is_empty_until_it_is_published() -> None:
     provider = _provider(attributes)
     assert set(provider.buy_real_prices) == {_at(hour) for hour in range(24)}
     assert provider.buy_forecast_prices[_at(8, day=TOMORROW)] == pytest.approx(5.0 + 1 / 30)
+
+
+def test_today_comes_only_from_published_prices_and_a_sensor_with_only_a_forecast_is_refused() -> None:
+    """A market without published prices (Finland, Great Britain, ...): raw_today is empty and today's quarters from the
+    present are in raw_forecast. They are not used (no price before the present), and the price page refuses the sensor:
+    the own price source of Energy Price Forecast gives such a market published prices."""
+    today = [row for row in _rows(TODAY, lambda m: 3.0, step=15) if row["start"] >= _utc(_at(10, 30))]
+    attributes = {BUY: {"raw_today": [], "raw_tomorrow": [], "raw_forecast": today + _rows(TOMORROW, lambda m: 5.0, step=15)}}
+    provider = _provider(attributes)
+    assert provider.buy_real_prices == {} and min(provider.buy_forecast_prices) == _at(0, day=TOMORROW)
+    retail = {"unit_of_measurement": "EUR/kWh", "retail_source": "formula", **attributes[BUY]}
+    values = {"energypriceforecast_buy_entity_id": BUY}
+    assert price_sensor_errors(values, {BUY: _State("0.3", retail)}.get) == {"energypriceforecast_buy_entity_id": "price_sensor_forecast_only"}
+    published = {**retail, "raw_today": _rows(TODAY, lambda m: 1.0)}
+    assert price_sensor_errors(values, {BUY: _State("0.3", published)}.get) == {}
+    assert price_sensor_errors(values, {BUY: _State("0.3", {**retail, "raw_forecast": []})}.get) == {}  # nothing at all yet: not judged
+    assert price_sensor_errors(values, {BUY: _State("unavailable", retail)}.get) == {}  # a sensor that is down is not judged
+    after_midnight = {**retail, "raw_tomorrow": _rows(TODAY, lambda m: 1.0)}  # today's rows still in raw_tomorrow
+    assert price_sensor_errors(values, {BUY: _State("0.3", after_midnight)}.get) == {}
+    # the sell sensor (the wholesale series) needs published prices as well
+    wholesale = {"unit_of_measurement": "EUR/kWh", **attributes[BUY]}
+    both = {"energypriceforecast_buy_entity_id": BUY, "energypriceforecast_sell_entity_id": SELL}
+    states = {BUY: _State("0.3", published), SELL: _State("0.1", wholesale)}
+    assert price_sensor_errors(both, states.get) == {"energypriceforecast_sell_entity_id": "price_sensor_forecast_only"}
+    # the more specific errors still win over a sensor with only a forecast
+    same = {"energypriceforecast_buy_entity_id": BUY, "energypriceforecast_sell_entity_id": BUY}
+    assert price_sensor_errors(same, {BUY: _State("0.3", retail)}.get) == {
+        "energypriceforecast_buy_entity_id": "price_sensor_forecast_only",
+        "energypriceforecast_sell_entity_id": "price_sensor_not_wholesale",
+    }
+    assert price_sensor_errors(values, {BUY: _State("0.1", wholesale)}.get) == {"energypriceforecast_buy_entity_id": "price_sensor_not_retail"}
+    # the current buy price is the real one, else the forecast (never missing, which would book a charge at 0)
+    combined = create_price_provider(_config())
+    combined.set_now(NOW, COPENHAGEN)
+    combined.set_snapshot({"attributes": {BUY: published}, "values": {}})
+    assert combined.get_buy_price(_at(12)) == 1.0
+    combined.set_snapshot({"attributes": {BUY: {**published, "raw_forecast": _rows(TOMORROW, lambda m: 5.0)}}, "values": {}})
+    assert combined.get_buy_price(_at(8, day=TOMORROW)) == pytest.approx(5.0 + 1 / 30, abs=0.01)
+
+
+def test_a_published_price_of_today_still_wins_over_a_forecast_row_of_today() -> None:
+    attributes = {BUY: {"raw_today": _rows(TODAY, lambda m: 1.0), "raw_forecast": _rows(TODAY, lambda m: 99.0)}}
+    provider = _provider(attributes)
+    assert provider.buy_real_prices[_at(12)] == 1.0 and provider.buy_forecast_prices == {}
+
+
+def test_a_forecast_quarter_never_enters_an_hour_with_a_published_price() -> None:
+    """Published hours next to forecast quarters (two lists with different periods): the hour keeps its published price."""
+    forecast = _rows(TODAY, lambda m: 99.0, step=15) + _rows(TOMORROW, lambda m: 99.0, step=15) + _rows(DAY_3, lambda m: 7.0, step=15)
+    attributes = {BUY: {"raw_today": _rows(TODAY, lambda m: 1.0), "raw_tomorrow": _rows(TOMORROW, lambda m: 2.0), "raw_forecast": forecast}}
+    provider = _provider(attributes)  # tomorrow's quarters :15, :30 and :45 are not published timestamps, but their hour is
+    assert all(timestamp.date() == DAY_3 for timestamp in provider.buy_forecast_prices)
+    assert len(provider.buy_forecast_prices) == 96
+
+
+class _Stub:
+    def __init__(self, name: str, real: dict, forecast: dict) -> None:
+        self.source_name, self._real, self._forecast, self.sell_price_details = name, real, forecast, {}
+
+    def get_buy_real_prices(self):
+        return self._real
+
+    def get_buy_forecast_prices(self):
+        return self._forecast
+
+
+def test_a_forecast_of_another_provider_never_enters_an_hour_with_a_real_price() -> None:
+    """An hourly real price of one provider and forecast quarters of the next: the real price is the price of the hour."""
+    combined = create_price_provider(_config())
+    combined.providers = [
+        _Stub("hourly", {_at(10): 1.0}, {}),
+        _Stub("quarters", {}, {_at(10, minute): 99.0 for minute in (0, 15, 30, 45)} | {_at(11, 15): 5.0}),
+    ]
+    prices, real, sources, _details = combined._combine("buy")
+    assert prices == {_at(10): 1.0, _at(11, 15): 5.0} and real == {_at(10): 1.0}
+    assert sources[_at(11, 15)] == "quarters:forecast"
 
 
 def test_a_missing_or_wrong_attribute_gives_no_prices_instead_of_an_error() -> None:
@@ -414,3 +490,11 @@ def test_utc_rows_are_converted_to_the_time_zone_of_home_assistant(zone) -> None
         moment += datetime.timedelta(hours=1)
     prices = _provider({BUY: {"raw_today": rows}}, tz=tz).buy_real_prices
     assert prices == {_at(hour): float(hour) for hour in range(24)}
+
+
+def test_the_energy_price_forecast_sensors_of_a_setup() -> None:
+    prices = {"energypriceforecast_buy_entity_id": BUY, "energypriceforecast_sell_entity_id": SELL, "energidataservice_buy_entity_id": "sensor.eds"}
+    assert energypriceforecast_entities(prices) == [BUY, SELL]
+    assert energypriceforecast_entities({**prices, "energypriceforecast_sell_entity_id": BUY}) == [BUY]
+    assert energypriceforecast_entities({"energypriceforecast_buy_entity_id": "", "energypriceforecast_sell_entity_id": None}) == []
+    assert not is_forecast_only(None) and not is_forecast_only(_State("unknown", {"raw_forecast": [1]}))

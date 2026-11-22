@@ -4,6 +4,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+
 from ..const import CURRENCY_PRICE_SCALE, CURRENCY_UNIT_ALIASES, PRICE_PROVIDER_KEYS, PRICE_PROVIDER_PRIORITY
 from .base import is_price_per_mwh, price_unit_divisor  # noqa: F401 (price_unit_divisor: the converter of the providers and the history)
 from .factory import PROVIDER_CLASSES
@@ -71,13 +75,56 @@ def is_price_subunit(unit: Any) -> bool:
     return token in _SUBUNITS or token.endswith(("ct", "cent", "cents")) or _is_subunit_code(currency)
 
 
+def is_forecast_only(state: Any) -> bool:
+    """An Energy Price Forecast sensor that is loaded but has no published prices today or tomorrow, only a forecast: a
+    market where it publishes none (today then has no price before the present; its own price source gives one), or
+    published prices that are late. A sensor that is not loaded (None, unavailable, unknown) is not judged."""
+    if state is None or getattr(state, "state", None) in ("unavailable", "unknown"):
+        return False
+    attributes = getattr(state, "attributes", {})
+    return not attributes.get("raw_today") and not attributes.get("raw_tomorrow") and bool(attributes.get("raw_forecast"))
+
+
+def forecast_only_sensors(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, bool | None]:
+    """For each Energy Price Forecast sensor whether it has only a forecast (is_forecast_only), or None while it can't be
+    judged: unavailable or unknown (Energy Price Forecast starting, down, reloading), or loaded without any price rows
+    yet. A sensor that Energy Price Forecast doesn't provide counts as without the problem, so it can't hold a repair:
+    one with no state (removed or renamed together with its registry entry), and one with only the state Home Assistant
+    restores for a registry entry nobody provides, while the Energy Price Forecast entry that owns it runs."""
+    registry = er.async_get(hass)
+    result: dict[str, bool | None] = {}
+    for entity_id in entity_ids:
+        state = hass.states.get(entity_id)
+        if state is None or (state.attributes.get("restored") and _energypriceforecast_running(hass, registry.async_get(entity_id))):
+            result[entity_id] = False
+            continue
+        loaded = state.state not in ("unavailable", "unknown")
+        has_rows = any(state.attributes.get(key) for key in ("raw_today", "raw_tomorrow", "raw_forecast"))
+        result[entity_id] = is_forecast_only(state) if loaded and has_rows else None
+    return result
+
+
+def _energypriceforecast_running(hass: HomeAssistant, entry: er.RegistryEntry | None) -> bool:
+    """Whether the Energy Price Forecast entry that owns the sensor runs (without a registry entry: any of them)."""
+    owner = hass.config_entries.async_get_entry(entry.config_entry_id) if entry is not None and entry.config_entry_id else None
+    if owner is not None:
+        return owner.state is ConfigEntryState.LOADED
+    return any(candidate.state is ConfigEntryState.LOADED for candidate in hass.config_entries.async_entries("energypriceforecast"))
+
+
+def energypriceforecast_entities(prices: Mapping[str, Any]) -> list[str]:
+    """The Energy Price Forecast sensors of a setup (buy, then sell; once each)."""
+    return list(dict.fromkeys(prices.get(key) for key in ("energypriceforecast_buy_entity_id", "energypriceforecast_sell_entity_id") if prices.get(key)))
+
+
 def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], Any]) -> dict[str, str]:
     """Errors of the price sensors a price page has just been given (field -> translation key), for a sensor that is loaded.
 
     A sensor whose unit is a subunit of the currency (ct/kWh, p/kWh) is refused (so is a price per MWh of Energi Data Service): its prices are 100 or 1000 times too large. The buy
     sensor of Energy Price Forecast must be its retail price (a wholesale sensor as the buy price would plan on prices
     without the supplier's margin, taxes and network charge) and its sell sensor the wholesale one, not the same sensor
-    (a retail price as the sell price is more than a sale pays). A sensor that is not loaded is not judged."""
+    (a retail price as the sell price is more than a sale pays). A sensor of Energy Price Forecast with only a forecast and
+    no published prices today or tomorrow is refused too. A sensor that is not loaded is not judged."""
     errors: dict[str, str] = {}
     for key in PRICE_SENSOR_KEYS:
         state = get_state(values[key]) if values.get(key) else None
@@ -96,6 +143,10 @@ def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], An
             or (loaded and isinstance(attributes.get("raw_today"), list) and "retail_source" in attributes)
         ):
             errors[key] = "price_sensor_not_wholesale"  # the retail price is more than a sale pays: the sell sensor is the wholesale one
+        elif key.startswith("energypriceforecast_") and is_forecast_only(state):
+            # a market where Energy Price Forecast publishes no prices (the charging history, the price of the energy in the
+            # battery and the price history need today's), or prices that are late: the text says both
+            errors[key] = "price_sensor_forecast_only"
     return errors
 
 

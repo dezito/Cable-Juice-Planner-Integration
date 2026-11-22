@@ -56,6 +56,12 @@ and system tariff. A sell sensor from Energi Data Service without tariffs is alr
 net and system tariff come from the buy sensor. Energy Price Forecast has no tariffs in its prices: the sell price is
 the price of its sell sensor (the wholesale price, required: the retail price is higher than what a sale pays) less the sell fee.
 
+**A market without published prices** (Energy Price Forecast in Finland, Great Britain, SE1/SE2 and others) needs
+the own price source of Energy Price Forecast (a Nord Pool or ENTSO-e sensor), which gives it published prices from
+midnight: with only a forecast, today has no price before the present, so the price page refuses the sensor, and an existing setup gets a repair when a sensor has had only a forecast for at least an hour (it goes by itself when published prices are back). A
+forecast never enters an hour that has a real price, also not one of another provider with other periods, and only
+real prices are stored in the price history.
+
 **Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
 prices: a forecast buy price is raised and a forecast sell price lowered (a sale is worth less; with a
 [fixed solar sell price](rules/solar.md#fixed-solar-sell-price) the hourly price is raised instead, as the

@@ -1908,6 +1908,20 @@ def test_price_history_averages_mixed_intervals_by_covered_duration() -> None:
     assert engine.kwh_avg_prices_db["history"][12][DAY.weekday()][0] == pytest.approx(0.225)
 
 
+def test_price_history_never_stores_a_forecast_as_a_real_price() -> None:
+    """A market without published prices (Energy Price Forecast in Finland, ...): today is only a forecast, nothing is stored."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    # (before the startup: it stores the day already)
+    engine.price_provider.get_buy_real_prices = lambda: {}
+    engine.price_provider.get_sell_real_prices = lambda: {}
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    assert engine.price_provider.get_buy_prices()  # the prices are there for the plan, only not as real prices
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    assert engine.kwh_avg_prices_db["history"][12][DAY.weekday()] == _price_history()["history"][12][DAY.weekday()]
+
+
 def _assert_price_history_repaired(engine: CJPEngine, good: dict) -> None:
     today, other = DAY.weekday(), (DAY.weekday() + 1) % 7
     for name in ("history", "history_sell"):

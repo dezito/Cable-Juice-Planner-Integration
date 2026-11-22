@@ -173,8 +173,8 @@
           "energypriceforecast_sell_entity_id": "Salgspris"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif",
-          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris)"
+          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif. I Energy Price Forecast hedder den “Aktuel detailpris”, og den findes kun, når “Detailpris” (“Estimat” eller “Egen formel”) er slået til dér",
+          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris). I Energy Price Forecast hedder den “Prisserie”"
         }
       },
       "prices_stromligning": {
@@ -419,6 +419,7 @@
       "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
+      "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
       "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
@@ -613,8 +614,8 @@
           "energypriceforecast_sell_entity_id": "Salgspris"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif",
-          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris)"
+          "energypriceforecast_buy_entity_id": "Energy Price Forecast-sensoren med detailprisen, inklusive leverandørens tillæg, afgifter og nettarif. I Energy Price Forecast hedder den “Aktuel detailpris”, og den findes kun, når “Detailpris” (“Estimat” eller “Egen formel”) er slået til dér",
+          "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris). I Energy Price Forecast hedder den “Prisserie”"
         }
       },
       "prices_stromligning": {
@@ -832,6 +833,7 @@
       "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
+      "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
       "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
@@ -1440,6 +1442,10 @@
           }
         }
       }
+    },
+    "energypriceforecast_forecast_only": {
+      "title": "Energy Price Forecast-sensorer, som Cable Juice Planner bruger, har ingen offentliggjorte priser ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) bruger Energy Price Forecast-sensorer, der i mindst en time ikke har haft offentliggjorte priser for i dag eller i morgen, kun en prognose:\n{entities}\n\nUden en pris for i dag har de timer, der er gået, ingen pris, så de mangler i ladehistorikken og prishistorikken.\n\nHvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden). Ellers er priserne blot forsinket.\n\nDenne reparation forsvinder af sig selv, når sensorerne har offentliggjorte priser igen."
     },
     "stromligning_entities": {
       "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",

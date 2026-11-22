@@ -423,6 +423,17 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - Energy Price Forecast has no tariffs in its prices: sell price = the price of its sell sensor − `sell_fee`. The page
   requires the sell sensor and refuses a retail sensor or the buy sensor as the sell sensor (the retail price is higher than
   what a sale pays). An entry without one (a backup restored in the options menu) sells at its buy sensor's price less the fee (decided with the user): higher than a sale pays.
+- Energy Price Forecast in a market without published prices (empty `raw_today`/`raw_tomorrow`, today only in
+  `raw_forecast`) is refused on the price page (`price_sensor_forecast_only`), for both the buy and the sell sensor: past
+  hours of today would have no price. Its own price source (Nord Pool/ENTSO-e) gives such a market published prices. A
+  forecast never enters an hour with a real price (`_combine`, also across providers), and the price history stores only
+  real prices.
+- An entry that already has such a sensor (set up before, restored from a backup, or whose own price source was removed
+  later) gets the repair `energypriceforecast_forecast_only` (`DependencyWatcher._check_forecast_only()`), only once the
+  sensor has had only a forecast for about an hour (late prices make none). A sensor that can't be judged (unavailable,
+  unknown, no price rows yet) is never judged: it neither creates nor removes the repair. A repair the user ignored stays
+  ignored (do not delete and recreate it). A restored state of a sensor that Energy Price Forecast no longer provides
+  does not count while its entry runs. Do not use the `freezer` fixture to test it: the clock is `_utcnow()`.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - The dashboard's sell price chart subtracts the configured fee (`@@sell_fee_value@@`, set in
   `render_dashboard()`); keep it in sync with `calculate_sell_price()`.

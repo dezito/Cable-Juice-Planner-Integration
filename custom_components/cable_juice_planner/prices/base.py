@@ -388,13 +388,16 @@ class CombinedPriceProvider(BasePriceProvider):
                             details[timestamp] = provider.sell_price_details[timestamp].copy()
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Can't get real prices from %s: %s %s", provider.source_name, err, type(err))
+        # a forecast never enters an hour with a real price, also not one of another provider with other periods (an hourly
+        # real price and forecast quarters): the real price is the price of the whole hour
+        real_hours = {reset_time_to_hour(timestamp) for timestamp in real_prices}
         for provider in self.providers:
             try:
                 for timestamp, price in getattr(provider, f"get_{kind}_forecast_prices")().items():
                     timestamp = _naive(timestamp)
                     if not is_number(price):
                         continue
-                    if timestamp not in prices:
+                    if timestamp not in prices and reset_time_to_hour(timestamp) not in real_hours:
                         prices[timestamp] = round(price, self.decimals)
                         sources[timestamp] = f"{provider.source_name}:forecast"
                         if sell and timestamp in provider.sell_price_details:
@@ -460,9 +463,11 @@ class CombinedPriceProvider(BasePriceProvider):
     def get_buy_price(self, timestamp=None) -> float:
         self._sync_prices()
         timestamp = _naive(timestamp if timestamp is not None else self.now)
-        result = self.get_price_at_timestamp(self.buy_real_prices, timestamp)
+        # the real price, else the forecast of the hour (e.g. after midnight before the next price update): a missing price
+        # would book the charging at 0
+        result = self.get_price_at_timestamp(self.buy_prices, timestamp)
         if result is None:
-            raise ValueError(f"No real buy price available for {timestamp}")
+            raise ValueError(f"No buy price available for {timestamp}")
         return result["price"]
 
     def get_sell_price(self, timestamp=None) -> dict:

@@ -249,9 +249,10 @@ class EnergyPrice:
             _LOGGER.info("KWH avg prices already updated today, skipping append")
             return
         try:
-            # only the provider's prices - the hours filled from the history must not be stored again
-            grid_prices = self.price_provider.get_buy_prices()
-            sell_prices = self.price_provider.get_sell_prices() if self.is_solar_configured() else {}
+            # only the provider's real prices - never a forecast (a market without published prices stores nothing), and
+            # the hours filled from the history must not be stored again
+            grid_prices = self.price_provider.get_buy_real_prices()
+            sell_prices = self.price_provider.get_sell_real_prices() if self.is_solar_configured() else {}
             today = self.now().date()
             day_of_week = self.now().weekday()
             max_length = self.config["database"]["kwh_avg_prices_db_data_to_save"]

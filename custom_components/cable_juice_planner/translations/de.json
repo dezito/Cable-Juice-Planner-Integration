@@ -173,8 +173,8 @@
           "energypriceforecast_sell_entity_id": "Verkaufspreis"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt",
-          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet)"
+          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt. In Energy Price Forecast heißt er „Aktueller Endkundenpreis“, und es gibt ihn nur, wenn dort „Endkundenpreis“ („Schätzung“ oder „Eigene Formel“) eingeschaltet ist",
+          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet). In Energy Price Forecast heißt er „Preisreihe“"
         }
       },
       "prices_stromligning": {
@@ -419,6 +419,7 @@
       "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
+      "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
       "price_currency_mismatch": "Dieser Sensor hat eine andere Währung als die anderen Preissensoren. Verwende Preissensoren in einer Währung (oder wähle den anderen Preisanbieter ab)."
     },
     "abort": {
@@ -613,8 +614,8 @@
           "energypriceforecast_sell_entity_id": "Verkaufspreis"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt",
-          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet)"
+          "energypriceforecast_buy_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Endkundenpreis, einschließlich Marge des Lieferanten, Steuern und Netzentgelt. In Energy Price Forecast heißt er „Aktueller Endkundenpreis“, und es gibt ihn nur, wenn dort „Endkundenpreis“ („Schätzung“ oder „Eigene Formel“) eingeschaltet ist",
+          "energypriceforecast_sell_entity_id": "Der Energy-Price-Forecast-Sensor mit dem Großhandelspreis. Der Verkaufspreis ist dieser Preis abzüglich der Verkaufsgebühr (der Endkundenpreis liegt über dem, was ein Verkauf einbringt, und wird deshalb nicht als Verkaufspreis verwendet). In Energy Price Forecast heißt er „Preisreihe“"
         }
       },
       "prices_stromligning": {
@@ -832,6 +833,7 @@
       "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, pro MWh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh).",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
+      "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
       "price_currency_mismatch": "Dieser Sensor hat eine andere Währung als die anderen Preissensoren. Verwende Preissensoren in einer Währung (oder wähle den anderen Preisanbieter ab)."
     },
     "abort": {
@@ -1440,6 +1442,10 @@
           }
         }
       }
+    },
+    "energypriceforecast_forecast_only": {
+      "title": "Energy-Price-Forecast-Sensoren, die Cable Juice Planner nutzt, haben keine veröffentlichten Preise ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) nutzt Energy-Price-Forecast-Sensoren, die seit mindestens einer Stunde keine veröffentlichten Preise für heute oder morgen haben, nur eine Prognose:\n{entities}\n\nOhne einen Preis für heute haben die vergangenen Stunden keinen Preis, daher fehlen sie im Ladeverlauf und im Preisverlauf.\n\nWenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht). Andernfalls sind die Preise nur verspätet.\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren wieder veröffentlichte Preise haben."
     },
     "stromligning_entities": {
       "title": "Strømligning-Sensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",

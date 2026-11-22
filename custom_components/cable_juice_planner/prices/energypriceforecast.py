@@ -97,10 +97,14 @@ class EnergyPriceForecastPriceProvider(BasePriceProvider):
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
         real = self._published(entity_id, current_hour)
+        published_hours = {reset_time_to_hour(timestamp) for timestamp in real}
         prices = {}
         for timestamp, price in self._rows(self._get_entity_attr(entity_id).get("raw_forecast"), self._divisor(entity_id)):
-            # a forecast never replaces a published price (the rows do not overlap, but a start must not be both)
-            if days_between(current_hour, timestamp) > 0 and timestamp not in real:
+            # from tomorrow on: a market without published prices (today only a forecast, no price before the present) is
+            # refused on the price page; the own price source of Energy Price Forecast gives it published prices. A
+            # forecast never enters an hour with a published price (not even a quarter of a published hour, when the two
+            # lists have different periods)
+            if days_between(current_hour, timestamp) > 0 and reset_time_to_hour(timestamp) not in published_hours:
                 prices[timestamp] = price + self._forecast_adder(timestamp, sell)
         return dict(sorted(prices.items()))
 

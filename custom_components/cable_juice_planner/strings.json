@@ -173,8 +173,8 @@
           "energypriceforecast_sell_entity_id": "Sell price"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "The Energy Price Forecast sensor with the retail price, including the supplier’s margin, taxes and network charge",
-          "energypriceforecast_sell_entity_id": "The Energy Price Forecast sensor with the wholesale price. The sell price is this price less the sell fee (the retail price is higher than what a sale pays, so it is not used as a sell price)"
+          "energypriceforecast_buy_entity_id": "The Energy Price Forecast sensor with the retail price, including the supplier’s margin, taxes and network charge. In Energy Price Forecast it is “Current retail price”, which only exists when retail pricing (“Estimate” or “Own formula” under “Retail price”) is turned on there",
+          "energypriceforecast_sell_entity_id": "The Energy Price Forecast sensor with the wholesale price. The sell price is this price less the sell fee (the retail price is higher than what a sale pays, so it is not used as a sell price). In Energy Price Forecast it is “Price forecast series”"
         }
       },
       "prices_stromligning": {
@@ -419,6 +419,7 @@
       "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, per MWh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh).",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
+      "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
       "price_currency_mismatch": "This sensor is in another currency than the other price sensors. Use price sensors in one currency (or deselect the other price provider)."
     },
     "abort": {
@@ -613,8 +614,8 @@
           "energypriceforecast_sell_entity_id": "Sell price"
         },
         "data_description": {
-          "energypriceforecast_buy_entity_id": "The Energy Price Forecast sensor with the retail price, including the supplier’s margin, taxes and network charge",
-          "energypriceforecast_sell_entity_id": "The Energy Price Forecast sensor with the wholesale price. The sell price is this price less the sell fee (the retail price is higher than what a sale pays, so it is not used as a sell price)"
+          "energypriceforecast_buy_entity_id": "The Energy Price Forecast sensor with the retail price, including the supplier’s margin, taxes and network charge. In Energy Price Forecast it is “Current retail price”, which only exists when retail pricing (“Estimate” or “Own formula” under “Retail price”) is turned on there",
+          "energypriceforecast_sell_entity_id": "The Energy Price Forecast sensor with the wholesale price. The sell price is this price less the sell fee (the retail price is higher than what a sale pays, so it is not used as a sell price). In Energy Price Forecast it is “Price forecast series”"
         }
       },
       "prices_stromligning": {
@@ -832,6 +833,7 @@
       "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, per MWh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh).",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
+      "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
       "price_currency_mismatch": "This sensor is in another currency than the other price sensors. Use price sensors in one currency (or deselect the other price provider)."
     },
     "abort": {
@@ -1440,6 +1442,10 @@
           }
         }
       }
+    },
+    "energypriceforecast_forecast_only": {
+      "title": "Energy Price Forecast sensors that Cable Juice Planner uses have no published prices ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) uses Energy Price Forecast sensors that have had no published prices for today or tomorrow for at least an hour, only a forecast:\n{entities}\n\nWithout a price for today the hours that have passed have no price, so they are missing from the charging history and the price history.\n\nIf Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source). Otherwise the prices are only late.\n\nThis repair disappears by itself when the sensors have published prices again."
     },
     "stromligning_entities": {
       "title": "Strømligning sensors that Cable Juice Planner needs are not available ({prefix})",
