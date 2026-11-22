@@ -23,8 +23,7 @@
           "kwh_meter_entity_id": "kWh-Zähler",
           "lifetime_kwh_meter_entity_id": "Gesamt-kWh-Zähler",
           "enabled_entity_id": "Ladegerät aktiviert",
-          "cable_connected_entity_id": "Kabel angeschlossen",
-          "co2_entity_id": "CO₂-Intensität"
+          "cable_connected_entity_id": "Kabel angeschlossen"
         },
         "data_description": {
           "status_entity_id": "Ladezustand (Unterstützte Zustände: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -32,8 +31,7 @@
           "kwh_meter_entity_id": "Riemann-Summen-Integralsensor verwenden (Methode: linke Riemann-Summe), wenn der kWh-Zähler des Laders träge ist (z. B. Easee); sonst Lebensdauer-kWh-Zähler des Laders nutzen",
           "lifetime_kwh_meter_entity_id": "Alternative zu kwh_meter_entity_id, wenn der Lebensdauer-kWh-Zähler nicht genutzt werden soll",
           "enabled_entity_id": "Optional: Schalter/Sensor, der anzeigt, ob das Ladegerät an ist (on/off). Ist es aus, bittet das Attribut charger_enabled des Aktionssensors um Einschalten.",
-          "cable_connected_entity_id": "Nur verwendet, wenn das Ladegerät keinen Statussensor hat: zeigt, ob das Auto angeschlossen ist.",
-          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+          "cable_connected_entity_id": "Nur verwendet, wenn das Ladegerät keinen Statussensor hat: zeigt, ob das Auto angeschlossen ist."
         }
       },
       "charger_specs": {
@@ -330,7 +328,11 @@
         "title": "Strompreise",
         "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken.",
         "data": {
+          "price_country": "Land",
           "price_providers": "Preisanbieter"
+        },
+        "data_description": {
+          "price_country": "Das Land, für das die Preise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Das Land von Home Assistant wird vorgeschlagen."
         }
       },
       "user": {
@@ -409,6 +411,8 @@
       "prefix_in_use": "Dieses Präfix wird bereits verwendet.",
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
+      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle Energy Price Forecast (der größte Teil Europas) oder ändere das Land.",
+      "price_provider_no_forecast": "Keiner der gewählten Preisanbieter liefert eine Preisprognose, daher könnte die Planung nur die Preise von heute und morgen nutzen. Wähle zusätzlich einen weiteren Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
       "simulation_needs_ev": "Die Simulation des Akkustands erfordert Akkustand, Reichweite und Kilometerzähler des Autos.",
@@ -464,8 +468,7 @@
           "kwh_meter_entity_id": "kWh-Zähler",
           "lifetime_kwh_meter_entity_id": "Gesamt-kWh-Zähler",
           "enabled_entity_id": "Ladegerät aktiviert",
-          "cable_connected_entity_id": "Kabel angeschlossen",
-          "co2_entity_id": "CO₂-Intensität"
+          "cable_connected_entity_id": "Kabel angeschlossen"
         },
         "data_description": {
           "status_entity_id": "Ladezustand (Unterstützte Zustände: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -473,8 +476,7 @@
           "kwh_meter_entity_id": "Riemann-Summen-Integralsensor verwenden (Methode: linke Riemann-Summe), wenn der kWh-Zähler des Laders träge ist (z. B. Easee); sonst Lebensdauer-kWh-Zähler des Laders nutzen",
           "lifetime_kwh_meter_entity_id": "Alternative zu kwh_meter_entity_id, wenn der Lebensdauer-kWh-Zähler nicht genutzt werden soll",
           "enabled_entity_id": "Optional: Schalter/Sensor, der anzeigt, ob das Ladegerät an ist (on/off). Ist es aus, bittet das Attribut charger_enabled des Aktionssensors um Einschalten.",
-          "cable_connected_entity_id": "Nur verwendet, wenn das Ladegerät keinen Statussensor hat: zeigt, ob das Auto angeschlossen ist.",
-          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+          "cable_connected_entity_id": "Nur verwendet, wenn das Ladegerät keinen Statussensor hat: zeigt, ob das Auto angeschlossen ist."
         }
       },
       "charger_specs": {
@@ -771,7 +773,11 @@
         "title": "Strompreise",
         "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken.",
         "data": {
+          "price_country": "Land",
           "price_providers": "Preisanbieter"
+        },
+        "data_description": {
+          "price_country": "Das Land, für das die Preise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Das Land von Home Assistant wird vorgeschlagen."
         }
       },
       "site": {
@@ -823,6 +829,8 @@
       "prefix_in_use": "Dieses Präfix wird bereits verwendet.",
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
+      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle Energy Price Forecast (der größte Teil Europas) oder ändere das Land.",
+      "price_provider_no_forecast": "Keiner der gewählten Preisanbieter liefert eine Preisprognose, daher könnte die Planung nur die Preise von heute und morgen nutzen. Wähle zusätzlich einen weiteren Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
       "simulation_needs_ev": "Die Simulation des Akkustands erfordert Akkustand, Reichweite und Kilometerzähler des Autos.",
@@ -1226,9 +1234,6 @@
       },
       "drive_efficiency_last_odometer": {
         "name": "Kilometerstand beim letzten Laden"
-      },
-      "co2_emitted": {
-        "name": "CO₂ ausgestoßen"
       },
       "kwh_charged_by_solar": {
         "name": "kWh mit Solar geladen"

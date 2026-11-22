@@ -57,7 +57,7 @@ class CJPSensor(CJPUpdatingEntity, SensorEntity):
             self._attr_state_class = SensorStateClass(state_class)
         if key == "charger_action":
             self._attr_options = list(CHARGER_ACTION_STATES)
-        if key in ("co2_emitted", "kwh_charged_by_solar"):
+        if key == "kwh_charged_by_solar":
             self._attr_suggested_display_precision = 2
 
     @property

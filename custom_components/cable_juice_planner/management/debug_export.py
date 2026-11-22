@@ -95,7 +95,7 @@ _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _URL_RE = re.compile(r"\b(?:https?|wss?)://[^\s)\"'<>]+")
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _SENSITIVE_KEY_RE = re.compile(
-    r"^(address|street|city|postal_code|zip_code|country|vin|serial|serial_number|username|user_name|email|phone|"
+    r"^(address|street|city|postal_code|zip_code|country|price_country|vin|serial|serial_number|username|user_name|email|phone|"
     r"mac|ip|ip_address|host|url|entity_picture|friendly_name|notify_list|location_name|name_by_user)$"
     r"|token|password|secret|api_?key|webhook"
 )

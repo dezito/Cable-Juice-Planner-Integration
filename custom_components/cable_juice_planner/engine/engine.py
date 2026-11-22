@@ -259,7 +259,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
 
     def _runtime_state(self) -> dict:
         """State the PyScript version kept in helpers and sensor attributes."""
-        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "co2_emitted", "kwh_charged_by_solar", "last_full_charge")
+        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "kwh_charged_by_solar", "last_full_charge")
         return {
             "sensors": {key: self.sensor_states.get(key) for key in keep if self.sensor_states.get(key) is not None},
             "last_battery_level_attributes": dict(self.sensor_attrs.get("drive_efficiency_last_battery_level", {})),

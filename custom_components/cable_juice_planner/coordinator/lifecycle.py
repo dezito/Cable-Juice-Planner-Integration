@@ -315,7 +315,6 @@ class CoordinatorLifecycle:
         public_session = f"binary_sensor.{legacy}_public_charging_session_done"
         legacy_full_charge = self.hass.states.get(f"input_datetime.{legacy}_last_full_charge")
         numeric = {
-            "co2_emitted": f"input_number.{legacy}_co2_emitted",
             "kwh_charged_by_solar": f"input_number.{legacy}_kwh_charged_by_solar",
             "drive_efficiency_last_battery_level": last_battery_level,
             "drive_efficiency_last_odometer": f"sensor.{legacy}_drive_efficiency_last_odometer",

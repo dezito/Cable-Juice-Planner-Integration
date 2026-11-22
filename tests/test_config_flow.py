@@ -56,6 +56,7 @@ async def _submit_defaults_until(hass: HomeAssistant, result, step_id: str | Non
 
 
 async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
+    hass.config.country = "SE"
     result = await _start_instance(hass, dashboard_icon="mdi:car-electric")
     result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
     result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
@@ -80,6 +81,7 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     assert result["title"] == "Cable Juice Planner (flow)"
     assert result["data"][CONF_ENTITY_PREFIX] == "flow"
     options = result["options"]
+    assert options["price_country"] == "SE"  # a new entry: the country of Home Assistant is suggested and stored
     assert options["status_entity_id"] == CHARGER_OPTIONS["status_entity_id"]
     assert options["charging_loss"] == -0.05  # shown in %, stored as a fraction
     assert options["usable_battery_level_entity_id"] == EV_LEVEL
@@ -274,6 +276,7 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     """A PyScript ev_config.yaml in the config dir is offered and its values prefill the pages."""
     shutil.copy(FIXTURES / "ev_config.yaml", tmp_path / "ev_config.yaml")
     hass.config.config_dir = str(tmp_path)
+    hass.config.country = "DE"
     result = await _start_instance(hass, prefix="ev")
     assert result["step_id"] == "import_legacy"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"import_source": "ev"})
@@ -292,6 +295,7 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     assert options["charge_port_door_entity_id"] == "cover.my_car_charge_port_door"
     assert options["notify_list"] == ["notify.mobile_app_phone"]
     assert options["language"] == "da"
+    assert options["price_country"] == "DK"  # an import keeps its own: Denmark, not the country of Home Assistant
     # the removed testing mode in the legacy file (testing_mode: true) is ignored, not imported
     assert "testing_mode" not in options
     assert options["charger_power_entity_id"] == "sensor.ev_charger_power"

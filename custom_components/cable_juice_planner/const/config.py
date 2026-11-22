@@ -29,7 +29,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "kwh_meter_entity_id": "",
             "lifetime_kwh_meter_entity_id": "",
             "enabled_entity_id": "",
-            "co2_entity_id": "",
             "cable_connected_entity_id": "",
             "other_ev_using_this_charger_entity_ids": [],
         },
@@ -130,6 +129,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         },
         "refund": 0.0,
         "sell_fee": 0.03,
+        "country": "DK",  # ISO 3166-1 alpha-2: the country of the prices (the price provider page); Denmark for entries from before it
         # not a page of the flow: set when the entry is made from the unit of the price sensors (const/base.py price_scale)
         "price_scale": 1.0,
     },
@@ -179,7 +179,6 @@ OPTION_PATHS: dict[str, str] = {
     "lifetime_kwh_meter_entity_id": "charger.entity_ids.lifetime_kwh_meter_entity_id",
     "enabled_entity_id": "charger.entity_ids.enabled_entity_id",
     "cable_connected_entity_id": "charger.entity_ids.cable_connected_entity_id",
-    "co2_entity_id": "charger.entity_ids.co2_entity_id",
     "power_voltage": "charger.power_voltage",
     "charging_phases": "charger.charging_phases",
     "charging_max_amp": "charger.charging_max_amp",
@@ -227,6 +226,7 @@ OPTION_PATHS: dict[str, str] = {
     "stromligning_sell_surcharge": "prices.entity_ids.stromligning_sell_surcharge",
     "refund": "prices.refund",
     "sell_fee": "prices.sell_fee",
+    "price_country": "prices.country",
     "price_scale": "prices.price_scale",
     # solar
     "production_entity_id": "solar.entity_ids.production_entity_id",
@@ -273,7 +273,6 @@ FLOW_STEPS: dict[str, list[str]] = {
         "lifetime_kwh_meter_entity_id",
         "enabled_entity_id",
         "cable_connected_entity_id",
-        "co2_entity_id",
     ],
     "charger_specs": ["power_voltage", "charging_phases", "charging_max_amp", "charging_loss"],
     "load_balancing": ["site_priority", "site_phase_order"],
@@ -380,7 +379,7 @@ def default_options() -> dict[str, Any]:
 
 
 # Options that no longer exist; old backups and stored options may still hold them
-REMOVED_OPTION_KEYS = ("testing_mode",)
+REMOVED_OPTION_KEYS = ("testing_mode", "co2_entity_id")
 
 
 def strip_removed_options(options: dict[str, Any]) -> dict[str, Any]:

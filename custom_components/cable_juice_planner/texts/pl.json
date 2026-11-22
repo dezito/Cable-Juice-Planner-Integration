@@ -493,7 +493,6 @@
     "simulated_battery_level": "Poziom baterii używany przez plan: ostatnia wartość z samochodu plus to, co od tego czasu zliczył licznik kWh ładowarki (ze stratami ładowania). Wpisz tu rzeczywistą wartość samochodu, jeśli dane samochodu się spóźniają.",
     "drive_efficiency_last_battery_level": "Poziom baterii podczas ostatniego ładowania (%)",
     "drive_efficiency_last_odometer": "Przebieg podczas ostatniego ładowania ({distance})",
-    "co2_emitted": "CO₂ wyemitowane w kg, na podstawie Energi Data Service",
     "kwh_charged_by_solar": "kWh naładowane energią słoneczną",
     "public_charging_session_done": "Zaznacz, że ładowanie publiczne zostało zakończone i koszt musi zostać wprowadzony",
     "ev_request": "Żądania do auta: wake_up, preheat_start i preheat_stop. Wykonaj je swoją automatyzacją.",

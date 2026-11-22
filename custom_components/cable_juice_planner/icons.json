@@ -350,9 +350,6 @@
       "drive_efficiency_last_odometer": {
         "default": "mdi:counter"
       },
-      "co2_emitted": {
-        "default": "mdi:molecule-co2"
-      },
       "kwh_charged_by_solar": {
         "default": "mdi:white-balance-sunny"
       },

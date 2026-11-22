@@ -162,7 +162,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
   - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate; optionally the most accurate type is chosen automatically
   - battery capacity over time, charging loss by power and learned charging power by battery level
-- **CO₂ emissions** and **kWh charged by solar**
+- **kWh charged by solar**
 - **Very detailed charging history**
   - each charge: time, charging reason, percentage, kWh, price and price/kWh
   - per month: km, kWh, share from solar, price and price/kWh
@@ -252,7 +252,7 @@ Setup is done in the UI, split into pages with help texts:
 1. **Car:** name (used as the device name and in notifications), prefix and language. All entity
    ids start with `cjp_`. Without a prefix they are named `sensor.cjp_overview`, and with the prefix
    `tesla` they are named `sensor.cjp_tesla_overview`. Use one prefix per car.
-2. **Charger:** status, power, kWh meters, on/off, cable and CO₂, as well as voltage, phases,
+2. **Charger:** status, power, kWh meters, on/off and cable, as well as voltage, phases,
    max. amps and charging loss
 3. **Load balancing:** priority, phase order and the chargers on the same circuit (only with a
    [shared grid connection](docs/load-balancing.md))
@@ -329,7 +329,7 @@ affect the plan).
 
 The results include `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
 `_emoji_description`, `_kwh_cost_price`, `_drive_efficiency`, `_km_per_kwh`, `_estimated_range`,
-`_co2_emitted`, `_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
+`_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
 full), `_charging_loss_model`, `_economy`, `_what_if`, `_what_if_settings`, `_what_if_no_solar` and `_what_if_solar` (the What-if results) and `_analysis`. Large attributes (markdown, plans, measurements)
 are not stored in the recorder database.
 

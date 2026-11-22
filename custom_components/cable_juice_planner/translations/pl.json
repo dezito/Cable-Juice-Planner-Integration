@@ -23,8 +23,7 @@
           "kwh_meter_entity_id": "Licznik kWh",
           "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
           "enabled_entity_id": "Ładowarka włączona",
-          "cable_connected_entity_id": "Kabel podłączony",
-          "co2_entity_id": "Intensywność CO₂"
+          "cable_connected_entity_id": "Kabel podłączony"
         },
         "data_description": {
           "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -32,8 +31,7 @@
           "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
           "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
           "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
-          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone.",
-          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone."
         }
       },
       "charger_specs": {
@@ -330,7 +328,11 @@
         "title": "Ceny energii",
         "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki.",
         "data": {
+          "price_country": "Kraj",
           "price_providers": "Dostawcy cen"
+        },
+        "data_description": {
+          "price_country": "Kraj, którego dotyczą ceny. Decyduje, których dostawców cen można wybrać. Proponowany jest kraj z Home Assistant."
         }
       },
       "user": {
@@ -409,6 +411,8 @@
       "prefix_in_use": "Ten prefiks jest już używany.",
       "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
+      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj.",
+      "price_provider_no_forecast": "Żaden z wybranych dostawców cen nie podaje prognozy cen, więc planowanie mogłoby używać tylko cen na dziś i jutro. Wybierz dodatkowo innego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
       "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
@@ -464,8 +468,7 @@
           "kwh_meter_entity_id": "Licznik kWh",
           "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
           "enabled_entity_id": "Ładowarka włączona",
-          "cable_connected_entity_id": "Kabel podłączony",
-          "co2_entity_id": "Intensywność CO₂"
+          "cable_connected_entity_id": "Kabel podłączony"
         },
         "data_description": {
           "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -473,8 +476,7 @@
           "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
           "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
           "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
-          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone.",
-          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone."
         }
       },
       "charger_specs": {
@@ -771,7 +773,11 @@
         "title": "Ceny energii",
         "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki.",
         "data": {
+          "price_country": "Kraj",
           "price_providers": "Dostawcy cen"
+        },
+        "data_description": {
+          "price_country": "Kraj, którego dotyczą ceny. Decyduje, których dostawców cen można wybrać. Proponowany jest kraj z Home Assistant."
         }
       },
       "site": {
@@ -823,6 +829,8 @@
       "prefix_in_use": "Ten prefiks jest już używany.",
       "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
+      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj.",
+      "price_provider_no_forecast": "Żaden z wybranych dostawców cen nie podaje prognozy cen, więc planowanie mogłoby używać tylko cen na dziś i jutro. Wybierz dodatkowo innego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
       "simulation_needs_ev": "Symulacja poziomu baterii wymaga poziomu baterii, zasięgu i licznika auta.",
@@ -1226,9 +1234,6 @@
       },
       "drive_efficiency_last_odometer": {
         "name": "Przebieg przy ostatnim ładowaniu"
-      },
-      "co2_emitted": {
-        "name": "Emisja CO₂"
       },
       "kwh_charged_by_solar": {
         "name": "kWh naładowane ze słońca"

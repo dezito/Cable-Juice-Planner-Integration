@@ -493,7 +493,6 @@
     "simulated_battery_level": "Batteriniveauet planen bruger: bilens seneste værdi plus det, laderens kWh-måler har talt siden (med ladetab). Skriv bilens rigtige værdi her, hvis bilens tal er bagud.",
     "drive_efficiency_last_battery_level": "Batteriniveau ved sidste ladning (%)",
     "drive_efficiency_last_odometer": "Kilometerstand ved sidste ladning ({distance})",
-    "co2_emitted": "CO₂ udledt i kg, baseret på Energi Data Service CO₂-faktor",
     "kwh_charged_by_solar": "kWh opladet af solcellerne",
     "public_charging_session_done": "Marker at offentlig ladning er afsluttet og omkostning skal indtastes",
     "ev_request": "Forespørgsler til bilen: wake_up, preheat_start og preheat_stop. Udfør dem med din automation.",

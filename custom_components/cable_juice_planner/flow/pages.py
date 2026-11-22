@@ -13,7 +13,7 @@ from homeassistant.helpers import selector
 from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, default_options, object_prefix, price_scale
 from ..site import charger_devices, circuit_of, update_circuits
 from ..management.dependency_checks import disabled_sensors
-from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices, price_currency_errors, price_sensor_errors
+from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices, price_currency_errors, price_sensor_errors, DEFAULT_COUNTRY, default_providers, provider_errors
 from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
@@ -207,12 +207,29 @@ class CJPFlowPages:
         )
         return [*([ignored] if isinstance(ignored, str) else ignored), *([own] if own else []), *behind]
 
+    # the country field is suggested from Home Assistant's country once, for a new entry (an import or a backup keeps its own)
+    _price_country_shown = False
+
+    def _suggest_price_country(self) -> None:
+        own_values = getattr(self, "_restore_backup", None) is not None or getattr(self, "_legacy_prefix", None) is not None
+        if self._new_entry and not own_values and not self._price_country_shown:
+            country = str(self.hass.config.country or DEFAULT_COUNTRY).upper()  # type: ignore[attr-defined]
+            self._options["price_country"] = country
+            if country != DEFAULT_COUNTRY:
+                self._providers = default_providers(country)
+        self._price_country_shown = True
+
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        self._suggest_price_country()
         if user_input is not None:
             providers = [p for p in user_input.get("price_providers", []) if p in PRICE_PROVIDERS]
+            country = str(user_input.get("price_country") or DEFAULT_COUNTRY).upper()
+            self._options["price_country"] = country
             if not providers:
                 errors["base"] = "no_price_provider"
+            elif errors := provider_errors(country, providers):
+                self._providers = providers
             else:
                 self._providers = providers
                 for provider, keys in PRICE_PROVIDER_KEYS.items():
@@ -222,12 +239,15 @@ class CJPFlowPages:
                 return await self._async_next()
         schema = vol.Schema(
             {
+                vol.Required("price_country", default=self._options.get("price_country", DEFAULT_COUNTRY)): selector.CountrySelector(),
                 vol.Required("price_providers", default=self._providers): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=PRICE_PROVIDERS, multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="price_providers")
-                )
+                ),
             }
         )
-        return self.async_show_form(step_id="price_provider", data_schema=schema, errors=errors, description_placeholders=self._placeholders())  # type: ignore[attr-defined]
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="price_provider", data_schema=schema, errors=errors, description_placeholders=self._placeholders()
+        )
 
     async def async_step_general(self, user_input=None) -> ConfigFlowResult:
         return await self._async_page("general", user_input)

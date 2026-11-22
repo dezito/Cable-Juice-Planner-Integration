@@ -151,6 +151,11 @@ in the currency (EUR/kWh, GBP/kWh, …), not in cents or pence: CJP refuses a se
 currency of the sensor sets the [price scale](how-it-works.md#prices). All price sensors must be in the same
 currency (a backup provider in another currency is refused).
 
+The **country** of the prices is chosen on the same page as the providers (Home Assistant's country is suggested, and a new
+entry outside Denmark starts with Energy Price Forecast). A provider with no prices in the country is refused: Strømligning
+only works in Denmark, Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the
+Netherlands, Belgium, Austria, Germany and Luxembourg, and Energy Price Forecast in most of Europe.
+
 Strømligning switches its sensors excl. VAT (which the sell sensors and the tariffs use) off by default, and a
 disabled sensor can't be selected: enable them first under **Settings → Devices & services → Entities** (*Show
 disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options. If a

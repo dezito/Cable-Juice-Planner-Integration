@@ -23,8 +23,7 @@
           "kwh_meter_entity_id": "kWh-måler",
           "lifetime_kwh_meter_entity_id": "Livstids-kWh-måler",
           "enabled_entity_id": "Lader aktiveret",
-          "cable_connected_entity_id": "Kabel tilsluttet",
-          "co2_entity_id": "CO₂-intensitet"
+          "cable_connected_entity_id": "Kabel tilsluttet"
         },
         "data_description": {
           "status_entity_id": "Ladestatus (Understøttede tilstande: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -32,8 +31,7 @@
           "kwh_meter_entity_id": "Brug Riemann-sum integral-sensor (integrationsmetode: Venstre Riemann-sum), hvis laderens kWh-måler er langsom (fx Easee); ellers brug laderens livstids-kWh-måler",
           "lifetime_kwh_meter_entity_id": "Alternativ til kwh_meter_entity_id, hvis du ikke vil bruge laderens livstids-kWh-måler",
           "enabled_entity_id": "Valgfri: kontakt/sensor der viser om laderen er tændt (on/off). Er laderen slukket, sættes attributten charger_enabled på action-sensoren.",
-          "cable_connected_entity_id": "Bruges kun når laderen ikke har en status-sensor: afgør om bilen er tilsluttet.",
-          "co2_entity_id": "Energi Data Service CO2 entity_id"
+          "cable_connected_entity_id": "Bruges kun når laderen ikke har en status-sensor: afgør om bilen er tilsluttet."
         }
       },
       "charger_specs": {
@@ -330,7 +328,11 @@
         "title": "Elpriser",
         "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
         "data": {
+          "price_country": "Land",
           "price_providers": "Prisleverandører"
+        },
+        "data_description": {
+          "price_country": "Landet priserne gælder for. Det afgør, hvilke prisudbydere der kan vælges. Home Assistants land foreslås."
         }
       },
       "user": {
@@ -409,6 +411,8 @@
       "prefix_in_use": "Dette prefix bruges allerede af en anden Cable Juice Planner-instans.",
       "prefix_entities_exist": "Der findes allerede entiteter med dette prefix (f.eks. fra PyScript-versionen). Vælg et andet prefix eller fjern de gamle entiteter.",
       "no_price_provider": "Vælg mindst én prisleverandør.",
+      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet.",
+      "price_provider_no_forecast": "Ingen af de valgte prisudbydere giver en prisprognose, så planlægningen kun ville kunne bruge priserne for i dag og i morgen. Vælg også en anden prisudbyder.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
       "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
@@ -464,8 +468,7 @@
           "kwh_meter_entity_id": "kWh-måler",
           "lifetime_kwh_meter_entity_id": "Livstids-kWh-måler",
           "enabled_entity_id": "Lader aktiveret",
-          "cable_connected_entity_id": "Kabel tilsluttet",
-          "co2_entity_id": "CO₂-intensitet"
+          "cable_connected_entity_id": "Kabel tilsluttet"
         },
         "data_description": {
           "status_entity_id": "Ladestatus (Understøttede tilstande: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
@@ -473,8 +476,7 @@
           "kwh_meter_entity_id": "Brug Riemann-sum integral-sensor (integrationsmetode: Venstre Riemann-sum), hvis laderens kWh-måler er langsom (fx Easee); ellers brug laderens livstids-kWh-måler",
           "lifetime_kwh_meter_entity_id": "Alternativ til kwh_meter_entity_id, hvis du ikke vil bruge laderens livstids-kWh-måler",
           "enabled_entity_id": "Valgfri: kontakt/sensor der viser om laderen er tændt (on/off). Er laderen slukket, sættes attributten charger_enabled på action-sensoren.",
-          "cable_connected_entity_id": "Bruges kun når laderen ikke har en status-sensor: afgør om bilen er tilsluttet.",
-          "co2_entity_id": "Energi Data Service CO2 entity_id"
+          "cable_connected_entity_id": "Bruges kun når laderen ikke har en status-sensor: afgør om bilen er tilsluttet."
         }
       },
       "charger_specs": {
@@ -771,7 +773,11 @@
         "title": "Elpriser",
         "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
         "data": {
+          "price_country": "Land",
           "price_providers": "Prisleverandører"
+        },
+        "data_description": {
+          "price_country": "Landet priserne gælder for. Det afgør, hvilke prisudbydere der kan vælges. Home Assistants land foreslås."
         }
       },
       "site": {
@@ -823,6 +829,8 @@
       "prefix_in_use": "Dette prefix bruges allerede af en anden Cable Juice Planner-instans.",
       "prefix_entities_exist": "Der findes allerede entiteter med dette prefix (f.eks. fra PyScript-versionen). Vælg et andet prefix eller fjern de gamle entiteter.",
       "no_price_provider": "Vælg mindst én prisleverandør.",
+      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet.",
+      "price_provider_no_forecast": "Ingen af de valgte prisudbydere giver en prisprognose, så planlægningen kun ville kunne bruge priserne for i dag og i morgen. Vælg også en anden prisudbyder.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
       "simulation_needs_ev": "Simulering af batteriniveau kræver bilens batteriniveau, rækkevidde og kilometertæller.",
@@ -1226,9 +1234,6 @@
       },
       "drive_efficiency_last_odometer": {
         "name": "Kilometerstand ved sidste ladning"
-      },
-      "co2_emitted": {
-        "name": "CO₂ udledt"
       },
       "kwh_charged_by_solar": {
         "name": "kWh ladet af solcellerne"

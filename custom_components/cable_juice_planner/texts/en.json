@@ -493,7 +493,6 @@
     "simulated_battery_level": "The battery level the plan uses: the car's latest value plus what the charger's kWh meter has counted since (with charging loss). Enter the car's real value here if the car's figure is behind.",
     "drive_efficiency_last_battery_level": "Battery level at last charging (%)",
     "drive_efficiency_last_odometer": "Odometer reading at last charging ({distance})",
-    "co2_emitted": "CO₂ emitted in kg, based on Energi Data Service CO₂ factor",
     "kwh_charged_by_solar": "kWh charged by solar",
     "public_charging_session_done": "Mark that the public charging session has ended and the cost must be entered",
     "ev_request": "Requests for the car: wake_up, preheat_start and preheat_stop. Carry them out with your automation.",

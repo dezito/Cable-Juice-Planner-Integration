@@ -493,7 +493,6 @@
     "simulated_battery_level": "Der Akkustand, den der Plan nutzt: der letzte Wert des Autos plus das, was der kWh-Zähler des Laders seitdem gezählt hat (mit Ladeverlust). Tragen Sie hier den echten Wert des Autos ein, wenn die Angabe des Autos hinterherhinkt.",
     "drive_efficiency_last_battery_level": "Akkustand beim letzten Ladevorgang (%)",
     "drive_efficiency_last_odometer": "Kilometerstand beim letzten Ladevorgang ({distance})",
-    "co2_emitted": "CO₂ in kg, basierend auf Energi Data Service CO₂-Faktor",
     "kwh_charged_by_solar": "Durch Solar geladene kWh",
     "public_charging_session_done": "Markieren Sie, dass die öffentliche Ladesitzung beendet ist und die Kosten eingegeben werden müssen",
     "ev_request": "Anfragen an das Auto: wake_up, preheat_start und preheat_stop. Führe sie mit deiner Automation aus.",

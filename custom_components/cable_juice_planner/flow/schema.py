@@ -77,7 +77,6 @@ SELECTORS: dict[str, Any] = {
     "lifetime_kwh_meter_entity_id": _entity("sensor", device_class="energy"),
     "enabled_entity_id": _entity(["switch", "binary_sensor", "input_boolean"]),
     "cable_connected_entity_id": _entity(["binary_sensor", "sensor"]),
-    "co2_entity_id": _entity("sensor", integration="energidataservice"),
     "power_voltage": _number(100, 480, 1, "V"),
     "charging_phases": _number(1, 3, 1),
     "charging_max_amp": _number(6, 80, 1, "A"),

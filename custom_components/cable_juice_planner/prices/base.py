@@ -128,6 +128,9 @@ class BasePriceProvider:
     source_name = "base"
     # config key of the buy price entity
     buy_key = ""
+    # the countries (ISO 3166-1 alpha-2) the provider gives prices in (None: any, it has its own list), and whether it gives a forecast
+    countries: frozenset[str] | None = None
+    has_forecast = True
 
     def __init__(self, config: dict) -> None:
         prices_config = config.get("prices", {})

@@ -23,7 +23,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
     """Handle the Cable Juice Planner config flow."""
 
     VERSION = 2
-    MINOR_VERSION = 5
+    MINOR_VERSION = 6
     _new_entry = True
 
     def __init__(self) -> None:

@@ -18,6 +18,7 @@ from .currency import detect_price_scale, price_currency_errors, price_sensor_er
 from .energidataservice import EnergiDataServicePriceProvider
 from .energypriceforecast import EnergyPriceForecastPriceProvider
 from .dashboard import price_dashboard_entities
+from .availability import DEFAULT_COUNTRY, default_providers, provider_errors
 from .factory import create_price_provider, providers_from_options
 from .stromligning import (
     STROMLIGNING_PLATFORM,
@@ -31,6 +32,7 @@ from .stromligning import (
 __all__ = [
     "STROMLIGNING_PLATFORM",
     "STROMLIGNING_UNIQUE_ID_PREFIXES",
+    "DEFAULT_COUNTRY",
     "BasePriceProvider",
     "CombinedPriceProvider",
     "EnergiDataServicePriceProvider",
@@ -38,11 +40,13 @@ __all__ = [
     "StromligningPriceProvider",
     "PRICE_SNAPSHOT_SECONDS",
     "create_price_provider",
+    "default_providers",
     "detect_price_scale",
     "has_stromligning_sell_prices",
     "price_currency_errors",
     "price_dashboard_entities",
     "price_sensor_errors",
+    "provider_errors",
     "providers_from_options",
     "stromligning_entities_to_watch",
     "stromligning_problems",
