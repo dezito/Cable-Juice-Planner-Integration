@@ -5,6 +5,9 @@ days of watching the plan before you trust it.
 
 ## 1. Check what you need
 
+You need Home Assistant **2025.12** or newer with the recorder (default). The [analysis](dashboard-analysis.md#analysis) and
+the charging loss read its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
+
 | You need | Why |
 |---|---|
 | A charger with **status**, **power** (W) and **kWh** sensors | whether the car is connected and charging, and how much went in |
@@ -16,7 +19,10 @@ Optional:
 - an **EV integration** with battery level, range and odometer (and preferably charge port, charge limit
   and location). Without one, you enter the battery level yourself when you plug in (virtual EV).
 - **solar production** (W), [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and a weather
-  integration with `weather.get_forecasts`
+  integration with `weather.get_forecasts`, e.g.
+  [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
+  [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
+  [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
 - a **home battery** (level and power)
 
 For the dashboard you need the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template-card`
@@ -38,7 +44,9 @@ Not in the HACS search? Add it as a custom repository first: **HACS** → ⋮ �
 
 ## 3. Go through the setup
 
-The setup is split into pages. Every field has a help text – here are the ones that matter most.
+The setup is split into pages. Every field has a help text – here are the ones that matter most. The entity
+selectors only show relevant entities: battery level only `battery` sensors, power only `power` sensors, kWh only
+`energy` sensors, prices only entities from the price integrations and the forecast only Solcast.
 
 ### Car
 
@@ -61,6 +69,7 @@ The setup is split into pages. Every field has a help text – here are the ones
 | kWh meter | if the charger's kWh meter updates slowly (e.g. Easee), make a *Riemann sum integral* (left) of the power sensor and use it |
 | Voltage, phases, max. amps | e.g. 230 V (the default), 3 phases, 16 A: limits how many kWh fit in an hour. The voltage also turns the charger's power into amps for the [load balancing](load-balancing.md), and the [charger test](charger-control.md#test-your-charger-automation) tells you when the power shows another one. An entry still at 240 V, the default of earlier versions, gets a repair that sets 230 V when you submit it; ignore it if your grid really has 240 V |
 | Charging loss | in percent, 0 or negative: −5 means 5 % is lost. CJP can [measure it](charging-loss.md) |
+| Charger enabled, cable connected, CO₂ | optional. *Charger enabled* is a switch or sensor showing whether the charger is on, and the action sensor asks you to turn it on when it is off. *Cable connected* is only used when the charger has no status sensor. *CO₂* is an optional sensor for the CO₂ figures |
 
 ### EV (optional)
 
@@ -164,6 +173,7 @@ Energi Data Service and/or Strømligning. With both, Strømligning has priority:
 hour it has one, and Energi Data Service fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
+The page also sets the electricity tax refund and the selling fee, which are explained under [Prices](how-it-works.md#prices).
 
 Strømligning switches its sensors excl. VAT (which the sell sensors and the tariffs use) off by default, and a
 disabled sensor can't be selected: enable them first under **Settings → Devices & services → Entities** (*Show
@@ -186,7 +196,14 @@ the days without Solcast use the weather forecast and the stored solar history.
 
 - **Notify services:** e.g. `notify.mobile_app_phone`. Use the mobile app for actionable notifications
   (public charging asks for the price).
+- **Interval:** the minutes between each check of the plan and the charging.
 - **Dashboard** in the sidebar (default on).
+- **Diagnostic file log:** writes a detailed log to `cable_juice_planner_<prefix>.log` in the config folder (2 MB per file, 3 rotations). See [Report a problem](faq-troubleshooting.md#report-a-problem).
+
+### Databases
+
+How much history is stored: days of power values, solar production per cloud cover category, price history,
+drive efficiency, km/kWh and months of charging history. The defaults suit most.
 
 Everything can be changed later under **Configure** on the integration.
 
