@@ -270,6 +270,26 @@ private agent memory). Update or remove a note when it stops being true.
   must contain no ASCII apostrophe or quote character (`'`, `"`): use wording
   without possessives (the typographic ’ is fine). Only keys inserted as plain
   markup, such as the "Read more" explanations, may contain them.
+- Charger and car states (`CHARGER_*_STATUS`, `EV_PLUGGED_STATES`, `EV_UNPLUGGED_STATES` in `const/base.py`) are
+  `StateSet`s: `in` ignores case and surrounding blanks, and `+` keeps the type. Never build one from a plain tuple
+  (`(*A, *B)` loses it; use `StateSet(*A, *B)` or `+`), and never compare a status with `==` to a literal; use
+  `normalize_state()`. A state is listed only when it surely means one thing. States that can mean either (paused,
+  suspended, sleeping, idle, occupied), a fault (error, faulted) or no data (unknown, unavailable) are deliberately
+  not listed, so the unknown-status repair shows. OCPP states (Available, Preparing, SuspendedEV, Finishing) are left
+  out by user decision: Preparing is also shown while charging on OCPP 2.0.1. `CHARGER_HELD_STATUS` (a subset of ready:
+  the charger itself holds the charging back, e.g. Easee smart start or load balancing) is never restarted
+  (`is_charging`), does not end the charging loss measurement and does not start the charger test. A new state needs
+  its source (the integration's `strings.json` or `const.py`) and a test in `tests/test_ev_wake_away.py`.
+- The charger blueprint's "States that mean charging" and "States that mean done" count for CJP's own status entity
+  (`management/automation_inputs.py` `status_aliases`, `coordinator/status_states.py`): only when that entity is among the
+  automation's status entities, read only from `automations.yaml`. They can only add states: the built in states always
+  win, a state listed as both is dropped, and no data or fault state is mapped. "States that mean the charger is not
+  ready" is not used, because it also holds states CJP reads as plugged in (`awaiting_start`). The mapping happens at
+  the boundary (snapshot, history buffers, status events, the recorder history, repairs, load balancing) through
+  `coordinator.canonical_status()`, so the engine only knows the built in states; a new place that reads the raw
+  status state of the charger from Home Assistant must use it too.
+- A car that is away from home is never woken: `ready_to_charge()` checks `is_ev_home()` before every `wake_up_ev()`,
+  whatever the cable sensor or the charger status says. Away and not plugged in shows the `ev_not_home` text.
 
 ### HACS default-catalog review
 
