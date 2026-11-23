@@ -1588,8 +1588,10 @@ def _limits_while_held(limits: list, test: float, own: float) -> None:
     """The test limit and then the car's own were published with the action unchanged: the automation sends a changed
     limit only on its own (or with a new charge), never together with a stop."""
     published = [(action, limit) for action, limit in limits if limit is not None]
-    test_at = next(index for index, (_, limit) in enumerate(published) if limit == test)
-    back_at = next(index for index, (_, limit) in enumerate(published) if index > test_at and limit == own)
+    test_at = next((index for index, (_, limit) in enumerate(published) if limit == test), None)
+    assert test_at is not None, f"the test limit {test} was never published: {published}"
+    back_at = next((index for index, (_, limit) in enumerate(published) if index > test_at and limit == own), None)
+    assert back_at is not None, f"the car's own limit {own} was not published after the test limit {test}: {published}"
     assert published[test_at - 1][0] == published[test_at][0], published
     assert published[back_at - 1][0] == published[back_at][0], published
 
@@ -1643,7 +1645,7 @@ async def test_stopping_during_the_limit_step_puts_the_cars_limit_back_before_th
     base = "custom_components.cable_juice_planner.coordinator.charger_test"
     with (
         patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
-        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 0.5), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 30), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
         patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
     ):
         await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
@@ -1670,7 +1672,7 @@ async def test_stopping_during_the_limit_step_after_an_overdraw_still_tells_the_
     base = "custom_components.cable_juice_planner.coordinator.charger_test"
     with (
         patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
-        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 0.5), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
+        patch(f"{base}.OVERDRAW_AFTER_SECONDS", 0), patch(f"{base}.LIMIT_TIMEOUT", 30), patch(f"{base}.LIMIT_SAMPLE_SECONDS", 0.01),
         patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
     ):
         await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
@@ -1693,8 +1695,17 @@ async def test_a_car_that_is_full_during_the_limit_step_still_gets_its_own_limit
     """The car reports completed while it is at the test's limit: the put-back has no charger status check."""
     coordinator = charger_entry.runtime_data
     limits: list = []
-    wire_charger(hass, limit_follows=lambda value: value != 80 or hass.states.get(CHARGER_STATUS).state == "completed", limits=limits)
     test = _test_limit(hass)
+
+    def follows(value: float) -> bool:
+        if value == test:
+            # the car reports completed from the moment it takes the test's limit, however slow the runner is. This runs in a
+            # worker thread, and the status has listeners in the event loop
+            hass.loop.call_soon_threadsafe(hass.states.async_set, CHARGER_STATUS, "completed")
+            return True
+        return value != 80 or hass.states.get(CHARGER_STATUS).state == "completed"
+
+    wire_charger(hass, limit_follows=follows, limits=limits)
     base = "custom_components.cable_juice_planner.coordinator.charger_test"
     with (
         patch(f"{base}.ATTEMPT_TIMEOUT", 0.3), patch(f"{base}.SETTLE_SECONDS", 0), patch(f"{base}.SAMPLE_SECONDS", 0.01),
@@ -1702,13 +1713,8 @@ async def test_a_car_that_is_full_during_the_limit_step_still_gets_its_own_limit
         patch(f"{base}.LIMIT_PAUSE_SECONDS", 0), patch(FOUND, return_value=[]),
     ):
         await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
-        for _ in range(3000):
-            await asyncio.sleep(0.01)
-            if _car_limit(hass) == test:
-                break
-        assert _car_limit(hass) == test
-        hass.states.async_set(CHARGER_STATUS, "completed")
         await _finished(hass)
+    assert hass.states.get(CHARGER_STATUS).state == "completed"  # it took the test's limit
     assert _car_limit(hass) == 80
     assert hass.states.get(RESULT).attributes["limit_put_back"] == {"ok": True, "limit": 80}
     _limits_while_held(limits, test, 80)
