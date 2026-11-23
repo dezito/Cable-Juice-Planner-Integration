@@ -85,6 +85,7 @@ SELECTORS: dict[str, Any] = {
     # load balancing (only shown when a site entry exists)
     "site_priority": _number(1, 10, 1),
     "site_phase_order": selector.SelectSelector(selector.SelectSelectorConfig(options=list(PHASE_ORDERS), mode=selector.SelectSelectorMode.DROPDOWN)),
+    "charger_in_phase_meter": BOOLEAN,
     # car
     "usable_battery_level_entity_id": _entity("sensor", device_class="battery"),
     "simulate_battery_level_while_charging": BOOLEAN,

@@ -58,11 +58,13 @@
         "data": {
           "site_priority": "Priorität",
           "site_phase_order": "Phasenfolge des Ladegeräts",
+          "charger_in_phase_meter": "Phasensensoren enthalten das Ladegerät dieses Autos",
           "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
           "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "charger_in_phase_meter": "Ein (Standard): Die Phasenstromsensoren des gemeinsamen Netzanschlusses messen auch das Ladegerät dieses Autos. Ausschalten, wenn das Ladegerät an einem eigenen Zähler hängt, den die Phasensensoren nicht enthalten (aber hinter derselben Hauptsicherung): Sein Bezug wird dann im Überlastungstest und in der Hauptsicherungsprüfung zum gemessenen Phasenstrom addiert und nicht vom gemessenen Strom abgezogen, um das Haus zu erhalten, sodass der Schutz nie geringer wird. Wenn Sie unsicher sind, lassen Sie das Auto laden und beobachten Sie die Phasensensoren: Steigen sie um das, was es bezieht, enthalten sie es. Ausschalten ist für die Sicherung die sichere Seite, aber ein Ladegerät, das die Sensoren messen, zählt dann doppelt: Das Auto bekommt weniger Strom, und die Reparatur zur Hauptsicherung kann erscheinen. Ohne Phasensensoren hat die Einstellung keine Wirkung. Ohne Messwert vom Leistungssensor des Ladegeräts zählt das Auto mit dem Strom, den es erhalten hat.",
           "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
@@ -484,11 +486,13 @@
         "data": {
           "site_priority": "Priorität",
           "site_phase_order": "Phasenfolge des Ladegeräts",
+          "charger_in_phase_meter": "Phasensensoren enthalten das Ladegerät dieses Autos",
           "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
           "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "charger_in_phase_meter": "Ein (Standard): Die Phasenstromsensoren des gemeinsamen Netzanschlusses messen auch das Ladegerät dieses Autos. Ausschalten, wenn das Ladegerät an einem eigenen Zähler hängt, den die Phasensensoren nicht enthalten (aber hinter derselben Hauptsicherung): Sein Bezug wird dann im Überlastungstest und in der Hauptsicherungsprüfung zum gemessenen Phasenstrom addiert und nicht vom gemessenen Strom abgezogen, um das Haus zu erhalten, sodass der Schutz nie geringer wird. Wenn Sie unsicher sind, lassen Sie das Auto laden und beobachten Sie die Phasensensoren: Steigen sie um das, was es bezieht, enthalten sie es. Ausschalten ist für die Sicherung die sichere Seite, aber ein Ladegerät, das die Sensoren messen, zählt dann doppelt: Das Auto bekommt weniger Strom, und die Reparatur zur Hauptsicherung kann erscheinen. Ohne Phasensensoren hat die Einstellung keine Wirkung. Ohne Messwert vom Leistungssensor des Ladegeräts zählt das Auto mit dem Strom, den es erhalten hat.",
           "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
@@ -1486,7 +1490,7 @@
     },
     "site_fuse_exceeded": {
       "title": "Haus und Autos ziehen mehr als die Hauptsicherung (Lastverteilung)",
-      "description": "In den letzten {days} Tagen lag der stündliche Mittelwert des Stroms auf diesen Phasen mindestens {hours} Stunden lang über dem {factor}-Fachen der Hauptsicherung. Jede Zeile zeigt die Phase, ihre Hauptsicherung → den höchsten stündlichen Mittelwert (Stunden über der Grenze > die Grenze, also die Hauptsicherung mal {factor}):\n{phases}\n\nEine Sicherung dieser Größe kann einen solchen Strom kaum eine Stunde lang tragen. Entweder ist die Hauptsicherung auf der Seite des gemeinsamen Netzanschlusses zu niedrig eingestellt (die Autos bekommen dann weniger Strom, als sie könnten), oder ein Phasensensor misst etwas anderes: falsche Phasenreihenfolge, ein Sensor, der nicht die Netzphase ist, oder eine falsche Einheit. Prüfe die Größe der Sicherung und die Phasensensoren. Ist die Sicherung wirklich so groß und stimmen die Werte, wähle bei dieser Reparatur **Ignorieren**.\n\nDie Reparatur verschwindet von selbst, wenn die nächste Prognose sie nicht mehr findet: nach der Korrektur der Sicherung, spätestens wenn diese Stunden aus den letzten {days} Tagen heraus sind."
+      "description": "In den letzten {days} Tagen lag der stündliche Mittelwert des Stroms auf diesen Phasen mindestens {hours} Stunden lang über dem {factor}-Fachen der Hauptsicherung. Jede Zeile zeigt die Phase, ihre Hauptsicherung → den höchsten stündlichen Mittelwert (Stunden über der Grenze > die Grenze, also die Hauptsicherung mal {factor}):\n{phases}\n\nEine Sicherung dieser Größe kann einen solchen Strom kaum eine Stunde lang tragen. Entweder ist die Hauptsicherung auf der Seite des gemeinsamen Netzanschlusses zu niedrig eingestellt (die Autos bekommen dann weniger Strom, als sie könnten), oder ein Ladegerät, das die Phasensensoren messen, ist als außerhalb eingestellt (*Phasensensoren enthalten das Ladegerät dieses Autos* ausgeschaltet), sodass sein Bezug doppelt gezählt wird, oder ein Phasensensor misst etwas anderes: falsche Phasenreihenfolge, ein Sensor, der nicht die Netzphase ist, oder eine falsche Einheit. Prüfe die Größe der Sicherung und die Phasensensoren. Ist die Sicherung wirklich so groß und stimmen die Werte, wähle bei dieser Reparatur **Ignorieren**.\n\nDie Reparatur verschwindet von selbst, wenn die nächste Prognose sie nicht mehr findet: nach der Korrektur der Sicherung, spätestens wenn diese Stunden aus den letzten {days} Tagen heraus sind."
     },
     "charger_not_following": {
       "title": "Der Lader folgte dem Plan {count} Mal in {days} Tagen nicht ({prefix})",

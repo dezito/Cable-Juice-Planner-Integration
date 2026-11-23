@@ -206,7 +206,10 @@ safety margin is not taken off) for at least 3 hours in the last 7 days, the rep
 above the limit > the limit, which is 1.25 × the fuse). Numbers use a decimal comma in languages other than English.
 
 A fuse of that size is unlikely to carry that for an hour. So either the main fuse on the shared grid connection page is set
-too low (the cars then get less current than they could: correct it there), or a phase sensor measures something else: the
+too low (the cars then get less current than they could: correct it there), or a charger that the phase sensors do measure is
+set as outside them (*Phase sensors include this car's charger* turned off, see
+[load balancing](load-balancing.md#a-charger-outside-the-phase-sensors): the draw of a charger set as outside is added to the
+phases here, so one that is already in them counts twice), or a phase sensor measures something else: the
 phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors.
 If the fuse really is that large and the values are right, choose **Ignore**.
 

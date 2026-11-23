@@ -58,11 +58,13 @@
         "data": {
           "site_priority": "Priority",
           "site_phase_order": "Charger phase order",
+          "charger_in_phase_meter": "Phase sensors include this car's charger",
           "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
           "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "charger_in_phase_meter": "On (default): the phase current sensors of the shared grid connection also measure this car's charger. Turn off if the charger is on its own meter that the phase sensors do not include (but behind the same main fuse): its draw is then added to the measured phase current in the overload check and the main fuse check, and is not taken off the measured current to get the house, so the protection is never lower. If you are unsure, let the car charge and watch the phase sensors: if they rise by what it draws, they include it. Turning it off is the safe side for the fuse, but for a charger that the sensors do measure it counts twice: the car then gets less current, and the main fuse repair may appear. Without phase sensors the setting has no effect. Without a reading from the charger's power sensor the car counts with the current it was given.",
           "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
@@ -484,11 +486,13 @@
         "data": {
           "site_priority": "Priority",
           "site_phase_order": "Charger phase order",
+          "charger_in_phase_meter": "Phase sensors include this car's charger",
           "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
           "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "charger_in_phase_meter": "On (default): the phase current sensors of the shared grid connection also measure this car's charger. Turn off if the charger is on its own meter that the phase sensors do not include (but behind the same main fuse): its draw is then added to the measured phase current in the overload check and the main fuse check, and is not taken off the measured current to get the house, so the protection is never lower. If you are unsure, let the car charge and watch the phase sensors: if they rise by what it draws, they include it. Turning it off is the safe side for the fuse, but for a charger that the sensors do measure it counts twice: the car then gets less current, and the main fuse repair may appear. Without phase sensors the setting has no effect. Without a reading from the charger's power sensor the car counts with the current it was given.",
           "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
@@ -1486,7 +1490,7 @@
     },
     "site_fuse_exceeded": {
       "title": "The house and the cars draw more than the main fuse (load balancing)",
-      "description": "In the last {days} days the hourly mean current on these phases was above {factor} times the main fuse for {hours} hours or more. Each line shows the phase, its main fuse → the highest hourly mean current (hours above the limit > the limit, which is the main fuse times {factor}):\n{phases}\n\nA fuse of that size is unlikely to carry such a current for an hour. So either the main fuse on the shared grid connection page is set too low (the cars then get less current than they could), or a phase sensor measures something else: phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors. If the fuse really is that large and the values are correct, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the next forecast no longer finds it: after the fuse is corrected, at the latest when these hours are out of the last {days} days."
+      "description": "In the last {days} days the hourly mean current on these phases was above {factor} times the main fuse for {hours} hours or more. Each line shows the phase, its main fuse → the highest hourly mean current (hours above the limit > the limit, which is the main fuse times {factor}):\n{phases}\n\nA fuse of that size is unlikely to carry such a current for an hour. So either the main fuse on the shared grid connection page is set too low (the cars then get less current than they could), or a charger that the phase sensors do measure is set as outside them (*Phase sensors include this car's charger* turned off), so its draw is counted twice, or a phase sensor measures something else: phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors. If the fuse really is that large and the values are correct, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the next forecast no longer finds it: after the fuse is corrected, at the latest when these hours are out of the last {days} days."
     },
     "charger_not_following": {
       "title": "The charger did not follow the plan {count} times in {days} days ({prefix})",

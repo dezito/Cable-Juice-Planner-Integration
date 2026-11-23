@@ -462,6 +462,31 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   `FUSE_MIN_HOURS` hours of data and none is over, or the site has no phase
   sensors. A forecast that returns early judges nothing. An unload keeps it;
   removing the site deletes it (`async_remove_entry`).
+- `site_in_phase_meter` (option `charger_in_phase_meter`, per car entry, load
+  balancing page, default True; only an explicit False counts): False means
+  the site's phase sensors do not measure this car's charger. Protection is
+  never lower: `_house()` and the house forecast take only cars inside the
+  meter off the measurement (a power sensor shared by an inside and an
+  outside car is taken off for neither); the metered overload check adds
+  `_cars_draw(outside cars)` to the phase sensors (a shared sensor counts all
+  its cars) and also runs on the outside car's power/status events and on a
+  raised request; an outside car ahead counts in `snapshot_for` with
+  `_ahead_draw` (request until settled), not the metered `_car_draw`; the
+  fuse repair adds the outside draw to the phases and judges nothing when the
+  car's statistics don't cover every hour. A car outside without a fresh
+  reading counts its request. `register()` refreshes the house forecast, so a
+  changed option does not wait for the next hourly refresh; the forecast takes
+  a car off the phases only when it is inside and its power sensor is not
+  also an outside car's. Cars without a power sensor never share one
+  (`_cars_draw` groups them by entry). Setting it wrongly on (the sensors
+  don't include the charger) is the unsafe direction; wrongly off counts the
+  charger twice (more limiting, maybe the fuse repair). While the phase
+  sensors measure nothing the cars are counted from their power sensors and
+  the house from the last measured value or the forecast (both calculated
+  with the option). Separate from `charger_in_house_meter` (the house
+  consumption sensor of the solar surplus): the two answer different meters.
+  Without phase sensors it changes nothing (the power sensors are the
+  measurement).
 - Shared circuit (Easee master): user choices: chargers are picked as HA
   devices on each car's load balancing page; the circuit is stored once in the
   site options (`circuits`), so a change from one car applies to all of it; a

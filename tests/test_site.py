@@ -941,3 +941,304 @@ async def test_house_forecast_uses_the_recorded_unit(hass: HomeAssistant, meta_u
         assert site.house_forecast == {3: [1.0, 1.0, 1.0]}
     else:
         assert site.house_forecast[hour] == [round(expected, 2)] * 3
+
+
+# --------------------------------------------------------------------------- #
+# A charger on its own meter: the phase sensors do not include it (charger_in_phase_meter off)
+# --------------------------------------------------------------------------- #
+
+
+async def test_a_car_outside_the_phase_meter_is_not_taken_off_the_meter(hass: HomeAssistant) -> None:
+    """The meter shows the house's 10 A. a draws 10 A on each phase: inside the meter that is the meter's own 10 A (the house
+    is 0 A and b keeps 14 A); outside it, the house is the meter's 10 A and a's 10 A come on top (b keeps 4 A)."""
+    site, cars = await _phase_site(hass, 10)
+    site.update_from_result(cars["a"], _result([10, 10, 10]))
+    hass.states.async_set(STATUS_A, "charging")
+    hass.states.async_set(POWER_A, str(3 * 10 * 230), W)
+    assert _live_b(site, cars) == [14.0, 14.0, 14.0]
+    cars["a"].site_in_phase_meter = False
+    assert _live_b(site, cars) == [4.0, 4.0, 4.0]
+    await site.async_stop()
+
+
+async def _overload_site(hass: HomeAssistant, a_outside: bool):
+    """The meter shows the house's 20 A; b has 4 A; a charges 16 A on each phase (its status says charging)."""
+    site, cars = await _phase_site(hass, 20)
+    cars["a"].site_in_phase_meter = not a_outside
+    site.update_from_result(cars["b"], _result([4, 4, 4]))
+    hass.states.async_set(STATUS_A, "charging")
+    hass.states.async_set(POWER_A, str(3 * 16 * 230), W)
+    await hass.async_block_till_done()
+    return site, cars
+
+
+async def test_an_overload_from_a_car_outside_the_phase_meter_is_caught(hass: HomeAssistant) -> None:
+    """20 A measured + 16 A from a's own meter = 36 A on a 25 A fuse: the last car with current is limited at once."""
+    site, cars = await _overload_site(hass, a_outside=True)
+    assert site._metered()
+    assert cars["b"].limited == 1
+    assert getattr(cars["a"], "limited", 0) == 0
+    await site.async_stop()
+
+
+async def test_the_same_draw_inside_the_phase_meter_is_what_the_sensors_show(hass: HomeAssistant) -> None:
+    """Control for the test above: with a's charger in the meter the 20 A measured already include its 16 A, and a's
+    power sensor alone is no overload (the phase sensors are the measurement)."""
+    site, cars = await _overload_site(hass, a_outside=False)
+    assert getattr(cars["b"], "limited", 0) == 0
+    await site.async_stop()
+
+
+async def test_a_car_outside_the_phase_meter_that_starts_is_seen_without_a_new_phase_reading(hass: HomeAssistant) -> None:
+    """The plan gives a (outside) its current: the check runs at once, as for a car ahead without phase sensors, not first
+    when its power sensor shows it."""
+    site, cars = await _phase_site(hass, 20)
+    cars["a"].site_in_phase_meter = False
+    site.update_from_result(cars["b"], _result([4, 4, 4]))
+    assert getattr(cars["b"], "limited", 0) == 0
+    site.update_from_result(cars["a"], _result([16, 16, 16]))  # no power reading yet: it counts with what it was given
+    assert cars["b"].limited == 1
+    await site.async_stop()
+
+
+async def test_an_outside_car_without_a_reading_counts_what_it_was_given(hass: HomeAssistant) -> None:
+    """Its power sensor is unavailable: the protection is not lower than with a reading (the request counts)."""
+    site, cars = await _phase_site(hass, 20)
+    cars["a"].site_in_phase_meter = False
+    site.update_from_result(cars["b"], _result([4, 4, 4]))
+    hass.states.async_set(POWER_A, "unavailable", W)
+    site.update_from_result(cars["a"], _result([16, 16, 16]))
+    assert cars["b"].limited == 1
+    # past the ramp-up the request still counts (not only because the car has just been given its current)
+    _ramped(site, "a")
+    site._last_overload.clear()
+    site._check_overload()
+    assert cars["b"].limited == 2
+    await site.async_stop()
+
+
+async def test_a_car_ahead_outside_the_phase_meter_frees_nothing_on_a_fresh_zero_right_after_a_raise(hass: HomeAssistant) -> None:
+    """The sensors never show a's charger, so unlike a car inside the meter its fresh 0 W does not free its current until it
+    has had time to start and its status says it does not charge (as without phase sensors)."""
+    site, cars = await _phase_site(hass, 0)
+    site.update_from_result(cars["a"], _result([16, 16, 16]))
+    assert _live_b(site, cars) == [24.0, 24.0, 24.0]  # inside the meter: the sensors measure its draw, 0 A
+    cars["a"].site_in_phase_meter = False
+    assert _live_b(site, cars) == [8.0, 8.0, 8.0]  # outside: it is still starting
+    _ramped(site, "a")
+    assert _live_b(site, cars) == [24.0, 24.0, 24.0]  # ready_to_charge and a fresh 0 W: settled, nothing drawn
+    hass.states.async_set(STATUS_A, "charging")
+    assert _live_b(site, cars) == [8.0, 8.0, 8.0]  # the status may mean charging: its request counts
+    await site.async_stop()
+
+
+async def test_a_one_phase_draw_of_a_car_outside_the_phase_meter_is_not_spread_over_the_phases(hass: HomeAssistant) -> None:
+    """a was given 16 A on three phases and draws 3.7 kW (16 A on one phase): as without phase sensors all of it may be on one
+    phase, so b keeps 8 A, not the 18.7 A that a spread of 5.3 A per phase would leave."""
+    site, cars = await _phase_site(hass, 0)
+    cars["a"].site_in_phase_meter = False
+    site.update_from_result(cars["a"], _result([16, 16, 16]))
+    _ramped(site, "a")
+    hass.states.async_set(STATUS_A, "charging")
+    hass.states.async_set(POWER_A, str(16 * 230), W)
+    assert _live_b(site, cars) == [8.0, 8.0, 8.0]
+    await site.async_stop()
+
+
+async def test_a_power_sensor_shared_by_a_car_inside_and_one_outside_is_taken_off_the_meter_for_neither(hass: HomeAssistant) -> None:
+    """One power sensor shows both cars: its reading would take the outside car's draw off a meter that never held it."""
+    for entity_id in ("sensor.grid_l1", "sensor.grid_l2", "sensor.grid_l3"):
+        hass.states.async_set(entity_id, "20", {"unit_of_measurement": "A"})
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site, cars = await _power_site(hass, power_b=POWER_A, **phases)
+    hass.states.async_set(POWER_A, str(3 * 10 * 230), W)
+    cars["a"].site_in_phase_meter = False
+    # a outside: the reading shows both cars, none of it is taken off the 20 A (b alone would take 10 A off)
+    assert site._house() == [20.0, 20.0, 20.0]
+    # the overload check counts the shared sensor with all its cars (a is asked for, b rides along)
+    assert site._cars_draw([cars["a"]]) == site._cars_draw()
+    await site.async_stop()
+
+
+async def test_a_settled_car_outside_the_phase_meter_is_no_false_overload(hass: HomeAssistant) -> None:
+    """a has stopped (status completed, fresh 0 W, past the ramp-up): 20 A measured + 0 A is under the fuse."""
+    site, cars = await _phase_site(hass, 20)
+    cars["a"].site_in_phase_meter = False
+    site.update_from_result(cars["b"], _result([4, 4, 4]))
+    site.update_from_result(cars["a"], _result([16, 16, 16]))
+    cars["b"].limited = 0
+    _ramped(site, "a")
+    hass.states.async_set(STATUS_A, "completed")
+    hass.states.async_set(POWER_A, "0", W)
+    site._last_overload.clear()
+    site._check_overload()
+    assert cars["b"].limited == 0
+    await site.async_stop()
+
+
+async def test_a_car_outside_the_phase_meter_with_a_stale_reading_counts_its_request(hass: HomeAssistant) -> None:
+    """Its power sensor stopped reporting at 0 W while the meter measures: its request counts, never the stale 0 W."""
+    site, cars = await _phase_site(hass, 20)
+    cars["a"].site_in_phase_meter = False
+    _make_stale(hass, POWER_A)
+    hass.states.async_set(STATUS_A, "completed")
+    site.update_from_result(cars["b"], _result([4, 4, 4]))
+    site.update_from_result(cars["a"], _result([16, 16, 16]))
+    _ramped(site, "a")
+    site._last_overload.clear()
+    site._check_overload()
+    assert cars["b"].limited >= 1
+    await site.async_stop()
+
+
+async def test_the_house_forecast_is_refreshed_when_a_car_joins_with_phase_sensors(hass: HomeAssistant) -> None:
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site = CJPSite(hass, make_site_entry(fuse_l1=25, fuse_l2=25, fuse_l3=25, margin=1, **phases))
+    site._refresh_forecast = refreshed = MagicMock()
+    site.register(FakeCar("a", 1))
+    refreshed.assert_called_once()
+    plain = CJPSite(hass, make_site_entry(fuse_l1=25, fuse_l2=25, fuse_l3=25, margin=1))
+    plain._refresh_forecast = never = MagicMock()
+    plain.register(FakeCar("a", 1))
+    never.assert_not_called()
+    await site.async_stop()
+    await plain.async_stop()
+
+
+async def test_a_coordinator_reads_the_option_from_its_entry(hass: HomeAssistant, mock_entry) -> None:
+    from custom_components.cable_juice_planner.coordinator import CJPCoordinator  # noqa: PLC0415
+
+    mock_entry.add_to_hass(hass)
+    for value, expected in ((None, True), (True, True), (False, False)):
+        options = {**MOCK_OPTIONS, **({"charger_in_phase_meter": value} if value is not None else {})}
+        hass.config_entries.async_update_entry(mock_entry, options=options)
+        coordinator = CJPCoordinator(hass, mock_entry)
+        assert coordinator.site_in_phase_meter is expected
+        for name in ("_executor", "_what_if_executor"):
+            await hass.async_add_executor_job(getattr(coordinator, name).shutdown, True)
+
+
+async def test_the_meter_hanging_with_a_car_outside_still_counts_both(hass: HomeAssistant) -> None:
+    """The phase sensors measure nothing: the chargers' power sensors are the measurement (a car outside the meter is one of
+    them like the others) and the house counts with its last value."""
+    site, cars = await _phase_site(hass, 10)
+    cars["a"].site_in_phase_meter = False
+    for i in (1, 2, 3):
+        _make_stale(hass, f"sensor.grid_l{i}")
+    assert not site._metered()
+    site.update_from_result(cars["b"], _result([8, 8, 8]))
+    hass.states.async_set(STATUS_A, "charging")
+    hass.states.async_set(POWER_A, str(3 * 16 * 230), W)
+    await hass.async_block_till_done()
+    assert cars["b"].limited >= 1  # 10 A house + 16 A a = 26 A on a 25 A fuse
+    await site.async_stop()
+
+
+async def test_the_fuse_check_judges_nothing_when_an_outside_cars_statistics_are_missing(hass: HomeAssistant) -> None:
+    """A charger without statistics would be added as 0 A: the repair must not be removed on that, so nothing is judged."""
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site, cars = await _power_site(hass, **phases)
+    cars["a"].site_in_phase_meter = False
+    hass.config.components.add("recorder")
+    start = dt_util.utcnow().replace(hour=3, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
+    stats = {entity_id: [{"start": start, "mean": 20.0}] for entity_id in phases.values()}
+    metadata = {entity_id: (1, {"unit_of_measurement": "A"}) for entity_id in phases.values()}
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job)
+    site._check_fuse = judged = MagicMock()
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", MagicMock(return_value=stats)),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value=metadata),
+    ):
+        await site._async_refresh_forecast()
+    judged.assert_not_called()
+    hour = dt_util.as_local(start).hour
+    assert site.house_forecast[hour] == [20.0] * 3  # the forecast itself is not held up
+    await site.async_stop()
+
+
+@pytest.mark.parametrize("a_outside", [True, False])
+async def test_the_house_forecast_and_the_fuse_check_know_the_outside_car(hass: HomeAssistant, a_outside) -> None:
+    """The statistics show 20 A on each phase and a's charger drawing 16 A. In the meter the house forecast is 4 A and the fuse
+    check judges the 20 A; outside the meter the house is the 20 A and the fuse carries 36 A."""
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site, cars = await _power_site(hass, **phases)
+    cars["a"].site_in_phase_meter = not a_outside
+    hass.config.components.add("recorder")
+    start = dt_util.utcnow().replace(hour=3, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
+    ids = [*phases.values(), POWER_A, POWER_B]
+    stats = {entity_id: [{"start": start, "mean": 20.0}] for entity_id in phases.values()}
+    stats[POWER_A] = [{"start": start, "mean": 3 * 16 * 230.0}]
+    stats[POWER_B] = [{"start": start, "mean": 0.0}]
+    metadata = {entity_id: (1, {"unit_of_measurement": "A" if entity_id in phases.values() else "W"}) for entity_id in ids}
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job)
+    site._check_fuse = judged = MagicMock()
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", MagicMock(return_value=stats)),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value=metadata),
+    ):
+        await site._async_refresh_forecast()
+    hour = dt_util.as_local(start).hour
+    assert site.house_forecast[hour] == ([20.0] * 3 if a_outside else [4.0] * 3)
+    judged.assert_called_once()
+    fuse_phases = judged.call_args.args[0]
+    assert [phase[start.timestamp()] for phase in fuse_phases] == ([36.0] * 3 if a_outside else [20.0] * 3)
+    await site.async_stop()
+
+
+async def test_the_house_forecast_takes_nothing_off_for_a_sensor_shared_by_a_car_inside_and_one_outside(hass: HomeAssistant) -> None:
+    """The statistics of the shared sensor hold the outside car's draw too, which the phases never held: like _house(), the
+    forecast takes it off for neither car (after a restart before the meter reports, the house is the forecast)."""
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site, cars = await _power_site(hass, power_b=POWER_A, **phases)
+    cars["a"].site_in_phase_meter = False
+    hass.config.components.add("recorder")
+    start = dt_util.utcnow().replace(hour=3, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
+    stats = {entity_id: [{"start": start, "mean": 20.0}] for entity_id in phases.values()}
+    stats[POWER_A] = [{"start": start, "mean": 3 * 16 * 230.0}]
+    metadata = {entity_id: (1, {"unit_of_measurement": "A" if entity_id in phases.values() else "W"}) for entity_id in stats}
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job)
+    site._check_fuse = MagicMock()
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", MagicMock(return_value=stats)),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value=metadata),
+    ):
+        await site._async_refresh_forecast()
+    assert site.house_forecast[dt_util.as_local(start).hour] == [20.0] * 3
+    await site.async_stop()
+
+
+async def test_cars_without_a_power_sensor_do_not_share_one(hass: HomeAssistant) -> None:
+    """An outside car without a power sensor must not count the requests of an inside car without one: that car is already in
+    the 20 A the meter shows, and the sum would be an overload that is not there (checked again every 21 s)."""
+    site, cars = await _phase_site(hass, 20)
+    for car in cars.values():
+        car.config["charger"]["entity_ids"]["charger_power_entity_id"] = ""
+    cars["a"].site_in_phase_meter = False
+    site.update_from_result(cars["b"], _result([16, 16, 16]))  # b is inside: its 16 A are in the 20 A measured
+    assert site._cars_draw([cars["a"]]) == [0.0, 0.0, 0.0]  # a has no current and no sensor
+    site._last_overload.clear()
+    site._check_overload()
+    assert getattr(cars["b"], "limited", 0) == 0
+    assert site._overload_recheck is None
+    await site.async_stop()
+
+
+def test_the_option_is_on_by_default_and_on_the_load_balancing_page() -> None:
+    assert const.DEFAULT_CONFIG["site"]["charger_in_phase_meter"] is True
+    assert const.OPTION_PATHS["charger_in_phase_meter"] == "site.charger_in_phase_meter"
+    assert "charger_in_phase_meter" in const.FLOW_STEPS["load_balancing"]
+    # an entry stored before the option existed (or one that stores nothing) keeps the sensors including the charger
+    config = const.build_config({})
+    assert config["site"]["charger_in_phase_meter"] is True
+    assert const.build_config({"charger_in_phase_meter": False})["site"]["charger_in_phase_meter"] is False

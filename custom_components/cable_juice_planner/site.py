@@ -289,6 +289,10 @@ class CJPSite:
         self.devices[coordinator.entry.entry_id] = charger_devices(self.hass, _charger_entities(coordinator))
         self._track_car_power()
         _LOGGER.info("Site: %s joined (priority %s, phase order %s)", coordinator.prefix, coordinator.site_priority, coordinator.site_phase_order)
+        if self.has_phase_sensors:
+            # a car joining (also one reloaded after its charger_in_phase_meter changed) changes what the house forecast
+            # takes off the phases: not first at the next hour
+            self._refresh_forecast(None)
 
     def unregister(self, entry_id: str) -> None:
         self.members.pop(entry_id, None)
@@ -466,7 +470,13 @@ class CJPSite:
                 return list(self.fuse())
             return [max(last, hour) for last, hour in zip(self._last_house, forecast or [0.0, 0.0, 0.0])]
         cars = [0.0, 0.0, 0.0]
+        outside_sensors = {self._power_entity(coordinator) for coordinator in self._outside_members()} - {""}
         for coordinator in self.members.values():
+            if not self._in_meter(coordinator):
+                continue  # on its own meter: the phase sensors never measured it, so there is nothing to take off them
+            if self._power_entity(coordinator) in outside_sensors:
+                continue  # one power sensor for a car inside and one outside: its reading holds the outside car too, so
+                # nothing is taken off the meter for it (the house counts higher, never lower)
             cars = [a + b for a, b in zip(cars, self._car_draw(coordinator))]
         self._last_house = [max(m - c, 0.0) for m, c in zip(measured, cars)]
         self._house_measured = True
@@ -572,26 +582,48 @@ class CJPSite:
             return [max(a, b) for a, b in zip(worst, request)]
         return worst
 
-    def _cars_draw(self) -> list[float]:
+    @staticmethod
+    def _in_meter(coordinator: CJPCoordinator) -> bool:
+        """The site's phase sensors measure this car's charger (its option charger_in_phase_meter, default True)."""
+        return getattr(coordinator, "site_in_phase_meter", True) is not False
+
+    def _outside_members(self) -> list[CJPCoordinator]:
+        """The cars whose chargers are on their own meter: the phase sensors do not include them."""
+        return [coordinator for coordinator in self.members.values() if not self._in_meter(coordinator)]
+
+    def _cars_draw(self, members: list[CJPCoordinator] | None = None) -> list[float]:
         """The cars' draw per grid phase from their power sensors (each sensor once), for the overload check.
 
         Like the budget: a sensor without a reading, or with a car on it that is not :meth:`_settled`, counts with at
         least what its cars were given. So a car whose current went to the car behind and that starts after all (its
-        status says charging, or it got more current) is an overload at once, also when its power sensor is slow."""
+        status says charging, or it got more current) is an overload at once, also when its power sensor is slow.
+
+        members: only these cars (the ones outside the phase meter); all of them by default."""
         total = [0.0, 0.0, 0.0]
+
+        def key(coordinator: CJPCoordinator) -> str:
+            # cars without a power sensor share nothing: each is its own group (not one group "")
+            return self._power_entity(coordinator) or f"entry:{coordinator.entry.entry_id}"
+
         by_entity: dict[str, list[CJPCoordinator]] = {}
         for coordinator in self.members.values():
-            by_entity.setdefault(self._power_entity(coordinator), []).append(coordinator)
-        for entity_id, members in by_entity.items():
+            by_entity.setdefault(key(coordinator), []).append(coordinator)
+        wanted = {key(coordinator) for coordinator in members} if members is not None else None
+        for group, sharing in by_entity.items():
+            # a sensor shared with a car that is not asked for still counts all its cars (it shows them together): too
+            # much, never too little
+            if wanted is not None and group not in wanted:
+                continue
+            entity_id = self._power_entity(sharing[0])
             request = [0.0, 0.0, 0.0]
-            for coordinator in members:
+            for coordinator in sharing:
                 request = [a + b for a, b in zip(request, self.requests.get(coordinator.entry.entry_id) or [0.0, 0.0, 0.0])]
             watt = self._watt(entity_id) if entity_id else None
             if watt is None:
                 draw = request
             else:
-                draw = self._worst_case(members, watt, careful=False)
-                if not all(self._settled(coordinator) for coordinator in members):
+                draw = self._worst_case(sharing, watt, careful=False)
+                if not all(self._settled(coordinator) for coordinator in sharing):
                     draw = [max(a, b) for a, b in zip(draw, request)]
             total = [a + b for a, b in zip(total, draw)]
         return total
@@ -614,7 +646,12 @@ class CJPSite:
         live = list(fuse)
         for other in ahead:
             # with phase sensors the real draw counts (they measure it), else the charger power sensor (_ahead_draw)
-            draw = self._car_draw(other, self.requests.get(other.entry.entry_id) or [0.0, 0.0, 0.0]) if metered else self._ahead_draw(other)
+            # a car outside the phase meter is not in what the sensors show, so it counts as without phase sensors: with
+            # what it was given until it is settled (a fresh 0 W right after a raise frees nothing), like the overload check
+            if metered and self._in_meter(other):
+                draw = self._car_draw(other, self.requests.get(other.entry.entry_id) or [0.0, 0.0, 0.0])
+            else:
+                draw = self._ahead_draw(other)
             live = [a - b for a, b in zip(live, draw)]
         live = [max(a - h, 0.0) for a, h in zip(live, house)]
         self.available_now[entry_id] = live
@@ -652,9 +689,9 @@ class CJPSite:
         self.reservations[entry_id] = reservation
         self.requests[entry_id] = request
         self.urgent[entry_id] = urgent
-        if raised and not self._metered():
+        if raised and (not self._metered() or not self._in_meter(coordinator)):
             # a car ahead that gets back the current a car behind took over: the car behind is limited at once, not first
-            # when the car ahead's power shows it
+            # when the car ahead's power shows it. Also for a car outside the phase meter: the sensors do not show it
             self._check_overload()
         # the other cars of the circuit publish the new sum at once (the master may be one of them)
         for other in self.circuit_members(entry_id):
@@ -779,13 +816,19 @@ class CJPSite:
     def _car_power_changed(self, _event: Event) -> None:
         """A charger's power or status changed: without (working) phase sensors these are the measurement (a car that
         starts to draw, or whose status now says it charges)."""
-        if not self._metered():
+        if not self._metered() or self._outside_members():
             self._check_overload()
 
     @callback
     def _check_overload(self) -> None:
         if self._metered():
-            self._limit_on_overload(self._measured())
+            measured = self._measured()
+            outside = self._outside_members()
+            if outside and measured is not None:
+                # the phase sensors do not measure these chargers: what they draw (counted carefully, like without phase
+                # sensors) comes on top of what the sensors show, so the protection is never lower than with them inside
+                measured = [m + o for m, o in zip(measured, self._cars_draw(outside))]
+            self._limit_on_overload(measured)
         else:
             # the house too, when phase sensors are configured but measure nothing now (_house)
             self._limit_on_overload([car + house for car, house in zip(self._cars_draw(), self._house())])
@@ -862,7 +905,9 @@ class CJPSite:
 
         end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
         start = end - datetime.timedelta(days=FORECAST_DAYS)
-        chargers = {e: c.config["charger"]["entity_ids"]["charger_power_entity_id"] for e, c in self.members.items()}
+        # the members as they are now: a car that leaves during the statistics query must not stop the forecast
+        members = dict(self.members)
+        chargers = {e: c.config["charger"]["entity_ids"]["charger_power_entity_id"] for e, c in members.items()}
         ids = {*self.phase_entities, *(c for c in chargers.values() if c)}
         try:
             # fixed units: without them HA converts to the state's unit now, which may not be the recorded one (kW read as W
@@ -922,15 +967,12 @@ class CJPSite:
             watt = statistic_power_factor_to_w(unit) if unit else None
             factor = watt / voltage if watt is not None else 1.0
             phases.append(series(entity_id, lambda v, f=factor: abs(v) * f))
-        # the repair for a main fuse the house and the cars exceed: judged on the phases before the cars are taken off (the fuse
-        # carries both). Information only: an error is logged and never holds the forecast up
-        try:
-            self._check_fuse(phases)
-        except Exception:  # noqa: BLE001
-            _LOGGER.exception("Site: the main fuse check failed")
         cars = []
+        # a power sensor that a car outside the meter uses shows that car's draw in its statistics too, which the phases never
+        # held: it is taken off the phases for no car on it (like _house(); the forecast stays higher, never lower)
+        outside_sensors = {chargers[e] for e, c in members.items() if not self._in_meter(c) and chargers[e]}
         for entry_id, entity_id in chargers.items():
-            coordinator = self.members[entry_id]
+            coordinator = members[entry_id]
             unit = statistic_unit(entity_id) if entity_id else None
             # a charger's power in W; no unit, an energy unit (a meter picked as the power sensor?) or another unit is no
             # reading: nothing is subtracted, so the house forecast keeps the car's draw (conservative). Never more than the
@@ -943,12 +985,34 @@ class CJPSite:
             draw = series(
                 entity_id, lambda v, w=watt, cv=car_voltage, cp=car_phases, lim=limit: min(abs(v) * w / cv / cp, lim)
             ) if watt is not None else {}
-            cars.append((self._order(coordinator)[:car_phases], draw))
+            inside = self._in_meter(coordinator)
+            cars.append((self._order(coordinator)[:car_phases], draw, inside, inside and entity_id not in outside_sensors))
+        # the repair for a main fuse the house and the cars exceed: judged on the phases before the cars are taken off (the fuse
+        # carries both). A car outside the phase meter is not in them, so its draw is added (it uses the same fuse).
+        # An outside car whose statistics don't cover every hour (no or a wrong unit, missing hours) can't be added right: that
+        # would count it as 0 A and could remove the repair on unclear data, so nothing is judged (the repair stays as it is).
+        # Information only: an error is logged and never holds the forecast up
+        try:
+            fuse_phases = [dict(phase) for phase in phases]
+            judgeable = True
+            for grid_phases, draw, inside, _subtract in cars:
+                if not inside:
+                    for grid_phase in grid_phases:
+                        if any(ts not in draw for ts in fuse_phases[grid_phase]):
+                            judgeable = False
+                        for ts in fuse_phases[grid_phase]:
+                            fuse_phases[grid_phase][ts] += draw.get(ts, 0.0)
+            if judgeable:
+                self._check_fuse(fuse_phases)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Site: the main fuse check failed")
         sums: dict[int, list[float]] = {}
         counts: dict[int, int] = {}
         for ts in set(phases[0]) & set(phases[1]) & set(phases[2]):
             values = [phases[i][ts] for i in range(3)]
-            for grid_phases, draw in cars:
+            for grid_phases, draw, _inside, subtract in cars:
+                if not subtract:
+                    continue  # the phase sensors never measured it (or its sensor also shows an outside car): nothing to take off
                 for grid_phase in grid_phases:
                     values[grid_phase] -= draw.get(ts, 0.0)
             hour = dt_util.as_local(datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)).hour
