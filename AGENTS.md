@@ -93,6 +93,28 @@ Read the relevant documentation before changing behavior. In particular:
   Strømligning before Energi Data Service) and the prices themselves. Other
   code calls its methods (the coordinator via `coordinator.price_provider`)
   and never reads price entities, config keys or provider attributes itself.
+- Providers are merged on one common price interval, never a fixed one: the
+  finest interval all configured providers fit on, which is the greatest
+  common divisor of their own intervals, read from each provider's data (60,
+  30, 15 or 10 minutes, or any other length that divides an hour; for example
+  hourly plus 15 minute gives 15, 30 plus 60 gives 30, 10 plus 15 gives 5).
+  A coarser provider's price is repeated over every slot of its own interval,
+  and the provider priority applies per slot: the first provider with a real
+  price for the slot wins, then forecasts, as before. Never hardcode 15
+  minutes and never merge by timestamp alone: an hourly price at :00 next to
+  a lower-priority provider's :15, :30 and :45 made the planner see a falsely
+  cheap first quarter of every hour and plan only 15 minutes of charging per
+  hour. The dashboard plan overview and the charging history still group
+  adjacent periods into whole hours or continuous windows (for example
+  03:00-03:52). Cable Juice Planner and BattMind share this rule; change both
+  together. Tests must cover an hourly and a sub-hourly provider in the same
+  hour, three providers with different resolutions, and intervals that have
+  no common slot of 15 minutes (10 plus 15).
+  A provider's price is never repeated beyond that provider's own interval
+  that day (the most common gap between its prices that day): a row the
+  provider left out (it drops a price that is not a number) is a gap in the
+  combined prices. The next provider fills the slot; the price history only
+  fills an hour that has no price at all.
 - Keep network and blocking work out of the event loop. Follow the existing
   coordinator/executor lifecycle and ensure workers and resources are cleaned
   up on unload.
