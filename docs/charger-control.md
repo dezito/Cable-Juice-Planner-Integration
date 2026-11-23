@@ -219,6 +219,15 @@ not full. CJP then publishes one charging current after the other on `sensor.cjp
 the charger's power sensor, and shows the result as a table under the switch (the attribute `markdown` of
 `sensor.cjp_<prefix>_charger_test`).
 
+As soon as CJP knows which steps it will try (a few seconds after the start), the table lists every one of them, so you
+can see what will be tested and how far the test is: ⏳ waits, ▶️ is tested now, and a step gets its result (✅, ⚠️,
+❌ or 🔧) when it is done. A line above the table counts the steps that are done, and when the test ends only the
+results are left. A step that will not be tried (the charging steps and the stop after a charging step ended the test
+early) is shown as not reached as soon as that is known, and so is every step that was not finished when you stop the
+test. Without solar steps or without a way to set the current only the maximum and the stop are listed, and the charge
+limit step when the car has a charge limit entity. The sensor's attributes `plan` and `current` hold the listed steps and
+the one that is tested now while the test runs.
+
 | Step | What is published | Passes when the charger's power is |
 |---|---|---|
 | Maximum | the charger's maximum amps on all its phases | the amps × phases × the configured voltage |

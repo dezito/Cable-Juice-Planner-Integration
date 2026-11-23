@@ -145,7 +145,7 @@ class CJPChargerTestSensor(CJPUpdatingEntity, SensorEntity, RestoreEntity):
         return {
             "markdown": state["markdown"], "steps": state["steps"], "reason": state["reason"], "finished": state["finished"],
             "automation": state["automation"], "amps_control": state["amps_control"], "car_phases": state["car_phases"],
-            "limit_put_back": state.get("limit_put_back"),
+            "limit_put_back": state.get("limit_put_back"), "plan": state.get("plan", []), "current": state.get("current"),
         }
 
 
