@@ -111,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "charger_in_house_meter": "Zużycie domu obejmuje ładowarkę tego samochodu",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "charger_in_house_meter": "Włączone (domyślnie): czujnik zużycia domu mierzy też ładowarkę tego samochodu, więc Cable Juice Planner odejmuje od niego ładowarkę. Wyłącz, jeśli ładowarka ma własny licznik, którego czujnik zużycia domu nie obejmuje, za tym samym przyłączem sieciowym co instalacja słoneczna (nie osobne przyłącze): wtedy ładowarka nie jest odejmowana ani tutaj, ani przez samochody za nim, ani przez BattMind, a samochody za tym (lub o tym samym priorytecie) zamiast tego doliczają jej ładowanie do zużycia domu, jak zrobiłby to jeden licznik. Bez liczby z czujnika mocy ładowarki ładowarka liczy się ze swoją największą mocą. W razie wątpliwości zostaw włączone: naprawa poinformuje, gdy historia pokaże zużycie domu poniżej połowy tego, co pobiera ładowarka.",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
@@ -535,11 +537,13 @@
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "charger_in_house_meter": "Zużycie domu obejmuje ładowarkę tego samochodu",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "charger_in_house_meter": "Włączone (domyślnie): czujnik zużycia domu mierzy też ładowarkę tego samochodu, więc Cable Juice Planner odejmuje od niego ładowarkę. Wyłącz, jeśli ładowarka ma własny licznik, którego czujnik zużycia domu nie obejmuje, za tym samym przyłączem sieciowym co instalacja słoneczna (nie osobne przyłącze): wtedy ładowarka nie jest odejmowana ani tutaj, ani przez samochody za nim, ani przez BattMind, a samochody za tym (lub o tym samym priorytecie) zamiast tego doliczają jej ładowanie do zużycia domu, jak zrobiłby to jeden licznik. Bez liczby z czujnika mocy ładowarki ładowarka liczy się ze swoją największą mocą. W razie wątpliwości zostaw włączone: naprawa poinformuje, gdy historia pokaże zużycie domu poniżej połowy tego, co pobiera ładowarka.",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
@@ -1475,6 +1479,10 @@
     "consumption_frozen": {
       "title": "Czujnik zużycia domu pokazuje przez 6 godzin tę samą wartość ({prefix})",
       "description": "Cable Juice Planner ({prefix}) używa czujnika zużycia domu {entity} do zużycia domu w planie. Od {since} pokazuje wartość {value}, czyli co najmniej 6 godzin bez zmiany.\n\nPlan używa tego czujnika dla domu, więc czujnik, który stoi w miejscu, daje błędne zużycie domu. Sprawdź integrację lub urządzenie, które dostarcza czujnik: może przestało wysyłać wartości. Jeśli wartość naprawdę jest stała, wybierz przy tej naprawie **Ignoruj**.\n\nTa naprawa znika sama, gdy czujnik pokaże inną wartość. Niedostępny czujnik zostawia naprawę bez zmian. Powiadomienie planu o niedostępnym czujniku dotyczy tylko czujnika z wpisem w rejestrze encji (na przykład z integracji, utworzonego w interfejsie albo z YAML z unikalnym ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Zużycie domu chyba nie obejmuje ładowarki ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odejmuje ładowarkę tego samochodu od czujnika zużycia domu {entity}, ponieważ ustawienie **Zużycie domu obejmuje ładowarkę tego samochodu** jest włączone. Jednak przez {hours} godzin w ostatnich {days} dniach zużycie domu było poniżej {share} % tego, co pobierała sama ładowarka, bez energii słonecznej i bez ładowania ani rozładowywania baterii domowej. Czujnik, który obejmuje ładowarkę, nigdy nie może pokazywać mniej niż ładowarka, więc ładowarka ma prawdopodobnie własny licznik. Wtedy ładowarka jest odejmowana od domu, który nigdy jej nie zawierał: zużycie domu jest za niskie, a plan widzi nadwyżkę słoneczną i tanie godziny, których nie ma.\n\nJeśli ładowarka ma własny licznik, wyłącz **Zużycie domu obejmuje ładowarkę tego samochodu** w opcjach tego samochodu (strona Zużycie domu). Jeśli czujnik zużycia domu powinien obejmować ładowarkę, sprawdź czujnik. Jeśli wartości są prawidłowe, wybierz przy tej naprawie **Ignoruj**.\n\nTa naprawa znika sama, gdy ustawienie zostanie wyłączone, gdy czujnik zużycia domu lub czujnik mocy ładowarki zostanie usunięty, albo gdy godziny z ostatnich {days} dni pokażą, że zużycie domu obejmuje ładowarkę."
     },
     "site_fuse_exceeded": {
       "title": "Dom i samochody pobierają więcej niż bezpiecznik główny (rozdział mocy)",

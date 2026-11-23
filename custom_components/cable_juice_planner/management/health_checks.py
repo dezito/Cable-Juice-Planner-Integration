@@ -16,6 +16,9 @@ The repairs (the keys of "issues" in strings.json):
 - price_unit_scale: a price sensor in a subunit of its currency (øre, ct), per MWh or per Wh (no price is converted).
 - consumption_frozen: the house consumption power sensor has shown the same value for FROZEN_AFTER or longer (the plan uses it for
   the house). Only that sensor is judged: the others (solar, battery flow, charger power) are legitimately 0 for hours.
+- charger_outside_house_meter: the house consumption looks not to include this car's charger while the option
+  charger_in_house_meter says it does (the charger is then subtracted from a house that never had it). The engine judges it
+  from the stored hours (engine/energy/meter_check.py, JobResult.charger_meter); the option set to False removes it.
 
 The three value repairs are judged by management/value_checks.py (the same file as in BattMind): from the state, and from the
 history of the last few days, read at most once per VALUE_RECHECK. They are only raised and removed here, never fixed. The
@@ -81,6 +84,7 @@ ISSUE_POWER_UNIT = "power_without_unit"
 ISSUE_BATTERY_FRACTION = "battery_level_fraction"
 ISSUE_PRICE_SCALE = "price_unit_scale"
 ISSUE_CONSUMPTION_FROZEN = "consumption_frozen"
+ISSUE_CHARGER_OUTSIDE_METER = "charger_outside_house_meter"
 HEALTH_ISSUES = (
     ISSUE_MISSING,
     ISSUE_UNITS,
@@ -91,6 +95,7 @@ HEALTH_ISSUES = (
     ISSUE_BATTERY_FRACTION,
     ISSUE_PRICE_SCALE,
     ISSUE_CONSUMPTION_FROZEN,
+    ISSUE_CHARGER_OUTSIDE_METER,
 )
 
 STORE_VERSION = 1
@@ -277,18 +282,26 @@ class HealthWatcher:
         action_sensor: str,
         automations_path: str,
         consumption_entity: str = "",
+        charger_in_house_meter: bool = True,
         price_problems: Callable[[], tuple[list[tuple[str, str]], bool] | None] | None = None,
     ) -> None:
         """entities: the configured entities (the ones DependencyWatcher judges, in watched, are left out here).
         charger_power/power/battery/energy_entities: the sensors whose unit is read, by kind; a sensor listed twice is judged by
         the first kind (the charger power's rule, which can be stricter). action_sensor: the charger's action sensor the
         blueprint automation uses. automations_path: the automations.yaml the editor writes (read only). consumption_entity:
-        the house consumption power sensor (home.entity_ids.power_consumption_entity_id), judged by _check_consumption_frozen."""
+        the house consumption power sensor (home.entity_ids.power_consumption_entity_id), judged by _check_consumption_frozen.
+        charger_in_house_meter: the option of the same name (False: the charger is on its own meter, so there is no
+        charger_outside_house_meter repair)."""
         self.hass = hass
         self.entry = entry
         self.label = label
         self._entities = sorted({entity_id for entity_id in entities if entity_id and entity_id not in watched})
         self._consumption_entity = consumption_entity
+        self._charger_in_house_meter = charger_in_house_meter
+        self._own_charger_power = any(charger_power_entities)
+        # the engine's last verdict whether the house consumption includes the charger (engine/energy/meter_check.py), in
+        # memory only: the engine judges it again from its stored hours at every start
+        self._meter_verdict: dict[str, Any] | None = None
         # set by _consumption_changed when the house sensor went to another number after the grace (in memory only)
         self._consumption_moved = False
         # the startup grace of the house sensor is over (see _consumption_grace_over): until then the listener counts nothing
@@ -438,6 +451,15 @@ class HealthWatcher:
         if self._ha_started:
             self._check_not_following()
 
+    @callback
+    def record_charger_meter(self, verdict: dict[str, Any]) -> None:
+        """The engine's verdict whether the house consumption includes the charger (JobResult.charger_meter)."""
+        if self._stopped or not isinstance(verdict, dict):
+            return
+        self._meter_verdict = verdict
+        if self._ha_started:
+            self._check_charger_meter()
+
     async def async_check(self) -> None:
         """Judge every repair once. The checks are independent: one that fails leaves the others to run."""
         if self._stopped or not self._ha_started:
@@ -450,6 +472,7 @@ class HealthWatcher:
                 self._check_not_following,
                 self._check_status,
                 self._check_consumption_frozen,
+                self._check_charger_meter,
             ):
                 try:
                     check()
@@ -780,6 +803,32 @@ class HealthWatcher:
         # a repair that names this sensor while its stored value is lost: the value now is the baseline. A value that has been the
         # same for FROZEN_AFTER is raised and kept the same way
         self._store_and_raise(entity, state, last_changed)
+
+    def _check_charger_meter(self) -> None:
+        """The house consumption that looks not to include this car's charger (engine/energy/meter_check.py). The option set to
+        "on its own meter" is a positive answer and removes the repair; so do no house sensor or no charger power sensor (nothing
+        is subtracted then) and the engine's verdict that the house includes it. No verdict yet, or one that can't tell, leaves
+        the repair as it is. Another house sensor does not remove it: the stored hours are not reset, so the next verdict would
+        raise it again at once (and reset an Ignore); a True updates the sensor it names instead."""
+        if not self._charger_in_house_meter or not self._consumption_entity or not self._own_charger_power:
+            self._set_issue(ISSUE_CHARGER_OUTSIDE_METER, False, {})
+            return
+        verdict = self._meter_verdict
+        if verdict is None or verdict.get("verdict") is None:
+            return
+        if verdict["verdict"] is True:
+            self._set_issue(
+                ISSUE_CHARGER_OUTSIDE_METER,
+                True,
+                {
+                    "hours": str(verdict.get("hours", "")),
+                    "days": str(verdict.get("days", "")),
+                    "share": str(verdict.get("share", "")),
+                    "entity": self._consumption_entity or NOTHING,
+                },
+            )
+        else:
+            self._set_issue(ISSUE_CHARGER_OUTSIDE_METER, False, {})
 
     def _store_and_raise(self, entity: str, state: Any, since: datetime.datetime) -> None:
         self._store_consumption(entity, state, since)

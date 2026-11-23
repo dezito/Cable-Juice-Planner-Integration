@@ -119,7 +119,11 @@ charges with as consumption and only gets what is left, while car 1 doesn't coun
 out every other car's charging, they would each count the same surplus as theirs. Cars with the same priority
 count each other's charging as consumption, so the default (everyone priority 1) is the careful choice. A charger
 you added yourself under *Ignored consumers* is always subtracted, so don't add the charger of a car ahead of this
-one there. Turn the setting off if the house consumption sensor doesn't include the chargers.
+one there. Turn the setting off if the house consumption sensor doesn't include the chargers. A car whose charger
+has its own meter (*House consumption includes this car's charger* off on that car) is never subtracted by the others:
+the house sensor doesn't include it, so the cars behind it and those with the same priority add its charging to their
+house instead, and the order above holds as with one meter (without a reading from that charger it counts with its
+most).
 
 The right is by priority only, also when the car behind charges from the grid at that moment (a trip soon or a
 car below its daily minimum goes first in the *current* limit, but not in the solar surplus): the car ahead then

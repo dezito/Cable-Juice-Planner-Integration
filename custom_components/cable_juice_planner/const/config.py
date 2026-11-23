@@ -100,6 +100,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "invert_powerwall_watt_flow_entity_id": False,
         # also leave out the power of the chargers of the other cars (found at start, see utils/chargers.py)
         "ignore_cjp_chargers": True,
+        # the house consumption sensor includes this car's charger (it is then subtracted). False: the charger is on its own
+        # meter, so its power is added to the house consumption instead (engine/energy/power.py), and the other cars and
+        # BattMind don't subtract it either (utils/chargers.py, BattMind utils/cjp.py)
+        "charger_in_house_meter": True,
         # the chargers of the cars behind this one, also when they are not added automatically (set by the coordinator, not an
         # option): the only left-out sensors that are checked for a hung reading (engine/energy/power.py)
         "charger_entity_ids": [],
@@ -199,6 +203,7 @@ OPTION_PATHS: dict[str, str] = {
     "power_consumption_entity_id_include_powerwall_discharging": "home.power_consumption_entity_id_include_powerwall_discharging",
     "ignore_consumption_from_entity_ids": "home.entity_ids.ignore_consumption_from_entity_ids",
     "ignore_cjp_chargers": "home.ignore_cjp_chargers",
+    "charger_in_house_meter": "home.charger_in_house_meter",
     "powerwall_watt_flow_entity_id": "home.entity_ids.powerwall_watt_flow_entity_id",
     "invert_powerwall_watt_flow_entity_id": "home.invert_powerwall_watt_flow_entity_id",
     "powerwall_battery_level_entity_id": "home.entity_ids.powerwall_battery_level_entity_id",
@@ -286,6 +291,7 @@ FLOW_STEPS: dict[str, list[str]] = {
     "home": [
         "power_consumption_entity_id",
         "ignore_consumption_from_entity_ids",
+        "charger_in_house_meter",
         "ignore_cjp_chargers",
     ],
     "powerwall": [

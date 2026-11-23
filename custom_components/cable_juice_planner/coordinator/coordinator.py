@@ -46,7 +46,7 @@ from ..management.debug_export import DebugRecorder
 from ..management.health_checks import HealthWatcher
 from ..engine import CJPEngine, JobResult
 from ..prices import CombinedPriceProvider
-from ..utils.chargers import lower_priority_charger_power_entities
+from ..utils.chargers import lower_priority_charger_power_entities, own_meter_chargers_ahead
 from ..utils.formatting import translate
 from ..utils.helpers import unique_entity_ids
 from ..management.storage import CJPStorage
@@ -126,10 +126,14 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # not required to exist or be available at start: a car that is not set up yet must not hold this one up
         self.auto_ignored_entities = [entity_id for entity_id in self.lower_priority_chargers if entity_id not in listed]
         self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"] = [*listed, *self.auto_ignored_entities]
-        # every other car's charger, whatever its priority and whether it was added or listed: these are checked for a hung reading
-        self.config["home"]["charger_entity_ids"] = lower_priority_charger_power_entities(
-            hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, float("-inf")
-        )
+        # every other car's charger, whatever its priority, whether it was added or listed and whether it is on its own
+        # meter: these are checked for a hung reading
+        self.config["home"]["charger_entity_ids"] = self._all_other_chargers()
+        # the chargers on their own meter of the cars ahead of this one (or with the same priority): the house sensor does
+        # not include them, so they are added to it (power sensor -> its most in W, counted while it has no number). Always,
+        # also with ignore_cjp_chargers off: that switch only decides about the cars behind. Not required at start either.
+        self.added_chargers: dict[str, float] = self._own_meter_chargers_ahead()
+        self.config["home"]["added_consumption"] = dict(self.added_chargers)
         self._chargers_reload_scheduled = False
 
         charger = self.config["charger"]["entity_ids"]
@@ -144,6 +148,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 solar["production_entity_id"],
                 charger["charger_power_entity_id"],
                 *(home["ignore_consumption_from_entity_ids"] or []),
+                *self.added_chargers,
             ) if e
         })
         own_battery_level = f"number.{self.object_prefix}_battery_level"
@@ -156,7 +161,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # what the user configured: it must exist and be available before the planner starts
         self.configured_entities = sorted((entities - set(self.price_entities)) - {""} - set(self.auto_ignored_entities))
         # the states and units of the snapshot also cover the chargers of the other cars (read in the right unit)
-        self.snapshot_entities = sorted({*self.configured_entities, *self.auto_ignored_entities})
+        self.snapshot_entities = sorted({*self.configured_entities, *self.auto_ignored_entities, *self.added_chargers})
         self.buffered_entities = sorted(set(self.snapshot_entities) | set(self.long_entities))
         for entity_id in self.buffered_entities:
             if entity_id in self.long_entities:
@@ -208,6 +213,19 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         """The chargers of the cars with a lower priority than this one, from the options of the config entries."""
         return lower_priority_charger_power_entities(
             self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, self.site_priority
+        )
+
+    def _own_meter_chargers_ahead(self) -> dict[str, float]:
+        """The chargers on their own meter of the cars ahead of this one or with the same priority (utils/chargers.py)."""
+        return own_meter_chargers_ahead(
+            self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, self.site_priority
+        )
+
+    def _all_other_chargers(self) -> list[str]:
+        """Every other car's charger, whatever its priority and also on its own meter (checked for a hung reading)."""
+        return lower_priority_charger_power_entities(
+            self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None,
+            float("-inf"), include_own_meter=True,
         )
 
     @property
@@ -293,6 +311,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
             try:
                 for kind in result.charger_problems:
                     self.health_watcher.record_charger_problem(kind)
+                if result.charger_meter is not None:
+                    self.health_watcher.record_charger_meter(result.charger_meter)
             except Exception:  # noqa: BLE001 - a repair must never stop the notifications of the job below
                 _LOGGER.exception("Could not record the charger events of %s", self.object_prefix)
 

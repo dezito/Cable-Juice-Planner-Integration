@@ -47,5 +47,8 @@ class JobResult:
     site: dict | None = None  # reservation / request / urgent for the site
     # charger events for the repair "charger_not_following" (management/health_checks.py): "gave_up" or "no_rule"
     charger_problems: list[str] = field(default_factory=list)
+    # whether the house consumption sensor includes the charger, for the repair "charger_outside_house_meter"
+    # (engine/energy/meter_check.py charger_meter_verdict); None: not judged in this job
+    charger_meter: dict[str, Any] | None = None
     worker_thread: str = ""
     duration: float = 0.0

@@ -111,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "charger_in_house_meter": "Hausverbrauch enthält das Ladegerät dieses Autos",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "charger_in_house_meter": "Ein (Standard): Der Hausverbrauchssensor misst auch das Ladegerät dieses Autos, daher zieht Cable Juice Planner das Ladegerät davon ab. Ausschalten, wenn das Ladegerät einen eigenen Zähler hat, den der Hausverbrauchssensor nicht enthält, hinter demselben Netzanschluss wie die Solaranlage (kein separater Anschluss): Dann wird das Ladegerät nicht abgezogen, weder hier noch von den Autos dahinter oder von BattMind, und die Autos hinter diesem (oder mit derselben Priorität) zählen sein Laden stattdessen zu ihrem Hausverbrauch, wie es ein Zähler täte. Ohne eine Zahl vom Leistungssensor des Ladegeräts zählt das Ladegerät mit seiner höchsten Leistung. Im Zweifel eingeschaltet lassen: Eine Reparatur meldet sich, wenn der Verlauf einen Hausverbrauch zeigt, der unter der Hälfte dessen liegt, was das Ladegerät bezieht.",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
@@ -535,11 +537,13 @@
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "charger_in_house_meter": "Hausverbrauch enthält das Ladegerät dieses Autos",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "charger_in_house_meter": "Ein (Standard): Der Hausverbrauchssensor misst auch das Ladegerät dieses Autos, daher zieht Cable Juice Planner das Ladegerät davon ab. Ausschalten, wenn das Ladegerät einen eigenen Zähler hat, den der Hausverbrauchssensor nicht enthält, hinter demselben Netzanschluss wie die Solaranlage (kein separater Anschluss): Dann wird das Ladegerät nicht abgezogen, weder hier noch von den Autos dahinter oder von BattMind, und die Autos hinter diesem (oder mit derselben Priorität) zählen sein Laden stattdessen zu ihrem Hausverbrauch, wie es ein Zähler täte. Ohne eine Zahl vom Leistungssensor des Ladegeräts zählt das Ladegerät mit seiner höchsten Leistung. Im Zweifel eingeschaltet lassen: Eine Reparatur meldet sich, wenn der Verlauf einen Hausverbrauch zeigt, der unter der Hälfte dessen liegt, was das Ladegerät bezieht.",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
@@ -1475,6 +1479,10 @@
     "consumption_frozen": {
       "title": "Hausverbrauchssensor zeigt 6 Stunden lang denselben Wert ({prefix})",
       "description": "Cable Juice Planner ({prefix}) verwendet den Hausverbrauchssensor {entity} für den Hausverbrauch im Plan. Er zeigt seit {since} den Wert {value}, also mindestens 6 Stunden ohne Änderung.\n\nDer Plan verwendet diesen Sensor für das Haus; ein Sensor, der stehen bleibt, liefert einen falschen Hausverbrauch. Prüfe die Integration oder das Gerät, das den Sensor liefert: Es sendet vielleicht keine Werte mehr. Wenn der Wert wirklich konstant ist, wähle bei dieser Reparatur **Ignorieren**.\n\nDiese Reparatur verschwindet von selbst, sobald der Sensor einen anderen Wert meldet. Ein nicht verfügbarer Sensor lässt die Reparatur, wie sie ist. Die Benachrichtigung des Plans über einen nicht verfügbaren Sensor gilt nur für einen Sensor mit Eintrag im Entitätsregister (zum Beispiel aus einer Integration, in der Oberfläche angelegt oder per YAML mit einer eindeutigen ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Der Hausverbrauch scheint das Ladegerät nicht zu enthalten ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) zieht das Ladegerät dieses Autos vom Hausverbrauchssensor {entity} ab, weil die Einstellung **Hausverbrauch enthält das Ladegerät dieses Autos** eingeschaltet ist. In {hours} Stunden der letzten {days} Tage lag der Hausverbrauch aber unter {share} % dessen, was das Ladegerät allein bezog, ohne Solarstrom und ohne Laden oder Entladen der Hausbatterie. Ein Sensor, der das Ladegerät enthält, kann nie niedriger sein als das Ladegerät, daher hat das Ladegerät wahrscheinlich einen eigenen Zähler. Dann wird das Ladegerät von einem Haus abgezogen, das es nie enthielt: Der Hausverbrauch wird zu niedrig, und der Plan sieht Solarüberschuss und günstige Stunden, die es nicht gibt.\n\nWenn das Ladegerät einen eigenen Zähler hat, schalte **Hausverbrauch enthält das Ladegerät dieses Autos** in den Optionen dieses Autos aus (Seite Hausverbrauch). Wenn der Hausverbrauchssensor das Ladegerät enthalten sollte, prüfe den Sensor. Wenn die Werte so richtig sind, wähle bei dieser Reparatur **Ignorieren**.\n\nDiese Reparatur verschwindet von selbst, wenn die Einstellung ausgeschaltet wird, wenn der Hausverbrauchssensor oder der Leistungssensor des Ladegeräts entfernt wird oder wenn die Stunden der letzten {days} Tage zeigen, dass der Hausverbrauch das Ladegerät enthält."
     },
     "site_fuse_exceeded": {
       "title": "Haus und Autos ziehen mehr als die Hauptsicherung (Lastverteilung)",

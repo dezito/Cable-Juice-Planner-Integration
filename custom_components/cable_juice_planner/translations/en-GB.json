@@ -111,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "House consumption",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "charger_in_house_meter": "House consumption includes this car's charger",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home load (watts), not grid consumption",
           "ignore_consumption_from_entity_ids": "List of sensors to ignore",
+          "charger_in_house_meter": "On (default): the house consumption sensor also measures this car's charger, so Cable Juice Planner subtracts the charger from it. Turn off if the charger has its own meter that the house consumption sensor does not include, behind the same grid connection as the solar (not a separate connection): the charger is then not subtracted, neither here nor by the cars behind or by BattMind, and the cars behind this one (or with the same priority) add its charging to their house consumption instead, as one meter would. Without a number from the charger power sensor the charger counts with its most. If unsure, leave it on: a repair tells you when the history shows a house consumption under half of what the charger draws.",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
@@ -535,11 +537,13 @@
         "data": {
           "power_consumption_entity_id": "House consumption",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "charger_in_house_meter": "House consumption includes this car's charger",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home load (watts), not grid consumption",
           "ignore_consumption_from_entity_ids": "List of sensors to ignore",
+          "charger_in_house_meter": "On (default): the house consumption sensor also measures this car's charger, so Cable Juice Planner subtracts the charger from it. Turn off if the charger has its own meter that the house consumption sensor does not include, behind the same grid connection as the solar (not a separate connection): the charger is then not subtracted, neither here nor by the cars behind or by BattMind, and the cars behind this one (or with the same priority) add its charging to their house consumption instead, as one meter would. Without a number from the charger power sensor the charger counts with its most. If unsure, leave it on: a repair tells you when the history shows a house consumption under half of what the charger draws.",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
@@ -1475,6 +1479,10 @@
     "consumption_frozen": {
       "title": "House consumption sensor shows the same value for 6 hours ({prefix})",
       "description": "Cable Juice Planner ({prefix}) uses the house consumption sensor {entity} for the house consumption in the plan. It has shown {value} since {since}: at least 6 hours without a change.\n\nThe plan uses this sensor for the house, so a sensor that stays the same gives it a wrong house consumption. Check the integration or the device that delivers the sensor: it may have stopped sending values. If the value really is constant, choose **Ignore** on this repair.\n\nThis repair disappears by itself once the sensor reports a different value. An unavailable sensor keeps the repair as it is. The planner's notification about an unavailable sensor only covers a sensor with an entity registry entry (for example from an integration, made in the UI, or YAML with a unique ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "The house consumption does not seem to include the charger ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) subtracts this car's charger from the house consumption sensor {entity}, because the setting **House consumption includes this car's charger** is on. But in {hours} hours of the last {days} days the house consumption was under {share} % of what the charger alone drew, without solar and without the home battery charging or discharging. A sensor that includes the charger can never be lower than the charger, so the charger is probably on its own meter. The charger is then subtracted from a house that never had it: the house consumption becomes too low, and the plan sees solar surplus and cheap hours that are not there.\n\nIf the charger is on its own meter, turn off **House consumption includes this car's charger** in the options of this car (the House consumption page). If the house consumption sensor should include the charger, check the sensor. If the values are right as they are, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the setting is turned off, when the house consumption sensor or the charger power sensor is removed, or when the hours of the last {days} days show that the house consumption includes the charger."
     },
     "site_fuse_exceeded": {
       "title": "The house and the cars draw more than the main fuse (load balancing)",

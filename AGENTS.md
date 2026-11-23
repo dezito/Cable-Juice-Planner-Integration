@@ -77,7 +77,23 @@ Read the relevant documentation before changing behavior. In particular:
   The battery sign still comes from the recorder; a PyScript import or a restored backup wins.
 - BattMind reads the option `charger_power_entity_id` of this integration's
   config entries to leave the chargers out of its house consumption. Do not
-  rename or move that option without changing BattMind too.
+  rename or move that option without changing BattMind too. It also reads
+  `charger_in_house_meter` (only an explicit False counts); keep both in sync.
+- `charger_in_house_meter` (home page, default True): False means the car's
+  charger is on its own meter that the house sensor does not include. The
+  engine then adds the charger to `power_consumption` (`engine/energy/power.py`)
+  so everything downstream keeps one-meter semantics, and no other car or
+  BattMind subtracts it. The cars behind it and with the same priority add it
+  to their house instead (`own_meter_chargers_ahead()` in `utils/chargers.py`,
+  `home.added_consumption`: sensor -> max W), always, whatever
+  `ignore_cjp_chargers` says. A charger in these paths without a number in
+  the window counts its current state (only for a window that ends now),
+  else its max W (the safe side); that window is marked `estimated` and
+  `hour_end` stores it neither in `power_values_db` nor in
+  `solar_available_db`. A stale number is counted as it is (an idle charger
+  that reports only changes reads 0 for hours). The stuck-reading list `charger_entity_ids`
+  keeps own-meter chargers (`include_own_meter=True`). The what-if statistics
+  add only this car's own charger, not those of other cars.
 - The integration supports Home Assistant from the `hacs.json` minimum
   version up to the newest release. Use a fallback when a Home Assistant API
   changes. For example, read stored restore states only through
@@ -649,6 +665,20 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   engine through `JobResult.charger_problems`. Events while a charger test
   holds the charger and within `NOT_FOLLOWING_AFTER_TEST` minutes
   (`engine/control/schedule.py`) after it are not counted.
+- `charger_outside_house_meter` (information only) gets the verdict of
+  `engine/energy/meter_check.py` through `JobResult.charger_meter`, judged at
+  start and at every hour end from `power_values_db` (last `METER_CHECK_DAYS`
+  = 7 days; only hours with the charger at least 1 kW and solar, battery
+  charging and discharging under 100 W, house above 0). True: at least 3
+  hours with the house under 50 % of the charger. False (the positive answer)
+  only when at least 3 hours were judged and every one is at least 90 %; an
+  hour between 50 % and 90 % is unclear and keeps the repair. A False becomes
+  None while `home.added_consumption` is not empty (the added chargers can
+  hide it). Also removed when the option is False or no house or charger
+  power sensor is set. Another house sensor does not remove it (the stored
+  hours are not reset, so it would come back at once and lose an Ignore); a
+  True updates the sensor it names. The verdict is kept in memory only, and
+  computing it must never stop the job.
 - Value scale repairs (decided with the user: inform only, no fix flow and no
   conversion, because the blueprint reads the charger power itself):
   `power_without_unit` (a power or charger power sensor without a unit whose

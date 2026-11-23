@@ -660,7 +660,9 @@ not stored, so they are not offered. The home battery is kept as recorded (its e
 replaced nor valued) and no whole-house result is claimed.
 
 **From the recorder's statistics, like the other what-ifs.** The daily economy update reads the long-term
-statistics of the solar production, the house consumption (the EV included), the charger power and, for providers
+statistics of the solar production, the house consumption (the EV included; a charger on its own meter, *House
+consumption includes this car's charger* off, is added when the hours are stored; an hour already stored keeps its
+value until it is read again; the chargers of other cars on their own meter are not added here), the charger power and, for providers
 that have one sensor for it (Energi Data Service), the sell price, and keeps as many days of them as the history is kept (months set in the setup plus one month, at least 400). With those the
 comparison is calculated **hour by hour for every hour with a known buy and sell price**, for the time no
 recorded session covers (the sell price of an hour comes from CJP's own stored prices or from the recorder's sell

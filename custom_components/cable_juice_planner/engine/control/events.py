@@ -12,6 +12,7 @@ from ...const import (
     ENTITY_UNAVAILABLE_STATES,
 )
 from ...utils.helpers import reset_datetime
+from ..energy.power import ESTIMATED_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ class ControlEvents:
 
         self.set_charging_rule(f"📟{t('ui.startup.loading_db')}")
         self.load_power_values_db(databases.get("power_values"))
+        self.note_charger_meter()  # judged again from the stored hours: a restart does not wait an hour for the repair
         self.load_solar_available_db(databases.get("solar_available"))
         # ev.py loaded the price history before the price provider existed
         provider, self.price_provider = self.price_provider, None
@@ -201,8 +203,11 @@ class ControlEvents:
         """cron_hour_end (minute 59)."""
         local_energy = self.local_energy_available(period=60, without_all_exclusion=True, solar_only=True)
         power_values = self.power_values(period=60)
-        self.solar_available_append_to_db(local_energy)
+        if not power_values.get(ESTIMATED_KEY):
+            # a charger counted with its most is no measurement: the solar forecast must not learn it either
+            self.solar_available_append_to_db(local_energy)
         self.power_values_to_db(power_values)
+        self.note_charger_meter()
         self.stop_current_charging_session()
         self.kwh_charged_by_solar()
         self.solar_charged_percentage()

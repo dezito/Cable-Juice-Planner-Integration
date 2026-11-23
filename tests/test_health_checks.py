@@ -32,6 +32,7 @@ from custom_components.cable_juice_planner.management.health_checks import (
     HEALTH_ISSUES,
     ISSUE_BATTERY_FRACTION,
     ISSUE_BLUEPRINT,
+    ISSUE_CHARGER_OUTSIDE_METER,
     ISSUE_CONSUMPTION_FROZEN,
     ISSUE_MISSING,
     ISSUE_NOT_FOLLOWING,
@@ -1566,6 +1567,7 @@ EXPECTED_PLACEHOLDERS = {
     ISSUE_BATTERY_FRACTION: {"prefix", "entities", "days"},
     ISSUE_PRICE_SCALE: {"prefix", "entities"},
     ISSUE_CONSUMPTION_FROZEN: {"prefix", "entity", "value", "since"},
+    ISSUE_CHARGER_OUTSIDE_METER: {"prefix", "entity", "hours", "days", "share"},
     # the shared grid connection's repairs (site.py), not health checks
     ISSUE_PHASE_UNITS: {"entities"},
     ISSUE_FUSE_EXCEEDED: {"phases", "factor", "hours", "days"},
@@ -1842,3 +1844,82 @@ async def test_the_highest_value_in_a_repair_text_is_rounded_up_never_below_the_
     found = issue(hass, entry, ISSUE_POWER_UNIT)
     assert found.translation_placeholders["entities"] == "- sensor.house_power (≤ 4.27)", "4.2649 shown with 3 digits, rounded up"
     watcher.stop()
+
+
+# ---------------------------------------------------------------------- #
+# The house consumption that does not include the charger (engine/energy/meter_check.py)
+# ---------------------------------------------------------------------- #
+
+OUTSIDE = {"verdict": True, "hours": 4, "judged": 6, "days": 7, "share": 50}
+INSIDE = {"verdict": False, "hours": 0, "judged": 6, "days": 7, "share": 50}
+UNCLEAR = {"verdict": None, "hours": 1, "judged": 2, "days": 7, "share": 50}
+OWN_CHARGER = "sensor.own_charger_power"
+
+
+def make_meter(hass, entry, automations, watchers, **options) -> HealthWatcher:
+    """A watcher with a house sensor and a charger power sensor, so the charger can be subtracted."""
+    return make(hass, entry, automations, watchers, **{"consumption_entity": HOUSE, "charger_power_entities": [OWN_CHARGER], **options})
+
+
+async def test_a_charger_outside_the_house_consumption_is_a_repair_until_the_hours_show_it_inside(hass, entry, automations, watchers) -> None:
+    watcher = await start(hass, make_meter(hass, entry, automations, watchers))
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None  # no verdict yet: nothing
+
+    watcher.record_charger_meter(OUTSIDE)
+    found = issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER)
+    assert found is not None
+    assert found.translation_placeholders == {"prefix": "bm", "hours": "4", "days": "7", "share": "50", "entity": HOUSE}
+
+    # a verdict that can't tell, and the hourly check without a new verdict, keep it as it is (an Ignore too)
+    ir.async_get(hass).async_ignore(DOMAIN, f"{entry.entry_id}_{ISSUE_CHARGER_OUTSIDE_METER}", True)
+    watcher.record_charger_meter(UNCLEAR)
+    await advance(hass, **SETTLE_ONE_HOUR)
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER).dismissed_version is not None
+
+    watcher.record_charger_meter(INSIDE)  # the positive answer
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None
+
+
+async def test_a_verdict_before_home_assistant_has_started_is_judged_at_the_first_check(hass, entry, automations, watchers) -> None:
+    watcher = make_meter(hass, entry, automations, watchers)
+    await watcher.async_load()
+    watcher.record_charger_meter(OUTSIDE)  # the engine's first job may come before the watcher's first check
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None
+    watcher.start()
+    await settle(hass)
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is not None
+
+
+async def test_a_charger_set_to_its_own_meter_removes_the_repair_and_never_raises_it(hass, entry, automations, watchers) -> None:
+    create_issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER, entity=HOUSE, hours="4", days="7", share="50")
+    watcher = await start(hass, make_meter(hass, entry, automations, watchers, charger_in_house_meter=False))
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None  # the user acted: a positive answer
+
+    watcher.record_charger_meter(OUTSIDE)
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"consumption_entity": ""}, {"charger_power_entities": [""]}],
+    ids=["no house sensor", "no charger power sensor"],
+)
+async def test_without_a_house_or_charger_sensor_the_repair_goes(hass, entry, automations, watchers, options) -> None:
+    """Nothing is subtracted then, so there is nothing to repair: a positive answer, and it is never raised."""
+    create_issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER, entity=HOUSE, hours="4", days="7", share="50")
+    watcher = await start(hass, make_meter(hass, entry, automations, watchers, **options))
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None
+    watcher.record_charger_meter(OUTSIDE)
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is None
+
+
+async def test_another_house_sensor_keeps_the_repair_and_its_ignore_and_the_next_verdict_names_the_new_one(hass, entry, automations, watchers) -> None:
+    """The stored hours are not reset with the sensor, so deleting would only raise it again at once and lose the Ignore."""
+    create_issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER, entity="sensor.old_house", hours="4", days="7", share="50")
+    ir.async_get(hass).async_ignore(DOMAIN, f"{entry.entry_id}_{ISSUE_CHARGER_OUTSIDE_METER}", True)
+    watcher = await start(hass, make_meter(hass, entry, automations, watchers))
+    assert issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER) is not None
+    watcher.record_charger_meter(OUTSIDE)
+    found = issue(hass, entry, ISSUE_CHARGER_OUTSIDE_METER)
+    assert found.translation_placeholders["entity"] == HOUSE
+    assert found.dismissed_version is not None
