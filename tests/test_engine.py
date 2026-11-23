@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import json
 import math
+import re
 import zoneinfo
 from copy import deepcopy
 from pathlib import Path
@@ -2520,3 +2521,94 @@ def test_startup_publishes_the_charging_amps_table_with_solar() -> None:
     assert result.error is None
     assert result.states["charging_amps_table"] == engine.charging_amps_table()
     assert result.value["amps_report"] == engine.charging_amps_table()
+
+
+# --- providers with different price intervals are planned on one common interval ---
+
+
+def _quarters(rows: list[dict], key: str = "hour") -> list[dict]:
+    """Every hourly row as four 15 minute rows with the same price."""
+    result = []
+    for row in rows:
+        start = datetime.datetime.fromisoformat(row[key])
+        result.extend({**row, key: (start + datetime.timedelta(minutes=minute)).isoformat()} for minute in (0, 15, 30, 45))
+    return result
+
+
+def _mixed_provider_engine(hourly: dict[int, float], quarter_price: float, *, level: float = 25.0, km: float = 150.0) -> tuple[CJPEngine, object]:
+    """Work plan at 01:30 on DAY: Strømligning has hourly prices for `hourly`, Energi Data Service every
+    15 minutes (at quarter_price) for the whole day."""
+    now = datetime.datetime.combine(DAY, datetime.time(1, 30))
+    settings = {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "workday_departure_thursday": datetime.time(7),
+        "workday_distance_needed_thursday": km,
+    }
+    snap = snapshot(now, level=level, settings=settings, **PLUGGED_IN)
+    eds = snap.price_data["attributes"]["sensor.price"]
+    eds["raw_today"] = _quarters([{**row, "price": quarter_price} for row in eds["raw_today"]])
+    snap.price_data["attributes"]["sensor.sl"] = {
+        "prices": [
+            {"start": datetime.datetime.combine(DAY, datetime.time(hour), tzinfo=TZ).isoformat(), "price": price}
+            for hour, price in hourly.items()
+        ]
+    }
+    engine = CJPEngine(const.build_config({**OPTIONS, "stromligning_buy_current_price": "sensor.sl"}), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None
+    return engine, result
+
+
+def test_an_hourly_provider_is_planned_for_whole_hours_next_to_a_quarter_hour_provider() -> None:
+    """The reported case: Strømligning has hourly prices (02-05 cheap), Energi Data Service 15 minute prices that are
+    dearer. The cheap hours are charged for the whole hour, not for the first quarter of each hour."""
+    engine, result = _mixed_provider_engine({2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5}, 3.0, level=40, km=90.0)
+    prices = engine.get_grid_prices()
+    assert prices[datetime.datetime.combine(DAY, datetime.time(3, 45))] == pytest.approx(0.5)
+    planned = {timestamp: engine.charge_hours[timestamp] for timestamp in charge_hours(engine) if timestamp.date() == DAY}
+    assert planned
+    assert all(data["Price"] == pytest.approx(0.5) for data in planned.values()), {t: d["Price"] for t, d in planned.items()}
+    per_hour: dict[int, float] = {}
+    for timestamp, data in planned.items():
+        per_hour[timestamp.hour] = per_hour.get(timestamp.hour, 0.0) + data["kWh"]
+    # the first hours of the plan are full hours at the charge power
+    assert [round(kwh, 2) for kwh in sorted(per_hour.values(), reverse=True)[:2]] == [pytest.approx(MAX_WATT / 1000, abs=0.05)] * 2
+    # the overview shows the quarters that follow each other as one window, never as 02:00-02:15
+    overview = result.attributes["overview"]["overview"]
+    assert re.search(r"02:00-0[3-5]:\d\d", overview), overview
+    assert "02:00-02:15" not in overview and "02:15-02:30" not in overview
+
+
+def _trip_plan(quarter: bool, target: float = 100.0) -> dict[datetime.datetime, float]:
+    """The kWh per hour the planner books for a trip above the max level, on hourly or on 15 minute prices."""
+    now = datetime.datetime.combine(DAY, datetime.time(6, 30))
+    settings = {
+        "trip_date_time": datetime.datetime.combine(DAY, datetime.time(9)),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(18)),
+        "trip_charge_procent": target,
+        "max_recommended_charge_limit_battery_level": 60.0,
+    }
+    snap = snapshot(now, level=40, settings=settings, **PLUGGED_IN)
+    if quarter:
+        eds = snap.price_data["attributes"]["sensor.price"]
+        eds["raw_today"] = _quarters(eds["raw_today"])
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    per_hour: dict[datetime.datetime, float] = {}
+    for timestamp in charge_hours(engine):
+        if engine.charge_hours[timestamp].get("trip"):
+            hour = timestamp.replace(minute=0)
+            per_hour[hour] = per_hour.get(hour, 0.0) + engine.charge_hours[timestamp]["kWh"]
+    return per_hour
+
+
+@pytest.mark.parametrize("target", [100.0, 70.0], ids=["more than the hours before departure hold", "less than one hour holds"])
+def test_a_trip_is_planned_the_same_on_15_minute_prices_as_on_hourly_prices(target: float) -> None:
+    hourly = _trip_plan(quarter=False, target=target)
+    quarters = _trip_plan(quarter=True, target=target)
+    assert hourly
+    assert sum(quarters.values()) == pytest.approx(sum(hourly.values()), abs=0.1)
+    assert quarters == pytest.approx(hourly, abs=0.1)

@@ -43,6 +43,18 @@ used alone. The surplus the car can use is subtracted from what has to be bought
 Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
 solar surplus.
 
+**Two price integrations with different intervals.** The providers can have different interval lengths
+(Strømligning's buy price is hourly, Energi Data Service's is every 15 minutes). CJP puts all prices on one common
+interval: the finest one they all fit on (the greatest common divisor of the interval lengths, for example 15 minutes
+for hourly plus 15 minute prices, 5 minutes for 10 plus 15 minute prices). A price that covers a longer interval is
+repeated over every slot of it, and each slot gets the price of the first provider that has one (Strømligning before
+Energi Data Service, real prices before forecasts). So an hourly price covers its whole hour: it is never mixed with
+the other provider's quarters inside that hour. The plan is made per slot, but the overview and the charging history
+still show hours or longer stretches as one window (for example 03:00-03:52).
+A price missing from a feed (for example one that is not a number) is a gap in the combined prices: the price before
+it is not repeated over it, and the next price integration fills it. The price history only fills an hour that has no
+price at all, and the planner reads a slot without a price as running to the next one.
+
 Price timestamps mark the start of each interval. CJP supports different interval lengths in the same hour:
 each price applies until the next timestamp, up to the end of that hour. After a longer gap, CJP limits the
 last interval to the previous interval's duration (at most one hour), leaving the rest uncovered rather than

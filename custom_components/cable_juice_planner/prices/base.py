@@ -10,6 +10,7 @@ from typing import Any
 from ..const import ENTITY_UNAVAILABLE_STATES, PRICE_ADDER_DAY_BETWEEN_DIVIDER
 from ..management.value_checks import price_unit_wrong
 from ..utils.helpers import days_between, float_or_none, reset_time_to_hour
+from .intervals import common_interval_minutes, interval_slots, provider_intervals
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -338,39 +339,53 @@ class CombinedPriceProvider(BasePriceProvider):
         self.processed_version = self.shared_data["version"]
 
     def _combine(self, kind: str) -> tuple[dict, dict, dict, dict]:
+        """The prices of every provider on one common interval (the finest all of them fit on).
+
+        A provider's price covers the interval to its next timestamp (an hourly price the whole hour) and is
+        repeated over every slot of it. Per slot the first provider with a real price wins, then the first with a
+        forecast, so one hour never gets a falsely cheap quarter from an hourly price next to another provider's
+        quarters. A price that is no finite number covers its slots without a price, so another provider fills them."""
         prices: dict = {}
         real_prices: dict = {}
         sources: dict = {}
         details: dict = {}
         sell = kind == "sell"
+        layers = []
         for provider in self.providers:
+            entries: dict = {}
+            real_starts: set = set()
+            for label in ("forecast", "real"):
+                try:
+                    for timestamp, price in getattr(provider, f"get_{kind}_{label}_prices")().items():
+                        timestamp = _naive(timestamp)
+                        if label == "real" and not is_number(price) and is_number(entries.get(timestamp)):
+                            continue  # a real price that is no number leaves the provider's forecast for it, as before
+                        entries[timestamp] = price
+                        if label == "real":
+                            real_starts.add(timestamp)
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("Can't get %s prices from %s: %s %s", label, provider.source_name, err, type(err))
             try:
-                for timestamp, price in getattr(provider, f"get_{kind}_real_prices")().items():
-                    timestamp = _naive(timestamp)
-                    if not is_number(price):
-                        continue  # NaN/infinity is no price: the hour gets another provider's price, else the price history's, else none
-                    if timestamp not in prices:
-                        price = round(price, 2)
-                        prices[timestamp] = price
-                        real_prices[timestamp] = price
-                        sources[timestamp] = f"{provider.source_name}:real"
-                        if sell and timestamp in provider.sell_price_details:
-                            details[timestamp] = provider.sell_price_details[timestamp].copy()
+                layers.append((provider, provider_intervals(entries), real_starts))
             except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("Can't get real prices from %s: %s %s", provider.source_name, err, type(err))
-        for provider in self.providers:
-            try:
-                for timestamp, price in getattr(provider, f"get_{kind}_forecast_prices")().items():
-                    timestamp = _naive(timestamp)
-                    if not is_number(price):
-                        continue
-                    if timestamp not in prices:
-                        prices[timestamp] = round(price, 2)
-                        sources[timestamp] = f"{provider.source_name}:forecast"
-                        if sell and timestamp in provider.sell_price_details:
-                            details[timestamp] = provider.sell_price_details[timestamp].copy()
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("Can't get forecast prices from %s: %s %s", provider.source_name, err, type(err))
+                _LOGGER.warning("Can't read the %s prices of %s: %s %s", kind, provider.source_name, err, type(err))
+        grid = common_interval_minutes(end - start for _provider, intervals, _real in layers for start, end, _price in intervals)
+        for want_real in (True, False):
+            label = "real" if want_real else "forecast"
+            for provider, intervals, real_starts in layers:
+                for start, end, price in intervals:
+                    if (start in real_starts) != want_real or not is_number(price):
+                        continue  # NaN/infinity is no price: the slots get another provider's price, else the price history's, else none
+                    price = round(price, 2)
+                    for slot in interval_slots(start, end, grid):
+                        if slot in prices:
+                            continue
+                        prices[slot] = price
+                        if want_real:
+                            real_prices[slot] = price
+                        sources[slot] = f"{provider.source_name}:{label}"
+                        if sell and start in provider.sell_price_details:
+                            details[slot] = provider.sell_price_details[start].copy()
         if not prices:
             raise ValueError("No prices available from configured price providers")
         return (
