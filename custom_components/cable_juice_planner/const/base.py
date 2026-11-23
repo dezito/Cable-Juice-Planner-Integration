@@ -134,6 +134,13 @@ CHARGER_READY_STATUS = StateSet(
     "waiting for car demand",  # Wallbox
     "ev connected", "waiting for ev",  # myenergi
 )
+# Plugged in, and the charger itself holds the charging back (its load balancing, a smart or scheduled start, an approval in
+# its app). They are READY (the car is connected), but a restart of the charger (is_charging) can not release them, so it is
+# not tried and the charger is not reported as not following the plan.
+CHARGER_HELD_STATUS = StateSet(
+    "awaiting_load_balancing", "awaiting_smart_start", "awaiting_scheduled_start",  # Easee
+    "pending_approval",  # Ohme
+)
 CHARGER_NOT_READY_STATUS = StateSet(
     "off", "disconnect", "disconnected",
     "unplugged",  # Ohme
@@ -144,7 +151,7 @@ CHARGER_NOT_READY_STATUS = StateSet(
 CHARGER_COMPLETED_STATUS = StateSet(
     "completed", "complete", "charge_complete", "finished",  # complete: Tesla (Teslemetry, Tesla BLE), go-e
     "charging_finished",  # Tesla Wall Connector
-    "connected_finished",  # Zaptec
+    # not Zaptec connected_finished: it is also shown after a stop or pause command, not only for a full car (unverified)
 )
 CHARGER_CHARGING_STATUS = StateSet(
     "charging",

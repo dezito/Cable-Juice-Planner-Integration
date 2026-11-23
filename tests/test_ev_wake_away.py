@@ -113,7 +113,6 @@ def test_home_with_an_unavailable_cable_still_wakes_the_car() -> None:
         (CHARGER_NOT_READY_STATUS, "no_ev_connected", True),  # Peblar
         (CHARGER_NOT_READY_STATUS, "EV Disconnected", True),  # myenergi
         (CHARGER_COMPLETED_STATUS, "charging_finished", True),  # Tesla Wall Connector
-        (CHARGER_COMPLETED_STATUS, "Connected_Finished", True),  # Zaptec
         (CHARGER_CHARGING_STATUS, "connected_charging", True),  # Zaptec
         (CHARGER_CHARGING_STATUS, "Charging_Reduced", True),  # Tesla Wall Connector
         (CHARGER_CHARGING_STATUS, "Boosting", True),  # myenergi
@@ -135,7 +134,11 @@ def test_status_states_never_match_a_missing_value(state) -> None:
 @pytest.mark.parametrize(
     "state",
     # may mean either, or a fault or no data: no class (CJP then does not know the status, which is the honest answer)
-    ["paused", "Suspended", "sleeping", "scheduled", "idle", "Occupied", "Preparing", "SuspendedEV", "Finishing", "Available", "error", "Faulted", "Discharging", "locked", "waiting"],
+    [
+        "paused", "Suspended", "sleeping", "scheduled", "idle", "Occupied", "Preparing", "SuspendedEV", "Finishing", "Available", "error",
+        "Faulted", "Discharging", "locked", "waiting",
+        "Connected_Finished",  # Zaptec: also shown after a stop or pause command, so not "full"
+    ],
 )
 def test_a_state_that_can_mean_either_is_in_no_set(state: str) -> None:
     for states in (CHARGER_READY_STATUS, CHARGER_NOT_READY_STATUS, CHARGER_COMPLETED_STATUS, CHARGER_CHARGING_STATUS):

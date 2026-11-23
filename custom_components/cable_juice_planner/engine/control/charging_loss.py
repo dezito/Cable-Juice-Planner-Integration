@@ -9,6 +9,7 @@ import logging
 from ...const import (
     CHARGER_CHARGING_STATUS,
     CHARGER_COMPLETED_STATUS,
+    CHARGER_HELD_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_LOSS_MAX,
@@ -83,7 +84,8 @@ class ControlChargingLoss:
             if not self.is_calculating_charging_loss():
                 return None
             if source == "status":
-                if value in CHARGER_READY_STATUS + CHARGER_COMPLETED_STATUS and old_value in CHARGER_CHARGING_STATUS:
+                # not a charger that holds the charging back itself (load balancing, a schedule): that is a pause, not the end
+                if value in CHARGER_READY_STATUS + CHARGER_COMPLETED_STATUS and value not in CHARGER_HELD_STATUS and old_value in CHARGER_CHARGING_STATUS:
                     self.charging_loss_charging_completed = True
                     self.mark_dirty("runtime")
                     return "wait_for_meter"

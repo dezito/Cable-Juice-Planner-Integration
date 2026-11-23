@@ -269,7 +269,9 @@ class ControlEvents:
                 self.charge_if_needed()
             return None
         _LOGGER.info("Charger port status changed from %s to %s", old_value, value)
-        if value in CHARGER_READY_STATUS and old_value in CHARGER_NOT_READY_STATUS:
+        # plugged in: from no car to any state that shows one (a charger can go from unplugged to charging, or to done, without
+        # a state of its own in between, e.g. Peblar and Tesla Wall Connector)
+        if value in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS and old_value in CHARGER_NOT_READY_STATUS:
             self.charger_restart_unplugged()  # it was unplugged: a restart begins again
             self.economy_plugged_in()
             self.set_setting("allow_manual_charging_now", False)

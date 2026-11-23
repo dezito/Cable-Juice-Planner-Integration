@@ -7,6 +7,7 @@ import logging
 from ...const import (
     CHARGER_CHARGING_STATUS,
     CHARGER_COMPLETED_STATUS,
+    CHARGER_HELD_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_ALLOWED_AFTER_GOTO_TIME,
@@ -297,7 +298,7 @@ class ControlSchedule:
 
         if normalize_state(charger_status) == "error":
             problem = t("ui.is_charging.charger_error")
-        elif charger_status in CHARGER_READY_STATUS and sum(self.current_charging_amps) > 0:
+        elif charger_status in CHARGER_READY_STATUS and charger_status not in CHARGER_HELD_STATUS and sum(self.current_charging_amps) > 0:
             problem = t("ui.is_charging.charger_restart")
         else:
             self._charger_restart_reset(full=False)  # e.g. the site gives no current: nothing to start

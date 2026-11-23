@@ -28,7 +28,7 @@ async def _a_idle(hass: HomeAssistant, status: str, **cars_a):
 
 @pytest.mark.parametrize(
     "status",
-    ["completed", "Complete", "COMPLETED", "charge_complete", "Finished", "charging_finished", "connected_finished", "Unplugged", "No_EV_Connected", "Disconnected"],
+    ["completed", "Complete", "COMPLETED", "charge_complete", "Finished", "charging_finished", "Unplugged", "No_EV_Connected", "Disconnected"],
 )
 async def test_a_status_that_surely_means_not_charging_frees_the_current_in_any_case(hass: HomeAssistant, status: str) -> None:
     site, cars = await _a_idle(hass, status)
@@ -38,7 +38,7 @@ async def test_a_status_that_surely_means_not_charging_frees_the_current_in_any_
 
 @pytest.mark.parametrize(
     "status",
-    ["Charging", "connected_charging", "charging_reduced", "Boosting", "On", "Connected", "Ready", "paused", "suspended", "sleeping", "idle", "occupied", "Error", "Unknown", "unavailable"],
+    ["Charging", "connected_charging", "charging_reduced", "Boosting", "On", "Connected", "Ready", "paused", "suspended", "sleeping", "idle", "occupied", "Error", "Unknown", "unavailable", "Connected_Finished"],
 )
 async def test_a_status_that_may_mean_charging_frees_nothing(hass: HomeAssistant, status: str) -> None:
     site, cars = await _a_idle(hass, status)
