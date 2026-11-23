@@ -58,11 +58,13 @@
         "data": {
           "site_priority": "Priorytet",
           "site_phase_order": "Kolejność faz ładowarki",
+          "charger_in_phase_meter": "Czujniki faz obejmują ładowarkę tego samochodu",
           "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
           "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "charger_in_phase_meter": "Włączone (domyślnie): czujniki prądu faz wspólnego przyłącza sieciowego mierzą też ładowarkę tego samochodu. Wyłącz, jeśli ładowarka ma własny licznik, którego czujniki faz nie obejmują (ale jest za tym samym bezpiecznikiem głównym): jej pobór jest wtedy dodawany do zmierzonego prądu fazy w kontroli przeciążenia i kontroli bezpiecznika głównego, a nie jest odejmowany od zmierzonego prądu przy obliczaniu domu, więc ochrona nigdy nie jest słabsza. Jeśli nie masz pewności, pozwól samochodowi się ładować i obserwuj czujniki faz: jeśli rosną o tyle, ile pobiera, obejmują ją. Wyłączenie jest bezpieczne dla bezpiecznika, ale ładowarka, którą czujniki mierzą, jest wtedy liczona dwa razy: samochód dostaje mniej prądu i może pojawić się naprawa dotycząca bezpiecznika głównego. Bez czujników faz ustawienie nie ma wpływu. Bez odczytu z czujnika mocy ładowarki samochód liczy się z prądem, który otrzymał.",
           "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
@@ -484,11 +486,13 @@
         "data": {
           "site_priority": "Priorytet",
           "site_phase_order": "Kolejność faz ładowarki",
+          "charger_in_phase_meter": "Czujniki faz obejmują ładowarkę tego samochodu",
           "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
           "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "charger_in_phase_meter": "Włączone (domyślnie): czujniki prądu faz wspólnego przyłącza sieciowego mierzą też ładowarkę tego samochodu. Wyłącz, jeśli ładowarka ma własny licznik, którego czujniki faz nie obejmują (ale jest za tym samym bezpiecznikiem głównym): jej pobór jest wtedy dodawany do zmierzonego prądu fazy w kontroli przeciążenia i kontroli bezpiecznika głównego, a nie jest odejmowany od zmierzonego prądu przy obliczaniu domu, więc ochrona nigdy nie jest słabsza. Jeśli nie masz pewności, pozwól samochodowi się ładować i obserwuj czujniki faz: jeśli rosną o tyle, ile pobiera, obejmują ją. Wyłączenie jest bezpieczne dla bezpiecznika, ale ładowarka, którą czujniki mierzą, jest wtedy liczona dwa razy: samochód dostaje mniej prądu i może pojawić się naprawa dotycząca bezpiecznika głównego. Bez czujników faz ustawienie nie ma wpływu. Bez odczytu z czujnika mocy ładowarki samochód liczy się z prądem, który otrzymał.",
           "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
@@ -1486,7 +1490,7 @@
     },
     "site_fuse_exceeded": {
       "title": "Dom i samochody pobierają więcej niż bezpiecznik główny (rozdział mocy)",
-      "description": "W ciągu ostatnich dni ({days}) godzinowa średnia prądu na tych fazach była przez co najmniej {hours} h powyżej bezpiecznika głównego pomnożonego przez {factor}. Każda linia pokazuje fazę, jej bezpiecznik główny → najwyższą godzinową średnią prądu (godziny powyżej limitu > limit, czyli bezpiecznik główny razy {factor}):\n{phases}\n\nBezpiecznik tej wielkości raczej nie wytrzymałby takiego prądu przez godzinę. Więc albo bezpiecznik główny we wspólnym przyłączu jest ustawiony za nisko (samochody dostają wtedy mniej prądu, niż mogłyby), albo czujnik fazy mierzy coś innego: fazy w złej kolejności, czujnik, który nie jest fazą sieci, albo zła jednostka. Sprawdź wielkość bezpiecznika i czujniki faz. Jeśli bezpiecznik jest naprawdę tak duży, a wartości są poprawne, wybierz przy tej naprawie **Ignoruj**.\n\nNaprawa znika sama, gdy kolejna prognoza jej już nie znajduje: po poprawieniu bezpiecznika, najpóźniej gdy te godziny wypadną z ostatnich dni ({days})."
+      "description": "W ciągu ostatnich dni ({days}) godzinowa średnia prądu na tych fazach była przez co najmniej {hours} h powyżej bezpiecznika głównego pomnożonego przez {factor}. Każda linia pokazuje fazę, jej bezpiecznik główny → najwyższą godzinową średnią prądu (godziny powyżej limitu > limit, czyli bezpiecznik główny razy {factor}):\n{phases}\n\nBezpiecznik tej wielkości raczej nie wytrzymałby takiego prądu przez godzinę. Więc albo bezpiecznik główny we wspólnym przyłączu jest ustawiony za nisko (samochody dostają wtedy mniej prądu, niż mogłyby), albo ładowarka, którą czujniki faz mierzą, jest ustawiona jako poza nimi (*Czujniki faz obejmują ładowarkę tego samochodu* wyłączone), więc jej pobór jest liczony dwa razy, albo czujnik fazy mierzy coś innego: fazy w złej kolejności, czujnik, który nie jest fazą sieci, albo zła jednostka. Sprawdź wielkość bezpiecznika i czujniki faz. Jeśli bezpiecznik jest naprawdę tak duży, a wartości są poprawne, wybierz przy tej naprawie **Ignoruj**.\n\nNaprawa znika sama, gdy kolejna prognoza jej już nie znajduje: po poprawieniu bezpiecznika, najpóźniej gdy te godziny wypadną z ostatnich dni ({days})."
     },
     "charger_not_following": {
       "title": "Ładowarka nie stosowała się do planu {count} razy w ciągu {days} dni ({prefix})",

@@ -22,6 +22,7 @@ Then, for each car (under **Configure → Charger**, the *Load balancing* page):
 |---|---|
 | Priority | 1 = charges first |
 | Phase order | which grid phases the charger's L1/L2/L3 are connected to: L1-L2-L3, L2-L3-L1 or L3-L1-L2. 1-phase charging uses the charger's L1, so the right grid phase is loaded |
+| Phase sensors include this car's charger | on by default. Turn it off when the charger is on its own meter that the phase sensors above do not include (but behind the same main fuse): see [A charger outside the phase sensors](#a-charger-outside-the-phase-sensors) |
 | Chargers on the same circuit (optional) | the chargers (HA devices) sharing one circuit limit, e.g. Easee chargers behind a master – see [Shared circuit](#shared-circuit-eg-easee-master) |
 
 Without phase sensors, the fuse is a fixed budget for the cars, and the chargers' *Charging power* sensors
@@ -108,6 +109,38 @@ overloaded phase limits the last car at once.
 **Example:** a 25 A fuse with 1 A margin, two cars with 3 × 16 A. Car 1 (priority 1) charges at 16 A. The
 house uses 5 A on L1. Car 2 gets 25 − 1 − 5 − 16 = 3 A on L1 – too little, so it is planned in other hours
 (or with fewer amps once car 1 is done).
+
+## A charger outside the phase sensors
+
+If a car's charger is on its own meter that the phase sensors of the shared grid connection do not include (but is behind
+the same main fuse), turn off **Phase sensors include this car's charger** on that car. This is separate from *House
+consumption includes this car's charger* on the house page, which is about the house consumption sensor used for the solar
+surplus; set each one to what that sensor measures.
+
+Nothing is protected less because of it, the charger's draw is only added where the sensors can't see it:
+
+- **Overload:** its draw (from its *Charging power* sensor, counted the same careful way as without phase sensors, and with
+  what the car was given when there is no fresh reading) is added to the measured phase current, and the check also runs
+  when its power or status changes or its current is raised. The last charging car is limited at once if the sum is above the fuse.
+- **House:** the car's draw is no longer taken off the measured phase current to get the house, since the sensors never
+  held it. The house forecast does the same (it is updated when a car joins, e.g. after you changed the setting). If
+  an inside and an outside car share one power sensor, nothing is taken off for either (the house counts higher).
+- **Cars behind:** a car ahead on its own meter counts the way a car ahead counts without phase sensors: with what it was
+  given until its power sensor and status show that it does not draw (a fresh 0 W right after a raise frees nothing).
+- **Main fuse check:** the car's draw is added to the phases before the repair compares them with the fuse. When the
+  charger's statistics don't cover every hour (no or a wrong unit, missing hours) nothing is judged and the repair stays
+  as it is.
+
+Without phase sensors the setting changes nothing: the chargers' power sensors are the measurement. While the phase sensors
+measure nothing, the cars are counted from their power sensors and the house from its last measured value or the forecast,
+which were calculated with the setting.
+
+Both wrong ways cost something. With the setting on for a charger that the sensors do not include, the house looks too small
+by its own draw and an overload from the charger is not seen: this is the unsafe one. With it off for a charger that the
+sensors do include, its draw is counted twice: the car itself is limited more than needed (its own budget sees its draw as the
+house), the other cars get less current, and the repair *The house and the cars draw more than the main fuse* may appear.
+To check, let the car charge and watch the phase sensors: if they rise by what it draws, they include it. If you can't
+check, off is the safe side for the fuse.
 
 ## Solar surplus between cars
 

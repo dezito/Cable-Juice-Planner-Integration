@@ -236,6 +236,11 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
     def site_phase_order(self) -> str:
         return str(self.config["site"]["phase_order"])
 
+    @property
+    def site_in_phase_meter(self) -> bool:
+        """Whether the site's phase sensors measure this car's charger (only an explicit False says they do not)."""
+        return self.config["site"].get("charger_in_phase_meter", True) is not False
+
     @callback
     def async_site_recalculate(self) -> None:
         """The capacity changed (a car ahead changed its plan, the site was added/removed)."""

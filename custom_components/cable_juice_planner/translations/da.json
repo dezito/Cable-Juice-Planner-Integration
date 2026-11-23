@@ -58,11 +58,13 @@
         "data": {
           "site_priority": "Prioritet",
           "site_phase_order": "Laderens fasefølge",
+          "charger_in_phase_meter": "Fasesensorerne indeholder denne bils lader",
           "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
           "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "charger_in_phase_meter": "Til (standard): fasesensorerne på den fælles nettilslutning måler også denne bils lader. Slå fra, hvis laderen sidder på sin egen måler, som fasesensorerne ikke indeholder (men bag samme hovedsikring): dens træk lægges så oven i den målte fasestrøm i overbelastningstjekket og hovedsikringstjekket og trækkes ikke fra den målte strøm for at finde huset, så beskyttelsen aldrig bliver lavere. Er du i tvivl, så lad bilen lade og se på fasesensorerne: stiger de med det, bilen trækker, indeholder de den. At slå den fra er den sikre side for sikringen, men for en lader, som sensorerne måler, tæller den dobbelt: bilen får så mindre strøm, og reparationen om hovedsikringen kan dukke op. Uden fasesensorer har indstillingen ingen virkning. Uden en måling fra laderens effektsensor tæller bilen med den strøm, den har fået.",
           "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
@@ -484,11 +486,13 @@
         "data": {
           "site_priority": "Prioritet",
           "site_phase_order": "Laderens fasefølge",
+          "charger_in_phase_meter": "Fasesensorerne indeholder denne bils lader",
           "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
           "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "charger_in_phase_meter": "Til (standard): fasesensorerne på den fælles nettilslutning måler også denne bils lader. Slå fra, hvis laderen sidder på sin egen måler, som fasesensorerne ikke indeholder (men bag samme hovedsikring): dens træk lægges så oven i den målte fasestrøm i overbelastningstjekket og hovedsikringstjekket og trækkes ikke fra den målte strøm for at finde huset, så beskyttelsen aldrig bliver lavere. Er du i tvivl, så lad bilen lade og se på fasesensorerne: stiger de med det, bilen trækker, indeholder de den. At slå den fra er den sikre side for sikringen, men for en lader, som sensorerne måler, tæller den dobbelt: bilen får så mindre strøm, og reparationen om hovedsikringen kan dukke op. Uden fasesensorer har indstillingen ingen virkning. Uden en måling fra laderens effektsensor tæller bilen med den strøm, den har fået.",
           "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
@@ -1486,7 +1490,7 @@
     },
     "site_fuse_exceeded": {
       "title": "Huset og bilerne trækker mere end hovedsikringen (lastfordeling)",
-      "description": "I de seneste {days} dage har den gennemsnitlige strøm pr. time på disse faser været over {factor} gange hovedsikringen i {hours} timer eller mere. Hver linje viser fasen, hovedsikringen → den højeste gennemsnitlige strøm pr. time (timer over grænsen > grænsen, altså hovedsikringen gange {factor}):\n{phases}\n\nEn sikring af den størrelse kan næppe bære en sådan strøm i en time. Enten er hovedsikringen på siden for den fælles el-tilslutning sat for lavt (bilerne får så mindre strøm, end de kunne), eller også måler en fasesensor noget andet: faserne er i forkert rækkefølge, sensoren er ikke netfasen, eller enheden er forkert. Tjek sikringens størrelse og fasesensorerne. Hvis sikringen virkelig er så stor, og værdierne er rigtige, så vælg **Ignorer** på denne reparation.\n\nReparationen forsvinder af sig selv, når den næste prognose ikke længere finder den: efter at sikringen er rettet, senest når timerne er ude af de seneste {days} dage."
+      "description": "I de seneste {days} dage har den gennemsnitlige strøm pr. time på disse faser været over {factor} gange hovedsikringen i {hours} timer eller mere. Hver linje viser fasen, hovedsikringen → den højeste gennemsnitlige strøm pr. time (timer over grænsen > grænsen, altså hovedsikringen gange {factor}):\n{phases}\n\nEn sikring af den størrelse kan næppe bære en sådan strøm i en time. Enten er hovedsikringen på siden for den fælles el-tilslutning sat for lavt (bilerne får så mindre strøm, end de kunne), eller også er en lader, som fasesensorerne måler, sat til at være uden for dem (*Fasesensorerne indeholder denne bils lader* slået fra), så dens træk tælles to gange, eller også måler en fasesensor noget andet: faserne er i forkert rækkefølge, sensoren er ikke netfasen, eller enheden er forkert. Tjek sikringens størrelse og fasesensorerne. Hvis sikringen virkelig er så stor, og værdierne er rigtige, så vælg **Ignorer** på denne reparation.\n\nReparationen forsvinder af sig selv, når den næste prognose ikke længere finder den: efter at sikringen er rettet, senest når timerne er ude af de seneste {days} dage."
     },
     "charger_not_following": {
       "title": "Laderen fulgte ikke planen {count} gange inden for {days} dage ({prefix})",

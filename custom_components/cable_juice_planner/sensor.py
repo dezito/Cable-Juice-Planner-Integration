@@ -203,6 +203,7 @@ class CJPSiteSensor(SensorEntity):
                 "priority": coordinator.site_priority,
                 "urgent": self.site.urgent.get(entry_id, False),
                 "phase_order": coordinator.site_phase_order,
+                "in_phase_meter": coordinator.site_in_phase_meter,
                 "request": [round(a, 1) for a in self.site.requests.get(entry_id, [0.0, 0.0, 0.0])],
                 "available": [round(a, 1) for a in self.site.available_now.get(entry_id, [0.0, 0.0, 0.0])],
                 "reserved_hours": len(self.site.reservations.get(entry_id, {})),

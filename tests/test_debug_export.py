@@ -5,6 +5,7 @@ import datetime
 import gzip
 import json
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -57,8 +58,11 @@ async def test_export_is_anonymised(hass: HomeAssistant, config_dir: Path, loade
 
     assert data["integration"] == DOMAIN and data["prefix"] == OBJECT_PREFIX
     assert data["jobs"] and data["snapshots"] and data["engine"]
-    for secret in (CONSUMPTION, EV_LOCATION, EV_LEVEL, "Rasmussen", "55.67", "12.56"):
+    for secret in (CONSUMPTION, EV_LOCATION, EV_LEVEL, "Rasmussen"):
         assert secret not in text, secret
+    # the coordinates are numbers: a log time such as "20:26:55.675" or a timestamp is not the latitude 55.67
+    for coordinate in ("55.67", "12.56"):
+        assert not re.search(rf"(?<![\d.:]){re.escape(coordinate)}", text), coordinate
     location = data["snapshots"][-1]["snapshot"]["attributes"]["device_tracker.location"]
     assert location == {"latitude": 56, "longitude": 13, "friendly_name": "<redacted>"}
     assert data["snapshots"][-1]["snapshot"]["astral"]["latitude"] == round(hass.config.latitude)

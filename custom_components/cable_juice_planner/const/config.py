@@ -156,6 +156,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "site": {
         "priority": 1,
         "phase_order": "L1-L2-L3",
+        # whether the site's phase sensors measure this car's charger. False: the charger is on its own meter, so the phase
+        # sensors do not include it; load balancing adds its draw to the measured phases (never less protection)
+        "charger_in_phase_meter": True,
     },
 }
 
@@ -253,6 +256,7 @@ OPTION_PATHS: dict[str, str] = {
     "enable_diagnostic_file_log": "enable_diagnostic_file_log",
     "site_priority": "site.priority",
     "site_phase_order": "site.phase_order",
+    "charger_in_phase_meter": "site.charger_in_phase_meter",
     "power_values_db_data_to_save": "database.power_values_db_data_to_save",
     "solar_available_db_data_to_save": "database.solar_available_db_data_to_save",
     "kwh_avg_prices_db_data_to_save": "database.kwh_avg_prices_db_data_to_save",
@@ -274,7 +278,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "co2_entity_id",
     ],
     "charger_specs": ["power_voltage", "charging_phases", "charging_max_amp", "charging_loss"],
-    "load_balancing": ["site_priority", "site_phase_order"],
+    "load_balancing": ["site_priority", "site_phase_order", "charger_in_phase_meter"],
     "ev": [
         "usable_battery_level_entity_id",
         "simulate_battery_level_while_charging",
