@@ -56,3 +56,12 @@ test requirements in the active environment:
 ```bash
 python -m pip install -r requirements_test.txt
 ```
+
+## GitHub Actions
+
+`.github/workflows/tests.yml` runs the whole suite on every push and pull request on a Linux runner with
+Python 3.14: it installs `requirements_test.txt` and runs `python -m pytest -q -n auto`, so it uses the same pinned
+dependencies and `pytest.ini` as a local run. The README's *Tests* badge shows the result for `main`.
+`.github/workflows/validate.yml` (hassfest and HACS validation) is separate and has its own *Validate* badge.
+If a test passes locally but fails there, first compare the Python and Home Assistant versions in
+`requirements_test.txt` with the ones the workflow installs.

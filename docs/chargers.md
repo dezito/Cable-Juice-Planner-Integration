@@ -5,9 +5,11 @@ Choose *Edit in YAML* in the blueprint's field and paste. The variables (`max_ph
 [Charger and car control](charger-control.md#charger-and-car)) come from CJP, so you don't read any sensor
 yourself.
 
-> **Not tested on a real charger.** The services, entities, option names and ranges below are checked
-> against each integration's source code, but nobody has run these actions on a charger yet. Try each one
-> by hand (*Developer tools → Actions*) before you rely on it. If they work for you, please share them under
+> **Starting points, not a limit.** The blueprint works with any charger whose integration can start and stop
+> charging or set a current – these pages are only ready-made examples. The services, entities, option names and
+> ranges below are checked against each integration's source code, but have not been confirmed on a real charger
+> yet. Try each one by hand (*Developer tools → Actions*) before you rely on it. If they work for you, please
+> share them under
 > [Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-Integration/discussions/categories/blueprint-setups).
 
 Things that are the same for all of them:

@@ -10,7 +10,7 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 | [Getting started](getting-started.md) | you install CJP for the first time |
 | [How CJP plans](how-it-works.md) | you want to understand why the car charges when it does |
 | [Charger and car control](charger-control.md) | you build the automation that controls the charger and the car, or [test it](charger-control.md#test-your-charger-automation) |
-| [Ready-made charger actions](chargers.md) | you have a KEBA, Wallbox, Easee, myenergi or Ohme charger and want actions to paste into the blueprint (checked against the source, not tested on a charger) |
+| [Ready-made charger actions](chargers.md) | you want ready-made actions to paste into the blueprint for a KEBA, Wallbox, Easee, myenergi or Ohme charger (examples checked against the source; any charger that can start/stop or set a current works) |
 
 ## Charging rules
 
@@ -28,6 +28,8 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 
 | Page | Content |
 |---|---|
+| [Features and charging rules](features.md) | the complete feature list, every charging rule in short, and screenshots |
+| [How CJP compares](comparison.md) | CJP against EV Smart Charging, ha-evcc and provider solutions, the daily reserve and battery health, and CJP's trade-offs |
 | [Multiple cars (load balancing)](load-balancing.md) | several cars on the same main fuse |
 | [Charging loss](charging-loss.md) | measured continuously per charging power |
 | [Learn driving distance](learn-distance.md) | km per workday and the typical daily distance from the odometer |
@@ -38,6 +40,7 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 
 | Page | Content |
 |---|---|
+| [Entities and services](reference.md) | the settings entities, the result sensors and every service |
 | [Emojis](emojis.md) | what every emoji in the plan, the history and the current rule means |
 | [Recipes](cookbook.md) | typical setups: no car integration, solar with a fixed sell price, together with BattMind … |
 | [Switching from the PyScript version](migration.md) | import of configuration and databases |
