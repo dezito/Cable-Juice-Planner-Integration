@@ -3,6 +3,7 @@
   "name": "Cable Juice Planner",
   "after_dependencies": [
     "blueprint",
+    "energy",
     "recorder",
     "repairs",
     "sun",
