@@ -78,6 +78,14 @@ integration (virtual EV).
 
 ### House and home battery
 
+The solar production and home battery power fields are pre-filled from the Energy dashboard of Home Assistant 2025.12
+or newer. Each field is filled only when the dashboard has exactly one source of that kind (solar or battery) and that source has a power sensor. Cars in one
+house normally share the house's solar and battery sensors, so every car gets the suggestion, also when another car
+already uses that sensor. For an inverted or two-sensor battery, the battery field gets the sensor that the Energy
+dashboard generates for it; that sensor disappears if the Energy configuration is changed. They are
+only suggestions: you can pick another sensor or clear the field. The battery sign is still checked against the
+recorder, as described below.
+
 - **House consumption:** the house's consumption, not the grid import. Used for the solar surplus.
 - **Ignored consumers:** power sensors subtracted from the house – e.g. a heat pump you don't want in the
   forecast. The charger itself is subtracted automatically. The house consumption used for the solar surplus is never below 0 W.

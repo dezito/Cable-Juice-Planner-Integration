@@ -192,7 +192,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 
 ## Requirements
 
-- Home Assistant **2025.1** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
+- Home Assistant **2025.12** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
   its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
 - A charger with **status**, **power** (W) and **kWh** sensors
 - Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning)
