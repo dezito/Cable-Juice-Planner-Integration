@@ -384,7 +384,7 @@ def _generators(node) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize("provider", ["energidataservice", "stromligning", "energypriceforecast"])
+@pytest.mark.parametrize("provider", ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast"])
 def test_every_chart_generator_is_complete_javascript(provider: str) -> None:
     """The data generators of the price charts are JavaScript in a yaml string: a cut-off or unbalanced one breaks the whole chart."""
     chart = yaml.safe_load((TEMPLATE_DIR / "prices" / f"{provider}.yaml").read_text(encoding="utf-8"))

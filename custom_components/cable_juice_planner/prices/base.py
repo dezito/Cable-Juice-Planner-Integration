@@ -108,11 +108,17 @@ def is_price_per_wh(unit) -> bool:
     return isinstance(unit, str) and "/" in unit and unit.rsplit("/", 1)[1].strip().lower() == "wh"
 
 
+WATTCAST_BUY_KEY = "wattcast_buy_entity_id"
+
+
 def price_unit_error(key: str, unit: Any) -> bool:
     """A price sensor whose unit makes its prices 100 or 1000 times off: a price in a subunit of the currency (ct/kWh,
-    p/kWh) on any price key, a price per MWh or per Wh on an Energi Data Service key (Energy Price Forecast converts its own
+    p/kWh) on any price key, a price per MWh or per Wh on an Energi Data Service, Spot Forecast or Elprisprognos key (Energy Price Forecast converts its own
     price per MWh, see price_unit_divisor())."""
-    return is_price_subunit(unit) or (key.startswith("energidataservice_") and (is_price_per_mwh(unit) or is_price_per_wh(unit)))
+    if key == WATTCAST_BUY_KEY:
+        # Wattcast gives ct/kWh (euro) and nothing else: that unit is its own and known, any other is wrong
+        return isinstance(unit, str) and bool(unit.strip()) and unit.strip().lower() != "ct/kwh"
+    return is_price_subunit(unit) or (key.startswith(("energidataservice_", "spotforecast_", "elprognos_")) and (is_price_per_mwh(unit) or is_price_per_wh(unit)))
 
 
 def sell_price_parts(price: float, tariff: Mapping, costs: Mapping, sell_fee: float, decimals: int = 2) -> tuple[float, float, float]:
@@ -131,6 +137,8 @@ class BasePriceProvider:
     # the countries (ISO 3166-1 alpha-2) the provider gives prices in (None: any, it has its own list), and whether it gives a forecast
     countries: frozenset[str] | None = None
     has_forecast = True
+    # whether the recorded state of its sensor is a buy price (the economy and the price history read it); the wholesale sensors are not
+    records_history = True
 
     def __init__(self, config: dict) -> None:
         prices_config = config.get("prices", {})
@@ -337,7 +345,7 @@ class CombinedPriceProvider(BasePriceProvider):
 
     def buy_price_entity_ids(self) -> list[str]:
         """The buy price entities of the providers, in priority order."""
-        return [entity_id for entity_id in (p.get_buy_price_entity_id() for p in self.providers) if entity_id]
+        return [entity_id for entity_id in (p.get_buy_price_entity_id() for p in self.providers if p.records_history) if entity_id]
 
     def snapshot(self, get_state: GetState) -> dict:
         """The price entities for set_snapshot(): {"attributes": {...}, "values": {...}}."""
@@ -383,7 +391,7 @@ class CombinedPriceProvider(BasePriceProvider):
 
     def sell_price_entity_ids(self) -> list[str]:
         """The sell price entities of the providers that have one, in priority order."""
-        return list(dict.fromkeys(entity_id for entity_id in (p.get_sell_price_entity_id() for p in self.providers) if entity_id))
+        return list(dict.fromkeys(entity_id for entity_id in (p.get_sell_price_entity_id() for p in self.providers if p.records_history) if entity_id))
 
     def combine_history(self, history: Mapping[str, Mapping]) -> dict:
         """Recorded buy prices {entity_id: {timestamp: price}} -> {timestamp: price}: per

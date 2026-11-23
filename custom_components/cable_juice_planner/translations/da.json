@@ -175,6 +175,38 @@
           "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris). I Energy Price Forecast hedder den “Prisserie”"
         }
       },
+      "prices_spotforecast": {
+        "title": "Spot Forecast",
+        "description": "Prissensoren fra Spot Forecast-integrationen (børspriser og en prognose på 6 dage for Tyskland, Luxembourg, Holland og Sydnorge). Den giver engrosprisen uden moms, nettarif og leverandørens avance: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Vælg zonens sensor “Price”. Prisen skal være i EUR/kWh.",
+        "data": {
+          "spotforecast_buy_entity_id": "Prissensor"
+        },
+        "data_description": {
+          "spotforecast_buy_entity_id": "Spot Forecast-sensoren med prisen (dens entitet ender på _price). Den har de offentliggjorte priser for i dag og i morgen og prognosen derefter."
+        }
+      },
+      "prices_elprognos": {
+        "title": "Elprisprognos",
+        "description": "Prognosesensoren fra Elprisprognos-integrationen (børspriser og en prognose på 7 dage for de svenske zoner SE1–SE4). Den giver børsprisen uden moms: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Elprisprognos’ egen moms og egne tillæg bruges ikke.",
+        "data": {
+          "elprognos_buy_entity_id": "Prognosesensor"
+        },
+        "data_description": {
+          "elprognos_buy_entity_id": "Elprisprognos-sensoren “Elpris prognos SE3”. Dens attribut har de offentliggjorte priser for i dag og i morgen og prognosen derefter."
+        }
+      },
+      "prices_wattcast": {
+        "title": "Wattcast",
+        "description": "Sensorerne fra Wattcast-integrationen (børspriser og en prognose på 7 dage for Finland, Estland, Letland og Litauen). De giver prisen i ct/kWh uden moms, nettarif og leverandørens avance: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Wattcast er den eneste kilde, der må give ct/kWh; priserne læses som euro.",
+        "data": {
+          "wattcast_buy_entity_id": "Prissensor (time)",
+          "wattcast_forecast_entity_id": "Prognosesensor"
+        },
+        "data_description": {
+          "wattcast_buy_entity_id": "Wattcast-sensoren “Price (hour)” eller “Price”. Den har priserne for i dag og i morgen.",
+          "wattcast_forecast_entity_id": "Wattcast-sensoren “Forecast”. Den siger, hvilke priser der er offentliggjort (known_until), og har prognosen for dagene efter i morgen."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
@@ -218,10 +250,14 @@
         "description": "Beløb pr. kWh der ændrer hvad opladning og salg af sol er værd.",
         "data": {
           "refund": "Refusion",
-          "sell_fee": "Salgsgebyr"
+          "sell_fee": "Salgsgebyr",
+          "spot_vat": "Moms (børspriser)",
+          "spot_surcharge": "Tillæg (børspriser)"
         },
         "data_description": {
-          "refund": "Refusionsbeløb fra stat/land/udbyder"
+          "refund": "Refusionsbeløb fra stat/land/udbyder",
+          "spot_vat": "Momsen i procent, der lægges på børsprisen hos udbyderne af børspriser. Ingen standardværdi: den afhænger af dit land og din aftale.",
+          "spot_surcharge": "Det, der lægges på børsprisen med moms pr. kWh: nettarif, afgifter og din leverandørs avance (med moms). Ingen standardværdi: med 0 bliver købsprisen for lav og planen for optimistisk. Tag det fra din regning. Angiv det i prissensorens valuta."
         }
       },
       "solar": {
@@ -326,7 +362,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
+        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne. Børsprisintegrationerne (Spot Forecast, Elprisprognos, Wattcast) kommer sidst; de giver engrospriser, så moms og tillæg spørges der om på gebyrsiden.",
         "data": {
           "price_country": "Land",
           "price_providers": "Prisleverandører"
@@ -411,7 +447,7 @@
       "prefix_in_use": "Dette prefix bruges allerede af en anden Cable Juice Planner-instans.",
       "prefix_entities_exist": "Der findes allerede entiteter med dette prefix (f.eks. fra PyScript-versionen). Vælg et andet prefix eller fjern de gamle entiteter.",
       "no_price_provider": "Vælg mindst én prisleverandør.",
-      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet.",
+      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet. Børsprisintegrationerne: Spot Forecast i Tyskland, Luxembourg, Holland og Norge, Elprisprognos i Sverige og Wattcast i Finland, Estland, Letland og Litauen.",
       "price_provider_no_forecast": "Ingen af de valgte prisudbydere giver en prisprognose, så planlægningen kun ville kunne bruge priserne for i dag og i morgen. Vælg også en anden prisudbyder.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
@@ -420,10 +456,11 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast and Elprisprognos, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
+      "price_sensor_forecast_only": "Denne sensor har prisrækker, men ingen af dem er offentliggjort, så det er formentlig ikke integrationens prissensor (eller dens attributter afviger fra det forventede). Vælg integrationens prissensor; for Wattcast prissensoren og som prognosesensor dens prognosesensor (de må ikke byttes om). Er sensoren lige startet, så prøv igen, når priserne er offentliggjort.",
       "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
@@ -620,6 +657,38 @@
           "energypriceforecast_sell_entity_id": "Energy Price Forecast-sensoren med engrosprisen. Salgsprisen er denne pris minus salgsgebyret (detailprisen er højere end det, et salg giver, så den bruges ikke som salgspris). I Energy Price Forecast hedder den “Prisserie”"
         }
       },
+      "prices_spotforecast": {
+        "title": "Spot Forecast",
+        "description": "Prissensoren fra Spot Forecast-integrationen (børspriser og en prognose på 6 dage for Tyskland, Luxembourg, Holland og Sydnorge). Den giver engrosprisen uden moms, nettarif og leverandørens avance: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Vælg zonens sensor “Price”. Prisen skal være i EUR/kWh.",
+        "data": {
+          "spotforecast_buy_entity_id": "Prissensor"
+        },
+        "data_description": {
+          "spotforecast_buy_entity_id": "Spot Forecast-sensoren med prisen (dens entitet ender på _price). Den har de offentliggjorte priser for i dag og i morgen og prognosen derefter."
+        }
+      },
+      "prices_elprognos": {
+        "title": "Elprisprognos",
+        "description": "Prognosesensoren fra Elprisprognos-integrationen (børspriser og en prognose på 7 dage for de svenske zoner SE1–SE4). Den giver børsprisen uden moms: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Elprisprognos’ egen moms og egne tillæg bruges ikke.",
+        "data": {
+          "elprognos_buy_entity_id": "Prognosesensor"
+        },
+        "data_description": {
+          "elprognos_buy_entity_id": "Elprisprognos-sensoren “Elpris prognos SE3”. Dens attribut har de offentliggjorte priser for i dag og i morgen og prognosen derefter."
+        }
+      },
+      "prices_wattcast": {
+        "title": "Wattcast",
+        "description": "Sensorerne fra Wattcast-integrationen (børspriser og en prognose på 7 dage for Finland, Estland, Letland og Litauen). De giver prisen i ct/kWh uden moms, nettarif og leverandørens avance: købsprisen laves ud fra den med den moms og det tillæg, du angiver på gebyrsiden. Wattcast er den eneste kilde, der må give ct/kWh; priserne læses som euro.",
+        "data": {
+          "wattcast_buy_entity_id": "Prissensor (time)",
+          "wattcast_forecast_entity_id": "Prognosesensor"
+        },
+        "data_description": {
+          "wattcast_buy_entity_id": "Wattcast-sensoren “Price (hour)” eller “Price”. Den har priserne for i dag og i morgen.",
+          "wattcast_forecast_entity_id": "Wattcast-sensoren “Forecast”. Den siger, hvilke priser der er offentliggjort (known_until), og har prognosen for dagene efter i morgen."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensorer fra Strømligning integrationen. Købsprisen er påkrævet; salgs-sensorerne bruges til en præcis salgspris for sol.\n\nStrømligning slår som standard sine sensorer uden moms fra, og en deaktiveret sensor kan ikke vælges her: aktivér dem først under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*). Prisprognoserne kræver desuden *Inkluder prisudsigter for den næste uge?* i Strømlignings indstillinger.\nDeaktiveret i Strømligning nu: {stromligning_disabled}",
@@ -663,10 +732,14 @@
         "description": "Beløb pr. kWh der ændrer hvad opladning og salg af sol er værd.",
         "data": {
           "refund": "Refusion",
-          "sell_fee": "Salgsgebyr"
+          "sell_fee": "Salgsgebyr",
+          "spot_vat": "Moms (børspriser)",
+          "spot_surcharge": "Tillæg (børspriser)"
         },
         "data_description": {
-          "refund": "Refusionsbeløb fra stat/land/udbyder"
+          "refund": "Refusionsbeløb fra stat/land/udbyder",
+          "spot_vat": "Momsen i procent, der lægges på børsprisen hos udbyderne af børspriser. Ingen standardværdi: den afhænger af dit land og din aftale.",
+          "spot_surcharge": "Det, der lægges på børsprisen med moms pr. kWh: nettarif, afgifter og din leverandørs avance (med moms). Ingen standardværdi: med 0 bliver købsprisen for lav og planen for optimistisk. Tag det fra din regning. Angiv det i prissensorens valuta."
         }
       },
       "solar": {
@@ -771,7 +844,7 @@
       },
       "price_provider": {
         "title": "Elpriser",
-        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne.",
+        "description": "Vælg hvor timepriserne kommer fra. Med flere er prioriteten Strømligning, så Energi Data Service, så Energy Price Forecast: prisen fra den første, der har en, bruges for hver time, og den næste udfylder hullerne. Børsprisintegrationerne (Spot Forecast, Elprisprognos, Wattcast) kommer sidst; de giver engrospriser, så moms og tillæg spørges der om på gebyrsiden.",
         "data": {
           "price_country": "Land",
           "price_providers": "Prisleverandører"
@@ -829,7 +902,7 @@
       "prefix_in_use": "Dette prefix bruges allerede af en anden Cable Juice Planner-instans.",
       "prefix_entities_exist": "Der findes allerede entiteter med dette prefix (f.eks. fra PyScript-versionen). Vælg et andet prefix eller fjern de gamle entiteter.",
       "no_price_provider": "Vælg mindst én prisleverandør.",
-      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet.",
+      "price_provider_country": "En valgt prisudbyder har ingen priser i dette land. Strømligning virker kun i Danmark, og Energi Data Service i Danmark, Norge, Sverige, Finland, Estland, Letland, Litauen, Frankrig, Holland, Belgien, Østrig, Tyskland og Luxembourg. Vælg Energy Price Forecast (det meste af Europa) eller ændr landet. Børsprisintegrationerne: Spot Forecast i Tyskland, Luxembourg, Holland og Norge, Elprisprognos i Sverige og Wattcast i Finland, Estland, Letland og Litauen.",
       "price_provider_no_forecast": "Ingen af de valgte prisudbydere giver en prisprognose, så planlægningen kun ville kunne bruge priserne for i dag og i morgen. Vælg også en anden prisudbyder.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
@@ -838,10 +911,11 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh).",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast and Elprisprognos, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
+      "price_sensor_forecast_only": "Denne sensor har prisrækker, men ingen af dem er offentliggjort, så det er formentlig ikke integrationens prissensor (eller dens attributter afviger fra det forventede). Vælg integrationens prissensor; for Wattcast prissensoren og som prognosesensor dens prognosesensor (de må ikke byttes om). Er sensoren lige startet, så prøv igen, når priserne er offentliggjort.",
       "price_currency_mismatch": "Sensoren er i en anden valuta end de andre prissensorer. Brug prissensorer i én valuta (eller fravælg den anden prisudbyder)."
     },
     "abort": {
@@ -860,7 +934,10 @@
       "options": {
         "energidataservice": "Energi Data Service",
         "stromligning": "Strømligning",
-        "energypriceforecast": "Energy Price Forecast (Europa)"
+        "energypriceforecast": "Energy Price Forecast (Europa)",
+        "spotforecast": "Spot Forecast (DE, LU, NL, NO)",
+        "elprognos": "Elprisprognos (Sverige)",
+        "wattcast": "Wattcast (Finland, Baltikum)"
       }
     },
     "restore_backup": {
@@ -1454,7 +1531,7 @@
     },
     "price_sensor_unit": {
       "title": "Prissensorer som Cable Juice Planner bruger giver prisen i en forkert enhed ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) bruger prissensorer, der giver prisen i en underenhed af valutaen (fx ct/kWh eller p/kWh) eller, for Energi Data Service, pr. MWh eller Wh:\n{entities}\n\nDeres priser er 100 eller 1000 gange forkerte, så Cable Juice Planner bruger dem ikke: den planlægger i stedet på de gemte priser. Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh) i prisindstillingerne, eller sæt sensorens enhed tilbage.\n\nDenne reparation forsvinder af sig selv, når sensorerne igen giver prisen pr. kWh."
+      "description": "Cable Juice Planner ({prefix}) bruger prissensorer, der giver prisen i en underenhed af valutaen (fx ct/kWh eller p/kWh) eller, for Energi Data Service, Spot Forecast and Elprisprognos, pr. MWh eller Wh:\n{entities}\n\nDeres priser er 100 eller 1000 gange forkerte, så Cable Juice Planner bruger dem ikke: den planlægger i stedet på de gemte priser. Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh) i prisindstillingerne, eller sæt sensorens enhed tilbage.\n\nDenne reparation forsvinder af sig selv, når sensorerne igen giver prisen pr. kWh.\n\nWattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den."
     },
     "stromligning_entities": {
       "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",

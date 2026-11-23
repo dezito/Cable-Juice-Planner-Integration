@@ -8,7 +8,7 @@ days of watching the plan before you trust it.
 | You need | Why |
 |---|---|
 | A charger with **status**, **power** (W) and **kWh** sensors | whether the car is connected and charging, and how much went in |
-| [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning) and/or [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) | the prices per hour |
+| [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning), [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) and/or a spot forecast integration | the prices per hour |
 | A way to start/stop the charger (or the car) and set the current from Home Assistant | CJP only decides – your automation does it |
 
 Optional:
@@ -133,8 +133,8 @@ again.
 
 ### Prices
 
-Energi Data Service, Strømligning and/or Energy Price Forecast. With several, the priority is Strømligning, then
-Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour,
+Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast integration. With several, the priority is Strømligning, then
+Energi Data Service, then Energy Price Forecast, then the spot forecast integrations: the price of the first one that has one is used for every hour,
 and the next fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
@@ -150,6 +150,20 @@ price (required: the retail price is higher than what a sale pays, so it is refu
 in the currency (EUR/kWh, GBP/kWh, …), not in cents or pence: CJP refuses a sensor in ct/kWh or p/kWh, and one whose unit is changed to that later gives no prices (a repair names it). A sensor in EUR/MWh (a wholesale sensor often is) is converted to kWh, also in the recorded buy price history (read in the unit the sensor has now: if you change its unit, the old history is off by 1000 (MWh) or 100 (ct); a sensor that is missing from Home Assistant has its history left out). The
 currency of the sensor sets the [price scale](how-it-works.md#prices). All price sensors must be in the same
 currency (a backup provider in another currency is refused).
+
+**Spot forecast integrations** (wholesale prices with a forecast, for markets where no retail price sensor exists):
+[Spot Forecast](https://github.com/cygnusb/ha-spot-forecast) (Germany, Luxembourg, the Netherlands and Southern Norway; Denmark
+is left out, Energi Data Service and Strømligning are better there), [Elprisprognos](https://github.com/AlexAsplund/ha-elprognos)
+(Sweden) and [Wattcast](https://github.com/SectorTll/wattcast-homeassistant) (Finland, Estonia, Latvia, Lithuania; it gives
+ct/kWh, the only subunit that is accepted, and needs its forecast sensor too). They give the exchange price, not a price a household pays.
+The buy price is made from it: **spot price × (1 + VAT) + surcharge**, where the VAT (%) and the surcharge per kWh (grid fee,
+taxes and the supplier's margin, with VAT) are asked on the fee page and have **no default**: without them there are no prices,
+because a surcharge of 0 would make every buy price too low. The sell price is the spot price less the sell fee. A flat surcharge
+cannot follow a grid tariff that changes through the day, so the plan is less exact than with a retail price. The price page refuses a sensor that has price rows but none of them
+published (it is probably not the price sensor of the integration) and a price per MWh or Wh. The recorded history
+of these sensors is not used (their state is a wholesale price): the economy statement and the price database are filled by the
+published prices of the day. Elprisprognos only keeps today's coming hours in its list, so a price database needs the day to be
+complete at the first check after midnight.
 
 The **country** of the prices is chosen on the same page as the providers (Home Assistant's country is suggested, and a new
 entry outside Denmark starts with Energy Price Forecast). A provider with no prices in the country is refused: Strømligning

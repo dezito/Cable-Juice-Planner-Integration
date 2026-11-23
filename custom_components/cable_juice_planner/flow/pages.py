@@ -17,7 +17,7 @@ from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, det
 from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
-from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDERS, build_schema, normalize_input, validate_step
+from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDERS, SPOT_PRICE_PROVIDERS, build_schema, normalize_input, validate_step
 
 # the sensors the suggestions are made from; they are only made again when one of them was changed in this session
 DETECTION_SENSORS = ("power_consumption_entity_id", "powerwall_watt_flow_entity_id", "powerwall_battery_level_entity_id")
@@ -67,6 +67,8 @@ class CJPFlowPages:
             return "energidataservice" in self._providers
         if step == "prices_energypriceforecast":
             return "energypriceforecast" in self._providers
+        if step in ("prices_spotforecast", "prices_elprognos", "prices_wattcast"):
+            return step.removeprefix("prices_") in self._providers
         if step == "prices_stromligning":
             return "stromligning" in self._providers
         if step == "prices_stromligning_tariffs":
@@ -115,8 +117,15 @@ class CJPFlowPages:
         services = self.hass.services.async_services().get("notify", {})  # type: ignore[attr-defined]
         return [f"notify.{name}" for name in services if name not in ("send_message", "persistent_notification")]
 
-    async def _async_page(self, step: str, user_input: dict[str, Any] | None) -> ConfigFlowResult:
+    def _page_keys(self, step: str) -> list[str]:
+        """The fields of a page; the fee page also asks for the VAT and the surcharge when a wholesale price provider is chosen."""
         keys = FLOW_STEPS[step]
+        if step == "price_fees" and any(name in self._providers for name in SPOT_PRICE_PROVIDERS):
+            return [*keys, "spot_vat", "spot_surcharge"]
+        return keys
+
+    async def _async_page(self, step: str, user_input: dict[str, Any] | None) -> ConfigFlowResult:
+        keys = self._page_keys(step)
         errors: dict[str, str] = {}
         if step == "price_fees" and user_input is None:
             self._apply_price_scale(suggest_fee=True)  # the price pages are done: the fee suggestion follows the currency
@@ -356,6 +365,15 @@ class CJPFlowPages:
 
     async def async_step_prices_energypriceforecast(self, user_input=None) -> ConfigFlowResult:
         return await self._async_page("prices_energypriceforecast", user_input)
+
+    async def async_step_prices_spotforecast(self, user_input=None) -> ConfigFlowResult:
+        return await self._async_page("prices_spotforecast", user_input)
+
+    async def async_step_prices_elprognos(self, user_input=None) -> ConfigFlowResult:
+        return await self._async_page("prices_elprognos", user_input)
+
+    async def async_step_prices_wattcast(self, user_input=None) -> ConfigFlowResult:
+        return await self._async_page("prices_wattcast", user_input)
 
     async def async_step_prices_stromligning(self, user_input=None) -> ConfigFlowResult:
         return await self._async_page("prices_stromligning", user_input)

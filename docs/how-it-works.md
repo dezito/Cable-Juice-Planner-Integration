@@ -40,8 +40,8 @@ used alone. The surplus the car can use is subtracted from what has to be bought
 
 ### Prices
 
-Buy prices per hour (or 15 minutes) from Energi Data Service, Strømligning and/or Energy Price Forecast, and sell
-prices for the solar surplus.
+Buy prices per hour (or 15 minutes) from Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast
+integration, and sell prices for the solar surplus.
 
 Price timestamps mark the start of each interval. CJP supports different interval lengths in the same hour:
 each price applies until the next timestamp, up to the end of that hour. After a longer gap, CJP limits the
@@ -55,6 +55,11 @@ price is subtracted first, then the *Sell fee* (*Refund and fees* in the setting
 and system tariff. A sell sensor from Energi Data Service without tariffs is already the spot price, so its
 net and system tariff come from the buy sensor. Energy Price Forecast has no tariffs in its prices: the sell price is
 the price of its sell sensor (the wholesale price, required: the retail price is higher than what a sale pays) less the sell fee.
+
+**Spot forecast integrations** (Spot Forecast, Elprisprognos, Wattcast) give a wholesale price: the buy price is the spot price ×
+(1 + VAT) + surcharge, both from the fee page with no default (without them there are no prices), and the sell price is the
+spot price less the sell fee (Wattcast's ct/kWh is read as euro). The published prices are real; the forecast follows them
+from tomorrow on, and today's hours without a published price are not planned. The recorded state of these sensors is not used.
 
 **A market without published prices** (Energy Price Forecast in Finland, Great Britain, SE1/SE2 and others) needs
 the own price source of Energy Price Forecast (a Nord Pool or ENTSO-e sensor), which gives it published prices from
@@ -79,7 +84,7 @@ prices are rounded to 3 decimals instead of 2. Your own settings are never chang
 suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
 to prices in another currency, check the *Sell fee*. A sensor without a known unit
 leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
-this. The price pages of Energi Data Service and Energy Price Forecast refuse a sensor in cents or pence (and Energi Data Service one per MWh or Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). Every
+this. The price pages of Energi Data Service, Energy Price Forecast and the spot forecast integrations refuse a sensor in cents or pence (Wattcast gives ct/kWh and is read as euro) (and Energi Data Service, Spot Forecast and Elprisprognos one per MWh or Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). The forecast sensor of Wattcast says its unit too (`forecast_unit`): in another unit than ct/kWh it gives no prices, with a warning in the log and no repair. Every
 price sensor must be in the same currency (a backup provider in another currency is refused). The rates are rough: they only set the size of the limits, no price is ever converted between currencies. Currencies worth
 much less than a krone (CZK, HUF, ISK) are not recognised yet.
 

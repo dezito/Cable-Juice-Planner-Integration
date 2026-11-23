@@ -9,8 +9,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from ..const import CURRENCY_PRICE_SCALE, CURRENCY_UNIT_ALIASES, PRICE_PROVIDER_KEYS, PRICE_PROVIDER_PRIORITY
-from .base import _is_subunit_code, is_price_per_mwh, is_price_subunit, price_unit_divisor, price_unit_error  # noqa: F401 (the converter of the providers and the history, the unit checks)
+from .base import WATTCAST_BUY_KEY, _is_subunit_code, is_price_per_mwh, is_price_subunit, price_unit_divisor, price_unit_error  # noqa: F401 (the converter of the providers and the history, the unit checks)
+from .base import price_timestamp
 from .factory import PROVIDER_CLASSES
+from .spot_rows import elprognos_rows, spot_forecast_rows, wattcast_rows
 
 
 def price_scale_of_unit(unit: Any) -> float | None:
@@ -50,6 +52,9 @@ PRICE_SENSOR_KEYS = (
     "energidataservice_sell_entity_id",
     "energypriceforecast_buy_entity_id",
     "energypriceforecast_sell_entity_id",
+    "spotforecast_buy_entity_id",
+    "elprognos_buy_entity_id",
+    "wattcast_buy_entity_id",
 )
 
 
@@ -61,6 +66,15 @@ def is_forecast_only(state: Any) -> bool:
         return False
     attributes = getattr(state, "attributes", {})
     return not attributes.get("raw_today") and not attributes.get("raw_tomorrow") and bool(attributes.get("raw_forecast"))
+
+
+def _unit_of(key: str, state: Any) -> Any:
+    """The unit a price sensor's prices are in, for the currency: Wattcast's ct/kWh is euro (the one sensor in a subunit that is
+    accepted, see price_unit_error), the others have the unit they say."""
+    unit = getattr(state, "attributes", {}).get("unit_of_measurement") if state is not None else None
+    if key == WATTCAST_BUY_KEY and isinstance(unit, str) and unit.strip().lower() == "ct/kwh":
+        return "EUR/kWh"
+    return unit
 
 
 def forecast_only_sensors(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, bool | None]:
@@ -112,6 +126,32 @@ def wrong_unit_sensors(get_state: Callable[[str], Any], sensors: Mapping[str, st
     return found
 
 
+def spot_without_published(key: str, values: Mapping[str, Any], get_state: Callable[[str], Any]) -> bool:
+    """A spot forecast sensor that is loaded and has price rows but none of them published (spot_rows): not the price sensor of
+    the integration, or attributes that differ from what the provider reads. It would give no price for today and so no real
+    price at all. A sensor that is not loaded, has no rows yet, or (Wattcast) has no loaded forecast sensor is not judged."""
+    state = get_state(values[key]) if values.get(key) else None
+    if state is None or getattr(state, "state", None) in ("unavailable", "unknown"):
+        return False
+    attributes = getattr(state, "attributes", {})
+
+    def local(value):
+        return price_timestamp(value, None)
+
+    if key == "spotforecast_buy_entity_id":
+        rows = spot_forecast_rows(attributes, local)
+    elif key == "elprognos_buy_entity_id":
+        rows = elprognos_rows(attributes, local)
+    elif key == WATTCAST_BUY_KEY:
+        forecast = get_state(values["wattcast_forecast_entity_id"]) if values.get("wattcast_forecast_entity_id") else None
+        if forecast is None or getattr(forecast, "state", None) in ("unavailable", "unknown"):
+            return False
+        rows = wattcast_rows(attributes, getattr(forecast, "attributes", {}), local)
+    else:
+        return False
+    return bool(rows) and not any(is_published for _start, _price, is_published in rows)
+
+
 def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], Any]) -> dict[str, str]:
     """Errors of the price sensors a price page has just been given (field -> translation key), for a sensor that is loaded.
 
@@ -142,6 +182,9 @@ def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], An
             # a market where Energy Price Forecast publishes no prices (the charging history, the price of the energy in the
             # battery and the price history need today's), or prices that are late: the text says both
             errors[key] = "price_sensor_forecast_only"
+        elif loaded and spot_without_published(key, values, get_state):
+            # a spot forecast sensor whose rows are none of them published: not the sensor of the integration (or a shape it does not read)
+            errors[key] = "price_sensor_no_published"
     return errors
 
 
@@ -157,7 +200,7 @@ def price_currency_errors(options: Mapping[str, Any], page_keys: Any, get_state:
         for key in keys:
             entity_id = options.get(key)
             state = get_state(entity_id) if entity_id else None
-            currency = currency_of_unit(getattr(state, "attributes", {}).get("unit_of_measurement")) if state is not None else None
+            currency = currency_of_unit(_unit_of(key, state)) if state is not None else None
             if currency is not None:
                 currencies[key] = currency
     if len(set(currencies.values())) < 2:
@@ -176,7 +219,7 @@ def detect_price_scale(options: Mapping[str, Any], get_state: Callable[[str], An
         for key in (provider.buy_key, *(key for key in PRICE_PROVIDER_KEYS[name] if key != provider.buy_key)):
             entity_id = options.get(key) if key else None
             state = get_state(entity_id) if entity_id else None
-            scale = price_scale_of_unit(getattr(state, "attributes", {}).get("unit_of_measurement")) if state is not None else None
+            scale = price_scale_of_unit(_unit_of(key, state)) if state is not None else None
             if scale is not None:
                 return scale
     return None

@@ -39,7 +39,9 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price providers; CombinedPriceProvider is the only entry point
-│   └── energypriceforecast.py           Energy Price Forecast: buy = its retail sensor, sell = its wholesale sensor
+│   ├── energypriceforecast.py           Energy Price Forecast: buy = its retail sensor, sell = its wholesale sensor
+│   ├── spotprices.py                    Spot Forecast, Elprisprognos, Wattcast: wholesale prices, buy = spot × (1 + VAT) + surcharge
+│   └── spot_rows.py                     Pure row parsers of the three (the same file in both repositories)
 ├── management/                          Storage, backups, dashboard, and blueprint setup
 ├── utils/                               Shared utilities and datetime/time platform implementations
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
@@ -123,8 +125,8 @@ Read the relevant documentation before changing behavior. In particular:
   from Home Assistant's currency setting (EUR by default, also in Denmark). A new money amount per kWh in the code is
   chosen for kroner and read through `price_scale(config)` and `price_decimals(config)`; never scale a value the user
   entered or the `-1` of the fixed solar sell price. The rates are rough and only set the size of a limit, no price is
-  converted between currencies. A price sensor in a subunit (ct, p, GBp, øre …) is refused on the Energi Data Service and Energy Price Forecast
-  pages (`price_sensor_errors()`), and so is a price per MWh from Energi Data Service. Energy Price Forecast converts a
+  converted between currencies. A price sensor in a subunit (ct, p, GBp, øre …) is refused on the Energi Data Service, Energy Price Forecast and spot forecast
+  pages (`price_sensor_errors()`), and so is a price per MWh from Energi Data Service, Spot Forecast or Elprisprognos. Energy Price Forecast converts a
   price per MWh to kWh (`price_unit_divisor()`): its rows in the provider and its recorded history where the history is
   read (`CombinedPriceProvider.price_unit_divisors()`; the unit is the sensor's current one); units are read case-sensitively (`GBp` is not `GBP`), and all price sensors must be in one
   currency (`price_currency_errors()`), so a backup provider with a known unit is never in another currency.
@@ -153,7 +155,7 @@ Read the relevant documentation before changing behavior. In particular:
 - All price handling goes through `CombinedPriceProvider` (`prices/`, built by
   `create_price_provider()`): which price entities to read, the snapshot, the
   recorded price history, the provider priority (`PRICE_PROVIDER_PRIORITY`:
-  Strømligning, then Energi Data Service, then Energy Price Forecast) and the prices themselves. Other
+  Strømligning, then Energi Data Service, then Energy Price Forecast, then Spot Forecast, Elprisprognos and Wattcast) and the prices themselves. Other
   code calls its methods (the coordinator via `coordinator.price_provider`)
   and never reads price entities, config keys or provider attributes itself.
 - Keep network and blocking work out of the event loop. Follow the existing
@@ -435,10 +437,25 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   ignored (do not delete and recreate it). A restored state of a sensor that Energy Price Forecast no longer provides
   does not count while its entry runs. Do not use the `freezer` fixture to test it: the clock is `_utcnow()`.
 - A price sensor whose unit makes its prices 100 or 1000 times off (`price_unit_error()`: a subunit such as ct/kWh on any price
-  key, per MWh or per Wh on an Energi Data Service key; Energy Price Forecast converts its own per MWh) is refused on the price
+  key except Wattcast's own price key, which accepts exactly ct/kWh, read as euro; per MWh or per Wh on an Energi Data Service,
+  Spot Forecast or Elprisprognos key; Energy Price Forecast converts its own per MWh) is refused on the price
   page and, while running, gives no prices (`_wrong_unit()` in the providers: the next provider or the stored prices fill in,
   never a price that is too high). Its recorded history is left out of the what-if (`price_unit_divisors()` returns None), and the
   repair `price_sensor_unit` names it (no grace time, an ignored repair stays ignored).
+- Spot forecast providers (`prices/spotprices.py`: Spot Forecast, Elprisprognos, Wattcast; pure row parsers in
+  `prices/spot_rows.py`, the same file in both repositories) give wholesale prices, not retail prices. Buy price = spot ×
+  (1 + `spot_vat`/100) + `spot_surcharge`; sell price = spot − `sell_fee`, with no VAT or surcharge. `spot_vat` and
+  `spot_surcharge` have no default (None), are asked on the fee page only when such a provider is chosen, and a provider
+  without them raises instead of giving prices, never a default of 0 (a 0 entered by the user is valid). Published rows are
+  real; a forecast row never enters an hour that has a published price, and today's hours without a published price are not
+  planned. Their recorded state is a wholesale price, so `records_history = False` keeps the recorded state of the sensors out of the
+  price history, the analysis and the what-if (the combined provider still names the sensor in messages); their published
+  prices are still stored in the integration's own price database. Wattcast needs its forecast sensor too and gives
+  ct/kWh; its unit rule is the only subunit exception, and its forecast sensor's `forecast_unit` must be ct/kWh too (else
+  no prices, one log warning, no repair). A spot sensor with price rows but none published is
+  refused on the price page (`price_sensor_no_published`), and while running it logs a warning once; there is no repair
+  for it. Spot Forecast is not offered in Denmark. Fixtures are synthetic, built from the documented row shapes: no running
+  installation of the three integrations was checked.
 - Without a sell sensor (a restored backup may lack it) the economy's and the what-if's sell history is the history of the
   effective sell sensor of the provider (`get_sell_price_entity_id()`: the sell sensor, else the buy sensor), like the live prices.
 - No online buy prices after the first price snapshot (every price sensor is down or in the wrong unit) is no error: the price
@@ -459,6 +476,12 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - The dashboard's sell price chart subtracts the configured fee (`@@sell_fee_value@@`, set in
   `render_dashboard()`); keep it in sync with `calculate_sell_price()`.
+- The charts of the spot forecast providers (`dashboard/prices/spotforecast.yaml`, `elprognos.yaml`, `wattcast.yaml`) are the Energy
+  Price Forecast chart with its data source replaced: every read of the price sensors goes through one inline `adapt()`, the same
+  text in every generator and in `variables` (a test pins it). It must follow `prices/spot_rows.py` and the provider: published
+  rows, a forecast only from tomorrow on and never in a published hour, the unit guards, and the sell fee off the wholesale
+  price. `@@spot_vat@@` and `@@spot_surcharge@@` are the planner's values and `NaN` when one is missing: the chart then shows
+  no price, never one made with 0.
 - `kwh_avg_prices_db["history_sell"]` averages stored before this fix used the old sign (too high) and only
   phase out as new days are stored.
 - The forecast adder (`PRICE_ADDER_DAY_BETWEEN_DIVIDER`) makes a forecast sale worth less (decided with the
@@ -586,15 +609,17 @@ Inside it, run `python -m pytest` from the repository root; it is Linux, so no
 shims are needed. The dev HA runs on `http://localhost:8123`; after a code
 change run `bash ha-dev/devcontainer/restart.sh`, and
 `bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates eight car profiles, each with its own prefix ("Car with
+Seeding creates eleven car profiles, each with its own prefix ("Car with
 everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
 without car entities, "Car without climate entity"/`car_no_climate` without the
 climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
 updates every 30 minutes with the battery level simulation on, "Car without
 Energi Data Service"/`car_no_eds` with only Strømligning as price provider, and two
 cars with load balancing priority 1 and 2 (`car_priority_1`, `car_priority_2`) each with
-its own charger power sensor, and "Car with Energy Price Forecast"/`car_epf` on the simulated
-Energy Price Forecast sensors, which are in euro) plus the shared site entry. Use them to test
+its own charger power sensor, "Car with Energy Price Forecast"/`car_epf` on the simulated
+Energy Price Forecast sensors, which are in euro, and "Car with Spot Forecast"/`car_spotforecast`, "Car with
+Elprisprognos"/`car_elprognos` and "Car with Wattcast"/`car_wattcast` on the simulated spot forecast sensors, which are only
+seeded where the mounted integration has the providers) plus the shared site entry. Use them to test
 missing-entity and single-provider cases. The dev HA, the dev user's profile
 and the seeded entries are in English.
 

@@ -367,7 +367,7 @@ aside: the next run has it. A night in which CJP charged nothing is a connection
 long-term statistics first (the mean, else the state), and every hour they lack from the recorder's own states (a day at a time,
 only the days that have a missing hour and only as far back as the recorder keeps raw states; the mean of an hour is
 time-weighted and an hour is only filled when its states cover it completely: nothing is made up). That is done for the buy and sell
-price entities of every price provider (Energi Data Service, Strømligning and Energy Price Forecast, each hour from the first provider that has it), the
+price entities of every price provider (Energi Data Service, Strømligning and Energy Price Forecast, each hour from the first provider that has it; the spot forecast integrations have none, their recorded state is a wholesale price), the
 battery level and the charger power of the estimated connections, and the solar, house and charger power of the comparison without
 solar (power in whatever unit the entity has, brought to W). An hour taken from the statistics always wins. Hours
 from the recorded history of a price entity are an ordinary source.

@@ -115,6 +115,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "energidataservice_sell_entity_id": "",
             "energypriceforecast_buy_entity_id": "",
             "energypriceforecast_sell_entity_id": "",
+            "spotforecast_buy_entity_id": "",
+            "elprognos_buy_entity_id": "",
+            "wattcast_buy_entity_id": "",
+            "wattcast_forecast_entity_id": "",
             "stromligning_buy_current_price": "",
             "stromligning_buy_tomorrow_available": "",
             "stromligning_buy_forecasts": "",
@@ -129,6 +133,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         },
         "refund": 0.0,
         "sell_fee": 0.03,
+        # the VAT (%) and the surcharge per kWh (grid fee, taxes, margin) added to the wholesale price of the spot forecast providers:
+        # none by default, a buy price without them would be too low, so they must be set
+        "spot_vat": None,
+        "spot_surcharge": None,
         "country": "DK",  # ISO 3166-1 alpha-2: the country of the prices (the price provider page); Denmark for entries from before it
         # not a page of the flow: set when the entry is made from the unit of the price sensors (const/base.py price_scale)
         "price_scale": 1.0,
@@ -213,6 +221,10 @@ OPTION_PATHS: dict[str, str] = {
     "energidataservice_sell_entity_id": "prices.entity_ids.energidataservice_sell_entity_id",
     "energypriceforecast_buy_entity_id": "prices.entity_ids.energypriceforecast_buy_entity_id",
     "energypriceforecast_sell_entity_id": "prices.entity_ids.energypriceforecast_sell_entity_id",
+    "spotforecast_buy_entity_id": "prices.entity_ids.spotforecast_buy_entity_id",
+    "elprognos_buy_entity_id": "prices.entity_ids.elprognos_buy_entity_id",
+    "wattcast_buy_entity_id": "prices.entity_ids.wattcast_buy_entity_id",
+    "wattcast_forecast_entity_id": "prices.entity_ids.wattcast_forecast_entity_id",
     "stromligning_buy_current_price": "prices.entity_ids.stromligning_buy_current_price",
     "stromligning_buy_tomorrow_available": "prices.entity_ids.stromligning_buy_tomorrow_available",
     "stromligning_buy_forecasts": "prices.entity_ids.stromligning_buy_forecasts",
@@ -225,6 +237,8 @@ OPTION_PATHS: dict[str, str] = {
     "stromligning_sell_systemtariff": "prices.entity_ids.stromligning_sell_systemtariff",
     "stromligning_sell_surcharge": "prices.entity_ids.stromligning_sell_surcharge",
     "refund": "prices.refund",
+    "spot_vat": "prices.spot_vat",
+    "spot_surcharge": "prices.spot_surcharge",
     "sell_fee": "prices.sell_fee",
     "price_country": "prices.country",
     "price_scale": "prices.price_scale",
@@ -309,6 +323,9 @@ FLOW_STEPS: dict[str, list[str]] = {
     ],
     "prices_energidataservice": ["energidataservice_buy_entity_id", "energidataservice_sell_entity_id"],
     "prices_energypriceforecast": ["energypriceforecast_buy_entity_id", "energypriceforecast_sell_entity_id"],
+    "prices_spotforecast": ["spotforecast_buy_entity_id"],
+    "prices_elprognos": ["elprognos_buy_entity_id"],
+    "prices_wattcast": ["wattcast_buy_entity_id", "wattcast_forecast_entity_id"],
     "prices_stromligning": [
         "stromligning_buy_current_price",
         "stromligning_buy_tomorrow_available",
@@ -350,6 +367,9 @@ FLOW_STEPS: dict[str, list[str]] = {
 PRICE_PROVIDER_KEYS: dict[str, list[str]] = {
     "energidataservice": FLOW_STEPS["prices_energidataservice"],
     "energypriceforecast": FLOW_STEPS["prices_energypriceforecast"],
+    "spotforecast": FLOW_STEPS["prices_spotforecast"],
+    "elprognos": FLOW_STEPS["prices_elprognos"],
+    "wattcast": FLOW_STEPS["prices_wattcast"],
     "stromligning": FLOW_STEPS["prices_stromligning"] + FLOW_STEPS["prices_stromligning_tariffs"],
 }
 
@@ -359,7 +379,7 @@ OPTIONS_MENU: dict[str, list[str]] = {
     "charger": ["charger", "charger_specs", "load_balancing"],
     "ev": ["ev", "ev_specs"],
     "home": ["home", "powerwall", "detection_review"],
-    "prices": ["price_provider", "prices_energidataservice", "prices_energypriceforecast", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
+    "prices": ["price_provider", "prices_energidataservice", "prices_energypriceforecast", "prices_spotforecast", "prices_elprognos", "prices_wattcast", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
     "solar": ["solar", "solar_charging", "weather"],
     "notifications": ["notifications"],
     "advanced": ["advanced", "database"],
