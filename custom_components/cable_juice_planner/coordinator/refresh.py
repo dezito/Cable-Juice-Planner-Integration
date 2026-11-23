@@ -361,7 +361,7 @@ class CoordinatorRefresh:
                 )
                 windows, start = [], None
                 for state in states.get(status_id, []):
-                    connected = state.state in CONNECTED_STATUS
+                    connected = self.canonical_status(state.state) in CONNECTED_STATUS
                     if connected and start is None:
                         start = state.last_changed.timestamp()
                     elif not connected and start is not None and state.state not in ENTITY_UNAVAILABLE_STATES:
@@ -517,7 +517,7 @@ class CoordinatorRefresh:
                     )
                 )
                 data["status"] = [
-                    (state.last_changed.timestamp(), state.state in CONNECTED_STATUS)
+                    (state.last_changed.timestamp(), self.canonical_status(state.state) in CONNECTED_STATUS)
                     for state in states.get(status_id, []) if state.state not in ENTITY_UNAVAILABLE_STATES
                 ]
                 data["odometer"] = as_series((state.last_changed.timestamp(), state.state) for state in states.get(ev["odometer_entity_id"], []))

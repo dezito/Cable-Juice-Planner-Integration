@@ -5,7 +5,7 @@ import datetime
 import logging
 import math
 
-from ...const import ENTITY_UNAVAILABLE_STATES, EV_PLUGGED_STATES, EV_UNPLUGGED_STATES
+from ...const import ENTITY_UNAVAILABLE_STATES, EV_PLUGGED_STATES, EV_UNPLUGGED_STATES, normalize_state
 from ...utils.formatting import emoji_parse
 from ...utils.helpers import to_datetime
 
@@ -31,7 +31,7 @@ class HistorySession:
         if not self.is_entity_configured(location_entity):
             return False
         current_location = self.get_state(location_entity, error_state="unknown")
-        return not (current_location == "home" or current_location in ENTITY_UNAVAILABLE_STATES)
+        return not (normalize_state(current_location) == "home" or current_location in ENTITY_UNAVAILABLE_STATES)
 
     def _is_home(self) -> bool:
         """Known to be home (like _is_not_home, a briefly unavailable location is its last known state of the past day).
@@ -40,7 +40,7 @@ class HistorySession:
         location_entity = self.config["ev_car"]["entity_ids"]["location_entity_id"]
         if not self.is_entity_configured(location_entity):
             return False
-        return self.get_state(location_entity, error_state="unknown") == "home"
+        return normalize_state(self.get_state(location_entity, error_state="unknown")) == "home"
 
     def _odometer(self) -> float | None:
         """The odometer now; None without one or without a number (not the same as not driven).
@@ -136,7 +136,7 @@ class HistorySession:
                 _LOGGER.warning("Public charging session: The car was driven since the open session started at %s%%, starting a new one", sessions[-1]["start_battery_level"])
                 sessions.pop(-1)
             self._start_public_session()
-        elif is_open and entity_state in (*EV_PLUGGED_STATES, *EV_UNPLUGGED_STATES) and self._is_home():
+        elif is_open and entity_state in EV_PLUGGED_STATES + EV_UNPLUGGED_STATES and self._is_home():
             _LOGGER.warning("Public charging session: The port/cable changed at home while a session started at %s%% was open, dropping it", sessions[-1]["start_battery_level"])
             sessions.pop(-1)
             self.mark_dirty("runtime")

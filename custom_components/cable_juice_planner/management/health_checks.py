@@ -57,6 +57,7 @@ from ..const import (
     CHARGER_READY_STATUS,
     DOMAIN,
     ENTITY_UNAVAILABLE_STATES,
+    StateSet,
 )
 from ..utils.power import POWER_UNITS, power_unit_known
 from .automation_inputs import blueprint_automation_ids
@@ -135,8 +136,8 @@ ENERGY_UNIT = "kWh"
 BATTERY_UNITS = ("%",)
 
 # the statuses CJP knows (const/base.py), "error" (a restart has its own rules), and the unavailable ones (not a value to judge)
-KNOWN_STATUS = frozenset(
-    (*CHARGER_READY_STATUS, *CHARGER_NOT_READY_STATUS, *CHARGER_COMPLETED_STATUS, *CHARGER_CHARGING_STATUS, "error", *ENTITY_UNAVAILABLE_STATES)
+KNOWN_STATUS = StateSet(
+    *CHARGER_READY_STATUS, *CHARGER_NOT_READY_STATUS, *CHARGER_COMPLETED_STATUS, *CHARGER_CHARGING_STATUS, "error", *ENTITY_UNAVAILABLE_STATES
 )
 # the states of an automation that are judged: on (in use), off (disabled)
 AUTOMATION_STATES = ("on", "off")
@@ -284,6 +285,7 @@ class HealthWatcher:
         consumption_entity: str = "",
         charger_in_house_meter: bool = True,
         price_problems: Callable[[], tuple[list[tuple[str, str]], bool] | None] | None = None,
+        canonical_status: Callable[[Any], Any] | None = None,
     ) -> None:
         """entities: the configured entities (the ones DependencyWatcher judges, in watched, are left out here).
         charger_power/power/battery/energy_entities: the sensors whose unit is read, by kind; a sensor listed twice is judged by
@@ -320,6 +322,8 @@ class HealthWatcher:
                     scope.setdefault(entity_id, accepted)
         self._unit_scope: list[tuple[str, Callable[[str], bool]]] = list(scope.items())
         self._status_entity = status_entity
+        # the states the charger blueprint adds count as known (coordinator/status_states.py); the built in ones always do
+        self._canonical_status = canonical_status or (lambda value: value)
         self._action_sensor = action_sensor
         self._automations_path = automations_path
         # the sensors judged by their values (value_checks): the power sensors (the charger's too) and the battery levels
@@ -673,7 +677,7 @@ class HealthWatcher:
             return  # not judged now: the repair stays as it is
         now = dt_util.utcnow()
         before = dict(self._data["status_unknown"])
-        if state.state not in KNOWN_STATUS and now - state.last_changed >= datetime.timedelta(minutes=STATUS_UNKNOWN_MINUTES):
+        if self._canonical_status(state.state) not in KNOWN_STATUS and now - state.last_changed >= datetime.timedelta(minutes=STATUS_UNKNOWN_MINUTES):
             self._data["status_unknown"][state.state] = now.isoformat()
         cutoff = now - datetime.timedelta(days=STATUS_UNKNOWN_DAYS)
         self._data["status_unknown"] = {

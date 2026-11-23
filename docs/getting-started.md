@@ -64,7 +64,7 @@ selectors only show relevant entities: battery level only `battery` sensors, pow
 
 | Field | How to set it |
 |---|---|
-| Status | the charger's status sensor (`charging`, `completed`, `awaiting_start`, `disconnected` …) |
+| Status | the charger's status sensor (`charging`, `completed`, `awaiting_start`, `disconnected` …; case does not matter). Other states for charging or done can be added in the [charger blueprint](charger-control.md#charging-state) |
 | Power | the charging power in W |
 | kWh meter | if the charger's kWh meter updates slowly (e.g. Easee), make a *Riemann sum integral* (left) of the power sensor and use it |
 | Voltage, phases, max. amps | e.g. 230 V (the default), 3 phases, 16 A: limits how many kWh fit in an hour. The voltage also turns the charger's power into amps for the [load balancing](load-balancing.md), and the [charger test](charger-control.md#test-your-charger-automation) tells you when the power shows another one. An entry still at 240 V, the default of earlier versions, gets a repair that sets 230 V when you submit it; ignore it if your grid really has 240 V |

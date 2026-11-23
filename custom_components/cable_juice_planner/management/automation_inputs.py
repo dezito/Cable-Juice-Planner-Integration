@@ -13,10 +13,21 @@ import os
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import yaml as yaml_util
 
+from ..const import (
+    CHARGER_CHARGING_STATUS,
+    CHARGER_COMPLETED_STATUS,
+    CHARGER_NOT_READY_STATUS,
+    CHARGER_READY_STATUS,
+    normalize_state,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 BLUEPRINT_PATH = "cable_juice_planner/charger_control.yaml"
 ACTION_INPUT = "action_sensor"
+STATUS_INPUT = "charger_status"
+# the blueprint's lists of states and the built in state each one is read as (the canonical state, const/base.py)
+STATE_INPUTS = {"charging_states": CHARGER_CHARGING_STATUS[0], "completed_states": CHARGER_COMPLETED_STATUS[0]}
 
 
 def automations_using_blueprint(path: str, action_sensor: str) -> list[dict]:
@@ -63,6 +74,34 @@ def blueprint_automation_ids(path: str, action_sensor: str) -> list[str] | None:
         if blueprint["input"].get(ACTION_INPUT) == action_sensor and automation.get("id") is not None:
             ids.append(str(automation["id"]))
     return ids
+
+
+def _listed(value) -> list[str]:
+    """The entity ids or states of a blueprint input: a list (the multiple selectors) or one text (older automations)."""
+    items = value if isinstance(value, list) else [value]
+    return [normalize_state(item) for item in items if isinstance(item, str) and item.strip()]
+
+
+def status_aliases(inputs: list[dict], status_entity_id: str) -> dict[str, str]:
+    """The states the user gave the charger blueprint for CJP's status entity, as {state: built in state}.
+
+    "States that mean charging" and "States that mean done" of an automation that has this entity among its status
+    entities are read as charging and completed. The built in states always apply and always win: a state that is built in
+    (ready, plugged in ...) is never moved, and a state the automations name as both charging and done is left out (it is
+    not known which they mean). "States that mean the charger is not ready" is not used: it also holds states CJP reads as
+    plugged in (awaiting_start). An input that is not set is the blueprint's default, which the built in states cover.
+    The states are lower case, like every comparison (normalize_state)."""
+    entity = normalize_state(status_entity_id) if status_entity_id else ""
+    found: dict[str, set[str]] = {}
+    for automation in inputs:
+        if not entity or entity not in _listed(automation.get(STATUS_INPUT)):
+            continue
+        for key, built_in in STATE_INPUTS.items():
+            for state in _listed(automation.get(key)):
+                found.setdefault(state, set()).add(built_in)
+    # also what means no data or a fault (unknown, unavailable, error): that is never charging or done, whatever the user lists
+    known = (*CHARGER_READY_STATUS, *CHARGER_NOT_READY_STATUS, *CHARGER_COMPLETED_STATUS, *CHARGER_CHARGING_STATUS, "error", "unknown", "unavailable", "none")
+    return {state: next(iter(kinds)) for state, kinds in found.items() if len(kinds) == 1 and state not in known}
 
 
 def has_steps(inputs: list[dict], *keys: str) -> bool | None:

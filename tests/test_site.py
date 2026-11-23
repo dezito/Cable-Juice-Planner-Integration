@@ -187,6 +187,9 @@ class FakeCar:
     def async_site_limit(self) -> None:
         self.limited = getattr(self, "limited", 0) + 1
 
+    def canonical_status(self, value):
+        return value  # no states of the charger blueprint (coordinator/status_states.py)
+
 
 @pytest.fixture
 async def fake_site(hass: HomeAssistant):
