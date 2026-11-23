@@ -59,8 +59,8 @@ class CoordinatorLifecycle:
         # Home Assistant stopping does not unload the entries, and the what-if thread (a worker thread of an executor) is
         # waited for when the process exits: a replay with minutes left would hold up the stop or the restart
         self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
-        if self.config["home"]["ignore_cjp_chargers"]:
-            self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
+        # always: the chargers on their own meter of the cars ahead are added whatever ignore_cjp_chargers says
+        self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
         watched = self._start_dependency_checks()
         await self._async_start_health_checks(watched)
 
@@ -111,6 +111,7 @@ class CoordinatorLifecycle:
             energy_entities=[charger["kwh_meter_entity_id"], charger["lifetime_kwh_meter_entity_id"]],
             status_entity=charger["status_entity_id"],
             consumption_entity=home["power_consumption_entity_id"],
+            charger_in_house_meter=self.config["home"].get("charger_in_house_meter", True),
             action_sensor=f"sensor.{self.object_prefix}_charger_action",
             automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
             price_problems=self._price_unit_problems,
@@ -130,18 +131,21 @@ class CoordinatorLifecycle:
 
     @callback
     def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:
-        """A car was added, removed, enabled, disabled, got another charger or another priority: start again with the new list.
+        """A car was added, removed, enabled, disabled, got another charger or priority, or had its charger moved into or
+        out of the house meter (charger_in_house_meter): start again with the new lists.
 
         The signal also comes for every state change of a car's entry (loading, reloading), so the chargers of the cars
-        with a lower priority are compared with the ones this start used; only a real difference reloads, and only once.
+        with a lower priority (only while ignore_cjp_chargers is on) and the chargers on their own meter of the cars ahead
+        (always) are compared with the ones this start used; only a real difference reloads, and only once.
         A reload changes nothing in the options of the other cars, so the cars never reload each other in turn.
         """
         if entry.domain != DOMAIN or entry.entry_id == self.entry.entry_id or self._chargers_reload_scheduled:
             return
-        if self._lower_priority_chargers() == self.lower_priority_chargers:
+        lower = self._lower_priority_chargers() if self.config["home"]["ignore_cjp_chargers"] else []
+        if lower == self.lower_priority_chargers and self._own_meter_chargers_ahead() == self.added_chargers:
             return
         self._chargers_reload_scheduled = True
-        _LOGGER.info("The chargers of the cars with a lower priority changed, reloading %s to leave out their consumption", self.entry.title)
+        _LOGGER.info("The chargers of the other cars changed, reloading %s to count their consumption right", self.entry.title)
         self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 
     async def _async_apply_restore(self) -> None:

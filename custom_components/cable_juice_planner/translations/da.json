@@ -111,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "charger_in_house_meter": "Husets forbrug indeholder denne bils lader",
           "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "charger_in_house_meter": "Til (standard): husets forbrugssensor måler også denne bils lader, så Cable Juice Planner trækker laderen fra. Slå fra, hvis laderen har sin egen måler, som husets forbrugssensor ikke indeholder, bag samme nettilslutning som solcellerne (ikke en separat tilslutning): så trækkes laderen ikke fra, hverken her, af bilerne bagved eller af BattMind, og bilerne bag denne (eller med samme prioritet) lægger i stedet dens ladning til deres husforbrug, som én måler ville. Uden et tal fra laderens effektsensor tæller laderen med sin maksimale effekt. Er du i tvivl, så lad den være slået til: en reparation fortæller dig, når historikken viser et husforbrug under halvdelen af det, laderen bruger.",
           "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
@@ -535,11 +537,13 @@
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "charger_in_house_meter": "Husets forbrug indeholder denne bils lader",
           "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "charger_in_house_meter": "Til (standard): husets forbrugssensor måler også denne bils lader, så Cable Juice Planner trækker laderen fra. Slå fra, hvis laderen har sin egen måler, som husets forbrugssensor ikke indeholder, bag samme nettilslutning som solcellerne (ikke en separat tilslutning): så trækkes laderen ikke fra, hverken her, af bilerne bagved eller af BattMind, og bilerne bag denne (eller med samme prioritet) lægger i stedet dens ladning til deres husforbrug, som én måler ville. Uden et tal fra laderens effektsensor tæller laderen med sin maksimale effekt. Er du i tvivl, så lad den være slået til: en reparation fortæller dig, når historikken viser et husforbrug under halvdelen af det, laderen bruger.",
           "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
@@ -1475,6 +1479,10 @@
     "consumption_frozen": {
       "title": "Husforbrugssensoren viser den samme værdi i 6 timer ({prefix})",
       "description": "Cable Juice Planner ({prefix}) bruger husforbrugssensoren {entity} som husforbrug i planen. Den har vist {value} siden {since}: mindst 6 timer uden ændring.\n\nPlanen bruger sensoren til huset, så en sensor der står stille giver et forkert husforbrug. Tjek integrationen eller enheden der leverer sensoren: den sender måske ikke længere værdier. Hvis værdien virkelig er konstant, så vælg **Ignorer** på denne reparation.\n\nDenne reparation forsvinder af sig selv, når sensoren viser en anden værdi. En utilgængelig sensor lader reparationen stå. Planens underretning om en utilgængelig sensor gælder kun en sensor med en registreringspost i entitetsregistret (for eksempel fra en integration, oprettet i brugerfladen eller YAML med et unikt ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Husets forbrug ser ikke ud til at indeholde laderen ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) trækker denne bils lader fra husforbrugssensoren {entity}, fordi indstillingen **Husets forbrug indeholder denne bils lader** er slået til. Men i {hours} timer inden for de seneste {days} dage var husets forbrug under {share} % af det, laderen alene brugte, uden sol og uden at hjemmebatteriet lades op eller aflades. En sensor, der indeholder laderen, kan aldrig være lavere end laderen, så laderen sidder sandsynligvis på sin egen måler. Så trækkes laderen fra et hus, der aldrig havde den: husets forbrug bliver for lavt, og planen ser soloverskud og billige timer, der ikke er der.\n\nHvis laderen sidder på sin egen måler, så slå **Husets forbrug indeholder denne bils lader** fra i indstillingerne for denne bil (siden Husets forbrug). Hvis forbrugssensoren burde indeholde laderen, så tjek sensoren. Hvis værdierne er rigtige, som de er, så vælg **Ignorer** på denne reparation.\n\nDenne reparation forsvinder af sig selv, når indstillingen slås fra, når husforbrugssensoren eller laderens effektsensor fjernes, eller når timerne i de seneste {days} dage viser, at husets forbrug indeholder laderen."
     },
     "site_fuse_exceeded": {
       "title": "Huset og bilerne trækker mere end hovedsikringen (lastfordeling)",

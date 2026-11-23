@@ -231,6 +231,27 @@ async def test_a_changed_set_of_chargers_reloads_the_car_once(hass: HomeAssistan
     assert await changed()
     assert coordinators[-1].auto_ignored_entities == ["sensor.zoe_wallbox"]
 
+    # the car behind moved to its own meter: no longer subtracted, still checked for a hung reading; and back again
+    hass.config_entries.async_update_entry(zoe, options={**zoe.options, "charger_in_house_meter": False})
+    assert await changed()
+    assert coordinators[-1].auto_ignored_entities == []
+    assert coordinators[-1].config["home"]["charger_entity_ids"] == ["sensor.zoe_wallbox"]
+    hass.config_entries.async_update_entry(zoe, options={**zoe.options, "charger_in_house_meter": True})
+    assert await changed()
+    assert coordinators[-1].auto_ignored_entities == ["sensor.zoe_wallbox"]
+
+    # a car with the same priority (not behind) changes nothing while its charger is in the house consumption; on its own
+    # meter it is added to this car's house, so moving it there, or giving it another charger, reloads this car
+    leaf = car(hass, "sensor.leaf_power", "leaf", priority=1, announce=True)
+    assert not await changed()
+    hass.config_entries.async_update_entry(leaf, options={**leaf.options, "charger_in_house_meter": False})
+    assert await changed()
+    assert list(coordinators[-1].added_chargers) == ["sensor.leaf_power"]
+    assert "sensor.leaf_power" in coordinators[-1].snapshot_entities
+    hass.config_entries.async_update_entry(leaf, options={**leaf.options, "charger_power_entity_id": "sensor.leaf_wallbox"})
+    assert await changed()
+    assert list(coordinators[-1].config["home"]["added_consumption"]) == ["sensor.leaf_wallbox"]
+
 
 async def test_cars_do_not_reload_each_other(hass: HomeAssistant) -> None:
     """Cars 1 and 2 are set up. Car 3 (priority 3) is behind both: they reload once each. Car 4 (priority 1) is behind

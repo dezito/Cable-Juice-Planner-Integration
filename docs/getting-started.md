@@ -89,15 +89,34 @@ recorder, as described below.
 - **House consumption:** the house's consumption, not the grid import. Used for the solar surplus.
 - **Ignored consumers:** power sensors subtracted from the house – e.g. a heat pump you don't want in the
   forecast. The charger itself is subtracted automatically. The house consumption used for the solar surplus is never below 0 W.
+- **House consumption includes this car's charger** (on by default): the house consumption sensor also measures this
+  car's charger, so the charger is subtracted from it. Turn it off when the charger has its own meter that the house
+  consumption sensor does not include: the charger is then not subtracted, neither by this car nor by the cars behind
+  it (the switch below) nor by BattMind, and this car's plan works with the same house as with one meter. The cars
+  behind this one, and those with the same priority, add its charging to their house consumption instead (with one
+  meter the sensor would include it), so they don't count the solar it uses as theirs; they reload once when the
+  setting changes. Without a number from a charger power sensor that is set (none in the window and none now), the
+  charger counts with its most (phases × max. current × voltage of that car): less solar, never more than with one
+  meter. Such an hour is not stored for the consumption and solar forecasts. A charger power sensor that has stopped
+  reporting counts with its last number, so a charger that hangs at 0 W while it charges gives the cars behind solar that
+  the car ahead uses, and a car on its own meter without a charger power sensor is not seen by the others at all. The
+  setting assumes the charger is behind the same grid connection as the solar (not a separate connection), and that
+  every car sharing one charger has the same setting. Hours stored
+  while the setting was wrong stay in the forecast until they are replaced (as many days as the power values are kept,
+  15 by default). If unsure, leave it on: the repair *The house consumption does not seem to include the charger*
+  appears when the stored hours show a house consumption under half of what the charger alone drew (see
+  [Repairs](faq-troubleshooting.md)).
 - **Ignore chargers of cars with lower priority** (on by default): with several cars in Cable Juice Planner, the car
   with [priority](load-balancing.md#solar-surplus-between-cars) 1 has the first right to the solar surplus, then 2,
   and so on. A car therefore counts the charging of the cars ahead of it as consumption of the house, but subtracts
   the chargers of the cars behind it, so you don't add them to the list yourself. Cars with the same priority (the
   default is 1 for everyone) don't leave each other out. The page shows the chargers it found. A car added later, or
   one with another priority, is picked up automatically (the cars concerned reload once), this car's own charger is
-  never counted twice, and a charger that is also in your list is subtracted once. Turn it off if the house
-  consumption sensor does not include the chargers, e.g. a separate meter: subtracting them would then take
-  consumption that was never there out of the forecast.
+  never counted twice, and a charger that is also in your list is subtracted once. A car whose charger is set to its
+  own meter (the setting above, on that car) is never subtracted; one ahead of this car is added instead, also with
+  this switch off. Turn it off if the house consumption sensor includes
+  none of the chargers, e.g. a separate meter: subtracting them would then take consumption that was never there out
+  of the forecast.
 - **A charger that hangs:** The charger of another car that has not reported for over 30 minutes while it still reads a number other
   than 0 (a hung integration is not *unavailable*) is taken to be stuck: it is not subtracted, in the current hour and in the
   hours since it got stuck, until it reports again, and a warning is logged. The higher consumption is the safe side. It is the
@@ -134,7 +153,7 @@ continue. The suggestions are only made when you have chosen or changed one of t
 restored backup, an import from PyScript and the stored settings keep their values; tick *Detect again* to look again
 (the page is the last one of *Home* under *Configure*). The numbers are only suggestions – check that they fit before you continue.
 
-The consumption numbers are read after the consumers that the planner itself leaves out are subtracted (the ignored ones, this car's charger and, when the switch above is on, the chargers of the cars behind it), so
+The consumption numbers are read after the consumers that the planner itself leaves out are subtracted (the ignored ones, this car's charger unless it is on its own meter and, when the switch above is on, the chargers of the cars behind it), so
 the page compares what the planner works with. If the page shows a message instead of numbers (no recorder, the reading took
 too long, a power sensor with an unknown unit, no usable history), the current values are kept; tick *Detect again* to try
 again.

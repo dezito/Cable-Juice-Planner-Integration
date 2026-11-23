@@ -308,6 +308,25 @@ async def test_only_the_chargers_the_planner_leaves_out_are_given(hass: HomeAssi
     hass.config_entries.options.async_abort(result["flow_id"])
 
 
+async def test_chargers_on_their_own_meter_are_not_given_to_the_detector(hass: HomeAssistant, loaded_entry, detector: Detector) -> None:
+    """The house sensor does not include them, so there is nothing to leave out of what it reads: neither this car's own
+    charger nor one of a car behind."""
+    other = make_entry("zoe", {**loaded_entry.options, "charger_power_entity_id": "sensor.zoe_power", PRIORITY_KEY: 2, "charger_in_house_meter": False})
+    other.add_to_hass(hass)
+    hass.states.async_set(BATTERY_POWER, "0", {"unit_of_measurement": "W", "device_class": "power"})
+    hass.states.async_set(BATTERY_LEVEL, "50", {"unit_of_measurement": "%", "device_class": "battery"})
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "charger_in_house_meter": False})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    result = await _open_home(hass, loaded_entry)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**form_defaults(result), "powerwall_watt_flow_entity_id": BATTERY_POWER, "powerwall_battery_level_entity_id": BATTERY_LEVEL}
+    )
+    assert result["step_id"] == "detection_review"
+
+    assert detector.left_out[-1] == []
+    hass.config_entries.options.async_abort(result["flow_id"])
+
+
 async def test_the_trusted_sign_is_the_stored_one_not_what_the_form_says_now(hass: HomeAssistant, loaded_entry, detector: Detector) -> None:
     hass.states.async_set(BATTERY_POWER, "0", {"unit_of_measurement": "W", "device_class": "power"})
     hass.states.async_set(BATTERY_LEVEL, "50", {"unit_of_measurement": "%", "device_class": "battery"})

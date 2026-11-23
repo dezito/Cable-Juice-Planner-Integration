@@ -14,7 +14,7 @@ from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTIT
 from ..site import charger_devices, circuit_of, update_circuits
 from ..management.dependency_checks import disabled_sensors
 from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, has_stromligning_sell_prices
-from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
+from ..utils.chargers import charger_in_house_meter, charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
 from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDERS, build_schema, normalize_input, validate_step
@@ -177,7 +177,10 @@ class CJPFlowPages:
             if self._options.get("ignore_cjp_chargers", True)
             else []
         )
-        return [*([ignored] if isinstance(ignored, str) else ignored), *([own] if own else []), *behind]
+        # a charger on its own meter is not in the house consumption: the engine adds it instead of subtracting it, and the
+        # detection reads the sensors as they are, so it is not left out there
+        left_out = [own] if own and charger_in_house_meter(self._options) else []
+        return [*([ignored] if isinstance(ignored, str) else ignored), *left_out, *behind]
 
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

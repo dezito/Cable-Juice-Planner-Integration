@@ -104,6 +104,7 @@ SELECTORS: dict[str, Any] = {
     "power_consumption_entity_id_include_powerwall_discharging": BOOLEAN,
     "ignore_consumption_from_entity_ids": _entity("sensor", device_class="power", multiple=True),
     "ignore_cjp_chargers": BOOLEAN,
+    "charger_in_house_meter": BOOLEAN,
     "powerwall_watt_flow_entity_id": _entity("sensor", device_class="power"),
     "invert_powerwall_watt_flow_entity_id": BOOLEAN,
     "powerwall_battery_level_entity_id": _entity("sensor", device_class="battery"),
