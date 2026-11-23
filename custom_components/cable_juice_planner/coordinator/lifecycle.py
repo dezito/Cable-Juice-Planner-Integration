@@ -51,6 +51,12 @@ class CoordinatorLifecycle:
             if key.startswith(f"component.{DOMAIN}.entity.") and key.endswith(".name") and key.count(".") == 5
         }
         self.engine = CJPEngine(self.config, self.object_prefix, self.texts, title=self.title)
+        # before the first snapshot and the history buffers: the states the charger blueprint adds (coordinator/status_states.py)
+        try:
+            await self._async_load_status_aliases()
+        except Exception:  # noqa: BLE001 - a file that can't be read: the built in states alone (never stops the setup)
+            _LOGGER.debug("Could not read the states of the charger blueprint", exc_info=True)
+        self._start_status_aliases()
         if self.site is not None:
             self.site.register(self)
 
@@ -115,6 +121,7 @@ class CoordinatorLifecycle:
             action_sensor=f"sensor.{self.object_prefix}_charger_action",
             automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
             price_problems=self._price_unit_problems,
+            canonical_status=self.canonical_status,
         )
         await watcher.async_load()
         watcher.start()

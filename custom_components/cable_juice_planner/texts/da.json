@@ -169,6 +169,7 @@
     "ready_to_charge": {
       "cable_disconnected": "Ladekabel frakoblet",
       "cable_connected_ev_not_home": "Ladekabel forbundet, men bilen er ikke hjemme",
+      "ev_not_home": "Bilen er ikke hjemme",
       "cable_connected_not_to_ev": "Ladekabel ikke forbundet til bilen\nPrøver at vække bilen",
       "charge_port_closed": "Elbilens ladeport er ikke åben\nPrøver at vække bilen",
       "ev_unavailable": "Elbilens ladeport eller ladekabel er ikke tilgængelig\nPrøver at vække bilen"

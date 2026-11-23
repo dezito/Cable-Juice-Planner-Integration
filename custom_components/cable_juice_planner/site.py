@@ -57,6 +57,7 @@ from .const import (
     SIGNAL_SITE_UPDATE,
     SITE_DEFAULTS,
     SITE_HOURS_AHEAD,
+    StateSet,
 )
 from .management.value_checks import number_text
 from .utils.helpers import float_or_none
@@ -87,7 +88,7 @@ FUSE_OVER_HOURS = 3  # this many such hours in the forecast's days raise the rep
 FUSE_MIN_HOURS = 24  # hours of data per phase before a positive answer (the repair goes)
 STALE_CHECK_SECONDS = 30  # how often the overload check runs without a sensor event (a sensor that went stale)
 # charger statuses that surely mean "not charging": only then does a car's measured power free current (no phase sensors)
-SETTLED_STATUS = (*CHARGER_COMPLETED_STATUS, *CHARGER_NOT_READY_STATUS, "ready_to_charge", "awaiting_start", "awaiting_authorization")
+SETTLED_STATUS = StateSet(*CHARGER_COMPLETED_STATUS, *CHARGER_NOT_READY_STATUS, "ready_to_charge", "awaiting_start", "awaiting_authorization")
 FORECAST_DAYS = 7
 
 
@@ -546,7 +547,7 @@ class CJPSite:
             return False
         status_id = coordinator.config["charger"]["entity_ids"].get("status_entity_id") or ""
         state = self.hass.states.get(status_id) if status_id else None
-        if state is None or state.state not in SETTLED_STATUS or not self._fresh(state):
+        if state is None or coordinator.canonical_status(state.state) not in SETTLED_STATUS or not self._fresh(state):
             return False
         # the power sensor too: a stale 0 W is no proof that the car doesn't draw
         power = self.hass.states.get(self._power_entity(coordinator)) if self._power_entity(coordinator) else None
@@ -556,7 +557,7 @@ class CJPSite:
         """The charger's status reported within STALE_SECONDS and surely means not charging (SETTLED_STATUS)."""
         status_id = coordinator.config["charger"]["entity_ids"].get("status_entity_id") or ""
         state = self.hass.states.get(status_id) if status_id else None
-        return state is not None and state.state in SETTLED_STATUS and self._fresh(state)
+        return state is not None and coordinator.canonical_status(state.state) in SETTLED_STATUS and self._fresh(state)
 
     @staticmethod
     def _fresh(state) -> bool:

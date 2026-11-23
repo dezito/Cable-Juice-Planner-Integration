@@ -22,6 +22,10 @@ entities, and your automation does it – easiest with the blueprint that comes 
 | `sensor.cjp_<prefix>_charging_limit` | the wanted charge limit on the car in % (only with an EV integration) |
 | `event.cjp_<prefix>_ev_request` | `wake_up`, `preheat_start` (data: `departure`, `defrost`) and `preheat_stop` |
 
+`wake_up` is sent when the cable or charge port is not ready and the car is at home. The regular check (every cron interval)
+never sends it while the car is away from home (the car's location entity is not `home`), whatever the charger's status or
+the cable sensor says; it then shows that the car is not at home. A plug-in seen by the charger still wakes the car.
+
 ## The blueprint
 
 **Cable Juice Planner - charger control** is installed with the integration. It is placed in
@@ -145,6 +149,18 @@ several entities, e.g. both the charger's and the car's – **one of them is eno
 | Check that it charges or stops | on by default – see below |
 
 A new charging decision from CJP always sends start.
+
+**Cable Juice Planner reads the same lists.** For the charger's status sensor in *Cable Juice Planner*'s own setup (**Charger →
+Status**), the states in *States that mean charging* and *States that mean done* of an automation made from this blueprint
+count as charging and done too, when that sensor is one of the automation's *Status or "charging" entities*. They are added
+to the states CJP knows (the usual ones of Easee, Zaptec, Ohme, Wallbox, myenergi, Tesla and others, e.g. `charging`;
+`completed`, `complete`, `charge_complete`, `finished`), which always apply and are never moved to another meaning: a state that is also one of those (or that is `ready`, `connected`, `disconnected` …) is left out,
+and so is a state that is listed as both charging and done. *States that mean the charger is not ready* is not used, because
+it also holds states CJP reads as plugged in (`awaiting_start`). The automation is read from `automations.yaml` (read only) at
+start and each time automations are reloaded; an automation kept elsewhere (packages, YAML mode) is not found. Cable Juice
+Planner ignores upper and lower case: `Complete`, `COMPLETE` and `complete` are the same state to it. The blueprint itself
+compares the lists exactly as written, so list the states in the case the entity has. States that mean no data or a fault
+(`unknown`, `unavailable`, `error`) are never read as charging or done.
 
 **Check that it charges or stops:** 30 s after a start or stop the blueprint checks the entities above, and
 one of them is enough:

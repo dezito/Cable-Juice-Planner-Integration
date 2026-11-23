@@ -7,12 +7,14 @@ import logging
 from ...const import (
     CHARGER_CHARGING_STATUS,
     CHARGER_COMPLETED_STATUS,
+    CHARGER_HELD_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_ALLOWED_AFTER_GOTO_TIME,
     ENTITY_UNAVAILABLE_STATES,
     EV_PLUGGED_STATES,
     POWERWALL_DISCHARGING_TRIGGER,
+    normalize_state,
 )
 from ...utils.formatting import emoji_parse
 from ...utils.helpers import date_to_string, minutes_between, reset_datetime, round_up
@@ -68,9 +70,14 @@ class ControlSchedule:
         if self.is_ev_configured():
             ids = self.config["ev_car"]["entity_ids"]
             ev_charger_connector = self.get_state(ids["charge_cable_entity_id"], error_state="on") if self.is_entity_configured(ids["charge_cable_entity_id"]) else "not_configured"
-            if (ev_charger_connector in EV_PLUGGED_STATES or charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS) and not self.is_ev_home():
+            if not self.is_ev_home():
+                # a car that is away is never woken: not with the cable unplugged, whatever the charger status says (a status
+                # that is not known is not "unplugged"), nor with the port closed or an entity unavailable
                 _LOGGER.debug("To long away from home")
-                self.set_charging_rule(f"⛔{self.t('ui.ready_to_charge.cable_connected_ev_not_home')}")
+                # the status only counts when there is a status entity (without one it reads "connected")
+                status_plugged = self.is_entity_configured(charger["status_entity_id"]) and charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS
+                plugged_in = ev_charger_connector in EV_PLUGGED_STATES or status_plugged
+                self.set_charging_rule(f"⛔{self.t('ui.ready_to_charge.cable_connected_ev_not_home' if plugged_in else 'ui.ready_to_charge.ev_not_home')}")
                 return None
             if ev_charger_connector not in EV_PLUGGED_STATES:
                 _LOGGER.debug("Charger cable is Disconnected")
@@ -289,9 +296,9 @@ class ControlSchedule:
             # the session ends every hour (hour_end) while the plan goes on: the mark and the restarts made are kept
             return None
 
-        if charger_status == "error":
+        if normalize_state(charger_status) == "error":
             problem = t("ui.is_charging.charger_error")
-        elif charger_status in CHARGER_READY_STATUS and sum(self.current_charging_amps) > 0:
+        elif charger_status in CHARGER_READY_STATUS and charger_status not in CHARGER_HELD_STATUS and sum(self.current_charging_amps) > 0:
             problem = t("ui.is_charging.charger_restart")
         else:
             self._charger_restart_reset(full=False)  # e.g. the site gives no current: nothing to start
@@ -319,7 +326,7 @@ class ControlSchedule:
         if self.restarting_charger_count >= restarts:
             _LOGGER.warning("Charging has not started after %s restarts: giving up until it charges or is unplugged", restarts)
             # the reason, not "restarting the charger": it doesn't any more
-            reason = f"{problem}\n" if charger_status == "error" else ""
+            reason = f"{problem}\n" if normalize_state(charger_status) == "error" else ""
             # shown while the plan charges (_charge_if_needed), also in the plan's later charges
             self._charger_restart_rule = f"⛔{t('ui.is_charging.charging_failed')}\n{reason}{t('ui.is_charging.gave_up', count=restarts)}"
             self.set_charging_rule(self._charger_restart_rule)

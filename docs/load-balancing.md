@@ -67,8 +67,11 @@ overloaded phase limits the last car at once.
 - **Without phase sensors** the *Charging power* sensor (in a power unit) of each car is the measurement, so the
   cars ahead are counted carefully. A car ahead counts with what it was given, unless **all** of these hold:
   - its current was raised more than 2 minutes ago (the charger needs a moment to start),
-  - its charger status surely means not charging – *completed*, *finished*, *off*, *disconnected*,
-    *ready_to_charge*, *awaiting_start* or *awaiting_authorization*. *Charging*, a status that may also mean
+  - its charger status surely means not charging – *completed*, *complete*, *charge_complete*, *finished* (and the
+    other built in completed and not ready states, e.g. *charging_finished*, *connected_finished*, *unplugged*), *off*,
+    *disconnected*, *ready_to_charge*, *awaiting_start* or *awaiting_authorization*, in any case (*Complete* is
+    *complete*), and a state that the charger blueprint's *States that mean done* names for this status entity
+    (see [the charging state](charger-control.md#charging-state)). *Charging*, a status that may also mean
     charging (*on*, *connected*, *ready* …), an unknown one or none counts as charging (a power sensor that
     hangs at 0 W must not give its current away),
   - its power sensor has a reading in a power unit,

@@ -329,7 +329,7 @@ class CoordinatorChargerTest:
     def _charger_status(self) -> str:
         entity_id = self.config["charger"]["entity_ids"]["status_entity_id"]
         state = self.hass.states.get(entity_id) if entity_id else None
-        return state.state if state else "unavailable"
+        return self.canonical_status(state.state) if state else "unavailable"
 
     def _charger_power(self, entity_id: str) -> float | None:
         """The power of the charger now in W; None when the sensor has no number, has not reported lately, or its unit is no

@@ -169,6 +169,7 @@
     "ready_to_charge": {
       "cable_disconnected": "Kabel ładowania odłączony",
       "cable_connected_ev_not_home": "Kabel podłączony, EV poza domem",
+      "ev_not_home": "EV poza domem",
       "cable_connected_not_to_ev": "Kabel niepodłączony do EV\nPróba wybudzenia pojazdu",
       "charge_port_closed": "Port ładowania EV zamknięty\nPróba wybudzenia pojazdu",
       "ev_unavailable": "Port ładowania EV lub kabel niedostępny\nPróba wybudzenia pojazdu"

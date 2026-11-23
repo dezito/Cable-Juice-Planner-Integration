@@ -169,6 +169,7 @@
     "ready_to_charge": {
       "cable_disconnected": "Ladekabel getrennt",
       "cable_connected_ev_not_home": "Kabel verbunden, EV nicht zuhause",
+      "ev_not_home": "EV nicht zuhause",
       "cable_connected_not_to_ev": "Kabel nicht mit EV verbunden\nWeckversuch läuft",
       "charge_port_closed": "Ladeport nicht geöffnet\nWeckversuch läuft",
       "ev_unavailable": "EV-Ladeport oder Kabel nicht verfügbar\nWeckversuch läuft"
