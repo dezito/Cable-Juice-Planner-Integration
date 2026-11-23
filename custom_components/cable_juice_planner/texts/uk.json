@@ -169,6 +169,7 @@
     "ready_to_charge": {
       "cable_disconnected": "Кабель заряджання від’єднано",
       "cable_connected_ev_not_home": "Кабель підключено, але авто не вдома",
+      "ev_not_home": "Авто не вдома",
       "cable_connected_not_to_ev": "Кабель не підключено до EV\nСпроба розбудити авто",
       "charge_port_closed": "Порт заряджання EV зачинено\nСпроба розбудити авто",
       "ev_unavailable": "Порт або кабель EV недоступні\nСпроба розбудити авто"

@@ -169,6 +169,7 @@
     "ready_to_charge": {
       "cable_disconnected": "Charging cable disconnected",
       "cable_connected_ev_not_home": "Cable connected, EV not home",
+      "ev_not_home": "EV not at home",
       "cable_connected_not_to_ev": "Cable not connected to EV\nAttempting wake-up",
       "charge_port_closed": "EV port not open\nAttempting wake-up",
       "ev_unavailable": "EV port/cable unavailable\nAttempting wake-up"

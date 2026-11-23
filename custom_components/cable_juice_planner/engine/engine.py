@@ -49,6 +49,7 @@ from ..const import (
     is_powerwall_configured,
     is_public_charging_configured,
     is_solar_configured,
+    normalize_state,
 )
 from .analysis.analysis import Analysis
 from .control.control import Control
@@ -707,7 +708,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
                     if state not in disconnected_states:
                         break
                     values = self.history.get_values(entity_id, now - datetime.timedelta(minutes=15), now, include_timestamps=False, error_state=[connected_states[0]])
-                    if set(connected_states) & set(values):
+                    if any(value in connected_states for value in values):
                         break
                 else:
                     if configured:
@@ -715,7 +716,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Error getting current location: %s", err)
             current_location = "home"
-        return current_location == "home"
+        return normalize_state(current_location) == "home"
 
     # ------------------------------------------------------------------ #
     # Prices

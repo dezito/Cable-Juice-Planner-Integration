@@ -28,7 +28,14 @@ import datetime
 import logging
 
 from ...utils.helpers import round_up
-from ...const import CHARGER_CHARGING_STATUS, CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES
+from ...const import (
+    CHARGER_CHARGING_STATUS,
+    CHARGER_COMPLETED_STATUS,
+    CHARGER_HELD_STATUS,
+    CHARGER_NOT_READY_STATUS,
+    CHARGER_READY_STATUS,
+    ENTITY_UNAVAILABLE_STATES,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -350,7 +357,9 @@ class ChargerTest:
             out["reason"] = "not_connected"
         elif status in CHARGER_COMPLETED_STATUS:
             out["reason"] = "completed"
-        elif status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS:
+        elif status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS or status in CHARGER_HELD_STATUS:
+            # a charger that holds the charging back itself (load balancing, smart start, a schedule, an approval) would show
+            # no effect of the steps, which would read as an automation that does not follow the plan
             out["reason"] = "not_ready"
         elif self.other_ev_connected():
             out["reason"] = "other_ev"
@@ -374,7 +383,7 @@ class ChargerTest:
         balancing}. Nothing new is held when the cable is out or the car is full; a stop over a hold the test already has is
         always taken (a stop is harmless, and the held charge must not stay published when the car resumes or is plugged in)."""
         status = self.get_state(self.config["charger"]["entity_ids"]["status_entity_id"], try_history=False, error_state="unavailable")
-        if status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS and not (kind == "stop" and self.charger_hold_active()):
+        if (status not in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS or status in CHARGER_HELD_STATUS) and not (kind == "stop" and self.charger_hold_active()):
             return {"status": "not_ready", "requested": [0, 0, 0], "published": [0, 0, 0]}
         requested = amps_list(amps, phases) if kind == "charge" else [0, 0, 0]
         now = self.now()

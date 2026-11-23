@@ -54,13 +54,14 @@ from .data import CoordinatorData
 from .events import CoordinatorEvents
 from .lifecycle import CoordinatorLifecycle
 from .refresh import CoordinatorRefresh
+from .status_states import CoordinatorStatusStates
 from .charger_test import CoordinatorChargerTest
 from .what_if import CoordinatorWhatIf
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh, CoordinatorWhatIf, CoordinatorChargerTest):
+class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh, CoordinatorWhatIf, CoordinatorChargerTest, CoordinatorStatusStates):
     """Owns the engine, the worker thread and all scheduling for one config entry."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -104,6 +105,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self._public_cost_task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
         self._init_charger_test()
+        self._init_status_states()
 
         self._buffers: dict[str, list[tuple[float, str]]] = {}
         self._retention: dict[str, float] = {}

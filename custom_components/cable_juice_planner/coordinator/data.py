@@ -40,7 +40,7 @@ class CoordinatorData:
             state = self.hass.states.get(entity_id)
             if state is None:
                 continue
-            states[entity_id] = state.state
+            states[entity_id] = self._canonical_state(entity_id, state.state)
             attributes[entity_id] = dict(state.attributes)
             units[entity_id] = state.attributes.get("unit_of_measurement")
             if (reported := getattr(state, "last_reported", None)) is not None:
@@ -123,7 +123,7 @@ class CoordinatorData:
             if new_state is None:
                 return
             rows = self._buffers.setdefault(event.data["entity_id"], [])
-            row = (new_state.last_updated.timestamp(), new_state.state)
+            row = (new_state.last_updated.timestamp(), self._canonical_state(event.data["entity_id"], new_state.state))
             if rows and row[0] <= rows[-1][0]:
                 if row[0] == rows[-1][0]:
                     rows[-1] = row
@@ -165,7 +165,7 @@ class CoordinatorData:
                 loaded = []
                 for state in states.get(entity_id, []):
                     try:
-                        loaded.append((state.last_updated.timestamp(), state.state))
+                        loaded.append((state.last_updated.timestamp(), self._canonical_state(entity_id, state.state)))
                     except AttributeError:
                         continue
                 self._buffers[entity_id] = merge_rows(loaded, self._buffers.get(entity_id, []))

@@ -16,7 +16,7 @@ from homeassistant.helpers.event import (
     async_track_time_change,
 )
 
-from ..const import CHARGING_LOSS_METER_TIMEOUT, NUMBER_SETTINGS, SIGNAL_HELP_VALUES_CHANGED, WHAT_IF_SETTING_KEYS
+from ..const import CHARGING_LOSS_METER_TIMEOUT, NUMBER_SETTINGS, SIGNAL_HELP_VALUES_CHANGED, WHAT_IF_SETTING_KEYS, normalize_state
 from ..utils.formatting import format_charging_rule
 from ..utils.helpers import float_or_none
 from .constants import BATTERY_LEVEL_WAIT, CHARGE_TRIGGER_KEYS, PUBLIC_CHARGING_COST_DELAY, RULE_KEYS, SETTINGS_DEBOUNCE_SECONDS, TRIP_KEYS
@@ -80,6 +80,10 @@ class CoordinatorEvents:
 
     @callback
     def _charger_status_changed(self, value, old_value) -> None:
+        # a state the charger blueprint gave as charging or done is the built in one (coordinator/status_states.py)
+        value, old_value = self.canonical_status(value), self.canonical_status(old_value)
+        if normalize_state(value) == normalize_state(old_value):
+            return  # e.g. Charging -> charging, or two states the blueprint gives as done: nothing happened
         if self.settings.get("calculate_charging_loss"):
             self._background(self._async_charging_loss("status", value, old_value), "charging_loss")
         self._background(self._async_charger_status_flow(value, old_value), "charger_status")
