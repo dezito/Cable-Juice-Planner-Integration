@@ -378,6 +378,11 @@ def test_every_text_of_the_result_exists_in_every_language(language) -> None:
                     })
                     assert "{" not in markdown and "ui.charger_test" not in markdown
         assert "ui.charger_test" not in build_charger_test_markdown(t, {"status": status, "steps": [], "reason": "completed"})
+    # a running test: every step is a row from the start (waiting, or tested now), with the progress and the legend
+    plan = [{"name": name, "amps": 16, "phases": 3} for name in ("max", "min", "single_max", "single_min", "stop", "limit")]
+    for current in (None, "min", "limit"):
+        markdown = build_charger_test_markdown(t, {"status": "running", "steps": STEP_RESULTS[:1], "reason": None, "plan": plan, "current": current})
+        assert "{" not in markdown and "ui.charger_test" not in markdown
     assert "ui.charger_test" not in build_charger_test_markdown(t, {"status": "idle", "steps": [], "reason": None})
     for key in ("dashboard.section_charger_test", "dashboard.help_charger_test"):
         assert key in texts
@@ -412,6 +417,42 @@ def test_the_markdown_shows_a_row_per_step_and_what_was_tried() -> None:
     assert [row.split(" | ")[0] for row in rows] == ["| ✅", "| ❌", "| 🔧"]
     assert "Prøvet" in rows[1] and "16 A: 0 W" in rows[1]
     assert "1 af 3" in markdown
+
+
+def _table_rows(markdown: str) -> list[list[str]]:
+    rows = [line for line in markdown.splitlines() if line.startswith("| ") and "---" not in line][1:]  # without the header
+    return [[cell.strip() for cell in row.strip("|").split("|")] for row in rows]
+
+
+def test_a_running_test_lists_every_step_from_the_start_with_the_progress() -> None:
+    texts = _texts("da")
+    t = lambda key, **fmt: translate(texts, key, **fmt)  # noqa: E731
+    plan = [
+        {"name": "max", "amps": 16, "phases": 3}, {"name": "min", "amps": 6, "phases": 3}, {"name": "stop", "amps": 0, "phases": 0},
+        {"name": "limit", "amps": 0, "phases": 0},
+    ]
+    done = STEP_RESULTS[0]
+    assert done["name"] == "max"
+    base = {"status": "running", "reason": None, "automation": "found", "amps_control": True, "plan": plan}
+    # started: nothing is done, every step waits (the first is not "testing now" until it is measured), with the progress
+    start = build_charger_test_markdown(t, {**base, "steps": [], "current": None})
+    rows = _table_rows(start)
+    assert [row[0] for row in rows] == ["⏳"] * 4
+    assert rows[0][1] == "Maksimum: 16 A på 3 fase(r)" and rows[2][1] == "Stop opladning" and rows[3][1] == "Ladegrænse i bilen"
+    assert "0 af 4" in start and "▶️" in start.splitlines()[-1] and "⏳" in start.splitlines()[-1]  # the progress and the legend
+    # one done, the second is measured now, the rest waits: the stop and the charge limit are last
+    mid = build_charger_test_markdown(t, {**base, "steps": [done], "current": "min"})
+    rows = _table_rows(mid)
+    assert [row[0] for row in rows] == ["✅", "▶️", "⏳", "⏳"]
+    assert rows[1][2] == texts["ui.charger_test.testing"] and rows[2][2] == texts["ui.charger_test.waiting"]
+    assert "1 af 4" in mid
+    # the note on the car's charge limit still sits above the legend while the test runs
+    note = build_charger_test_markdown(t, {**base, "steps": [done], "current": None, "limit_put_back": {"ok": None, "limit": 80}})
+    assert "80 %" not in note  # ok None: shown only when the test has ended
+    # a test that is done (or has no plan, like one restored from before) shows only what has a result, with no waiting rows
+    assert [row[0] for row in _table_rows(build_charger_test_markdown(t, {**base, "status": "done", "steps": [done], "current": None}))] == ["✅"]
+    old = build_charger_test_markdown(t, {"status": "running", "steps": [done], "reason": None, "automation": "found", "amps_control": True})
+    assert [row[0] for row in _table_rows(old)] == ["✅"] and "⏳" not in old
 
 
 def test_the_markdown_tells_the_measured_voltage_once_per_number_of_phases() -> None:
@@ -559,6 +600,84 @@ async def test_without_solar_the_maximum_and_the_stop_are_tried(hass, charger_en
     assert ("charge", (16, 16, 16)) in seen
     assert hass.states.get(SWITCH).state == "off"
     assert charger_entry.runtime_data.engine._charger_hold is None
+
+
+async def test_a_running_test_shows_every_step_and_how_far_it_is(hass, charger_entry, fast_runner) -> None:
+    coordinator = charger_entry.runtime_data
+    seen: list[dict] = []
+    publish = coordinator._publish_charger_test
+
+    def watching(**changes) -> None:
+        publish(**changes)
+        seen.append({key: coordinator.charger_test_state[key] for key in ("status", "steps", "plan", "current", "markdown")})
+
+    wire_charger(hass)
+    with patch.object(coordinator, "_publish_charger_test", watching), patch(FOUND, return_value=[]):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": SWITCH}, blocking=True)
+        # published at once, before the engine has said which steps there are
+        assert coordinator.charger_test_state["status"] == "running" and coordinator.charger_test_state["steps"] == []
+        await _finished(hass)
+    running = [item for item in seen if item["status"] == "running"]
+    names = ["max", "stop", "limit"]  # without solar: the maximum, the stop and the charge limit
+    with_plan = [item for item in running if item["plan"]]
+    assert with_plan and all([step["name"] for step in item["plan"]] == names for item in with_plan)
+    # the first publication with the plan has every step waiting; the steps then turn into "testing now" one at a time
+    assert [row[0] for row in _table_rows(with_plan[0]["markdown"])] == ["⏳"] * 3
+    testing = [item["current"] for item in with_plan if item["current"]]
+    assert [name for i, name in enumerate(testing) if i == 0 or name != testing[i - 1]] == names
+    middle = next(item for item in with_plan if item["current"] == "stop")
+    assert [row[0] for row in _table_rows(middle["markdown"])] == ["✅", "▶️", "⏳"]
+    # when it is done there is no plan left and every step has its result
+    state = hass.states.get(RESULT)
+    assert state.state == "done" and state.attributes["plan"] == [] and state.attributes["current"] is None
+    assert list(_steps_of(hass)) == names
+    assert "⏳" not in state.attributes["markdown"] and "▶️" not in state.attributes["markdown"]
+
+
+async def test_a_stopped_test_shows_what_was_not_reached_and_no_waiting_rows(hass, solar_entry, fast_runner) -> None:
+    wire_charger(hass, working=False)  # a charger that gives no power: the maximum fails and ends the charging steps
+    with patch(FOUND, return_value=[]):
+        await _start(hass)
+    state = hass.states.get(RESULT)
+    assert state.state == "stopped" and state.attributes["plan"] == [] and state.attributes["current"] is None
+    assert list(_steps_of(hass)) == ["max", "min", "single_max", "single_min", "stop", "limit"]
+    assert "⏳" not in state.attributes["markdown"] and "▶️" not in state.attributes["markdown"]
+
+
+async def test_steps_that_will_not_be_tried_are_not_reached_at_once_not_waiting_during_the_limit_step(hass, solar_entry, fast_runner) -> None:
+    coordinator = solar_entry.runtime_data
+    seen: list[dict] = []
+    publish = coordinator._publish_charger_test
+
+    def watching(**changes) -> None:
+        publish(**changes)
+        seen.append(dict(coordinator.charger_test_state))
+
+    wire_charger(hass, working=False)  # no power at the maximum: the other charging steps and the stop are not tried
+    with patch.object(coordinator, "_publish_charger_test", watching), patch(FOUND, return_value=[]):
+        await _start(hass)
+    during_limit = next(item for item in seen if item["status"] == "running" and item["current"] == "limit")
+    rows = _table_rows(during_limit["markdown"])
+    assert [row[0] for row in rows] == ["❌", "🔧", "🔧", "🔧", "🔧", "▶️"]  # nothing waits for a test that will not come
+    assert "5 af 6" in during_limit["markdown"]
+    assert hass.states.get(RESULT).attributes["plan"] == [] and hass.states.get(RESULT).attributes["current"] is None
+
+
+async def test_a_stopped_test_does_not_go_on_showing_the_step_that_was_measured(hass, charger_entry, fast_runner) -> None:
+    coordinator = charger_entry.runtime_data
+    wire_charger(hass)
+    with patch(FOUND, return_value=[]), patch("custom_components.cable_juice_planner.coordinator.charger_test.ATTEMPT_TIMEOUT", 30):
+        coordinator.async_run_charger_test()
+        for _ in range(500):
+            await asyncio.sleep(0.01)
+            if coordinator.charger_test_state["current"]:
+                break
+        assert coordinator.charger_test_state["current"] and "▶️" in coordinator.charger_test_state["markdown"]
+        coordinator.async_stop_charger_test()
+        await _finished(hass)
+    state = hass.states.get(RESULT)
+    assert state.state == "stopped" and state.attributes["plan"] == [] and state.attributes["current"] is None
+    assert "⏳" not in state.attributes["markdown"] and "▶️" not in state.attributes["markdown"]
 
 
 async def test_the_search_finds_the_current_that_works_at_both_ends(hass, solar_entry, fast_runner) -> None:

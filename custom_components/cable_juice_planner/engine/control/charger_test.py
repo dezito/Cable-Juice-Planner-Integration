@@ -481,7 +481,10 @@ class ChargerTest:
 def build_charger_test_markdown(t, state: dict) -> str:
     """The result as markdown (the texts are ui.charger_test.*): a table row per step and a summary.
 
-    state: {"status", "steps": [step records of the coordinator], "reason", "automation": found | unknown | None, "amps_control"}.
+    state: {"status", "steps": [step records of the coordinator], "reason", "automation": found | unknown | None, "amps_control",
+    "plan": [{"name", "amps", "phases"}: every step of a running test in order], "current": the name of the step that is
+    measured right now or None}.
+    While the test runs, the steps that have no result yet are rows too: waiting, and the one that is tested now.
     """
     if state["status"] == "idle" and not state["steps"]:
         return t("ui.charger_test.not_run")
@@ -505,7 +508,18 @@ def build_charger_test_markdown(t, state: dict) -> str:
         label = t(f"ui.charger_test.step.{step['name']}", amps=step.get("configured_amps", 0), phases=step.get("phases", 0))
         lines.append(f"| {icons[step['status']]} | {label} | {charger_step_text(t, step)} |")
     if state["status"] == "running":
-        lines += ["", t("ui.charger_test.running_note")]
+        plan = [step for step in state.get("plan") or [] if isinstance(step, dict) and step.get("name")]
+        done = {step["name"] for step in state["steps"]}
+        for step in plan:
+            if step["name"] in done:
+                continue
+            icon, text = ("▶️", t("ui.charger_test.testing")) if step["name"] == state.get("current") else ("⏳", t("ui.charger_test.waiting"))
+            label = t(f"ui.charger_test.step.{step['name']}", amps=step.get("amps", 0), phases=step.get("phases", 0))
+            lines.append(f"| {icon} | {label} | {text} |")
+        if plan:  # the progress sits between the status and the table
+            lines[2:2] = [t("ui.charger_test.progress", done=len(done & {step["name"] for step in plan}), total=len(plan)), ""]
+        lines += ["", t("ui.charger_test.running_note"), "", t("ui.charger_test.legend_running" if plan else "ui.charger_test.legend")]
+        return "\n".join([*lines[:-2], *limit_note, *lines[-2:]])  # the note on the car's limit sits above the legend, as at the end
     else:
         lines += ["", t("ui.charger_test.summary", ok=counts["ok"] + counts["adjusted"], fail=counts["fail"], skip=counts["skip"], total=len(state["steps"]))]
         if state.get("reason"):
