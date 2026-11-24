@@ -284,8 +284,9 @@ class EnergyForecast:
             end_work = None
             try:
                 if self.workplan_charging_enabled() and self.switch_state(f"workday_{day_name}") == "on":
-                    work_last_charging = date.replace(hour=self.setting(f"workday_departure_{day_name}").hour) - datetime.timedelta(hours=stop_prediction_before)
-                    end_work = date.replace(hour=self.setting(f"workday_homecoming_{day_name}").hour)
+                    departure_time, homecoming_time = self.effective_workday_times(day_name, date.date() if isinstance(date, datetime.datetime) else date)
+                    work_last_charging = date.replace(hour=departure_time.hour) - datetime.timedelta(hours=stop_prediction_before)
+                    end_work = date.replace(hour=homecoming_time.hour)
                     if day == 0 and in_between(self.now(), work_last_charging, end_work) and self.ready_to_charge():
                         work_last_charging = None
                         end_work = None

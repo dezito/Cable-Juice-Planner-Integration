@@ -54,6 +54,7 @@ from ..const import (
 from .analysis.analysis import Analysis
 from .control.control import Control
 from .distance import Distance
+from .workplan import Workplan
 from .economy import Economy
 from .whatif.engine_part import WhatIf
 from .whatif.plan_part import WhatIfNoSolar
@@ -90,7 +91,7 @@ _LOGGER = logging.getLogger(__name__)
 NOTIFY_SUPPRESS = datetime.timedelta(minutes=60)
 
 
-class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, WhatIf, WhatIfSettings, WhatIfNoSolar, WhatIfSolar, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
+class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Economy, WhatIf, WhatIfSettings, WhatIfNoSolar, WhatIfSolar, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
     """Holds the Cable Juice Planner state and implements the algorithm."""
 
     def __init__(self, config: dict, prefix: str, texts: dict[str, str], title: str | None = None) -> None:
@@ -166,6 +167,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self.charging_loss_charger_begin_kwh = 0.0
         self.charging_loss_charging_completed = False
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
+        self.trip_days: set[str] = set()  # ISO dates of the trips seen (engine/workplan.py)
         self.learned_distances: dict[str, float] = {}  # number key -> learned distance with enough days
         self.charging_loss_db: dict = {"segments": [], "soc_power_segments": [], "backfilled": False}
         self.soc_power_model: dict = {"status": "no_data", "min_sessions": 3, "best_sessions": 0, "bands": []}
@@ -288,6 +290,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
             "public_charging_session_done": self.sensor_states.get("public_charging_session_done"),
             "charging_loss": self.config["charger"]["charging_loss"],
             "daily_odometer": dict(self.daily_odometer),
+            "trip_days": sorted(self.trip_days),
             "charging_loss_measurement": {
                 "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
                 "car_begin_kwh": self.charging_loss_car_begin_kwh,

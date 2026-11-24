@@ -59,6 +59,11 @@ class AnalysisStorage:
         # the departure as set: work_goto is moved up to 2 hours later for a car that is still plugged in after it
         departure = today.get("work_departure") or today.get("work_goto") if today else None
         if today and today.get("workday") and departure and now < departure:
+            known = self.analysis_db["departures"]
+            if any(entry.get("date") == now.date().isoformat() for entry in known):
+                # the departure changed after it was saved (a learned departure that today's car did not keep): the later one counts
+                self.analysis_db["departures"] = [entry for entry in known if entry.get("date") != now.date().isoformat()]
+                self.mark_dirty("analysis")
             self.analysis_db["pending_departure"] = {
                 "date": now.date().isoformat(), "departure": self._analysis_ts(departure),
                 "target": round(float(today.get("battery_level_before_work_sum", 0.0)), 1),

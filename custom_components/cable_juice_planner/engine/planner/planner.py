@@ -227,10 +227,12 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             }
 
             if self.workplan_charging_enabled() and self.switch_state(f"workday_{day_text}") == "on":
-                work_goto = end_of_day_datetime.replace(hour=self.setting(f'workday_departure_{day_text}').hour, minute=self.setting(f'workday_departure_{day_text}').minute, second=0)
+                # the entered times, or with Learn departure and homecoming on the earlier departure / later homecoming of them and the learned
+                departure_time, homecoming_time = self.effective_workday_times(day_text, end_of_day_datetime.date())
+                work_goto = end_of_day_datetime.replace(hour=departure_time.hour, minute=departure_time.minute, second=0)
 
                 work_departure = work_goto  # the departure as set, before it is moved for a car that is still plugged in
-                work_homecoming = end_of_day_datetime.replace(hour=self.setting(f'workday_homecoming_{day_text}').hour, minute=self.setting(f'workday_homecoming_{day_text}').minute, second=0)
+                work_homecoming = end_of_day_datetime.replace(hour=homecoming_time.hour, minute=homecoming_time.minute, second=0)
 
                 diff = minutes_between(now, work_goto)
                 # from the departure minute itself (diff 0) up to the allowed time after it

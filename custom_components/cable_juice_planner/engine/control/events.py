@@ -21,6 +21,7 @@ class ControlEvents:
     """Startup, triggers and state changes."""
 
     def trip_reset(self) -> None:
+        self.record_trip_days()  # the dates of a trip that has started outlive its settings
         self.set_setting("trip_charge_procent", 0.0)
         self.set_setting("trip_range_needed", 0.0)
         self.set_setting("trip_date_time", None)
@@ -53,6 +54,7 @@ class ControlEvents:
         elif key == "trip_reset":
             self.trip_reset()
         self.last_trip_change_datetime = self.now()
+        self.record_trip_days()
 
     def startup(self, databases: dict, odometer_history: dict | None = None) -> dict:
         """Load the databases and the runtime state and calculate the first plan."""
@@ -67,6 +69,7 @@ class ControlEvents:
         if isinstance(runtime.get("charging_loss"), (int, float)):
             self.config["charger"]["charging_loss"] = runtime["charging_loss"]
         self.daily_odometer = {str(date): float(value) for date, value in (runtime.get("daily_odometer") or {}).items()}
+        self.trip_days = {date for date in (runtime.get("trip_days") or []) if isinstance(date, str)}
         if (measurement := runtime.get("charging_loss_measurement")) and self.is_calculating_charging_loss():
             # a measurement in progress survives a restart or reload
             self.charging_loss_car_begin_battery_level = measurement.get("car_begin_battery_level", 0.0)
@@ -114,6 +117,7 @@ class ControlEvents:
         self.update_learned_distances()
         self.load_charging_loss_db(databases.get("charging_loss"))
         self.load_economy_db(databases.get("economy"))
+        self.update_learned_workplan()
         self.publish_economy()
         self.load_what_if()
         self.load_what_if_settings()
@@ -212,6 +216,7 @@ class ControlEvents:
         self.kwh_charged_by_solar()
         self.solar_charged_percentage()
         self.record_daily_odometer()
+        self.update_learned_workplan()
         self.analysis_record_planned()
         self.analysis_record_prices()
         self.economy_store_prices()

@@ -777,13 +777,15 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set ns = namespace(learn_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
+        {% set ns = namespace(learn_help=none, learn_departure_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
         {% set ns.learn_help = state_attr('switch.cjp_learn_driving_distance', 'help') %}
+        {% set ns.learn_departure_help = state_attr('switch.cjp_learn_departure_time', 'help') %}
         {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
         {% set ns.forecast_type_description = state_attr('select.cjp_forecast_type', 'description') %}
         {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
         {% set ns.soc_power_help = state_attr('switch.cjp_learn_soc_charge_power', 'help') %}
         {% if ns.learn_help %}{% set ns.sections = ns.sections + [ns.learn_help] %}{% endif %}
+        {% if ns.learn_departure_help %}{% set ns.sections = ns.sections + [ns.learn_departure_help] %}{% endif %}
         {% if ns.forecast_help %}{% set ns.forecast_section = ns.forecast_help %}{% endif %}
         {% if ns.forecast_type_description %}
         {% if ns.forecast_section %}{% set ns.forecast_section = ns.forecast_section ~ '\n\n' %}{% endif %}
@@ -803,6 +805,9 @@ views:
       show_header_toggle: false
       entities:
       - entity: switch.cjp_learn_driving_distance
+        name:
+          type: entity
+      - entity: switch.cjp_learn_departure_time
         name:
           type: entity
       - type: section
@@ -1173,6 +1178,51 @@ views:
         {% set learned = state_attr(typical, 'learned_distance') -%}
         {% set count = state_attr(typical, 'learned_days') or 0 -%}
         | **@@learn_distance_typical@@** | | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 14 else '' }} |
+      grid_options:
+        columns: full
+  # learned departure and homecoming per weekday (engine/workplan.py): entered times against the learned_time attribute
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_learn_departure@@'
+      icon: mdi:clock-time-eight-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>
+
+@@learn_departure_explain@@
+
+</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
+        {% set learning = is_state('switch.cjp_learn_departure_time', 'on') -%}
+        {% if learning %}@@learn_departure_on@@{% else %}@@learn_departure_off@@{% endif %}
+
+        {% set ns = namespace(days=0) -%}
+        {% for key, name in days -%}
+        {% set ns.days = ns.days + (state_attr('time.cjp_workday_departure_' ~ key, 'learned_days') or 0) -%}
+        {% endfor -%}
+        {% if ns.days == 0 -%}
+        <ha-alert alert-type="info">@@learn_departure_no_data@@</ha-alert>
+
+        {% endif -%}
+        | @@learn_departure_day@@ | @@learn_departure_workday@@ | @@learn_departure_entered@@ | @@learn_departure_learned@@ | @@learn_departure_used@@ | @@learn_departure_days@@ |
+        |:---|:---:|---:|---:|---:|---:|
+        {% for key, name in days -%}
+        {% set departure = 'time.cjp_workday_departure_' ~ key -%}
+        {% set homecoming = 'time.cjp_workday_homecoming_' ~ key -%}
+        {% set entered_departure = states(departure)[:5] -%}
+        {% set entered_homecoming = states(homecoming)[:5] -%}
+        {% set learned_departure = state_attr(departure, 'learned_time') -%}
+        {% set learned_homecoming = state_attr(homecoming, 'learned_time') -%}
+        {% set count = state_attr(departure, 'learned_days') or 0 -%}
+        {% set used = learning and is_state('switch.cjp_workplan_charging', 'on') and count >= 3 and learned_departure and learned_homecoming and entered_departure < entered_homecoming -%}
+        | **{{ name }}** | {{ '✅' if is_state('switch.cjp_workday_' ~ key, 'on') else '–' }} | {{ entered_departure }}–{{ entered_homecoming }} | {{ (learned_departure ~ '–' ~ learned_homecoming) if learned_departure and learned_homecoming else '–' }} | {{ ([entered_departure, learned_departure] | min ~ '–' ~ [entered_homecoming, learned_homecoming] | max) if used else (entered_departure ~ '–' ~ entered_homecoming) }} | {{ count }}{{ ' ⏳' if count < 3 else '' }} |
+        {% endfor -%}
       grid_options:
         columns: full
   # planned against actually charged

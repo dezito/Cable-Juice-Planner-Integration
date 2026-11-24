@@ -645,6 +645,22 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   average of the lowest prices stay in whole hours.
 - The autumn night with two 02:00 hours shares one price key (wall-clock
   time); this is accepted (twice a year) and only covered by a test.
+- Learned departure and homecoming (`engine/workplan.py`, switch `learn_departure_time`, default off): the 25th
+  percentile (rounded down) of the first unplug of a workday between 04:00 and 12:00 and the 75th percentile (rounded up)
+  of the plug-in the same day, per weekday, last 8 weeks, at least 3 days, from the measured connection windows
+  `economy_db["windows"]` only (never the modelled ones). Two rules are CJP's own: an unplug followed by a plug-in less
+  than 30 minutes later is a re-plug and costs the day, and a weekday whose entered departure is not before its entered
+  homecoming (a night shift) keeps its entered times. The plan uses the earlier departure and the later homecoming of the
+  entered and the learned, never the other way, and always through `effective_workday_times(day, date)`:
+  the planner and the consumption forecast do; preheating, the economy analysis of past connections
+  (`_next_departure`) and the What-if replay deliberately keep the entered times (a guard test in
+  `tests/test_workplan_learning.py` lists the allowed direct readers). The entered times are used on a day with a trip,
+  and for today's departure while the newest connection window is still open (positive proof that the car is plugged in
+  at home: never `ready_to_charge()` or a missing status, which would drop today's work day). The trip settings are
+  reset two hours after departure, so the dates of every trip that has started are kept in `trip_days` (runtime
+  database); a trip not yet started is excluded while set but never remembered. Anything that goes wrong in the helper
+  gives the entered times. The times the plan uses are part of the plan hash (`WORKPLAN_TIMES`). The learned values are
+  shown as the attributes `learned_time` and `learned_days` of the `time` entities and in the Analysis section.
 
 ### Health checks (repairs)
 

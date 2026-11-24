@@ -68,6 +68,12 @@
   - the suggestions are always shown, and with **Learn driving distance** on, the plan uses the higher of the
     entered and the learned km – the entered numbers are not changed
   - the analysis shows entered against learned distance per weekday
+- **[Learn departure and homecoming](learn-departure.md)**
+  - from when the car is unplugged and plugged in at the charger, CJP suggests the **departure** (25th percentile of the first
+    unplug on a workday between 04:00 and 12:00, rounded down to 15 minutes) and the **homecoming** (75th percentile of the
+    plug-in the same day, rounded up) per weekday from the last 8 weeks, at least 3 days per weekday
+  - the suggestions are always shown, and with **Learn departure and homecoming** on, the plan uses the earlier of the
+    entered and the learned departure and the later of the entered and the learned homecoming – the entered times are not changed
 - **[Analysis](dashboard-analysis.md#analysis)**
   - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km
   - saved compared with daily charging, and a score for how close the price came to the lowest possible

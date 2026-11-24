@@ -43,7 +43,7 @@ class ControlPreheat:
         next_work_time = reset_datetime()
         try:
             day_name = day_of_week_text(now)
-            work_time = self.setting(f"workday_departure_{day_name}")
+            work_time = self.setting(f"workday_departure_{day_name}")  # the entered departure: a comfort setting, not the learned one
             if self.switch_state(f"workday_{day_name}") == "on" and work_time is not None:
                 next_work_time = now.replace(hour=work_time.hour, minute=work_time.minute, second=0, microsecond=0)
         except Exception as err:  # noqa: BLE001

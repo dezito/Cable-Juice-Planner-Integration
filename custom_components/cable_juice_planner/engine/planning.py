@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 
-from ..const import CHARGING_TYPES, EMOJI_DESCRIPTION_GROUPS
+from ..const import CHARGING_TYPES, EMOJI_DESCRIPTION_GROUPS, WEEKDAYS
 from ..utils.helpers import limit_dict_size
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +49,11 @@ class Planning:
                 self.solar_charging_enabled(),
                 self.manual_charging_enabled(),
                 self.manual_charging_solar_enabled(),
+            ),
+            # the departure and homecoming the plan uses (learned or entered): a change, also today's at the learned departure, replans
+            "WORKPLAN_TIMES": tuple(
+                self.effective_workday_times(WEEKDAYS[(self.now() + datetime.timedelta(days=offset)).weekday()], (self.now() + datetime.timedelta(days=offset)).date())
+                for offset in range(8)
             ),
         }
 

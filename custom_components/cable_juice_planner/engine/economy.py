@@ -376,6 +376,7 @@ class Economy:
         oldest = min((s["ts"] for s in sessions), default=now) - 86400
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
         self.mark_dirty("economy")
+        self.update_learned_workplan()  # the windows just changed
         self.publish_economy(data.get("odometer_months") or {})
         try:
             self.store_derived_windows(data)

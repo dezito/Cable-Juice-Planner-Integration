@@ -21,6 +21,8 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     "cheap_grid_charging": {"default": False},
     "learn_driving_distance": {"default": False, "requires": "ev"},
     "workplan_charging": {"default": False},
+    # the plan uses the earlier of the entered and the learned departure and the later homecoming (engine/workplan.py)
+    "learn_departure_time": {"default": False},
     "trip_preheat": {"default": False},
     **{f"workday_{day}": {"default": False} for day in WEEKDAYS},
     **{f"preheat_{day}": {"default": False} for day in WEEKDAYS},
