@@ -258,6 +258,15 @@ session. This comparison helps separate vehicle taper from charger, solar, or si
 changes in those external limits. Unstable data, unconfirmed phases, and bands without enough evidence do not
 change the plan's existing capacity assumption.
 
+The line above the table says where the learning stands, *learning, no limit yet* or *at least one limit is learned*,
+followed by the most slower sessions found in one band so far, for example `2 / 3` (3 are needed; with a limit already
+learned the count can be 3 or more). Without any usable measurement the table says so instead. The table's *Typical
+power* column and the light points in the graph show what the car typically drew in each band (the median of its stable
+measurements, per phase count, so a long session with several measurements in one band weighs more), also where a limit is
+learned, so the section is not empty while it learns. For a band that takes its start value from the statistics (📊) these
+figures come from the hourly statistics. The points are for reading only: the plan uses a band's *Learned limit* and
+nothing else. A learned limit is a point in the graph as well as a line, so a single learned band is visible.
+
 With *Learn charge power by battery level* enabled, the planner applies the learned limit to price intervals that cross a
 trained band, while keeping the existing charger and site limits. The switch is off by default, and this
 estimate does not control the charger. Until a band has its own measurements, stable hourly long-term
