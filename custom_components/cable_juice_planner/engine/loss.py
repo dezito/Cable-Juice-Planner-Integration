@@ -48,6 +48,7 @@ SOC_POWER_STATISTICS_VERSION = 1
 LOSS_SHARE_LIMITS = (-0.3, 0.6)  # a wrong battery size moves the loss, so the limits are wide
 CAPACITY_MONTHS = 36
 LOSS_THREE_PHASE_MIN_KW = 3.8  # above the most 1 phase can give (16 A * 230 V = 3.7 kW)
+LOSS_PHASE_POWER_MARGIN = 1.15  # measured power above commanded phases x current x voltage by more than this: phases not observed
 
 Series = list[tuple[float, float]]  # (timestamp, value)
 
@@ -88,6 +89,20 @@ def _phase_count(phase_series: list[Series], ts_from: float, ts_to: float) -> in
             return None
         counts.add(sum(1 for v in values if v > 0))
     return counts.pop() if len(counts) == 1 else None
+
+
+def _commanded_amps(phase_series: list[Series], ts_from: float, ts_to: float) -> float | None:
+    """The highest phase current CJP commanded, averaged over the window by time. None when unknown."""
+    if not phase_series or not all(phase_series) or ts_to <= ts_from:
+        return None
+    times = sorted({ts_from, ts_to, *(t for series in phase_series for t, _ in series if ts_from < t < ts_to)})
+    total = 0.0
+    for start, end in zip(times, times[1:]):
+        values = [_state_at(series, start) for series in phase_series]
+        if any(v is None for v in values):
+            return None
+        total += max(values) * (end - start)
+    return total / (ts_to - ts_from)
 
 
 def _infer_phases(kw: float, configured: int) -> int:
@@ -157,8 +172,16 @@ def _segment(
     }
 
 
-def find_segments(soc: Series, meter: Series, power, phase_series: list[Series], battery_size: float, configured_phases: int, source: str = "history") -> list[dict]:
-    """Segments from changes of the battery level in raw history (sorted series)."""
+def find_segments(
+    soc: Series, meter: Series, power, phase_series: list[Series], battery_size: float, configured_phases: int, source: str = "history",
+    voltage: float | None = None,
+) -> list[dict]:
+    """Segments from changes of the battery level in raw history (sorted series).
+
+    The phases are those CJP commanded (phase_series), and only observed when the measured power agrees with them: with the
+    grid voltage given, a segment whose power is more than LOSS_PHASE_POWER_MARGIN above what the commanded current on the
+    commanded phases can give (the charger charged by itself, or on more phases or current than commanded) is not observed.
+    Less power than commanded is a taper, which is exactly what is learned, and stays observed."""
     # only real changes are anchors: the first reading is the level from before
     ticks: Series = [(ts, value) for (_, previous), (ts, value) in zip(soc, soc[1:]) if value != previous]
     last_meter = meter[-1][0] if meter else 0.0
@@ -189,6 +212,11 @@ def find_segments(soc: Series, meter: Series, power, phase_series: list[Series],
         if v_b - v_a >= LOSS_MIN_SOC_DELTA:
             phases = _phase_count(phase_series, t_a, t_b)
             phase_observed = phases is not None and phases > 0
+            if phase_observed and voltage:
+                amps = _commanded_amps(phase_series, t_a, t_b)
+                measured_kw = (kwh_b - kwh_a) / ((t_b - t_a) / 3600)
+                if amps is None or measured_kw > phases * amps * voltage / 1000 * LOSS_PHASE_POWER_MARGIN:
+                    phase_observed = False
             if not phase_observed:
                 phases = _infer_phases((kwh_b - kwh_a) / ((t_b - t_a) / 3600), configured_phases)
             observed_power = [row for row in power if t_a - 300 < row[0] < t_b]
@@ -452,7 +480,11 @@ class Loss:
         configured = int(self.config["charger"]["charging_phases"])
         found = []
         if data.get("soc") and data.get("meter"):
-            found += find_segments(data["soc"], data["meter"], data.get("power") or [], data.get("phases") or [], battery_size, configured, data.get("source", "history"))
+            voltage = float(self.config["charger"]["power_voltage"]) or None
+            found += find_segments(
+                data["soc"], data["meter"], data.get("power") or [], data.get("phases") or [], battery_size, configured,
+                data.get("source", "history"), voltage,
+            )
         if data.get("hours"):
             found += find_statistics_segments(data["hours"], battery_size, configured)
         if data.get("soc") and data.get("meter"):
@@ -516,6 +548,7 @@ class Loss:
         self.set_state("soc_charging_power_model", self.soc_power_model["status"])
         self.set_attr("soc_charging_power_model", "bands", self.soc_power_model["bands"])
         self.set_attr("soc_charging_power_model", "minimum_sessions", self.soc_power_model["min_sessions"])
+        self.set_attr("soc_charging_power_model", "best_sessions", self.soc_power_model.get("best_sessions", 0))
 
     def publish_charging_loss_model(self) -> None:
         """The sensor: the loss at the max charging power, kWh from the charger per 1 % (what the

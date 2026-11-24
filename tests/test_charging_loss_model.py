@@ -74,6 +74,99 @@ def test_raw_segments_include_confirmed_phases_and_power_stability() -> None:
     assert all(segment["power_max_w"] - segment["power_min_w"] <= segment["kw"] * 100 for segment in segments)
 
 
+def _phase_segments(commanded: list[list[tuple[float, float]]], kw: float = 11.04, voltage: float | None = 230.0):
+    start = 1_760_000_000.0
+    soc, meter, power = _session(start, kw, 3 if kw > 3.8 else 1, 3)
+    segments = find_segments(soc, meter, power, commanded, BATTERY, 3, voltage=voltage)
+    assert segments
+    return start, segments
+
+
+def _observed(commanded_amps: float, kw: float = 11.04, phases_commanded: int = 3, voltage: float | None = 230.0) -> list[bool]:
+    start = 1_760_000_000.0 - 600
+    commanded = [[(start, commanded_amps if i < phases_commanded else 0.0)] for i in range(3)]
+    return [segment["phase_observed"] for segment in _phase_segments(commanded, kw, voltage)[1]]
+
+
+def test_phases_are_observed_when_the_measured_power_fits_the_commanded_current() -> None:
+    assert all(_observed(16.0))  # 3 x 16 A x 230 V = 11.04 kW
+
+
+def test_a_taper_below_the_commanded_power_is_still_observed() -> None:
+    """The car takes less than commanded (a taper): that is what the model learns, so it must not be thrown away."""
+    assert all(_observed(16.0, kw=6.0))
+
+
+def test_power_above_what_the_commanded_phases_can_give_is_not_observed() -> None:
+    """Commanded 6 A on 3 phases (4.1 kW) while 11 kW were measured: the car charged by itself or on more than commanded."""
+    assert not any(_observed(6.0))
+
+
+def test_the_margin_is_15_percent_above_the_commanded_power() -> None:
+    # 11.04 kW measured: 3 x 14.2 A x 230 V x 1.15 = 11.27 kW is enough, 3 x 13.5 A x 230 V x 1.15 = 10.71 kW is not
+    assert all(_observed(14.2))
+    assert not any(_observed(13.5))
+
+
+def test_one_commanded_phase_cannot_explain_a_three_phase_power_and_the_segment_gets_the_inferred_phases() -> None:
+    start, segments = _phase_segments([[(1_760_000_000.0 - 600, 16.0 if i == 0 else 0.0)] for i in range(3)])
+    assert all(not segment["phase_observed"] for segment in segments)
+    assert all(segment["phases"] == 3 for segment in segments)  # 11 kW is more than 1 phase can give: inferred, not commanded
+    assert start
+
+
+def test_the_commanded_current_is_averaged_over_the_window_by_time_not_by_its_highest_value() -> None:
+    from custom_components.cable_juice_planner.engine.loss import _commanded_amps  # noqa: PLC0415
+
+    series = [[(0.0, 6.0), (100.0, 16.0)] for _ in range(3)]
+    assert _commanded_amps(series, 0.0, 200.0) == pytest.approx(11.0)
+    assert _commanded_amps(series, 100.0, 200.0) == pytest.approx(16.0)  # the value in force at the start counts
+    assert _commanded_amps(series, 0.0, 100.0) == pytest.approx(6.0)
+    assert _commanded_amps([], 0.0, 100.0) is None
+    assert _commanded_amps([[(0.0, 6.0)], []], 0.0, 100.0) is None
+    assert _commanded_amps(series, 50.0, 50.0) is None  # no window
+    assert _commanded_amps([[(50.0, 6.0)]] * 3, 0.0, 100.0) is None  # nothing commanded yet at the start
+
+
+def test_a_current_that_changes_inside_a_segment_is_weighted_by_time() -> None:
+    """6 A, then 16 A part way through the same segment: the time-weighted mean decides, not the highest value."""
+    start = 1_760_000_000.0
+    soc, meter, power = _session(start, 11.04, 3, 3)
+    segment = max(find_segments(soc, meter, power, [], BATTERY, 3), key=lambda s: s["end"] - s["start"])
+
+    def observed(fraction_at_6_amps: float) -> bool:
+        change = segment["start"] + fraction_at_6_amps * (segment["end"] - segment["start"])
+        commanded = [[(segment["start"] - 600, 6.0), (change, 16.0)] for _ in range(3)]
+        found = [s for s in find_segments(soc, meter, power, commanded, BATTERY, 3, voltage=230.0) if s["start"] == segment["start"]]
+        assert len(found) == 1
+        return found[0]["phase_observed"]
+
+    assert observed(0.1)  # a mean of 15 A: 3 x 15 A x 230 V x 1.15 = 11.9 kW covers the measured 11 kW
+    assert not observed(0.4)  # a mean of 12 A: 9.5 kW does not (the highest value, 16 A, would have passed it)
+
+
+def test_without_a_voltage_the_commanded_phases_are_trusted_as_before() -> None:
+    assert all(_observed(6.0, voltage=None))
+
+
+def test_the_engine_gives_the_grid_voltage_to_the_segments() -> None:
+    """End to end: the stored power segments of a session whose power the commanded current cannot explain are dropped."""
+
+    def stored(commanded_amps: float) -> list:
+        engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+        snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0)))
+        assert engine.run_job(snap, engine.startup, {}).error is None
+        start = snap.now.timestamp() - 86400
+        soc, meter, power = _session(start, 11.04, 3, 3)
+        phases = [[(start - 600, commanded_amps)] for _ in range(3)]
+        result = engine.run_job(snap, engine.charging_loss_update, {"soc": soc, "meter": meter, "power": power, "phases": phases})
+        assert result.error is None, result.error
+        return engine.charging_loss_db["soc_power_segments"]
+
+    assert stored(16.0)  # fits: kept for the charging power model
+    assert stored(6.0) == []  # 11 kW cannot be 3 x 6 A: the phases are not observed
+
+
 def test_variable_power_is_still_a_segment() -> None:
     soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)
     # Solar surplus can vary the power substantially during one charging session.

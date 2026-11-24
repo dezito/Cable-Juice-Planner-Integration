@@ -776,7 +776,9 @@ def test_soc_power_section_on_analysis() -> None:
     assert "row.sample_sessions" in table["content"]
     assert "row.sessions" in table["content"]
     assert "row.cap_kw" in table["content"]
-    assert [series["name"] for series in chart["series"]] == ["1 fase", "3 faser"]
+    assert [series["name"] for series in chart["series"]] == ["1 fase", "3 faser", "1 fase, målt", "3 faser, målt"]
+    assert "Status: " in table["content"] and "row.observed_kw" in table["content"]
+    assert chart["apex_config"]["markers"]["size"] > 0  # a single learned level is a point, not a line
     assert " %'" in chart["apex_config"]["xaxis"]["labels"]["formatter"]
     assert " %'" in chart["apex_config"]["tooltip"]["x"]["formatter"]
 

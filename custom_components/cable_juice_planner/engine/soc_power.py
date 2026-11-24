@@ -1,6 +1,7 @@
 """Learn a conservative charging-power cap from stable, phase-matched SOC segments."""
 from __future__ import annotations
 
+from statistics import median
 from typing import Any
 
 SOC_POWER_BAND_SIZE = 10
@@ -116,6 +117,7 @@ def _band_rows(segments: list[dict[str, Any]]) -> dict[tuple[int, int], dict[str
     """The rows per (phases, band) from segments of one source."""
     samples: dict[tuple[int, int], dict[float, float]] = {}
     tapered: dict[tuple[int, int], dict[float, float]] = {}
+    seen: dict[tuple[int, int], list[float]] = {}
 
     for session in _sessions(segments):
         session_id = float(session[0]["start"])
@@ -126,6 +128,7 @@ def _band_rows(segments: list[dict[str, Any]]) -> dict[tuple[int, int], dict[str
             key = (int(segment["phases"]), band)
             by_band.setdefault(key, []).append(segment)
             samples.setdefault(key, {})[session_id] = 0.0
+            seen.setdefault(key, []).append(float(segment["kw"]))
 
         for (phases, band), rows in by_band.items():
             candidate_caps = []
@@ -156,6 +159,9 @@ def _band_rows(segments: list[dict[str, Any]]) -> dict[tuple[int, int], dict[str
             "soc_end": band + SOC_POWER_BAND_SIZE,
             "sessions": len(observations),
             "sample_sessions": len(samples.get((phases, band), {})),
+            # what the car typically drew at this level in its stable segments (the median): shown while no limit is learned,
+            # so the chart is not empty. Never used by the plan (planning_power_cap reads cap_kw only)
+            "observed_kw": round(median(seen[(phases, band)]), 2) if seen.get((phases, band)) else None,
             "cap_kw": round(cap, 2) if cap is not None else None,
         }
     return rows
@@ -179,6 +185,8 @@ def build_soc_power_model(segments: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "status": "ready" if any(row["cap_kw"] is not None for row in rows) else "learning" if rows else "no_data",
         "min_sessions": SOC_POWER_MIN_SESSIONS,
+        # the most slower sessions in one level so far (the dashboard's "x / 3"): how close the nearest limit is
+        "best_sessions": max((row["sessions"] for row in rows), default=0),
         "bands": rows,
     }
 

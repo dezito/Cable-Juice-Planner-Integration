@@ -105,7 +105,12 @@ existing capacity assumption unchanged. The learned cap never raises the charger
 
 The comparison within a session reduces, but cannot eliminate, the effect of solar, charger, or site limits on
 the observed power. Phase grouping uses CJP's recorded per-phase amp settings, not separate measurements of
-current on each physical phase. This is a planning estimate only; the integration does not send a lower-power
+current on each physical phase. The measured power must agree with them: a segment whose power is more than 15 % above
+what the commanded current on the commanded phases can give (the charger charged by itself, or on more phases or current
+than CJP commanded) has no confirmed phase count and is not used. Power below the commanded power is a taper and is kept.
+The same phase count feeds the charging-loss model: a segment without a confirmed count takes the count the power implies
+(above 3.8 kW on a 3-phase charger it is 3 phases). Segments stored earlier are not judged again, they age out of the
+history. This is a planning estimate only; the integration does not send a lower-power
 command to the charger. The [battery-level power analysis](dashboard-analysis.md#charging-power-by-battery-level) shows the learned
 bands.
 
