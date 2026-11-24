@@ -919,6 +919,9 @@
       "learn_driving_distance": {
         "name": "Вивчати відстань поїздок"
       },
+      "learn_departure_time": {
+        "name": "Вивчати виїзд і повернення"
+      },
       "learn_soc_charge_power": {
         "name": "Навчати потужність заряджання за рівнем батареї"
       },

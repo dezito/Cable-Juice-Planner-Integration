@@ -8,7 +8,7 @@ The settings from the dashboard are entities that are kept across restarts:
 
 | Type | Examples |
 |---|---|
-| `switch` | charging rules, workdays and preheating per day, the What-if Smart days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
+| `switch` | charging rules, workdays and preheating per day, the What-if Smart days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, learn departure and homecoming, correct the price forecast, choose the forecast type automatically |
 | `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, start level, alternative reserve and the maximum recommended level (also the level Smart and charging at once charge to) |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |

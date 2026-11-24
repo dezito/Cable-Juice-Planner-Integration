@@ -129,6 +129,23 @@ The first distance comes the evening after the first start.
 
 </details>
 
+### Learned departure and homecoming
+
+Per weekday (Monday to Sunday): the departure and homecoming entered in the work plan against what CJP has
+[learned](learn-departure.md) from when the car is unplugged from and plugged in to the charger.
+
+| Column | Meaning |
+|---|---|
+| Workday | ✅ when the weekday is a workday in the work plan (only workdays are learned) |
+| Entered | departure–homecoming in the settings |
+| Learned | the suggestion: the 25th percentile of the departures rounded down and the 75th percentile of the homecomings rounded up, both to 15 minutes, from the last 8 weeks |
+| Used by the plan | with *Learn departure and homecoming* on and at least 3 days: the earlier departure and the later homecoming of *Entered* and *Learned*; otherwise *Entered* |
+| Days | days the times are learned from. ⏳ = fewer than 3, so the learned times are not used yet |
+
+Above the table it says whether *Learn departure and homecoming* is on. The section is empty until the car has been
+unplugged between 04:00 and 12:00 and plugged in again the same day on a workday; CJP records the connections from the
+start and keeps them as far back as its charging history reaches. The switch is under *Settings → Advanced*.
+
 ### Planned against actually charged
 
 The kWh planned the evening before against what was charged, and how much was charged outside the plan

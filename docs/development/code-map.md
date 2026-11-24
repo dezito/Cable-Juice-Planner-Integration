@@ -15,13 +15,14 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
 │   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
 │   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
-│   ├── energy/                          Prices, solar, forecasts, and power inputs
+│   ├── energy/                          Prices, solar, forecasts, and power inputs (`meter_check.py`: does the house sensor include the charger?)
 │   ├── history/                         Charging sessions, consumption, cost, and efficiency
 │   ├── analysis/                        Economy/forecast analysis and published results
 │   ├── economy.py                       Monthly charging economy comparison
 │   ├── pricing.py / state.py            Price helpers (incl. `sell_value()`) and engine state
 │   ├── debug.py                         Engine debug information
 │   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
+│   ├── workplan.py                      Learned departure and homecoming per weekday, and the times the plan uses
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price providers; CombinedPriceProvider is the only entry point
 ├── management/                          Storage, backups, dashboard, and blueprint setup
@@ -44,6 +45,8 @@ tests/                                   Pytest suite
 ├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
 ├── test_health_checks.py / test_value_checks.py / test_value_checks_recorder.py / test_site_fuse_check.py  Repairs: health checks, scale of values, main fuse
 ├── test_voltage_issue.py                The old-default voltage repair and its fix flow
+├── test_charger_meter.py                A charger on its own meter (house consumption) and the repair for a wrong setting
+├── test_workplan_learning.py            Learned departure and homecoming: samples, percentiles, the times the plan uses
 ├── test_charger_test.py                 Charger automation test: judging, voltage, runner parts, charge limit step
 ├── test_dashboard.py                    Dashboard generation and content
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation

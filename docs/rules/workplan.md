@@ -14,7 +14,7 @@ cheapest hours before each departure.
 | Setting | Meaning |
 |---|---|
 | Workday (per weekday) | the car drives to work this day |
-| Departure / homecoming | when the car leaves and comes home (default 07:00 and 16:00) |
+| Departure / homecoming | when the car leaves and comes home (default 07:00 and 16:00). Can be [learned from the charger](../learn-departure.md): the plan then uses the earlier departure and the later homecoming of the entered and the learned |
 | km needed | the day's round trip in km (default 50). Can be [learned from the odometer](../learn-distance.md) |
 | Preheat (per weekday) | preheat the car before departure |
 | Daily arrival battery level | the level the car must still have at homecoming (default 30 %) |

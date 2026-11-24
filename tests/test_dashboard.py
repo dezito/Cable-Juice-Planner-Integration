@@ -330,6 +330,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert switch not in workplan, language
         assert switch in advanced, language
         assert "switch.cjp_tesla_learn_soc_charge_power" in advanced, language
+        assert "switch.cjp_tesla_learn_departure_time" in advanced and "switch.cjp_tesla_learn_departure_time" not in workplan, language
         text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
         assert "@@" not in text, language
         settings = yaml.safe_load(text)["views"][1]
@@ -344,6 +345,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         ]
         assert actual_order == [
             switch,
+            "switch.cjp_tesla_learn_departure_time",
             ("section", None),
             "switch.cjp_tesla_auto_forecast_type",
             "select.cjp_tesla_forecast_type",
