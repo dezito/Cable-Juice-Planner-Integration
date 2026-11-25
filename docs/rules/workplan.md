@@ -61,6 +61,8 @@ With *Preheat* on for a weekday (and a car integration with a climate entity), C
 `preheat_start` on `event.cjp_<prefix>_ev_request` before departure – with `departure` and `defrost` (from
 the weather forecast or the outdoor temperature) in the data – and `preheat_stop` afterwards. Your
 automation starts and stops the climate. See [Charger and car control](../charger-control.md#the-action-entities).
+The departure is the one the plan uses: with [*Learn departure and homecoming*](../learn-departure.md) on, the earlier of
+the entered and the learned departure.
 
 ## Together with other rules
 

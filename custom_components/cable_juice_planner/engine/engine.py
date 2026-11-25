@@ -139,6 +139,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
 
         # runtime state (the globals of ev.py)
         self.preheating = False
+        # the departure a preheating was started for when that was the learned one (control/preheat.py). Not persisted
+        self._preheat_departure: datetime.datetime | None = None
         self.last_hash_results: dict = {}
         self.grid_price_cache: dict = {"using_offline_prices": False}
         self.sell_price_cache: dict = {"using_offline_prices": False}

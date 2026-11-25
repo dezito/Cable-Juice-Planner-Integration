@@ -210,6 +210,14 @@ class Workplan:
             _LOGGER.warning("The learned work plan times could not be used, the entered ones are: %s", err)
             return departure, homecoming
 
+    def learned_departure_in_use(self, day_text: str) -> datetime.time | None:
+        """The learned departure of a weekday when the plan uses it instead of the entered one (it is earlier), else None: learning
+        off, fewer than LEARN_MIN_WEEKDAY_SAMPLES days, a night shift. Looked at without a date, so the exceptions of a day (a trip,
+        today's car that is still plugged in after the learned departure) do not hide it."""
+        entered = self.setting(f"workday_departure_{day_text}")
+        used = self.effective_workday_times(day_text, None)[0]
+        return used if isinstance(entered, datetime.time) and isinstance(used, datetime.time) and used != entered else None
+
     def update_learned_workplan(self) -> None:
         """Keep the trip dates and publish the suggestions as the attributes learned_time and learned_days of the time entities."""
         self.record_trip_days()
