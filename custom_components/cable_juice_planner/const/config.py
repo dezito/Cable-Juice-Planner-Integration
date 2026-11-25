@@ -112,6 +112,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "notification": {
         "efficiency_on_cable_plug_in": True,
         "preheating": True,
+        "departure_readiness": True,
     },
     "notify_list": [],
     "prices": {
@@ -249,6 +250,7 @@ OPTION_PATHS: dict[str, str] = {
     "notify_list": "notify_list",
     "efficiency_on_cable_plug_in": "notification.efficiency_on_cable_plug_in",
     "preheating": "notification.preheating",
+    "departure_readiness": "notification.departure_readiness",
     # advanced / database
     "cron_interval": "cron_interval",
     "dashboard": "dashboard",
@@ -338,7 +340,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "charging_three_phase_min_amp",
     ],
     "weather": ["hourly_service_entity_id", "daily_service_entity_id", "outdoor_temp_entity_id"],
-    "notifications": ["notify_list", "efficiency_on_cable_plug_in", "preheating"],
+    "notifications": ["notify_list", "efficiency_on_cable_plug_in", "preheating", "departure_readiness"],
     "advanced": ["cron_interval", "dashboard", "enable_diagnostic_file_log"],
     "database": [
         "power_values_db_data_to_save",

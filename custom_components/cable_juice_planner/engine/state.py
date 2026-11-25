@@ -28,6 +28,8 @@ class Snapshot:
     solcast: dict[str, list] = field(default_factory=dict)
     astral: Any = None  # astral.Observer
     site: dict | None = None  # load balancing, see engine/site
+    # whether the charger automation has steps that set the car's charge limit; None: not known (coordinator/status_states.py)
+    car_limit_steps: bool | None = None
 
 
 @dataclass

@@ -229,6 +229,24 @@
       "message": "Poziom baterii poniżej dziennego celu - można włączyć wymuszone ładowanie",
       "no_charge_expensive_hours": "Brak ładowania w 3 najdroższych godzinach"
     },
+    "notify_departure": {
+      "title_not_ready": "Samochód nie będzie gotowy do wyjazdu",
+      "not_ready": "Wyjazd {departure}: brakuje ok. {missing} %.",
+      "reason_hours": "Przed wyjazdem zostało za mało godzin ładowania.",
+      "reason_limit": "Zapotrzebowanie przekracza limit ładowania {limit} %.",
+      "action_plan": "Pokaż plan ładowania",
+      "action_limit": "Zmień limit ładowania",
+      "title_plug_in": "Podłącz samochód",
+      "plug_in": "Ładowanie przed wyjazdem {departure} jest zaplanowane od {start}, ale samochód nie jest podłączony.",
+      "today": "dziś o {time}",
+      "tomorrow": "jutro o {time}",
+      "later": "{date} o {time}",
+      "car_limit": "Wyjazd {departure}: własny limit ładowania samochodu to {limit} %, a potrzeba {needed} %.",
+      "car_stopped": "Wyjazd {departure}: samochód zakończył ładowanie przy {level} %, a potrzeba {needed} %.",
+      "slow": "Wyjazd {departure}: ładowanie mocą {actual} kW zamiast planowanych {planned} kW. W tym tempie zabraknie ok. {missing} %.",
+      "action_car_limit": "Zmień limit ładowania samochodu",
+      "no_limit_steps": "Automatyzacja ładowarki nie ma kroku ustawiającego limit ładowania w samochodzie: dodaj go albo podnieś limit w samochodzie."
+    },
     "startup": {
       "configuration": {
         "header": "Konfiguracja",

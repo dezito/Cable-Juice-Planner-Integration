@@ -276,12 +276,14 @@
         "data": {
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
-          "preheating": "Preheating start/stop"
+          "preheating": "Preheating start/stop",
+          "departure_readiness": "Car not ready / plug in"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
-          "preheating": "Notify on preheating start/stop"
+          "preheating": "Notify on preheating start/stop",
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in."
         }
       },
       "advanced": {
@@ -704,12 +706,14 @@
         "data": {
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
-          "preheating": "Preheating start/stop"
+          "preheating": "Preheating start/stop",
+          "departure_readiness": "Car not ready / plug in"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
-          "preheating": "Notify on preheating start/stop"
+          "preheating": "Notify on preheating start/stop",
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in."
         }
       },
       "advanced": {

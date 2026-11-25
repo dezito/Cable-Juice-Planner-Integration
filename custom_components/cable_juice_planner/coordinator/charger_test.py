@@ -36,7 +36,7 @@ from ..engine.control.charger_test import (
     power_is_capped,
     tolerance_w,
 )
-from ..management.automation_inputs import AMPS_INPUTS, START_INPUTS, STOP_INPUTS, automations_using_blueprint, has_steps
+from ..management.automation_inputs import AMPS_INPUTS, LIMIT_INPUTS, START_INPUTS, STOP_INPUTS, automations_using_blueprint, has_steps
 from ..utils.power import power_to_w
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,7 +62,6 @@ LIMIT_SAMPLE_SECONDS = 10
 # limit in a run of its own (a limit that changes together with a stop is never sent)
 LIMIT_PAUSE_SECONDS = 15
 LIMIT_TOLERANCE = 0.5
-LIMIT_INPUTS = ("car_limit_actions",)
 
 
 class CoordinatorChargerTest:

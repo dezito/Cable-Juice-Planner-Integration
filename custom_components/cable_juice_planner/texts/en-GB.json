@@ -229,6 +229,24 @@
       "message": "Battery under daily target, forced charging available",
       "no_charge_expensive_hours": "Not charging during 3 most expensive hours"
     },
+    "notify_departure": {
+      "title_not_ready": "Car will not be ready for departure",
+      "not_ready": "Departure {departure}: about {missing} % short.",
+      "reason_hours": "There are not enough charging hours left before the departure.",
+      "reason_limit": "The need is above the charge limit of {limit} %.",
+      "action_plan": "Show charging plan",
+      "action_limit": "Change the charge limit",
+      "title_plug_in": "Plug in the car",
+      "plug_in": "Charging for the departure {departure} is planned from {start}, but the car is not plugged in.",
+      "today": "today at {time}",
+      "tomorrow": "tomorrow at {time}",
+      "later": "{date} at {time}",
+      "car_limit": "Departure {departure}: the car's own charge limit is {limit} %, but {needed} % is needed.",
+      "car_stopped": "Departure {departure}: the car stopped charging at {level} %, but {needed} % is needed.",
+      "slow": "Departure {departure}: charging at {actual} kW instead of the planned {planned} kW. At this speed about {missing} % will be missing.",
+      "action_car_limit": "Change the car's charge limit",
+      "no_limit_steps": "The charger automation has no step that sets the charge limit in the car: add one, or raise the limit in the car."
+    },
     "startup": {
       "configuration": {
         "header": "Configuration",

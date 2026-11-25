@@ -230,6 +230,7 @@ class FutureScheduled:
                                 self.scheduled_charging_added(ctx, day, what_day, timestamp, battery_level_id, battery_level_added, cost_added)
                     if round(kwh_needed_today, 1) > 0.0 and self.kwh_to_percentage(kwh_needed_today, include_charging_loss = True) > 0.0:
                         _LOGGER.warning(f"Battery level above max recommended charge limit {self.get_max_recommended_charge_limit_battery_level()}%, could not fullfill needed kWh for day {day}, left kwh_needed_today {kwh_needed_today}kWh")
+                        self.record_departure_shortfall(ctx, day, next_departure, kwh_needed_today)
         except Exception as e:
             _LOGGER.error(f"Error in scheduled_planner day:{day}: {e} {type(e)}")
             self.persistent_notification(

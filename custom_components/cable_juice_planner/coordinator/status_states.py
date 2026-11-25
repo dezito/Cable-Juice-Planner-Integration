@@ -15,7 +15,7 @@ from homeassistant.config import AUTOMATION_CONFIG_PATH
 from homeassistant.core import Event, callback
 
 from ..const import normalize_state
-from ..management.automation_inputs import automations_using_blueprint, status_aliases
+from ..management.automation_inputs import LIMIT_INPUTS, automations_using_blueprint, has_steps, status_aliases
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +25,9 @@ class CoordinatorStatusStates:
 
     def _init_status_states(self) -> None:
         self.status_aliases: dict[str, str] = {}
+        # whether the charger automation has steps that set the car's charge limit (None: no automation found, not known);
+        # read with the states, passed to the engine in the snapshot (the departure notice at plug-in)
+        self.car_limit_steps: bool | None = None
 
     def canonical_status(self, value: Any) -> Any:
         """The status as CJP reads it: a state the blueprint gave as charging or done is the built in one, anything else is
@@ -42,13 +45,12 @@ class CoordinatorStatusStates:
     async def _async_load_status_aliases(self) -> bool:
         """Read the automations and keep the states of the blueprint. True when they changed."""
         status_entity = self.config["charger"]["entity_ids"]["status_entity_id"]
-        if not status_entity:
-            aliases: dict[str, str] = {}
-        else:
-            found = await self.hass.async_add_executor_job(
-                automations_using_blueprint, self.hass.config.path(AUTOMATION_CONFIG_PATH), f"sensor.{self.object_prefix}_charger_action"
-            )
-            aliases = status_aliases(found, status_entity)
+        found = await self.hass.async_add_executor_job(
+            automations_using_blueprint, self.hass.config.path(AUTOMATION_CONFIG_PATH), f"sensor.{self.object_prefix}_charger_action"
+        )
+        # before the comparison below: a reload that only changes these steps is kept too
+        self.car_limit_steps = has_steps(found, *LIMIT_INPUTS)
+        aliases: dict[str, str] = status_aliases(found, status_entity) if status_entity else {}
         if aliases == self.status_aliases:
             return False
         self.status_aliases = aliases

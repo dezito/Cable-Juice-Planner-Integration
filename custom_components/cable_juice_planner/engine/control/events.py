@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 
 from ...const import (
     CHARGER_CHARGING_STATUS,
@@ -70,6 +71,15 @@ class ControlEvents:
             self.config["charger"]["charging_loss"] = runtime["charging_loss"]
         self.daily_odometer = {str(date): float(value) for date, value in (runtime.get("daily_odometer") or {}).items()}
         self.trip_days = {date for date in (runtime.get("trip_days") or []) if isinstance(date, str)}
+        self.restore_departure_notices(runtime.get("departure_notices"))
+        anchor = runtime.get("virtual_charge_anchor")
+        # meter None: unplugged, the next charge counts from the meter then
+        valid = isinstance(anchor, dict) and all(
+            (key == "meter" and anchor.get(key, 0) is None)
+            or (isinstance(anchor.get(key), (int, float)) and not isinstance(anchor.get(key), bool) and math.isfinite(anchor[key]))
+            for key in ("meter", "level", "base")
+        )
+        self.virtual_charge_anchor = {key: None if anchor[key] is None else float(anchor[key]) for key in ("meter", "level", "base")} if valid else None
         if (measurement := runtime.get("charging_loss_measurement")) and self.is_calculating_charging_loss():
             # a measurement in progress survives a restart or reload
             self.charging_loss_car_begin_battery_level = measurement.get("car_begin_battery_level", 0.0)
@@ -189,6 +199,8 @@ class ControlEvents:
         force = force or var_name == "enforce_planning"
         self.charge_if_needed(force_recalculate=force)
         self.is_battery_fully_charged()
+        # from the stored plan, also when the plan hash skipped the calculation
+        self.notify_departure_readiness()
         if self.is_ev_configured():
             self.analysis_check_departure()
         self.set_estimated_range()
@@ -303,6 +315,7 @@ class ControlEvents:
         self.economy_unplugged()
         # a restart of a charger that did not start begins again, also when it is plugged in before the next cron
         self.charger_restart_unplugged()
+        self.virtual_charge_unplugged()
         if not self.is_ev_home():
             return
         self.stop_current_charging_session()

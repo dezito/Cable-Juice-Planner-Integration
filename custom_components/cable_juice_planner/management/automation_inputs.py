@@ -38,7 +38,7 @@ def automations_using_blueprint(path: str, action_sensor: str) -> list[dict]:
         return []
     try:
         automations = yaml_util.load_yaml(path)
-    except (HomeAssistantError, OSError) as err:
+    except (HomeAssistantError, OSError, ValueError) as err:
         _LOGGER.debug("Could not read %s to see which actions the automation has steps for: %s", path, err)
         return []
     found: list[dict] = []
@@ -120,3 +120,5 @@ AMPS_INPUTS = ("amps_actions", "car_amps_actions", "circuit_actions")
 # current is never set to 0, so it does neither
 START_INPUTS = ("start_actions", "car_start_actions", "amps_actions")
 STOP_INPUTS = ("stop_actions", "car_stop_actions", "amps_actions")
+# the car's charge limit (the test, and the departure notice at plug-in)
+LIMIT_INPUTS = ("car_limit_actions",)

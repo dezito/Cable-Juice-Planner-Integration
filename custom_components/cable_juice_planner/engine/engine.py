@@ -170,6 +170,11 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
         self.charging_loss_charging_completed = False
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
         self.trip_days: set[str] = set()  # ISO dates of the trips seen (engine/workplan.py)
+        self.departure_notices: dict[str, str] = {}  # "<kind> <departure>" -> departure ISO of the sent notices (control/readiness.py)
+        self._readiness_seen: dict[str, tuple] = {}  # charging check -> (state, first seen) while the plan charges (control/readiness.py)
+        self._plug_in_seen: dict[str, tuple] = {}  # the same for the car's limit at plug-in (control/readiness.py)
+        # the virtual EV's level counted from the charger meter: {"meter": kWh, "level": %} (history/combine.py)
+        self.virtual_charge_anchor: dict | None = None
         self.learned_distances: dict[str, float] = {}  # number key -> learned distance with enough days
         self.charging_loss_db: dict = {"segments": [], "soc_power_segments": [], "backfilled": False}
         self.soc_power_model: dict = {"status": "no_data", "min_sessions": 3, "best_sessions": 0, "bands": []}
@@ -293,6 +298,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             "charging_loss": self.config["charger"]["charging_loss"],
             "daily_odometer": dict(self.daily_odometer),
             "trip_days": sorted(self.trip_days),
+            "departure_notices": dict(self.departure_notices),
+            "virtual_charge_anchor": dict(self.virtual_charge_anchor) if self.virtual_charge_anchor else None,
             "charging_loss_measurement": {
                 "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
                 "car_begin_kwh": self.charging_loss_car_begin_kwh,

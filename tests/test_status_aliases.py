@@ -63,6 +63,12 @@ def test_without_a_status_entity_there_are_no_aliases() -> None:
     assert status_aliases([_inputs(completed_states=["Finishing"])], "") == {}
 
 
+@pytest.fixture(autouse=True)
+def config_dir(hass: HomeAssistant, tmp_path: Path) -> None:
+    """The default test config folder is shared by all test workers: an automations.yaml written there reaches the others."""
+    hass.config.config_dir = str(tmp_path)
+
+
 def _write_automations(hass: HomeAssistant, *automations: dict) -> None:
     content = yaml.safe_dump([{"id": f"a{index}", "alias": "charger", "use_blueprint": {"path": BLUEPRINT, "input": item}} for index, item in enumerate(automations)])
     Path(hass.config.path("automations.yaml")).write_text(content, encoding="utf-8")
@@ -148,3 +154,19 @@ async def test_without_the_automation_only_the_built_in_states_apply(hass: HomeA
         assert (await coordinator._async_snapshot()).states[CHARGER_STATUS] == "Finishing"
     finally:
         await async_unload_and_join(hass, entry)
+
+
+async def test_whether_the_automation_sets_the_cars_limit_is_read_with_the_states(hass: HomeAssistant, aliased_entry) -> None:
+    """The departure notice at plug-in: the car's limit is only reported then when the automation cannot set it."""
+    coordinator = aliased_entry.runtime_data
+    assert coordinator.car_limit_steps is False
+    assert (await coordinator._async_snapshot()).car_limit_steps is False
+    _write_automations(hass, _inputs(charging_states=["Vehicle_Charging"], completed_states=["Finishing"], car_limit_actions=[{"action": "number.set_value"}]))
+    hass.bus.async_fire(EVENT_AUTOMATION_RELOADED)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.car_limit_steps is True  # the states did not change, the steps did
+    assert (await coordinator._async_snapshot()).car_limit_steps is True
+    Path(hass.config.path("automations.yaml")).write_text("[]\n", encoding="utf-8")
+    hass.bus.async_fire(EVENT_AUTOMATION_RELOADED)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.car_limit_steps is None  # no automation found: not known

@@ -66,6 +66,7 @@ class CoordinatorData:
             statistics={entity_id: list(rows) for entity_id, rows in self._statistics.items()},
             astral=observer,
             site=self.site.snapshot_for(self, now) if self.site is not None and self.entry.entry_id in self.site.members else None,
+            car_limit_steps=getattr(self, "car_limit_steps", None),
         )
         # like the shared price cache of the PyScript version: refreshed at most once an hour
         if include_prices and (not self._price_snapshot_time or time.monotonic() - self._price_snapshot_time > PRICE_SNAPSHOT_SECONDS):
