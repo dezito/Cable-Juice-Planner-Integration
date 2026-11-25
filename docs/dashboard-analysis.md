@@ -245,7 +245,8 @@ from the first start: the house consumption after the first whole day, km/kWh af
 ### Battery capacity
 
 kWh from the charger per 1 % per month and power group, from the [charging loss](charging-loss.md)
-measurements. Rising over the years = less capacity. Compare the same month year by year – winter is higher.
+measurements. Falling over the years = less capacity (fewer kWh fill 1 %) or a lower charging loss; rising = a higher
+charging loss. Compare the same month year by year – winter is higher.
 
 <details>
 <summary>Screenshot</summary>
