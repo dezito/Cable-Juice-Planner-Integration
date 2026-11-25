@@ -235,7 +235,8 @@ class ControlActions:
             return
         last_update_entity = self.config["ev_car"]["entity_ids"]["last_update_entity_id"]
         if self.is_entity_available(last_update_entity):
-            last_update = to_datetime(self.get_state(last_update_entity, error_state=reset_datetime()))
+            # a timestamp sensor's state is in UTC: compared with now() (local) after converting it
+            last_update = to_datetime(self.get_state(last_update_entity, error_state=reset_datetime()), self._snap.tz if self._snap else None)
             if minutes_between(last_update, self.now()) <= 14:
                 _LOGGER.debug("Ev already updated, skipping wake up call")
                 return

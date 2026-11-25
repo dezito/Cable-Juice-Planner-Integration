@@ -258,7 +258,7 @@
       },
       "weather": {
         "title": "Vejr",
-        "description": "Vejrprognosen bruges til at forudsige soloverskuddet og til forvarmning.",
+        "description": "Vejrprognosen bruges til at forudsige soloverskuddet (med solceller), til forvarmning og til funktionen »Tilpas kørselseffektivitet til temperaturen«. Siden kan også udfyldes uden solceller.",
         "data": {
           "hourly_service_entity_id": "Timeprognose",
           "daily_service_entity_id": "Dagsprognose",
@@ -267,7 +267,7 @@
         "data_description": {
           "hourly_service_entity_id": "Timeprognose entity_id",
           "daily_service_entity_id": "Dagsprognose entity_id",
-          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast"
+          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast og giver turene under Analyse deres udetemperatur"
         }
       },
       "notifications": {
@@ -686,7 +686,7 @@
       },
       "weather": {
         "title": "Vejr",
-        "description": "Vejrprognosen bruges til at forudsige soloverskuddet og til forvarmning.",
+        "description": "Vejrprognosen bruges til at forudsige soloverskuddet (med solceller), til forvarmning og til funktionen »Tilpas kørselseffektivitet til temperaturen«. Siden kan også udfyldes uden solceller.",
         "data": {
           "hourly_service_entity_id": "Timeprognose",
           "daily_service_entity_id": "Dagsprognose",
@@ -695,7 +695,7 @@
         "data_description": {
           "hourly_service_entity_id": "Timeprognose entity_id",
           "daily_service_entity_id": "Dagsprognose entity_id",
-          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast"
+          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast og giver turene under Analyse deres udetemperatur"
         }
       },
       "notifications": {
@@ -921,6 +921,9 @@
       },
       "learn_departure_time": {
         "name": "Lær afgang og hjemkomst"
+      },
+      "temperature_efficiency": {
+        "name": "Tilpas kørselseffektivitet til temperaturen"
       },
       "learn_soc_charge_power": {
         "name": "Lær ladeeffekt efter batteriniveau"

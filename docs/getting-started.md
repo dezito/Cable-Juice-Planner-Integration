@@ -27,6 +27,8 @@ Optional:
   [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
   [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
 - a **home battery** (level and power)
+- for preheating, the driving temperature analysis and [Adjust driving efficiency to temperature](temperature-efficiency.md)
+  also without solar: a weather integration with `weather.get_forecasts` and an outdoor temperature sensor
 
 For the dashboard you need the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template-card`
 and `card-mod`. If Home Assistant can't find some of them, a notification lists the missing ones with links to
@@ -187,8 +189,13 @@ missing tariff counts as 0, which makes the sell price too high.
 
 ### Solar panels, solar charging and weather (optional)
 
-Only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
+Solar charging only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
 details, and [Fixed solar sell price](rules/solar.md#fixed-solar-sell-price) if your agreement pays a fixed price.
+
+The **Weather** page is also shown without solar: the weather forecast and the outdoor temperature are used for
+preheating, the outdoor temperature of the drives under Analysis and
+[Adjust driving efficiency to temperature](temperature-efficiency.md). Without solar, set them under
+**Configure → Solar panels and weather**.
 
 With Solcast, select e.g. `sensor.solcast_pv_forecast_forecast_today`; the other days are found automatically.
 Solcast switches the forecast sensors of day 3 and on off by default: enable `…_forecast_day_3` and on

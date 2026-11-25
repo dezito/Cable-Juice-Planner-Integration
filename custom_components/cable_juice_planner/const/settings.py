@@ -23,6 +23,8 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     "workplan_charging": {"default": False},
     # the plan uses the earlier of the entered and the learned departure and the later homecoming (engine/workplan.py)
     "learn_departure_time": {"default": False},
+    # the plan's driving at the forecast outdoor temperature, never more km/kWh than learned (engine/temperature_efficiency.py)
+    "temperature_efficiency": {"default": False, "requires": "ev"},
     "trip_preheat": {"default": False},
     **{f"workday_{day}": {"default": False} for day in WEEKDAYS},
     **{f"preheat_{day}": {"default": False} for day in WEEKDAYS},

@@ -75,8 +75,9 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     result = await _configure(hass, result, "price_provider", {"price_providers": ["energidataservice"]})
     result = await _configure(hass, result, "prices_energidataservice", {"energidataservice_buy_entity_id": PRICE})
     result = await _configure(hass, result, "price_fees", {"refund": 0.0, "sell_fee": 0.03})
-    # no production entity -> no solar charging / weather pages
+    # no production entity -> no solar charging page; the weather page is shown without solar too
     result = await _configure(hass, result, "solar", form_defaults(result))
+    result = await _configure(hass, result, "weather", {"outdoor_temp_entity_id": "sensor.outdoor"})
     result = await _configure(hass, result, "notifications", form_defaults(result))
     result = await _configure(hass, result, "advanced", {**form_defaults(result), "dashboard": False})
     result = await _configure(hass, result, "database", form_defaults(result))
@@ -90,6 +91,7 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     assert options["usable_battery_level_entity_id"] == EV_LEVEL
     assert options["dashboard"] is False
     assert options["dashboard_icon"] == "mdi:car-electric"
+    assert options["outdoor_temp_entity_id"] == "sensor.outdoor"
 
 
 async def test_ev_entities_all_or_nothing(hass: HomeAssistant) -> None:
@@ -284,6 +286,7 @@ async def test_a_pre_filled_solar_sensor_can_be_cleared_and_stays_empty(hass: Ho
     values = form_defaults(result)
     values.pop("production_entity_id")  # the user clears the field: an optional field left out of the submitted form
     result = await hass.config_entries.flow.async_configure(result["flow_id"], values)
+    result = await _configure(hass, result, "weather", form_defaults(result))  # shown without solar too
     result = await _configure(hass, result, "notifications", form_defaults(result))
     result = await _configure(hass, result, "advanced", {**form_defaults(result), "dashboard": False})
     result = await _configure(hass, result, "database", form_defaults(result))
@@ -333,6 +336,7 @@ async def _finish_without_solar(hass: HomeAssistant, result: dict) -> dict:
     values = form_defaults(result)
     values.pop("production_entity_id", None)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], values)
+    result = await _configure(hass, result, "weather", form_defaults(result))  # shown without solar too
     result = await _configure(hass, result, "notifications", form_defaults(result))
     result = await _configure(hass, result, "advanced", {**form_defaults(result), "dashboard": False})
     return await _configure(hass, result, "database", form_defaults(result))

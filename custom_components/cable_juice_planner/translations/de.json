@@ -258,7 +258,7 @@
       },
       "weather": {
         "title": "Wetter",
-        "description": "Die Wetterprognose wird für den Solarüberschuss und das Vorheizen verwendet.",
+        "description": "Die Wetterprognose wird für den Solarüberschuss (mit Solaranlage), das Vorheizen und die Funktion „Fahreffizienz an die Temperatur anpassen“ verwendet. Die Seite kann auch ohne Solaranlage ausgefüllt werden.",
         "data": {
           "hourly_service_entity_id": "Stündliche Prognose",
           "daily_service_entity_id": "Tägliche Prognose",
@@ -267,7 +267,7 @@
         "data_description": {
           "hourly_service_entity_id": "Stundenprognose-Entity",
           "daily_service_entity_id": "Tagesprognose-Entity",
-          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast"
+          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast und für die Außentemperatur der Fahrten in der Analyse"
         }
       },
       "notifications": {
@@ -686,7 +686,7 @@
       },
       "weather": {
         "title": "Wetter",
-        "description": "Die Wetterprognose wird für den Solarüberschuss und das Vorheizen verwendet.",
+        "description": "Die Wetterprognose wird für den Solarüberschuss (mit Solaranlage), das Vorheizen und die Funktion „Fahreffizienz an die Temperatur anpassen“ verwendet. Die Seite kann auch ohne Solaranlage ausgefüllt werden.",
         "data": {
           "hourly_service_entity_id": "Stündliche Prognose",
           "daily_service_entity_id": "Tägliche Prognose",
@@ -695,7 +695,7 @@
         "data_description": {
           "hourly_service_entity_id": "Stundenprognose-Entity",
           "daily_service_entity_id": "Tagesprognose-Entity",
-          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast"
+          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast und für die Außentemperatur der Fahrten in der Analyse"
         }
       },
       "notifications": {
@@ -921,6 +921,9 @@
       },
       "learn_departure_time": {
         "name": "Abfahrt und Rückkehr lernen"
+      },
+      "temperature_efficiency": {
+        "name": "Fahreffizienz an die Temperatur anpassen"
       },
       "learn_soc_charge_power": {
         "name": "Ladeleistung nach Akkustand lernen"

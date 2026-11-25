@@ -34,6 +34,7 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 | [Charging loss](charging-loss.md) | measured continuously per charging power |
 | [Learn driving distance](learn-distance.md) | km per workday and the typical daily distance from the odometer |
 | [Learn departure and homecoming](learn-departure.md) | the departure and homecoming per workday from when the car is unplugged and plugged in |
+| [Adjust driving efficiency to temperature](temperature-efficiency.md) | the plan's km/kWh at the forecast outdoor temperature of each drive |
 | [Public charging](public-charging.md) | charges away from home in the history and the economy |
 | [Dashboard and analysis](dashboard-analysis.md) | every view, and how to read the analysis |
 

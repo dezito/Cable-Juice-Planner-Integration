@@ -392,6 +392,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert actual_order == [
             switch,
             "switch.cjp_tesla_learn_departure_time",
+            "switch.cjp_tesla_temperature_efficiency",
             ("section", None),
             "switch.cjp_tesla_auto_forecast_type",
             "select.cjp_tesla_forecast_type",
@@ -407,6 +408,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert "ns.soc_power_help" in read_more, language
         attributes = {
             ("switch.cjp_tesla_learn_driving_distance", "help"): "learn-help",
+            ("switch.cjp_tesla_temperature_efficiency", "help"): "temperature-help",
             ("switch.cjp_tesla_auto_forecast_type", "help"): "forecast-help",
             ("select.cjp_tesla_forecast_type", "description"): "forecast-type-description",
             ("switch.cjp_tesla_price_forecast_correction", "help"): "price-help",
@@ -416,6 +418,8 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         )
         ordered_sections = (
             "learn-help",
+            "---",
+            "temperature-help",
             "---",
             "forecast-help",
             "forecast-type-description",
@@ -429,7 +433,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
             section_positions.append(position)
             cursor = position + len(section)
         assert section_positions == sorted(section_positions), language
-        assert rendered_read_more.count("---") == 2, language
+        assert rendered_read_more.count("---") == 3, language
 
 
 def _settings_sections(options: dict, existing: set[str]) -> dict[str, list[str]]:

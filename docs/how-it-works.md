@@ -28,7 +28,9 @@ each departure.
 
 CJP measures every drive (from unplugging to plugging in): km, battery % used and the outdoor temperature.
 From that it knows the car's **driving efficiency**, km/kWh and the realistic range – so "50 km" means the
-battery % the car really uses, also in winter.
+battery % the car really uses, also in winter. With [*Adjust driving efficiency to temperature*](temperature-efficiency.md)
+on, the plan also moves the learned km/kWh to the forecast outdoor temperature of each planned drive when that is
+colder – never above the learned value.
 
 ### Solar surplus
 

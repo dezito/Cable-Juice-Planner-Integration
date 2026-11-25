@@ -777,15 +777,17 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set ns = namespace(learn_help=none, learn_departure_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
+        {% set ns = namespace(learn_help=none, learn_departure_help=none, temperature_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
         {% set ns.learn_help = state_attr('switch.cjp_learn_driving_distance', 'help') %}
         {% set ns.learn_departure_help = state_attr('switch.cjp_learn_departure_time', 'help') %}
+        {% set ns.temperature_help = state_attr('switch.cjp_temperature_efficiency', 'help') %}
         {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
         {% set ns.forecast_type_description = state_attr('select.cjp_forecast_type', 'description') %}
         {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
         {% set ns.soc_power_help = state_attr('switch.cjp_learn_soc_charge_power', 'help') %}
         {% if ns.learn_help %}{% set ns.sections = ns.sections + [ns.learn_help] %}{% endif %}
         {% if ns.learn_departure_help %}{% set ns.sections = ns.sections + [ns.learn_departure_help] %}{% endif %}
+        {% if ns.temperature_help %}{% set ns.sections = ns.sections + [ns.temperature_help] %}{% endif %}
         {% if ns.forecast_help %}{% set ns.forecast_section = ns.forecast_help %}{% endif %}
         {% if ns.forecast_type_description %}
         {% if ns.forecast_section %}{% set ns.forecast_section = ns.forecast_section ~ '\n\n' %}{% endif %}
@@ -808,6 +810,9 @@ views:
         name:
           type: entity
       - entity: switch.cjp_learn_departure_time
+        name:
+          type: entity
+      - entity: switch.cjp_temperature_efficiency
         name:
           type: entity
       - type: section
@@ -1050,6 +1055,24 @@ views:
         @@drive_temperature_cold_1@@ **{{ ((f.cold_cost or 0) * 100) | round(0) }} %** @@drive_temperature_cold_2@@
         {%- else -%}
         <ha-alert alert-type="info">@@drive_temperature_no_data@@ ({{ a.drives | length if a.drives else 0 }})</ha-alert>
+        {%- endif %}
+
+        {% set adj = state_attr('sensor.cjp_km_per_kwh', 'temperature_adjustment') -%}
+        {% set reasons = {'too_few_drives': '@@drive_temperature_reason_too_few_drives@@', 'too_narrow': '@@drive_temperature_reason_too_narrow@@', 'no_cold_effect': '@@drive_temperature_reason_no_cold_effect@@', 'implausible': '@@drive_temperature_reason_implausible@@', 'no_forecast': '@@drive_temperature_reason_no_forecast@@', 'too_few_matched': '@@drive_temperature_reason_too_few_matched@@', 'no_learned': '@@drive_temperature_reason_no_learned@@', 'failed': '@@drive_temperature_reason_failed@@'} -%}
+        {% if not is_state('switch.cjp_temperature_efficiency', 'on') or not adj or not adj.enabled -%}
+        @@drive_temperature_plan_off@@
+        {%- elif adj.reason -%}
+        @@drive_temperature_plan_waiting@@ {{ reasons.get(adj.reason, adj.reason) }} ({{ adj.drives or 0 }})
+        {%- elif adj.drives_used -%}
+        @@drive_temperature_plan_on@@
+
+        | @@drive_temperature_plan_drive@@ | @@drive_temperature_plan_forecast@@ | @@drive_temperature_plan_learned@@ | @@drive_temperature_plan_used@@ |
+        |:---|---:|---:|---:|
+        {% for d in adj.drives_used -%}
+        | {{ d.start[8:10] }}/{{ d.start[5:7] }} {{ d.start[11:16] }}{{ ('–' ~ ((d.end[8:10] ~ '/' ~ d.end[5:7] ~ ' ') if d.end[:10] != d.start[:10] else '') ~ d.end[11:16]) if d.end else '' }} | {{ (d.temp ~ ' °C') if d.temp is not none else '–' }} | {{ d.learned if d.learned is not none else '–' }} | {{ ('**' ~ d.km_per_kwh ~ '**') if d.km_per_kwh is not none else ((d.learned if d.learned is not none else '–') ~ ' (' ~ reasons.get(d.reason, d.reason) ~ ')') }} |
+        {% endfor -%}
+        {%- else -%}
+        @@drive_temperature_plan_none@@
         {%- endif %}
       grid_options:
         columns: full
