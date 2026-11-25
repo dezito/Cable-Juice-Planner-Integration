@@ -264,7 +264,8 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                     charging_plan[day]['work_range_needed'] = self.get_entity_daily_distance(day_text = day_text)
                     if away_on_workday:
                         charging_plan[day]['work_range_needed'] /= 2
-                    charging_plan[day]['work_battery_level_needed'] = self.calc_distance_to_battery_level(charging_plan[day]['work_range_needed'])
+                    # at the forecast temperature while the car is away (switch temperature_efficiency), else the learned km/kWh
+                    charging_plan[day]['work_battery_level_needed'] = self.calc_distance_to_battery_level_for(charging_plan[day]['work_range_needed'], work_goto, work_homecoming)
 
                     if len(workday_labels) > 0:
                         charging_plan[day]['label'] = workday_labels.pop(0)
@@ -294,7 +295,9 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 charging_plan[day]['rules'].append("trip")
 
                 if trip_range:
-                    charging_plan[day]['trip_battery_level_needed'] = self.range_to_battery_level(trip_range, self.get_min_trip_battery_level(), trip_date_time)
+                    charging_plan[day]['trip_battery_level_needed'] = self.range_to_battery_level(
+                        trip_range, self.get_min_trip_battery_level(), trip_date_time, drive=self.trip_drive_window(charging_plan[day])
+                    )
                     trip_target_level = charging_plan[day]['trip_battery_level_needed']
                 elif trip_target_level:
                     charging_plan[day]['trip_battery_level_needed'] = trip_target_level
@@ -377,7 +380,9 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             elif self.fill_up_charging_enabled():
                 charging_plan[day]['offday'] = True
                 charging_plan[day]['offday_range_needed'] = self.get_entity_daily_distance()
-                charging_plan[day]['offday_battery_level_needed'] = self.calc_distance_to_battery_level(charging_plan[day]['offday_range_needed'])
+                charging_plan[day]['offday_battery_level_needed'] = self.calc_distance_to_battery_level_for(
+                    charging_plan[day]['offday_range_needed'], *self.day_drive_window(charging_plan[day], now)
+                )
                 charging_plan[day]['offday_kwh_needed'] = self.percentage_to_kwh(charging_plan[day]['offday_battery_level_needed'], include_charging_loss=True)
                 charging_plan[day]['emoji'] = emoji_parse({'fill_up': True})
 
@@ -545,6 +550,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             for timestamp, value in sorted((k, v) for k, v in chargeHours.items() if isinstance(k, datetime.datetime))
         ])
         driving = self.planned_driving(charging_plan, now)
+        self.publish_temperature_efficiency(now)
         self.set_attr("current_charging_rule", "battery_forecast", self.battery_forecast_flow(charging_plan, chargeHours, now, driving))
         # the planned driving for the chart's bars, overlapping driving is added up there
         self.set_attr("current_charging_rule", "distance_forecast", [

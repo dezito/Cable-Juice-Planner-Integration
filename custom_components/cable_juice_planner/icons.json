@@ -85,6 +85,9 @@
       "learn_departure_time": {
         "default": "mdi:clock-time-eight-outline"
       },
+      "temperature_efficiency": {
+        "default": "mdi:snowflake-thermometer"
+      },
       "learn_soc_charge_power": {
         "default": "mdi:car-electric-outline"
       },

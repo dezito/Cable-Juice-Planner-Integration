@@ -57,6 +57,11 @@ Read the relevant documentation before changing behavior. In particular:
 - Respect Home Assistant timestamps and configured time zones. Avoid naive
   datetime assumptions and test departure boundaries, price intervals,
   day/week transitions, and daylight-saving transitions when relevant.
+- ISO strings with an offset from Home Assistant (weather forecasts, timestamp
+  sensor states) are read with `to_datetime(value, self._snap.tz)`, which
+  converts them to local time before dropping the offset; `to_datetime()`
+  without tz keeps the string's wall clock and is only for CJP's own naive
+  timestamps.
 - Preserve compatibility of config-entry options, entity IDs/unique IDs,
   stored history, backups, and import from the PyScript version. Changes to
   these formats or identifiers require a migration/compatibility path and
@@ -670,6 +675,17 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   database); a trip not yet started is excluded while set but never remembered. Anything that goes wrong in the helper
   gives the entered times. The times the plan uses are part of the plan hash (`WORKPLAN_TIMES`). The learned values are
   shown as the attributes `learned_time` and `learned_days` of the `time` entities and in the Analysis section.
+- Adjust driving efficiency to temperature (`engine/temperature_efficiency.py`, switch `temperature_efficiency`, default
+  off, requires EV): only the planner converts km to battery % with the adjusted km/kWh, through the `*_for()` helpers in
+  `engine/battery.py` (a guard test in `tests/test_temperature_efficiency.py` lists the allowed callers); measurements,
+  the range, the drive efficiency, the startup info and the What-if keep the learned km/kWh. Each learned
+  `km_kwh_efficiency_db` entry is moved from the temperature of its analysis drive (ended within 600 s) to the forecast
+  temperature of the planned drive along a km-weighted line from the newest `ANALYSIS_DRIVES` analysis drives, and the
+  same forecast type runs over the moved entries, so the cold is not counted twice. The result is clamped to
+  [0.5 × learned, learned]; too few drives, no forecast, too few matched entries or any error give the learned value.
+  Drive windows: work departure to homecoming (a homecoming at or before the departure is the next morning), trip
+  departure to homecoming, spread driving 06:00–22:00 (the chart still spreads the km over the whole day). The switch is
+  part of the plan hash.
 
 ### Health checks (repairs)
 

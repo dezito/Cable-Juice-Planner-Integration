@@ -85,7 +85,9 @@ attributes.
 ### Driving and temperature
 
 km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
-temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C.
+temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C. Below it: with
+[*Adjust driving efficiency to temperature*](temperature-efficiency.md) on, the km/kWh the plan uses for each planned
+drive at its forecast temperature next to the learned one, or why the learned one is used.
 
 <details>
 <summary>Screenshot</summary>

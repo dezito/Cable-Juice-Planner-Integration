@@ -52,18 +52,19 @@ class EnergyForecast:
         if key not in cache:
             hourly: dict = {}
             daily: dict = {}
+            tz = self._snap.tz if self._snap else None  # forecast times in UTC are looked up by the local hour
             for data in forecast_dict.get("hourly") or []:
                 if data is None:
                     continue
                 try:
-                    hourly.setdefault(reset_time_to_hour(to_datetime(data["datetime"])), data)
+                    hourly.setdefault(reset_time_to_hour(to_datetime(data["datetime"], tz)), data)
                 except Exception:  # noqa: BLE001
                     break
             for data in forecast_dict.get("daily") or []:
                 if data is None:
                     continue
                 try:
-                    daily.setdefault(to_datetime(data["datetime"]).replace(hour=0, minute=0, second=0, tzinfo=None), data)
+                    daily.setdefault(to_datetime(data["datetime"], tz).replace(hour=0, minute=0, second=0, tzinfo=None), data)
                 except Exception:  # noqa: BLE001
                     break
             cache[key] = (hourly, daily, forecast_dict)

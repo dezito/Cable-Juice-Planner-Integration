@@ -76,6 +76,9 @@
     plug-in the same day, rounded up) per weekday from the last 8 weeks, at least 3 days per weekday
   - the suggestions are always shown, and with **Learn departure and homecoming** on, the plan uses the earlier of the
     entered and the learned departure and the later of the entered and the learned homecoming – the entered times are not changed
+- **[Adjust driving efficiency to temperature](temperature-efficiency.md)**
+  - from the drives against the outdoor temperature, the plan uses the km/kWh at the forecast temperature of each planned
+    drive (work day, trip, the rest of the day), based on the learned km/kWh and never above it
 - **[Analysis](dashboard-analysis.md#analysis)**
   - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km
   - saved compared with daily charging, and a score for how close the price came to the lowest possible

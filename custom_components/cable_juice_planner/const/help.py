@@ -22,6 +22,7 @@ ENTITY_HELP_GROUPS: dict[str, str] = {
     "typical_daily_distance": "fill_up",
     "learn_driving_distance": "learn_distance",
     "learn_departure_time": "learn_departure",
+    "temperature_efficiency": "temperature_efficiency",
     "learn_soc_charge_power": "soc_charge_power",
     "workplan_charging": "workplan",
     "workday_monday": "workplan",

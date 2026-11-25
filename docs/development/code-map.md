@@ -23,6 +23,8 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── debug.py                         Engine debug information
 │   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
 │   ├── workplan.py                      Learned departure and homecoming per weekday, and the times the plan uses
+│   ├── temperature_efficiency.py        km/kWh line against the outdoor temperature, moving the learned drives to the forecast
+│   │                                    (pure functions; the engine side and the planner's `*_for()` helpers are in `battery.py`)
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price providers; CombinedPriceProvider is the only entry point
 ├── management/                          Storage, backups, dashboard, and blueprint setup
@@ -48,10 +50,13 @@ tests/                                   Pytest suite
 ├── test_voltage_issue.py                The old-default voltage repair and its fix flow
 ├── test_charger_meter.py                A charger on its own meter (house consumption) and the repair for a wrong setting
 ├── test_workplan_learning.py            Learned departure and homecoming: samples, percentiles, the times the plan uses
+├── test_temperature_efficiency.py       The plan's km/kWh at the forecast temperature: the line, the forecast, the plan, the callers
 ├── test_charger_test.py                 Charger automation test: judging, voltage, runner parts, charge limit step
 ├── test_dashboard.py                    Dashboard generation and content
 ├── test_solar_forecast.py               utils/solar_forecast.py (the same file as in BattMind)
 ├── test_solar_forecast_sources.py       The solar forecast of the snapshot: Solcast, Forecast.Solar, Helios Forecast, debug replay
+├── test_weather_forecast_fetch.py       The weather forecast of the snapshot: also without solar with a weather entity, never without one
+├── test_forecast_timezone.py            Times with an offset in local time: the weather forecast in UTC, the car's last update
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests
 └── debug_replay.py                      Debug/replay helper

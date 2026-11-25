@@ -258,7 +258,7 @@
       },
       "weather": {
         "title": "Weather",
-        "description": "The weather forecast is used to predict the solar surplus and for preheating.",
+        "description": "The weather forecast is used to predict the solar surplus (with solar), for preheating and for the “Adjust driving efficiency to temperature” switch. The page can be filled in without solar too.",
         "data": {
           "hourly_service_entity_id": "Hourly forecast",
           "daily_service_entity_id": "Daily forecast",
@@ -267,7 +267,7 @@
         "data_description": {
           "hourly_service_entity_id": "Hourly forecast entity",
           "daily_service_entity_id": "Daily forecast entity",
-          "outdoor_temp_entity_id": "Used for preheat/defrost decisions with more accurate temperature than forecast"
+          "outdoor_temp_entity_id": "Used for preheat/defrost decisions with more accurate temperature than forecast, and gives the drives under Analysis their outdoor temperature"
         }
       },
       "notifications": {
@@ -686,7 +686,7 @@
       },
       "weather": {
         "title": "Weather",
-        "description": "The weather forecast is used to predict the solar surplus and for preheating.",
+        "description": "The weather forecast is used to predict the solar surplus (with solar), for preheating and for the “Adjust driving efficiency to temperature” switch. The page can be filled in without solar too.",
         "data": {
           "hourly_service_entity_id": "Hourly forecast",
           "daily_service_entity_id": "Daily forecast",
@@ -695,7 +695,7 @@
         "data_description": {
           "hourly_service_entity_id": "Hourly forecast entity",
           "daily_service_entity_id": "Daily forecast entity",
-          "outdoor_temp_entity_id": "Used for preheat/defrost decisions with more accurate temperature than forecast"
+          "outdoor_temp_entity_id": "Used for preheat/defrost decisions with more accurate temperature than forecast, and gives the drives under Analysis their outdoor temperature"
         }
       },
       "notifications": {
@@ -921,6 +921,9 @@
       },
       "learn_departure_time": {
         "name": "Learn departure and homecoming"
+      },
+      "temperature_efficiency": {
+        "name": "Adjust driving efficiency to temperature"
       },
       "learn_soc_charge_power": {
         "name": "Learn charge power by battery level"

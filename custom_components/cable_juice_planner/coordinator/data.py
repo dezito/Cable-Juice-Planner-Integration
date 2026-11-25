@@ -71,8 +71,12 @@ class CoordinatorData:
         if include_prices and (not self._price_snapshot_time or time.monotonic() - self._price_snapshot_time > PRICE_SNAPSHOT_SECONDS):
             snapshot.price_data = self._price_snapshot()
             self._price_snapshot_time = time.monotonic()
-        if include_forecast and self.solar_configured:
+        # the weather forecast also without solar (preheating, Adjust driving efficiency to temperature), but only with a
+        # weather entity set: without one the service is never called (and its missing service never logged)
+        weather_ids = self.config["forecast"]["entity_ids"]
+        if include_forecast and (self.solar_configured or weather_ids.get("hourly_service_entity_id") or weather_ids.get("daily_service_entity_id")):
             snapshot.forecast_dict = await self._async_weather_forecasts()
+        if include_forecast and self.solar_configured:
             # the hourly solar forecast rows: Solcast's own detailedHourly, else the energy platform of Forecast.Solar
             # or Helios Forecast (utils/solar_forecast.py), normalised to the same rows
             snapshot.solcast = self._solcast_snapshot() or await self._async_energy_forecast_snapshot()

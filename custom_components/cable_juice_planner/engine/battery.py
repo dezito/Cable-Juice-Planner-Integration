@@ -7,6 +7,8 @@ import math
 
 from ..const import CHARGER_CHARGING_STATUS, CHARGER_COMPLETED_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES, EV_UNPLUGGED_STATES
 from ..utils.helpers import float_or_none, round_up
+from . import temperature_efficiency
+from .analysis.helpers import ANALYSIS_DRIVES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -164,6 +166,117 @@ class Battery:
     def calc_battery_level_to_distance(self, battery_level):
         return battery_level * self.distance_per_percentage()
 
+    # --- the plan's driving at the forecast temperature (engine/temperature_efficiency.py) -------------------------
+    # Only the planner reads these (tests/test_temperature_efficiency.py lists the callers): the measurements, the range
+    # and the drive efficiency keep the learned km/kWh.
+
+    def temperature_efficiency_enabled(self) -> bool:
+        return bool(self.is_ev_configured() and self.switch_state("temperature_efficiency", error_state="off") == "on")
+
+    def _temperature_efficiency_model(self) -> dict:
+        """The line, the temperature of each learned drive and the forecast, once per job."""
+        cache = self._job_cache
+        if "temperature_efficiency_model" not in cache:
+            tz = self._snap.tz
+            analysis = getattr(self, "analysis_db", None) or {}
+            # the newest drives, like the line shown under Analysis (the What-if keeps more)
+            points = temperature_efficiency.drive_points((analysis.get("drives") or [])[-ANALYSIS_DRIVES:], self.config["ev_car"]["battery_size"])
+            curve, reason = temperature_efficiency.fit_curve(points)
+            hourly, daily = temperature_efficiency.forecast_temperatures(self.get_forecast_dict(), tz)
+            cache["temperature_efficiency_model"] = {
+                "curve": curve,
+                "reason": reason,
+                "temps": temperature_efficiency.entry_temperatures(self.km_kwh_efficiency_db, points, tz) if curve else [],
+                "hourly": hourly,
+                "daily": daily,
+                "drives": len(points),
+            }
+        return cache["temperature_efficiency_model"]
+
+    def temperature_km_kwh(self, start, end=None) -> float | None:
+        """The km/kWh for driving from start to end at its forecast temperature, never above the learned one; None keeps the
+        learned one (switch off, too little data, no forecast). Every drive the plan asked for is kept for the dashboard."""
+        if not self.temperature_efficiency_enabled() or not isinstance(start, datetime.datetime):
+            return None
+        if isinstance(end, datetime.datetime):
+            while end <= start:  # a night shift: home the next morning
+                end += datetime.timedelta(days=1)
+        uses = self._job_cache.setdefault("temperature_km_kwh", {})
+        key = (start, end)
+        if key not in uses:
+            try:
+                uses[key] = self._temperature_km_kwh_use(start, end)
+            except Exception as err:  # noqa: BLE001
+                # never let the adjustment break the plan: the learned km/kWh is the plan without the switch
+                if not self._job_cache.get("temperature_km_kwh_warned"):
+                    self._job_cache["temperature_km_kwh_warned"] = True
+                    _LOGGER.warning("Adjust driving efficiency to temperature failed, using the learned km/kWh: %s", err)
+                uses[key] = {"start": start, "end": end, "temp": None, "learned": None, "km_per_kwh": None, "reason": temperature_efficiency.REASON_FAILED}
+        return uses[key]["km_per_kwh"]
+
+    def _temperature_km_kwh_use(self, start, end) -> dict:
+        model = self._temperature_efficiency_model()
+        learned = float(self.get_forecast_value(self.km_kwh_efficiency_db, self.drive_forecast_type) or 0.0)
+        use = {"start": start, "end": end, "temp": None, "learned": round(learned, 2) if learned > 0 else None, "km_per_kwh": None, "reason": model["reason"]}
+        if learned <= 0:
+            use["reason"] = temperature_efficiency.REASON_NO_LEARNED
+        elif model["curve"] is not None:
+            temp = temperature_efficiency.window_temperature(model["hourly"], model["daily"], start, end)
+            moved = temperature_efficiency.moved_entries(self.km_kwh_efficiency_db, model["temps"], model["curve"], temp) if temp is not None else None
+            if temp is None:
+                use["reason"] = temperature_efficiency.REASON_NO_FORECAST
+            elif moved is None:
+                use["reason"] = temperature_efficiency.REASON_TOO_FEW_MATCHED
+            else:
+                adjusted = float(self.get_forecast_value(moved, self.drive_forecast_type) or 0.0)
+                adjusted = max(min(adjusted, learned), learned * temperature_efficiency.MIN_FACTOR)
+                use.update(temp=round(temp, 1), km_per_kwh=round(adjusted, 2), reason=None)
+        return use
+
+    def distance_per_percentage_for(self, start, end=None) -> float:
+        """distance_per_percentage for driving from start to end: with Adjust km/kWh to the temperature on, at the forecast
+        temperature of the drive and never more than the learned one."""
+        base = self.distance_per_percentage()
+        km_kwh = self.temperature_km_kwh(start, end)
+        if km_kwh is None:
+            return base
+        return min(base, self.km_kwh_to_km_percentage(km_kwh))
+
+    def calc_distance_to_battery_level_for(self, distance, start, end=None):
+        return distance / self.distance_per_percentage_for(start, end)
+
+    def calc_battery_level_to_distance_for(self, battery_level, start, end=None):
+        return battery_level * self.distance_per_percentage_for(start, end)
+
+    def publish_temperature_efficiency(self, now) -> None:
+        """What the plan used, as the attribute temperature_adjustment of km_per_kwh (the dashboard's Driving and temperature)."""
+        if not self.is_ev_configured():
+            return
+        enabled = self.temperature_efficiency_enabled()
+        data = {"enabled": enabled, "reason": None, "drives": None, "per_degree": None, "drives_used": []}
+        if enabled:
+            try:
+                model = self._temperature_efficiency_model()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Adjust driving efficiency to temperature failed, using the learned km/kWh: %s", err)
+                model = {"curve": None, "reason": temperature_efficiency.REASON_FAILED, "drives": None}
+            curve = model["curve"]
+            data.update(reason=model["reason"], drives=model["drives"], per_degree=round(curve["b"], 3) if curve else None)
+            uses = sorted(self._job_cache.get("temperature_km_kwh", {}).values(), key=lambda use: use["start"])
+            data["drives_used"] = [
+                {
+                    "start": use["start"].isoformat(),
+                    "end": use["end"].isoformat() if isinstance(use["end"], datetime.datetime) else None,
+                    "temp": use["temp"],
+                    "learned": use["learned"],
+                    "km_per_kwh": use["km_per_kwh"],
+                    "reason": use["reason"],
+                }
+                for use in uses
+                if (use["end"] if isinstance(use["end"], datetime.datetime) else use["start"]) >= now
+            ]
+        self.set_attr("km_per_kwh", "temperature_adjustment", data)
+
     def battery_level(self, real: bool = False, unknown: float | None = 0.0) -> float | None:
         """The car's battery level (the virtual one without a car integration).
 
@@ -313,14 +426,20 @@ class Battery:
                 _LOGGER.error(err)
         return distance
 
-    def range_to_battery_level(self, extraRange=None, batteryBuffer=None, date=None):  # noqa: N803 - names from ev.py
+    def range_to_battery_level(self, extraRange=None, batteryBuffer=None, date=None, drive=None):  # noqa: N803 - names from ev.py
+        """drive: (start, end) of the planned drive, so the km/kWh at its forecast temperature counts (the planner's trip);
+        without it the learned km/kWh."""
         min_range_in_battery_level = self.get_min_charge_limit_battery_level()
         extraRange = extraRange if extraRange is not None else self.get_entity_daily_distance(day_text=None, date=date)
         batteryBuffer = batteryBuffer if batteryBuffer is not None else self.get_min_daily_battery_level()
         try:
             if not isinstance(extraRange, (int, float)):
                 raise ValueError(f"extraRange should be a number, but got: {extraRange}")
-            min_range_in_battery_level = round_up(self.calc_distance_to_battery_level(extraRange)) + batteryBuffer
+            if drive is not None:
+                level = self.calc_distance_to_battery_level_for(extraRange, *drive)
+            else:
+                level = self.calc_distance_to_battery_level(extraRange)
+            min_range_in_battery_level = round_up(level) + batteryBuffer
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Error calculating battery level - extraRange: %s, batteryBuffer: %s: %s", extraRange, batteryBuffer, err)
         return min(min_range_in_battery_level, 100.0)

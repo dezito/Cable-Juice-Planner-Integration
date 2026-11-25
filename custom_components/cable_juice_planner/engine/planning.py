@@ -49,6 +49,8 @@ class Planning:
                 self.solar_charging_enabled(),
                 self.manual_charging_enabled(),
                 self.manual_charging_solar_enabled(),
+                # the forecast temperatures themselves are replanned every hour (CURRENT_HOUR) like the solar forecast
+                self.temperature_efficiency_enabled(),
             ),
             # the departure and homecoming the plan uses (learned or entered): a change, also today's at the learned departure, replans
             "WORKPLAN_TIMES": tuple(

@@ -69,8 +69,10 @@ class CJPFlowPages:
             return "stromligning" in self._providers
         if step == "prices_stromligning_tariffs":
             return "stromligning" in self._providers and has_stromligning_sell_prices(self._options)
-        if step in ("solar_charging", "weather"):
+        if step == "solar_charging":
             return bool(self._options.get("production_entity_id"))
+        # weather is not only for solar: preheating, the outdoor temperature of the drives and Adjust driving efficiency
+        # to temperature use it too, so the page is shown without solar as well
         if step == "detection_review":
             return bool(self._options.get("powerwall_watt_flow_entity_id"))  # without a home battery there is nothing to suggest
         return True
