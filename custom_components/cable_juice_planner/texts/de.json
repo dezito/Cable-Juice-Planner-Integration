@@ -229,6 +229,24 @@
       "message": "Akkustand unter täglichem Ziel - erzwungenes Laden verfügbar",
       "no_charge_expensive_hours": "Kein Laden in den 3 teuersten Stunden"
     },
+    "notify_departure": {
+      "title_not_ready": "Auto wird zur Abfahrt nicht bereit sein",
+      "not_ready": "Abfahrt {departure}: es fehlen ca. {missing} %.",
+      "reason_hours": "Vor der Abfahrt sind nicht mehr genug Ladestunden übrig.",
+      "reason_limit": "Der Bedarf liegt über dem Ladelimit von {limit} %.",
+      "action_plan": "Ladeplan anzeigen",
+      "action_limit": "Ladelimit ändern",
+      "title_plug_in": "Auto anschließen",
+      "plug_in": "Das Laden für die Abfahrt {departure} ist ab {start} Uhr geplant, aber das Auto ist nicht angeschlossen.",
+      "today": "heute um {time}",
+      "tomorrow": "morgen um {time}",
+      "later": "am {date} um {time}",
+      "car_limit": "Abfahrt {departure}: das eigene Ladelimit des Autos ist {limit} %, benötigt werden aber {needed} %.",
+      "car_stopped": "Abfahrt {departure}: das Auto hat das Laden bei {level} % beendet, benötigt werden aber {needed} %.",
+      "slow": "Abfahrt {departure}: es wird mit {actual} kW statt der geplanten {planned} kW geladen. Bei diesem Tempo fehlen ca. {missing} %.",
+      "action_car_limit": "Ladelimit des Autos ändern",
+      "no_limit_steps": "Die Laderautomation hat keinen Schritt, der das Ladelimit im Auto setzt: füge einen hinzu oder erhöhe das Limit im Auto."
+    },
     "startup": {
       "configuration": {
         "header": "Konfiguration",

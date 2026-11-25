@@ -62,6 +62,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning), with the forecast corrected for its measured bias
 - **[Charging loss](docs/charging-loss.md) measured continuously** and **[learned driving distance](docs/learn-distance.md)**
 - **[Public charging](docs/public-charging.md)** detected automatically and added to the history and the economy
+- **Departure notifications:** a push when the car will not be ready for the next departure (also at plug-in and while it charges: the car's own limit too low, the car stops early, or charging too slow), and a reminder to plug in when the charging planned for it starts
 - **[Analysis](docs/dashboard-analysis.md#analysis):** economy, saved against daily charging, driving against temperature, ready at departure, price forecast accuracy and more
 - **Very detailed charging history**, CO₂ emissions and kWh charged by solar
 - **Fail-safe:** prices in CJP's own database, and the blueprint charges at a fixed current if the integration stops

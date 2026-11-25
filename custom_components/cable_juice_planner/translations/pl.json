@@ -276,12 +276,14 @@
         "data": {
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
-          "preheating": "Podgrzewanie start/stop"
+          "preheating": "Podgrzewanie start/stop",
+          "departure_readiness": "Samochód niegotowy / podłącz"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
-          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony."
         }
       },
       "advanced": {
@@ -704,12 +706,14 @@
         "data": {
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
-          "preheating": "Podgrzewanie start/stop"
+          "preheating": "Podgrzewanie start/stop",
+          "departure_readiness": "Samochód niegotowy / podłącz"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
-          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony."
         }
       },
       "advanced": {

@@ -388,6 +388,19 @@ place and extend them to new code:
   stays 1 % under the charge limit, a value the user enters is simulated from,
   and plug-in sends a "does it match the car?" notification. Planning/control
   use `battery_level()`; history and measurements use `battery_level(real=True)`.
+- Departure notifications (`engine/control/readiness.py`): not ready (the planner's shortfall), plug in, and while
+  the plan charges `car_limit`, `car_stopped` (car integration only) and `slow` (also a virtual EV). `car_limit` is
+  also sent at plug-in when the charger automation has no `car_limit_actions` step (`car_limit_steps` False, read
+  from `automations.yaml` by `coordinator/status_states.py`; None is not known and gives no notice), with the need
+  capped at `_plan_cap()`. Each is sent once per departure (a work day by its date, a trip by its set time) and kept
+  in the runtime state. Missing, unknown or stale data never gives a notification. HA's `last_reported` is no proof
+  of a new car report (cloud integrations rewrite cached values): only the car's own last-update time or a changed
+  value counts.
+- Virtual EV level (`charging_power_to_emulated_battery_level`): counted from the runtime anchor
+  `virtual_charge_anchor` {meter, level, base}. Only whole percents are added and the anchor moves by their kWh.
+  A reset always counts from the meter now, never from an older meter. Only a level that differs from the counted
+  one is entered and becomes the new base; a meter that went back or an unplug (meter None) keeps the base, and the
+  0 % reset of an unplugged car clears it. Base 0 means the level is not the car's: no departure notifications.
 - Solar forecast sources: `forecast_entity_id` accepts Solcast, Forecast.Solar or Helios Forecast. Solcast keeps
   `detailedHourly`; the other two are read through the HA energy platform by `utils/solar_forecast.py`, which must stay
   byte-identical with BattMind together with `tests/test_solar_forecast.py`.

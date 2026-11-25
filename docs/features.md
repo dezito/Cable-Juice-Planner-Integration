@@ -53,6 +53,12 @@
   - a charge away from home is detected automatically: time, battery level at start and end, and percentage added
   - you get a notification, enter the total price, and the charge is added to the history and the economy
   - waiting sessions are remembered across restarts, and charges can also be added with a service
+- **Departure notifications:** a push notification when the car will not be ready for the next departure (too few
+  hours left, or the need is above the charge limit), and also while it charges: the car's own charge limit is too
+  low (already at plug-in when the charger automation does not set it), the car stops charging below the need (with
+  a car integration), or it charges so slowly that the departure is missed (also for a virtual EV). And a reminder to plug in when the charging planned for the departure starts while the car is home and
+  unplugged. Each departure gets each notification once, also across a restart; it can be turned off under
+  *Notifications*
 - **[Charging loss](charging-loss.md)**
   - **measured continuously** from the charger's kWh meter and the car's battery level, also back in Home
     Assistant's history – no full charge needed

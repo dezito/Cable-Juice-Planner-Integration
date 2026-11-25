@@ -64,6 +64,7 @@ class ControlSchedule:
             if not self.is_ev_configured() and float(self.number_state("battery_level", error_state=0.0)) != 0.0 and not self._charger_restart_disabling():
                 _LOGGER.info("Reseting battery level to 0.0")
                 self.set_setting("battery_level", 0.0)
+                self.virtual_charge_level_cleared()
             return None
         if self.manual_charging_enabled() or self.manual_charging_solar_enabled():
             return True

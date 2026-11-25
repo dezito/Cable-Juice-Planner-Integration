@@ -276,12 +276,14 @@
         "data": {
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
-          "preheating": "Vorheizen Start/Stopp"
+          "preheating": "Vorheizen Start/Stopp",
+          "departure_readiness": "Auto nicht bereit / anschließen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
-          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen"
+          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist."
         }
       },
       "advanced": {
@@ -704,12 +706,14 @@
         "data": {
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
-          "preheating": "Vorheizen Start/Stopp"
+          "preheating": "Vorheizen Start/Stopp",
+          "departure_readiness": "Auto nicht bereit / anschließen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
-          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen"
+          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist."
         }
       },
       "advanced": {

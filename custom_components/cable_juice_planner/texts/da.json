@@ -229,6 +229,24 @@
       "message": "Elbilens batteriniveau er under det daglige batteriniveau, tvangsladning kan aktiveres",
       "no_charge_expensive_hours": "Lader ikke i de 3 dyreste timer"
     },
+    "notify_departure": {
+      "title_not_ready": "Bilen bliver ikke klar til afgang",
+      "not_ready": "Afgang {departure}: mangler ca. {missing} %.",
+      "reason_hours": "Der er ikke ladetimer nok tilbage før afgang.",
+      "reason_limit": "Behovet er over ladegrænsen på {limit} %.",
+      "action_plan": "Vis ladeplanen",
+      "action_limit": "Ret ladegrænsen",
+      "title_plug_in": "Sæt bilen til opladning",
+      "plug_in": "Opladning til afgang {departure} er planlagt fra kl. {start}, men bilen er ikke sat til.",
+      "today": "i dag kl. {time}",
+      "tomorrow": "i morgen kl. {time}",
+      "later": "{date} kl. {time}",
+      "car_limit": "Afgang {departure}: bilens egen ladegrænse er {limit} %, men der skal bruges {needed} %.",
+      "car_stopped": "Afgang {departure}: bilen stoppede opladningen ved {level} %, men der skal bruges {needed} %.",
+      "slow": "Afgang {departure}: lader med {actual} kW i stedet for de planlagte {planned} kW. Med den fart mangler der ca. {missing} %.",
+      "action_car_limit": "Ret bilens ladegrænse",
+      "no_limit_steps": "Laderautomationen har intet trin, der sætter ladegrænsen i bilen: tilføj et, eller hæv grænsen i bilen."
+    },
     "startup": {
       "configuration": {
         "header": "Konfiguration",

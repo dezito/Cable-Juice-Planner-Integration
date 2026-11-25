@@ -239,6 +239,44 @@ for it at startup and notify you.
 
 - **Notify services:** e.g. `notify.mobile_app_phone`. Use the mobile app for actionable notifications
   (public charging asks for the price).
+- **Car not ready / plug in** (default on): a push notification once per departure (work plan or trip, at most 24 hours
+  ahead) when even every hour up to the departure is not enough (about 2 % or more short), with the reason: too few
+  hours, or a need above the charge limit. Nothing is sent while an hour before the departure has no price yet.
+  And a reminder when the charging planned for the next departure starts within an hour (or has started) while the
+  car is home and has been unplugged for at least 15 minutes. Nothing is sent while the battery level is unknown, or
+  for a car without its integration while its level is 0 % or only what was charged since it was plugged in without
+  entering a level. The reminder needs a location entity: without one
+  the car only counts as home in the 15 minutes after it was unplugged.
+
+  It also checks what the car does while a planned hour before the next departure charges, so you hear in time when
+  a plan that looks fine will not be met. Each check must hold for two intervals (at least 10 minutes) within planned
+  hours in a row:
+  - the car's own charge limit (the *Car charge limit* entity) is more than 2 % below the need and the car did not
+    take the limit the plan asks for: the charger automation does not set it. A cloud integration shows the car's
+    limit late, so the car must have reported (the *Last update* entity, the car's own time) after the check first
+    saw the low limit; without that entity the low limit must hold for an hour. The button opens the car's limit;
+  - with a car integration: the charger says the car is done below the need and below the limit asked for now (e.g.
+    its own limit or a schedule in the car). The car's level must be newer than the stop: the car's own time of its
+    last report, or without the *Last update* entity a level that changed after the stop (a cloud integration writes
+    its old level again on every poll);
+  - the car charges at less than 80 % of the planned power, at most what load balancing allows now (the power now and
+    over the last 15 minutes, with the status charging all that time), so slowly that even every hour up to the
+    departure at that power is not enough. A level from a while ago is counted up for that time at the planned power.
+    Slower but in time is no notification: the plan adds hours itself. Also for a car without its integration: its
+    level is counted up from the charger's kWh meter.
+
+  When the charger automation has no step that sets the car's limit (*Set charge limit in the car* in the blueprint),
+  the car's low limit is reported already when the car is plugged in (the charger is ready, charging or done and the
+  car is home) and charging for the next departure is planned, not first when the planned hour starts in the night.
+  The same rules apply: below the need (at most the level the plan charges to, the max recommended charge limit) by
+  more than 2 %, the car's level too, and a limit the car reported after it was seen (or for an hour). The notification then says that the automation has no such step. CJP reads this from
+  the automations in `automations.yaml`; with the automation elsewhere (packages, YAML mode) it is not known and
+  this notification is not sent at plug-in.
+
+  These checks do not run while the charger is being restarted (that has its own notification), during the charger
+  test and the hour after it, the charging loss measurement, manual charging, without any charging mode, with another
+  car on the charger, or while a departure is moved later for a car still plugged in. A limit, level, age of the
+  level, status or power that is not known gives no notification.
 - **Interval:** the minutes between each check of the plan and the charging.
 - **Dashboard** in the sidebar (default on).
 - **Diagnostic file log:** writes a detailed log to `cable_juice_planner_<prefix>.log` in the config folder (2 MB per file, 3 rotations). See [Report a problem](faq-troubleshooting.md#report-a-problem).

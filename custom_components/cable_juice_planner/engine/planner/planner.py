@@ -224,6 +224,8 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 "solar_kwh_prediction": [],
                 "solar_cost_prediction": [],
                 "solar_prediction_corrected": False,
+                # set by scheduled_planner when even every hour up to the departure is not enough (control/readiness.py notifies)
+                "departure_shortfall": None,
             }
 
             if self.workplan_charging_enabled() and self.switch_state(f"workday_{day_text}") == "on":

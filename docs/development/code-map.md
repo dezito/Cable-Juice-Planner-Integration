@@ -13,6 +13,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── planner/                         Charge plan and price-level decisions
 │   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
 │   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
+│   │   ├── readiness.py                 Departure notifications: not ready (the shortfall scheduled_planner records; while charging the car's limit, a car that stops, slow charging; the car's limit at plug-in when the automation has no limit step: `car_limit_steps` from `coordinator/status_states.py`), plug in; sent once per departure (runtime state)
 │   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
 │   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
 │   ├── energy/                          Prices, solar, forecasts, and power inputs (`meter_check.py`: does the house sensor include the charger?)
@@ -57,6 +58,7 @@ tests/                                   Pytest suite
 ├── test_solar_forecast_sources.py       The solar forecast of the snapshot: Solcast, Forecast.Solar, Helios Forecast, debug replay
 ├── test_weather_forecast_fetch.py       The weather forecast of the snapshot: also without solar with a weather entity, never without one
 ├── test_forecast_timezone.py            Times with an offset in local time: the weather forecast in UTC, the car's last update
+├── test_departure_readiness.py          Departure notifications: the planner's shortfall, once per departure and across a restart, plug in, the checks while charging and at plug-in, the virtual EV's level from the charger meter
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests
 └── debug_replay.py                      Debug/replay helper

@@ -276,12 +276,14 @@
         "data": {
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
-          "preheating": "Forvarmning start/stop"
+          "preheating": "Forvarmning start/stop",
+          "departure_readiness": "Bil ikke klar / sæt stik i"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
-          "preheating": "Notifikation ved start/stop af forvarmning"
+          "preheating": "Notifikation ved start/stop af forvarmning",
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til."
         }
       },
       "advanced": {
@@ -704,12 +706,14 @@
         "data": {
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
-          "preheating": "Forvarmning start/stop"
+          "preheating": "Forvarmning start/stop",
+          "departure_readiness": "Bil ikke klar / sæt stik i"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
-          "preheating": "Notifikation ved start/stop af forvarmning"
+          "preheating": "Notifikation ved start/stop af forvarmning",
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til."
         }
       },
       "advanced": {
