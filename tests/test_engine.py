@@ -2475,3 +2475,54 @@ def test_without_any_price_the_second_call_fails_like_the_first_not_with_a_key_e
     for _ in range(2):
         result = engine.run_job(snap, engine.get_hour_prices, True, True)
         assert isinstance(result.error, ValueError), repr(result.error)  # not the KeyError of a missing cached price
+
+
+def test_every_price_update_publishes_the_prices_the_plan_is_made_on_for_the_price_chart() -> None:
+    """Attribute price_chart of sensor.cjp_current_charging_rule, set with every price update (not by the plan, which may not run): one row
+    per price period for 7 days, real and forecast in one list. The dashboard's price chart of every provider is drawn from it."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine, _ = run(12, level=20, **PLUGGED_IN)
+    result = engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.update_grid_prices)
+    assert result.error is None, result.error
+    rows = result.attributes["current_charging_rule"]["price_chart"]
+    times = [datetime.datetime.fromisoformat(row["time"]) for row in rows]
+    midnight = datetime.datetime.combine(DAY, datetime.time())
+    assert times == sorted(set(times)) and times[0] == midnight and times[-1] < midnight + datetime.timedelta(days=7)
+    provider = engine.price_provider.get_buy_prices()  # what the provider gives (the rows are the plan's prices: these, and the price history for the rest)
+    sell = engine.get_sell_prices()
+    for row, time in zip(rows, times):
+        if time in provider:
+            assert row["buy"] == pytest.approx(provider[time], abs=0.006)
+        assert row["sell"] == (pytest.approx(sell[time], abs=0.006) if time in sell else None)
+    # today and tomorrow are published prices, the days after a forecast
+    assert not any(row["forecast"] for row, time in zip(rows, times) if time < midnight + datetime.timedelta(days=2))
+    assert any(row["forecast"] for row in rows)
+    # the sell price is the wholesale (here: the buy) price less the sell fee, once
+    fee = abs(float(engine.config["prices"]["sell_fee"]))
+    real = next(row for row in rows if not row["forecast"] and row["sell"] is not None)
+    assert real["sell"] == pytest.approx(real["buy"] - fee, abs=0.011)
+    # the next plan keeps it
+    assert "price_chart" in engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.charge_if_needed, True).attributes["current_charging_rule"]
+
+
+def test_a_failed_price_update_publishes_what_the_plan_has_never_the_rows_of_an_earlier_update(monkeypatch) -> None:
+    """A sell price that cannot be had is no sell price (never the buy price); without buy prices there is nothing to draw: the chart
+    must not keep the rows of an update that worked."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine, _ = run(12, level=20, **PLUGGED_IN)
+
+    def published() -> list:
+        result = engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.update_grid_prices)
+        return result.attributes["current_charging_rule"]["price_chart"]
+
+    rows = published()
+    assert rows and any(row["sell"] is not None for row in rows)
+
+    def fail(*args, **kwargs):
+        raise ValueError("no prices")
+
+    monkeypatch.setattr(engine, "get_sell_prices", fail)
+    without_sell = published()
+    assert [row["buy"] for row in without_sell] == [row["buy"] for row in rows] and all(row["sell"] is None for row in without_sell)
+    monkeypatch.setattr(engine, "get_grid_prices", fail)
+    assert published() == []

@@ -342,103 +342,20 @@ async def test_wattcast_is_offered_in_finland_with_both_sensors_and_not_in_denma
     assert {str(key) for key in result["data_schema"].schema} == {"wattcast_buy_entity_id", "wattcast_forecast_entity_id"}
 
 
-SPOT_CHARTS = ("spotforecast", "elprognos", "wattcast")
-
-
-def _chart(provider: str) -> dict:
-    return yaml.safe_load((CHART_DIR / f"{provider}.yaml").read_text(encoding="utf-8"))
-
-
-def _strings(node) -> list[str]:
-    if isinstance(node, str):
-        return [node]
-    if isinstance(node, dict):
-        return [text for value in node.values() for text in _strings(value)]
-    if isinstance(node, list):
-        return [text for value in node for text in _strings(value)]
-    return []
-
-
-def _adapter(text: str) -> str:
-    start = text.index("const adapt = ")
-    return text[start: text.index("\n};", start) + 3]
-
-
-@pytest.mark.parametrize("provider", SPOT_CHARTS)
-def test_the_spot_chart_reads_its_sensors_through_one_adapter_that_is_the_same_everywhere(provider: str) -> None:
-    """The chart is the Energy Price Forecast chart with its data source changed: every read of the price sensors goes through
-    adapt(), which makes the planner's prices of the spot sensor. The text is pinned here; that the JavaScript gives the providers' prices was
-    checked once by running it in a headless browser against the simulated sensors, which is not part of this suite."""
-    chart = _chart(provider)
-    users = [text for text in _strings(chart) if "adapt(" in text]
-    assert len(users) >= 8
-    adapters = {_adapter(text) for text in users}
-    assert len(adapters) == 1  # one text, so one fix
-    adapter = adapters.pop()
-    assert "`" not in adapter and "${" not in adapter  # config-template-card evaluates ${ anywhere in the card
-    # the buy price of the planner, and no price at all (not one made with 0) without the VAT or the surcharge
-    assert "spot * (1 + vat / 100) + extra" in adapter and "@@spot_vat@@" in adapter and "@@spot_surcharge@@" in adapter
-    assert "if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;" in adapter
-    # published like the provider: Spot Forecast "market", Elprisprognos an explicit false, Wattcast before known_until
-    assert {"spotforecast": "r.source === 'market'", "elprognos": "r.forecast === false", "wattcast": "< until"}[provider] in adapter
-    # only Wattcast gives ct/kWh: its price rows and its forecast p50 are divided by 100 (the euro), no other sensor is
-    assert ("num(r.value) / 100" in adapter and "num(r.p50) / 100" in adapter) == (provider == "wattcast")
-    assert (adapter.count("/ 100") == 3) == (provider == "wattcast") and (adapter.count("/ 100") == 1) == (provider != "wattcast")
-    text = (CHART_DIR / f"{provider}.yaml").read_text(encoding="utf-8")
-    assert "energy_price_forecast" not in text and "Energy Price Forecast" not in text
-    # the sell price is the wholesale price less the sell fee, like the planner
-    sell = next(text for text in _strings(chart) if "adapt(hass.states, 'spot')" in text and "@@sell_fee_value@@" in text)
-    assert "- (Number('@@sell_fee_value@@') || 0)" in sell
-    # like the planner: a forecast never enters a published hour, only tomorrow on is forecast, a refused unit gives no price at all
-    assert "const covered = new Set(published.map(row => hour(row.start)));" in adapter and "tomorrow.setHours(24, 0, 0, 0);" in adapter
-    if provider == "wattcast":
-        assert "if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;" in adapter
-        assert "f.forecast_unit.trim().toLowerCase() !== 'ct/kwh'" in adapter
-    else:
-        assert "if (wrongUnit(a.unit_of_measurement)) return rows;" in adapter and "if (per === 'mwh' || per === 'wh') return true;" in adapter
-    assert all(_balanced(text) for text in users)  # the variables too, not only the data generators
-    assert any(text.startswith('${vars.total_hours ? (') for text in _strings(chart))  # no numbers in the title without prices
-    assert sum("adapt(hass.states, 'spot')" in text for text in users) >= 1 and all(_balanced(js) for js in _generators(chart))
-
-
-def _spot_options(**options):
-    return {"spotforecast_buy_entity_id": "sensor.spot_forecast_de_lu_price", "spot_vat": 19.0, "spot_surcharge": 0.2, **options}
-
-
-def test_the_build_gives_the_spot_chart_the_vat_and_the_surcharge_and_nan_when_one_is_missing() -> None:
+def test_the_dashboard_maps_only_the_buy_sensor_of_a_spot_chart_to_the_configured_one() -> None:
+    """Only the buy sensor is the chart's own (the restart card): the chart itself draws the plan's prices (test_published_providers.py)."""
     from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
 
     from .test_dashboard import _own
     from .test_engine import OPTIONS
 
-    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price", "sensor.spot_forecast_de_lu_price"}
-    base = {**OPTIONS, "language": "en", "energidataservice_buy_entity_id": "", "energidataservice_sell_entity_id": "", "sell_fee": 0.03}
-    text = render_dashboard(build_config({**base, **_spot_options()}), "tesla", "entry1", existing, "EUR")
-    assert "Number('19')" in text and "Number('0.2')" in text and "@@" not in text
-    assert "sensor.spot_forecast_de_lu_price" in text and "sensor.spot_forecast'" not in text
-    for missing in ("spot_vat", "spot_surcharge"):
-        text = render_dashboard(build_config({**base, **_spot_options(**{missing: None})}), "tesla", "entry1", existing, "EUR")
-        assert "Number('NaN')" in text
-
-
-def test_the_spot_chart_gets_zero_as_a_value_and_nan_for_anything_that_is_not_a_number_and_the_wattcast_pair_is_mapped() -> None:
-    from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
-
-    from .test_dashboard import _own
-    from .test_engine import OPTIONS
-
-    ids = {"sensor.spot_forecast_de_lu_price", "sensor.wattcast_fi_price_hour", "sensor.wattcast_fi_forecast"}
+    ids = {"sensor.wattcast_fi_price_hour", "sensor.wattcast_fi_forecast"}
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price", *ids}
     base = {**OPTIONS, "language": "en", "energidataservice_buy_entity_id": "", "energidataservice_sell_entity_id": "", "sell_fee": 0.03}
-    text = render_dashboard(build_config({**base, **_spot_options(spot_vat=0.0, spot_surcharge=0.0)}), "tesla", "entry1", existing, "EUR")
-    assert "Number('0')" in text and "Number('NaN')" not in text  # a VAT and a surcharge of 0 are values
-    for bad in ("", "abc", float("inf"), float("nan")):
-        text = render_dashboard(build_config({**base, **_spot_options(spot_vat=bad)}), "tesla", "entry1", existing, "EUR")  # a hand-edited backup
-        assert "Number('NaN')" in text, bad
     wattcast = {"wattcast_buy_entity_id": "sensor.wattcast_fi_price_hour", "wattcast_forecast_entity_id": "sensor.wattcast_fi_forecast", "spot_vat": 25.5, "spot_surcharge": 0.08}
     text = render_dashboard(build_config({**base, **wattcast}), "tesla", "entry1", existing, "EUR")
-    assert "sensor.wattcast_fi_price_hour" in text and "sensor.wattcast_fi_forecast" in text  # the longer id is not cut at the shorter one
-    assert "'sensor.wattcast'" not in text and "'sensor.wattcast_forecast'" not in text
+    assert "sensor.wattcast_fi_price_hour" in text and "'sensor.wattcast'" not in text and "@@" not in text
+    assert "sensor.wattcast_fi_forecast" not in text  # Wattcast's forecast sensor is not the chart's: it draws the plan's prices
 
 
 def test_a_wattcast_forecast_unit_that_is_wrong_is_named_once_in_the_log_and_forgotten_when_it_is_right() -> None:

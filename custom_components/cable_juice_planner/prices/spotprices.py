@@ -151,7 +151,9 @@ class WattcastPriceProvider(SpotPriceProvider):
 
     @classmethod
     def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
-        return {"sensor.wattcast": prices["wattcast_buy_entity_id"], "sensor.wattcast_forecast": prices["wattcast_forecast_entity_id"]}
+        # the chart draws the plan's prices (attribute price_chart of the plan entity) and only watches the buy sensor of the provider:
+        # the card with the restart button when it is unavailable
+        return {"sensor.wattcast": prices["wattcast_buy_entity_id"]}
 
     def _wrong_unit(self, entity_id: str) -> bool:
         unit = self._get_entity_attr(entity_id).get("unit_of_measurement")

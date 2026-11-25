@@ -14,11 +14,6 @@ from .base import BasePriceProvider, _naive, is_number, price_timestamp
 _LOGGER = logging.getLogger(__name__)
 
 
-def _derive(entity_id: str, old: str, new: str) -> str:
-    """The entity of the same device: the configured one with `old` in its id replaced by `new` ("" when it has no `old`)."""
-    return entity_id.replace(old, new) if old in entity_id else ""
-
-
 class StromligningPriceProvider(BasePriceProvider):
     """Strømligning ('prices' attribute with start/price, tariffs as separate sensors)."""
 
@@ -53,17 +48,9 @@ class StromligningPriceProvider(BasePriceProvider):
 
     @classmethod
     def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
-        buy, sell = prices["stromligning_buy_current_price"], prices["stromligning_sell_current_price"]
-        return {
-            "sensor.stromligning_current_price_vat": buy,
-            "sensor.stromligning_forecasts_vat": prices["stromligning_buy_forecasts"],
-            "binary_sensor.stromligning_tomorrow_available_vat": prices["stromligning_buy_tomorrow_available"],
-            "sensor.stromligning_nettariff_vat": _derive(buy, "current_price", "nettariff"),
-            "sensor.stromligning_systemtariff_vat": _derive(buy, "current_price", "systemtariff"),
-            "sensor.stromligning_15min_spotprice_ex_vat": _derive(sell, "current_price", "spotprice"),
-            "sensor.stromligning_15min_forecasts_ex_vat": prices["stromligning_sell_forecasts"],
-            "binary_sensor.stromligning_15min_tomorrow_available_ex_vat": prices["stromligning_sell_tomorrow_available"],
-        }
+        # the chart draws the plan's prices (attribute price_chart of the plan entity) and only watches the buy sensor of the provider:
+        # the card with the restart button when it is unavailable
+        return {"sensor.stromligning_current_price_vat": prices["stromligning_buy_current_price"]}
 
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_current_price, self.buy_tomorrow_available)

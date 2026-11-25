@@ -23,6 +23,15 @@ PRICE_KEYS = [
     "elprognos_buy_entity_id",
     "wattcast_buy_entity_id",
     "wattcast_forecast_entity_id",
+    "epexspot_buy_entity_id",
+    "epexspot_sell_entity_id",
+    "gespot_buy_entity_id",
+    "octopus_buy_entity_id",
+    "octopus_buy_next_day_entity_id",
+    "octopus_sell_entity_id",
+    "octopus_sell_next_day_entity_id",
+    "nordpool_buy_entity_id",
+    "nordpool_sell_entity_id",
     BUY,
     "stromligning_buy_tomorrow_available",
     "stromligning_buy_forecasts",
@@ -48,15 +57,14 @@ def test_the_dashboard_has_one_price_chart_and_stromligning_is_preferred() -> No
     prices = dict.fromkeys(PRICE_KEYS, "")
     prices.update({"energidataservice_buy_entity_id": "sensor.eds", "energidataservice_sell_entity_id": "sensor.eds_sell"})
     mapping = price_dashboard_entities(prices)
-    assert mapping["sensor.energi_data_service"] == "sensor.eds" and mapping["sensor.energi_data_service_salg"] == "sensor.eds_sell"
+    assert mapping["sensor.energi_data_service"] == "sensor.eds" and "sensor.energi_data_service_salg" not in mapping
     assert mapping["sensor.stromligning_current_price_vat"] == ""
 
     prices.update({BUY: "sensor.sl_current_price_vat", **{"stromligning_sell_current_price": "sensor.sl_15min_current_price_ex_vat"}})
     mapping = price_dashboard_entities(prices)
     assert mapping["sensor.stromligning_current_price_vat"] == "sensor.sl_current_price_vat"
-    assert mapping["sensor.stromligning_nettariff_vat"] == "sensor.sl_nettariff_vat"
-    assert mapping["sensor.stromligning_15min_spotprice_ex_vat"] == "sensor.sl_15min_spotprice_ex_vat"
-    assert mapping["sensor.energi_data_service"] == "" and mapping["sensor.energi_data_service_salg"] == ""  # the Energi Data Service chart is removed
+    assert not any("nettariff" in entity or "spotprice" in entity for entity in mapping)  # the chart draws the plan's prices: nothing of the tariffs
+    assert mapping["sensor.energi_data_service"] == ""  # the Energi Data Service chart is removed
 
 
 def test_the_dashboard_price_chart_with_only_stromligning_or_none() -> None:
@@ -65,12 +73,12 @@ def test_the_dashboard_price_chart_with_only_stromligning_or_none() -> None:
     prices[BUY] = "sensor.sl_current_price_vat"
     mapping = price_dashboard_entities(prices)
     assert mapping["sensor.stromligning_current_price_vat"] == "sensor.sl_current_price_vat"
-    assert mapping["sensor.energi_data_service"] == "" and mapping["sensor.energi_data_service_salg"] == ""
+    assert mapping["sensor.energi_data_service"] == ""
 
 
-@pytest.mark.parametrize(("provider", "prefix"), [("energidataservice", "energi_data_service"), ("stromligning", "stromligning"), ("energypriceforecast", "energy_price_forecast"), ("spotforecast", "spot_forecast"), ("elprognos", "elpris_prognos"), ("wattcast", "wattcast")])
+@pytest.mark.parametrize(("provider", "prefix"), [("energidataservice", "energi_data_service"), ("stromligning", "stromligning"), ("energypriceforecast", "energy_price_forecast"), ("spotforecast", "spot_forecast"), ("elprognos", "elpris_prognos"), ("wattcast", "wattcast"), ("epexspot", "epex_spot"), ("gespot", "gespot"), ("octopus", "octopus"), ("nordpool", "nordpool")])
 def test_a_provider_maps_exactly_the_external_entities_of_its_chart_file(provider: str, prefix: str) -> None:
     """dashboard/prices/<provider>.yaml and the provider's dashboard_entities() stay together."""
     mapped = set(PROVIDER_CLASSES[provider].dashboard_entities(dict.fromkeys(PRICE_KEYS, "")))
     chart = (TEMPLATE_DIR / "prices" / f"{provider}.yaml").read_text(encoding="utf-8")
-    assert mapped == set(re.findall(rf"\b(?:sensor|binary_sensor)\.{prefix}\w*", chart))
+    assert mapped == set(re.findall(rf"\b(?:sensor|binary_sensor|event)\.{prefix}\w*", chart))

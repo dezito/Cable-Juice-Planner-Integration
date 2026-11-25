@@ -18,7 +18,7 @@ RESERVED_PREFIXES = {"site"}  # sensor.cjp_site_* belong to the shared grid conn
 IMPORT_NONE = "none"
 BACKUP_EXPORT = "export"
 CRON_INTERVALS = ["1", "2", "3", "4", "5", "6", "10", "12", "15", "20", "30"]
-PRICE_PROVIDERS = ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast"]
+PRICE_PROVIDERS = ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast", "epexspot", "gespot", "octopus", "nordpool"]
 # the providers of wholesale prices: the VAT and the surcharge on the fee page are for them
 SPOT_PRICE_PROVIDERS = ("spotforecast", "elprognos", "wattcast")
 ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
@@ -38,6 +38,10 @@ CONFIG_FLOW_STEPS = [
     "prices_spotforecast",
     "prices_elprognos",
     "prices_wattcast",
+    "prices_epexspot",
+    "prices_gespot",
+    "prices_octopus",
+    "prices_nordpool",
     "prices_stromligning",
     "prices_stromligning_tariffs",
     "price_fees",
@@ -124,6 +128,15 @@ SELECTORS: dict[str, Any] = {
     "elprognos_buy_entity_id": _entity("sensor", integration="elprisprognos"),
     "wattcast_buy_entity_id": _entity("sensor", integration="wattcast"),
     "wattcast_forecast_entity_id": _entity("sensor", integration="wattcast"),
+    "epexspot_buy_entity_id": _entity("sensor", integration="epex_spot"),
+    "epexspot_sell_entity_id": _entity("sensor", integration="epex_spot"),
+    "gespot_buy_entity_id": _entity("sensor", integration="ge_spot"),
+    "octopus_buy_entity_id": _entity("event", integration="octopus_energy"),
+    "octopus_buy_next_day_entity_id": _entity("event", integration="octopus_energy"),
+    "octopus_sell_entity_id": _entity("event", integration="octopus_energy"),
+    "octopus_sell_next_day_entity_id": _entity("event", integration="octopus_energy"),
+    "nordpool_buy_entity_id": _entity("sensor", integration="nordpool"),
+    "nordpool_sell_entity_id": _entity("sensor", integration="nordpool"),
     "stromligning_buy_current_price": _entity("sensor", integration="stromligning"),
     "stromligning_buy_tomorrow_available": _entity("binary_sensor", integration="stromligning"),
     "stromligning_buy_forecasts": _entity("sensor", integration="stromligning"),
@@ -194,6 +207,13 @@ REQUIRED_KEYS = {
     "elprognos_buy_entity_id",
     "wattcast_buy_entity_id",
     "wattcast_forecast_entity_id",
+    "epexspot_buy_entity_id",
+    "epexspot_sell_entity_id",
+    "gespot_buy_entity_id",
+    "octopus_buy_entity_id",
+    "octopus_buy_next_day_entity_id",
+    "nordpool_buy_entity_id",
+    "nordpool_sell_entity_id",
     "spot_vat",
     "spot_surcharge",
     "stromligning_buy_current_price",

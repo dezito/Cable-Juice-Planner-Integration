@@ -274,7 +274,7 @@ def test_the_dashboard_maps_the_entities_of_its_chart() -> None:
     prices = {key: "" for keys in PRICE_PROVIDER_KEYS.values() for key in keys}
     prices.update({"energypriceforecast_buy_entity_id": BUY, "energypriceforecast_sell_entity_id": SELL})
     mapping = price_dashboard_entities(prices)
-    assert mapping["sensor.energy_price_forecast"] == BUY and mapping["sensor.energy_price_forecast_sell"] == SELL
+    assert mapping["sensor.energy_price_forecast"] == BUY and "sensor.energy_price_forecast_sell" not in mapping  # the chart draws the plan's prices
     assert mapping["sensor.energi_data_service"] == ""  # one chart: the first configured provider in priority order
 
 
@@ -384,19 +384,17 @@ def _generators(node) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize("provider", ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast"])
+@pytest.mark.parametrize("provider", ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast", "epexspot", "gespot", "octopus", "nordpool"])
 def test_every_chart_generator_is_complete_javascript(provider: str) -> None:
     """The data generators of the price charts are JavaScript in a yaml string: a cut-off or unbalanced one breaks the whole chart."""
     chart = yaml.safe_load((TEMPLATE_DIR / "prices" / f"{provider}.yaml").read_text(encoding="utf-8"))
     generators = _generators(chart)
     assert len(generators) >= 5
     assert all(_balanced(js) for js in generators), provider
-    if provider == "energypriceforecast":
-        zone = next(js for js in generators if "forecast_zone" in js)
-        # the forecast zone starts at the first forecast row and is as high as the highest price
-        for part in ("var start", "raw_forecast[0].start", "var rows", "rows[i].value", "var maxP", "rows[j].start", "return out;"):
-            assert part in zone, part
-        assert all(".hour" not in js and ".price" not in js and "tomorrow_valid" not in js for js in generators)
+    zone = next(js for js in generators if "forecast_zone" in js)
+    # the forecast zone starts at the first forecast row of the plan's prices (none without one) and is as high as the highest price
+    for part in ("var start", "raw_forecast[0].start", "var rows", "rows[i].value", "var maxP", "rows[j].start", "return out;", "if (!(eds.raw_forecast || []).length) return [];"):
+        assert part in zone, (provider, part)
 
 
 @pytest.mark.parametrize("unit", ["ct/MWh", "c/MWh", "snt/kWh", "gr/kWh", "Rp/kWh", "GBX/kWh", "c€/kWh", "cts/kWh", "bani/kWh"])
@@ -432,13 +430,6 @@ def test_a_price_per_mwh_gets_the_scale_of_its_currency_and_is_accepted_on_the_e
     # and it is the same currency as a kWh sensor in EUR
     both = {"sensor.k": _State("0.1", {"unit_of_measurement": "EUR/kWh", "raw_today": []}), **states}
     assert price_currency_errors({"energypriceforecast_buy_entity_id": "sensor.k", "energypriceforecast_sell_entity_id": "sensor.w"}, ["energypriceforecast_sell_entity_id"], both.get) == {}
-
-
-def test_the_chart_divides_the_rows_of_a_sensor_per_mwh_by_1000() -> None:
-    """The chart reads the sensors' rows itself: a price per MWh is drawn per kWh like the planner's prices."""
-    text = (TEMPLATE_DIR / "prices" / "energypriceforecast.yaml").read_text(encoding="utf-8")
-    assert text.count("endsWith('mwh') ? 1000 : 1") == 6  # the three limits, the buy and the sell series and the forecast zone
-    assert text.count("Number(row.value) / buyDiv") == 2 and "Number(row.value) / sellDiv" in text
 
 
 def test_the_combined_provider_names_the_sensors_whose_history_is_per_mwh() -> None:

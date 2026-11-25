@@ -350,16 +350,6 @@ def _replace(text: str, replace: dict[str, str]) -> str:
     return pattern.sub(lambda match: replace[match.group(1)], text)
 
 
-def _spot_number(value: Any) -> str:
-    """The VAT or surcharge of the spot forecast providers as the number the chart reads; "NaN" when it is missing or is not a finite
-    number (a hand-edited backup): the chart then shows no price, and the build does not fail on it."""
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "NaN"
-    return f"{number:g}" if number == number and abs(number) != float("inf") else "NaN"
-
-
 def render_dashboard(
     config: dict[str, Any], prefix: str, entry_id: str, existing: set[str], currency: str | None = None, distance: str | None = None
 ) -> str:
@@ -395,12 +385,6 @@ def render_dashboard(
     if not is_ev_configured(config):
         template = _drop_sections(template, (*EV_SECTIONS, *EV_WHAT_IF_SECTIONS))
     texts = load_texts(normalize_language(config.get("language")), currency, distance, PRICE_CORRECTION_MAX * price_scale(config))
-    # the sell price chart subtracts the same sell fee as the planner
-    texts["dashboard.sell_fee_value"] = f"{abs(float(config['prices'].get('sell_fee', 0.0))):g}"
-    # the charts of the spot forecast providers make the buy price from the wholesale price with the planner's VAT and surcharge: NaN
-    # when one is missing (the chart then shows no price, like the planner), never 0
-    for key in ("spot_vat", "spot_surcharge"):
-        texts[f"dashboard.{key}"] = _spot_number(config["prices"].get(key))
     template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 

@@ -35,108 +35,36 @@
           today_prices: |
             const adapt = (states, mode) => {
               const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-              const vat = Number('@@spot_vat@@');
-              const extra = Number('@@spot_surcharge@@');
-              if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-              const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-              const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-              const published = [];
-              const forecast = [];
-              const add = (start, spot, isPublished) => {
-                const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-              };
-              const p = states['sensor.wattcast']?.attributes || {};
-              const f = states['sensor.wattcast_forecast']?.attributes;
-              // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-              if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-              if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-              const until = new Date(f.known_until).getTime();
-              const priced = new Set();
-              [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                if (!r || !Number.isFinite(num(r.value))) return;
-                priced.add(hour(r.start));
-                add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
               });
-              (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-              // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-              const covered = new Set(published.map(row => hour(row.start)));
-              const tomorrow = new Date();
-              tomorrow.setHours(24, 0, 0, 0);
-              rows.raw_today = published;
-              rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
               return rows;
             };
             adapt(states, 'buy').raw_today.map(item => Number(item.value)).filter(Number.isFinite)
           tomorrow_prices: |
             const adapt = (states, mode) => {
               const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-              const vat = Number('@@spot_vat@@');
-              const extra = Number('@@spot_surcharge@@');
-              if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-              const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-              const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-              const published = [];
-              const forecast = [];
-              const add = (start, spot, isPublished) => {
-                const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-              };
-              const p = states['sensor.wattcast']?.attributes || {};
-              const f = states['sensor.wattcast_forecast']?.attributes;
-              // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-              if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-              if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-              const until = new Date(f.known_until).getTime();
-              const priced = new Set();
-              [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                if (!r || !Number.isFinite(num(r.value))) return;
-                priced.add(hour(r.start));
-                add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
               });
-              (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-              // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-              const covered = new Set(published.map(row => hour(row.start)));
-              const tomorrow = new Date();
-              tomorrow.setHours(24, 0, 0, 0);
-              rows.raw_today = published;
-              rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
               return rows;
             };
             adapt(states, 'buy').raw_tomorrow.map(item => Number(item.value)).filter(Number.isFinite)
           forecast_prices: |
             const adapt = (states, mode) => {
               const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-              const vat = Number('@@spot_vat@@');
-              const extra = Number('@@spot_surcharge@@');
-              if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-              const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-              const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-              const published = [];
-              const forecast = [];
-              const add = (start, spot, isPublished) => {
-                const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-              };
-              const p = states['sensor.wattcast']?.attributes || {};
-              const f = states['sensor.wattcast_forecast']?.attributes;
-              // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-              if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-              if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-              const until = new Date(f.known_until).getTime();
-              const priced = new Set();
-              [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                if (!r || !Number.isFinite(num(r.value))) return;
-                priced.add(hour(r.start));
-                add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
               });
-              (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-              // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-              const covered = new Set(published.map(row => hour(row.start)));
-              const tomorrow = new Date();
-              tomorrow.setHours(24, 0, 0, 0);
-              rows.raw_today = published;
-              rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
               return rows;
             };
             adapt(states, 'buy').raw_forecast.map(item => Number(item.value)).filter(Number.isFinite)
@@ -170,7 +98,8 @@
           price10: vars.mean_price + vars.step_over_mean * 4
           price11: vars.highest_price
           total_span: 24 * 7 - 1
-        entities: []
+        entities:
+          - sensor.cjp_current_charging_rule
         card:
           type: custom:apexcharts-card
           apex_config:
@@ -268,36 +197,12 @@
               data_generator: |
                 const adapt = (states, mode) => {
                   const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-                  const vat = Number('@@spot_vat@@');
-                  const extra = Number('@@spot_surcharge@@');
-                  if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-                  const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-                  const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-                  const published = [];
-                  const forecast = [];
-                  const add = (start, spot, isPublished) => {
-                    const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                    if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-                  };
-                  const p = states['sensor.wattcast']?.attributes || {};
-                  const f = states['sensor.wattcast_forecast']?.attributes;
-                  // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-                  if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-                  if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-                  const until = new Date(f.known_until).getTime();
-                  const priced = new Set();
-                  [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                    if (!r || !Number.isFinite(num(r.value))) return;
-                    priced.add(hour(r.start));
-                    add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
                   });
-                  (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-                  // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-                  const covered = new Set(published.map(row => hour(row.start)));
-                  const tomorrow = new Date();
-                  tomorrow.setHours(24, 0, 0, 0);
-                  rows.raw_today = published;
-                  rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
                   return rows;
                 };
                 const buy = adapt(hass.states, 'buy');
@@ -353,36 +258,12 @@
               data_generator: |
                 const adapt = (states, mode) => {
                   const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-                  const vat = Number('@@spot_vat@@');
-                  const extra = Number('@@spot_surcharge@@');
-                  if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-                  const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-                  const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-                  const published = [];
-                  const forecast = [];
-                  const add = (start, spot, isPublished) => {
-                    const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                    if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-                  };
-                  const p = states['sensor.wattcast']?.attributes || {};
-                  const f = states['sensor.wattcast_forecast']?.attributes;
-                  // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-                  if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-                  if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-                  const until = new Date(f.known_until).getTime();
-                  const priced = new Set();
-                  [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                    if (!r || !Number.isFinite(num(r.value))) return;
-                    priced.add(hour(r.start));
-                    add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
                   });
-                  (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-                  // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-                  const covered = new Set(published.map(row => hour(row.start)));
-                  const tomorrow = new Date();
-                  tomorrow.setHours(24, 0, 0, 0);
-                  rows.raw_today = published;
-                  rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
                   return rows;
                 };
                 const sell = adapt(hass.states, 'spot');
@@ -390,7 +271,7 @@
                 const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
                 const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
                 const sellDiv = String(sell.unit_of_measurement || '').toLowerCase().endsWith('mwh') ? 1000 : 1;
-                const values = new Map(sellRows.map(row => [new Date(row.start).getTime(), Number(row.value) / sellDiv - (Number('@@sell_fee_value@@') || 0)]));
+                const values = new Map(sellRows.map(row => [new Date(row.start).getTime(), Number(row.value) / sellDiv]));
                 const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
                 return times.map(time => [time, values.has(time) && Number.isFinite(values.get(time)) ? values.get(time) : null]);
               float_precision: 2
@@ -407,36 +288,12 @@
               data_generator: |
                 const adapt = (states, mode) => {
                   const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-                  const vat = Number('@@spot_vat@@');
-                  const extra = Number('@@spot_surcharge@@');
-                  if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-                  const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-                  const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-                  const published = [];
-                  const forecast = [];
-                  const add = (start, spot, isPublished) => {
-                    const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                    if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-                  };
-                  const p = states['sensor.wattcast']?.attributes || {};
-                  const f = states['sensor.wattcast_forecast']?.attributes;
-                  // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-                  if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-                  if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-                  const until = new Date(f.known_until).getTime();
-                  const priced = new Set();
-                  [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                    if (!r || !Number.isFinite(num(r.value))) return;
-                    priced.add(hour(r.start));
-                    add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
                   });
-                  (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-                  // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-                  const covered = new Set(published.map(row => hour(row.start)));
-                  const tomorrow = new Date();
-                  tomorrow.setHours(24, 0, 0, 0);
-                  rows.raw_today = published;
-                  rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
                   return rows;
                 };
                 const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
@@ -474,40 +331,17 @@
               data_generator: |
                 const adapt = (states, mode) => {
                   const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-                  const vat = Number('@@spot_vat@@');
-                  const extra = Number('@@spot_surcharge@@');
-                  if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-                  const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-                  const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-                  const published = [];
-                  const forecast = [];
-                  const add = (start, spot, isPublished) => {
-                    const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                    if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-                  };
-                  const p = states['sensor.wattcast']?.attributes || {};
-                  const f = states['sensor.wattcast_forecast']?.attributes;
-                  // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-                  if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-                  if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-                  const until = new Date(f.known_until).getTime();
-                  const priced = new Set();
-                  [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                    if (!r || !Number.isFinite(num(r.value))) return;
-                    priced.add(hour(r.start));
-                    add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
                   });
-                  (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-                  // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-                  const covered = new Set(published.map(row => hour(row.start)));
-                  const tomorrow = new Date();
-                  tomorrow.setHours(24, 0, 0, 0);
-                  rows.raw_today = published;
-                  rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
                   return rows;
                 };
                 try {
                   var eds = adapt(hass.states, 'buy');
+                  if (!(eds.raw_forecast || []).length) return [];
 
                   // Start: the first forecast hour (most accurate)
                   var start = null;
@@ -587,36 +421,12 @@
               data_generator: |
                 const adapt = (states, mode) => {
                   const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
-                  const vat = Number('@@spot_vat@@');
-                  const extra = Number('@@spot_surcharge@@');
-                  if (!Number.isFinite(vat) || !Number.isFinite(extra)) return rows;
-                  const num = value => (typeof value === 'number' && Number.isFinite(value)) ? value : NaN;
-                  const hour = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
-                  const published = [];
-                  const forecast = [];
-                  const add = (start, spot, isPublished) => {
-                    const value = mode === 'buy' ? spot * (1 + vat / 100) + extra : spot;
-                    if (start && Number.isFinite(value)) (isPublished ? published : forecast).push({ start: start, value: value });
-                  };
-                  const p = states['sensor.wattcast']?.attributes || {};
-                  const f = states['sensor.wattcast_forecast']?.attributes;
-                  // Wattcast gives ct/kWh and nothing else, and needs its forecast sensor: otherwise no price, like the provider
-                  if (!f || String(p.unit_of_measurement || '').trim().toLowerCase() !== 'ct/kwh') return rows;
-                  if (typeof f.forecast_unit === 'string' && f.forecast_unit.trim().toLowerCase() !== 'ct/kwh') return rows;
-                  const until = new Date(f.known_until).getTime();
-                  const priced = new Set();
-                  [...(Array.isArray(p.raw_today) ? p.raw_today : []), ...(Array.isArray(p.raw_tomorrow) ? p.raw_tomorrow : [])].forEach(r => {
-                    if (!r || !Number.isFinite(num(r.value))) return;
-                    priced.add(hour(r.start));
-                    add(r.start, num(r.value) / 100, new Date(r.start).getTime() < until);
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
                   });
-                  (Array.isArray(f.forecast) ? f.forecast : []).forEach(r => { if (r && !priced.has(hour(r.start))) add(r.start, num(r.p50) / 100, false); });
-                  // like the planner: a forecast never enters an hour that has a published price, and today's hours without one are not planned
-                  const covered = new Set(published.map(row => hour(row.start)));
-                  const tomorrow = new Date();
-                  tomorrow.setHours(24, 0, 0, 0);
-                  rows.raw_today = published;
-                  rows.raw_forecast = forecast.filter(row => !covered.has(hour(row.start)) && new Date(row.start).getTime() >= tomorrow.getTime());
                   return rows;
                 };
                 const plan = entity.attributes.charge_plan || [];
@@ -624,7 +434,7 @@
                 const sell = adapt(hass.states, 'spot');
                 const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
                 const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
-                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                const times = [...new Set([...[...buyRows, ...sellRows].map(row => new Date(row.start).getTime()), ...plan.map(p => new Date(p.time).getTime())].filter(Number.isFinite))].sort((a, b) => a - b);
                 return times.map(time => {
                   const charging = plan.find(p => {
                     const start = new Date(p.time).getTime();

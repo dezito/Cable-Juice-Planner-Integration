@@ -31,10 +31,9 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
 
     @classmethod
     def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
-        return {
-            "sensor.energi_data_service": prices["energidataservice_buy_entity_id"],
-            "sensor.energi_data_service_salg": prices["energidataservice_sell_entity_id"],
-        }
+        # the chart draws the plan's prices (attribute price_chart of the plan entity) and only watches the buy sensor of the provider:
+        # the card with the restart button when it is unavailable
+        return {"sensor.energi_data_service": prices["energidataservice_buy_entity_id"]}
 
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_entity_id)

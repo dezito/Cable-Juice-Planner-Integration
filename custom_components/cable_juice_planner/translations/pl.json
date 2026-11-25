@@ -207,6 +207,56 @@
           "wattcast_forecast_entity_id": "Czujnik Wattcast „Forecast”. Mówi, które ceny są opublikowane (known_until), i zawiera prognozę na dni po jutrze."
         }
       },
+      "prices_epexspot": {
+        "title": "EPEX Spot",
+        "description": "Czujniki integracji EPEX Spot (ceny z rynku dnia następnego dla Niemiec, Austrii, Holandii, Belgii, Francji i innych). Wybierz jej czujnik **Total Price** jako cenę zakupu (ma narzut i podatek ustawione w EPEX Spot) i jej czujnik **Market Price** jako cenę sprzedaży (cena giełdowa). Ceny muszą być w walucie za kWh (€/kWh). Podaje tylko dziś i jutro, więc wybierz też innego dostawcę cen z prognozą. Nie źródła Tibber i Energyforecast.de: ich ceny nie są ceną giełdową.",
+        "data": {
+          "epexspot_buy_entity_id": "Cena zakupu (Total Price)",
+          "epexspot_sell_entity_id": "Cena sprzedaży (Market Price)"
+        },
+        "data_description": {
+          "epexspot_buy_entity_id": "Czujnik EPEX Spot „Total Price”: cena giełdowa z narzutem i podatkiem ustawionymi w EPEX Spot.",
+          "epexspot_sell_entity_id": "Czujnik EPEX Spot „Market Price”: cena giełdowa bez narzutu i podatku. Cena sprzedaży to ta cena minus opłata za sprzedaż."
+        }
+      },
+      "prices_gespot": {
+        "title": "GE-Spot",
+        "description": "Czujnik ceny integracji GE-Spot (ceny z rynku dnia następnego z Nord Pool, ENTSO-E i innych, z Twoim VAT, taryfą i podatkiem). Wybierz czujnik „Current Price” swojego obszaru z ceną za kWh w walucie (nie w centach ani øre). Podaje dziś i jutro (jutro, gdy jest kompletne): jego cena to cena zakupu, a jego cena rynkowa (raw_value) to cena sprzedaży, gdy źródło ją ma. Nie ma prognozy, więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "gespot_buy_entity_id": "Czujnik ceny (Current Price)"
+        },
+        "data_description": {
+          "gespot_buy_entity_id": "Czujnik GE-Spot „Current Price” Twojego obszaru (jego encja kończy się obszarem, na przykład _se3)."
+        }
+      },
+      "prices_octopus": {
+        "title": "Octopus Energy",
+        "description": "Stawki integracji Octopus Energy (Wielka Brytania, na przykład Agile): zdarzenia „Current Day Rates” i „Next Day Rates” zawierają półgodzinne ceny w funtach za kWh z VAT. Wybierz dwa swojego licznika poboru. Jeśli oddajesz energię do sieci, wybierz też dwa licznika oddawania; bez taryfy eksportowej sprzedaż jest warta zero. Podaje dziś i jutro (jutro, gdy Octopus je opublikuje), więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "octopus_buy_entity_id": "Cena zakupu: stawki na dziś",
+          "octopus_buy_next_day_entity_id": "Cena zakupu: stawki na jutro",
+          "octopus_sell_entity_id": "Cena sprzedaży: eksport, stawki na dziś (opcjonalnie)",
+          "octopus_sell_next_day_entity_id": "Cena sprzedaży: eksport, stawki na jutro (opcjonalnie)"
+        },
+        "data_description": {
+          "octopus_buy_entity_id": "Zdarzenie „Current Day Rates” licznika poboru w Octopus Energy.",
+          "octopus_buy_next_day_entity_id": "Zdarzenie „Next Day Rates” licznika poboru. Puste, dopóki stawki na jutro nie zostaną opublikowane.",
+          "octopus_sell_entity_id": "Zdarzenie „Current Day Rates” licznika oddawania (w nazwie jest export). Zostaw puste, jeśli nie oddajesz energii.",
+          "octopus_sell_next_day_entity_id": "Zdarzenie „Next Day Rates” licznika oddawania."
+        }
+      },
+      "prices_nordpool": {
+        "title": "Nord Pool",
+        "description": "Czujniki integracji Nord Pool z HACS (nie własny Nord Pool Home Assistanta, nie ma wierszy cen). Wybierz czujnik z ceną za kWh razem z VAT i kosztami ustawionymi w nim jako cenę zakupu, a drugi czujnik bez VAT i kosztów (cena giełdowa) jako cenę sprzedaży: dodaj integrację dwa razy, drugą z wyłączonym VAT. Ceny muszą być za kWh w walucie (nie w centach ani øre, nie za MWh). Podaje dziś i jutro, więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "nordpool_buy_entity_id": "Cena zakupu (z VAT)",
+          "nordpool_sell_entity_id": "Cena sprzedaży (bez VAT)"
+        },
+        "data_description": {
+          "nordpool_buy_entity_id": "Czujnik Nord Pool z ceną razem z VAT i Twoimi kosztami.",
+          "nordpool_sell_entity_id": "Czujnik Nord Pool bez VAT i kosztów (cena giełdowa). Cena sprzedaży to ta cena minus opłata za sprzedaż."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
@@ -362,7 +412,7 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat.",
+        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat. EPEX Spot, GE-Spot, Octopus Energy i Nord Pool podają Twoje własne opublikowane ceny (dziś i jutro): obok nich potrzebny jest dostawca z prognozą, a one są zaraz po Energi Data Service, przed Energy Price Forecast i innymi szacunkami.",
         "data": {
           "price_country": "Kraj",
           "price_providers": "Dostawcy cen"
@@ -447,7 +497,7 @@
       "prefix_in_use": "Ten prefiks jest już używany.",
       "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
-      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj. Integracje cen giełdowych: Spot Forecast w Niemczech, Luksemburgu, Holandii i Norwegii, Elprisprognos w Szwecji i Wattcast w Finlandii, Estonii, na Łotwie i Litwie.",
+      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj. Integracje cen giełdowych: Spot Forecast w Niemczech, Luksemburgu, Holandii i Norwegii, Elprisprognos w Szwecji i Wattcast w Finlandii, Estonii, na Łotwie i Litwie. EPEX Spot i GE-Spot: większość Europy (GE-Spot także Australia i USA), Octopus Energy: Wielka Brytania, Nord Pool: Dania, Norwegia, Szwecja, Finlandia, kraje bałtyckie, Francja, Holandia, Belgia, Austria i Niemcy.",
       "price_provider_no_forecast": "Żaden z wybranych dostawców cen nie podaje prognozy cen, więc planowanie mogłoby używać tylko cen na dziś i jutro. Wybierz dodatkowo innego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
@@ -456,11 +506,15 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast and Elprisprognos, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
-      "price_sensor_forecast_only": "Ten czujnik ma wiersze cen, ale żaden nie jest opublikowany, więc prawdopodobnie nie jest to czujnik ceny integracji (albo jego atrybuty różnią się od oczekiwanych). Wybierz czujnik ceny integracji; w Wattcast czujnik ceny, a jako czujnik prognozy jego czujnik prognozy (nie mogą być zamienione). Jeśli czujnik właśnie się uruchomił, spróbuj ponownie po opublikowaniu cen.",
+      "price_sensor_no_published": "Ten czujnik ma wiersze cen, ale żaden nie jest opublikowany, więc prawdopodobnie nie jest to czujnik ceny integracji (albo jego atrybuty różnią się od oczekiwanych). Wybierz czujnik ceny integracji; w Wattcast czujnik ceny, a jako czujnik prognozy jego czujnik prognozy (nie mogą być zamienione). Jeśli czujnik właśnie się uruchomił, spróbuj ponownie po opublikowaniu cen.",
+      "price_sensor_no_rows": "Ten czujnik nie ma wierszy cen, więc to nie jest czujnik ceny integracji (na przykład własny Nord Pool Home Assistanta ich nie ma). Wybierz czujnik ceny integracji.",
+      "price_sensor_not_exchange": "Ten czujnik EPEX Spot bierze ceny ze źródła, które nie podaje ceny giełdowej (Tibber podaje własną cenę całkowitą, Energyforecast.de prognozę). Wybierz czujnik innego źródła, na przykład Awattar, ENTSO-E lub Energy-Charts.",
+      "price_sensor_same_sensor": "Cena sprzedaży potrzebuje innego czujnika niż cena zakupu. Wybierz czujnik z ceną giełdową (bez VAT i kosztów), a w Octopus Energy stawki eksportowe.",
+      "price_sensor_wrong_role": "Ten czujnik nie pasuje do tego pola: w EPEX Spot cena zakupu to czujnik „Total Price”, a cena sprzedaży „Market Price”; w Octopus Energy cena zakupu to zdarzenie poboru energii elektrycznej, a cena sprzedaży zdarzenie eksportu, i dzień musi pasować (dzisiejszy lub jutrzejszy).",
       "price_currency_mismatch": "Ten czujnik jest w innej walucie niż pozostałe czujniki cen. Używaj czujników cen w jednej walucie (lub odznacz innego dostawcę cen)."
     },
     "abort": {
@@ -689,6 +743,56 @@
           "wattcast_forecast_entity_id": "Czujnik Wattcast „Forecast”. Mówi, które ceny są opublikowane (known_until), i zawiera prognozę na dni po jutrze."
         }
       },
+      "prices_epexspot": {
+        "title": "EPEX Spot",
+        "description": "Czujniki integracji EPEX Spot (ceny z rynku dnia następnego dla Niemiec, Austrii, Holandii, Belgii, Francji i innych). Wybierz jej czujnik **Total Price** jako cenę zakupu (ma narzut i podatek ustawione w EPEX Spot) i jej czujnik **Market Price** jako cenę sprzedaży (cena giełdowa). Ceny muszą być w walucie za kWh (€/kWh). Podaje tylko dziś i jutro, więc wybierz też innego dostawcę cen z prognozą. Nie źródła Tibber i Energyforecast.de: ich ceny nie są ceną giełdową.",
+        "data": {
+          "epexspot_buy_entity_id": "Cena zakupu (Total Price)",
+          "epexspot_sell_entity_id": "Cena sprzedaży (Market Price)"
+        },
+        "data_description": {
+          "epexspot_buy_entity_id": "Czujnik EPEX Spot „Total Price”: cena giełdowa z narzutem i podatkiem ustawionymi w EPEX Spot.",
+          "epexspot_sell_entity_id": "Czujnik EPEX Spot „Market Price”: cena giełdowa bez narzutu i podatku. Cena sprzedaży to ta cena minus opłata za sprzedaż."
+        }
+      },
+      "prices_gespot": {
+        "title": "GE-Spot",
+        "description": "Czujnik ceny integracji GE-Spot (ceny z rynku dnia następnego z Nord Pool, ENTSO-E i innych, z Twoim VAT, taryfą i podatkiem). Wybierz czujnik „Current Price” swojego obszaru z ceną za kWh w walucie (nie w centach ani øre). Podaje dziś i jutro (jutro, gdy jest kompletne): jego cena to cena zakupu, a jego cena rynkowa (raw_value) to cena sprzedaży, gdy źródło ją ma. Nie ma prognozy, więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "gespot_buy_entity_id": "Czujnik ceny (Current Price)"
+        },
+        "data_description": {
+          "gespot_buy_entity_id": "Czujnik GE-Spot „Current Price” Twojego obszaru (jego encja kończy się obszarem, na przykład _se3)."
+        }
+      },
+      "prices_octopus": {
+        "title": "Octopus Energy",
+        "description": "Stawki integracji Octopus Energy (Wielka Brytania, na przykład Agile): zdarzenia „Current Day Rates” i „Next Day Rates” zawierają półgodzinne ceny w funtach za kWh z VAT. Wybierz dwa swojego licznika poboru. Jeśli oddajesz energię do sieci, wybierz też dwa licznika oddawania; bez taryfy eksportowej sprzedaż jest warta zero. Podaje dziś i jutro (jutro, gdy Octopus je opublikuje), więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "octopus_buy_entity_id": "Cena zakupu: stawki na dziś",
+          "octopus_buy_next_day_entity_id": "Cena zakupu: stawki na jutro",
+          "octopus_sell_entity_id": "Cena sprzedaży: eksport, stawki na dziś (opcjonalnie)",
+          "octopus_sell_next_day_entity_id": "Cena sprzedaży: eksport, stawki na jutro (opcjonalnie)"
+        },
+        "data_description": {
+          "octopus_buy_entity_id": "Zdarzenie „Current Day Rates” licznika poboru w Octopus Energy.",
+          "octopus_buy_next_day_entity_id": "Zdarzenie „Next Day Rates” licznika poboru. Puste, dopóki stawki na jutro nie zostaną opublikowane.",
+          "octopus_sell_entity_id": "Zdarzenie „Current Day Rates” licznika oddawania (w nazwie jest export). Zostaw puste, jeśli nie oddajesz energii.",
+          "octopus_sell_next_day_entity_id": "Zdarzenie „Next Day Rates” licznika oddawania."
+        }
+      },
+      "prices_nordpool": {
+        "title": "Nord Pool",
+        "description": "Czujniki integracji Nord Pool z HACS (nie własny Nord Pool Home Assistanta, nie ma wierszy cen). Wybierz czujnik z ceną za kWh razem z VAT i kosztami ustawionymi w nim jako cenę zakupu, a drugi czujnik bez VAT i kosztów (cena giełdowa) jako cenę sprzedaży: dodaj integrację dwa razy, drugą z wyłączonym VAT. Ceny muszą być za kWh w walucie (nie w centach ani øre, nie za MWh). Podaje dziś i jutro, więc wybierz też innego dostawcę cen z prognozą.",
+        "data": {
+          "nordpool_buy_entity_id": "Cena zakupu (z VAT)",
+          "nordpool_sell_entity_id": "Cena sprzedaży (bez VAT)"
+        },
+        "data_description": {
+          "nordpool_buy_entity_id": "Czujnik Nord Pool z ceną razem z VAT i Twoimi kosztami.",
+          "nordpool_sell_entity_id": "Czujnik Nord Pool bez VAT i kosztów (cena giełdowa). Cena sprzedaży to ta cena minus opłata za sprzedaż."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
@@ -844,7 +948,7 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat.",
+        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat. EPEX Spot, GE-Spot, Octopus Energy i Nord Pool podają Twoje własne opublikowane ceny (dziś i jutro): obok nich potrzebny jest dostawca z prognozą, a one są zaraz po Energi Data Service, przed Energy Price Forecast i innymi szacunkami.",
         "data": {
           "price_country": "Kraj",
           "price_providers": "Dostawcy cen"
@@ -902,7 +1006,7 @@
       "prefix_in_use": "Ten prefiks jest już używany.",
       "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
-      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj. Integracje cen giełdowych: Spot Forecast w Niemczech, Luksemburgu, Holandii i Norwegii, Elprisprognos w Szwecji i Wattcast w Finlandii, Estonii, na Łotwie i Litwie.",
+      "price_provider_country": "Wybrany dostawca cen nie ma cen w tym kraju. Strømligning działa tylko w Danii, a Energi Data Service w Danii, Norwegii, Szwecji, Finlandii, Estonii, Łotwie, Litwie, Francji, Holandii, Belgii, Austrii, Niemczech i Luksemburgu. Wybierz Energy Price Forecast (większość Europy) albo zmień kraj. Integracje cen giełdowych: Spot Forecast w Niemczech, Luksemburgu, Holandii i Norwegii, Elprisprognos w Szwecji i Wattcast w Finlandii, Estonii, na Łotwie i Litwie. EPEX Spot i GE-Spot: większość Europy (GE-Spot także Australia i USA), Octopus Energy: Wielka Brytania, Nord Pool: Dania, Norwegia, Szwecja, Finlandia, kraje bałtyckie, Francja, Holandia, Belgia, Austria i Niemcy.",
       "price_provider_no_forecast": "Żaden z wybranych dostawców cen nie podaje prognozy cen, więc planowanie mogłoby używać tylko cen na dziś i jutro. Wybierz dodatkowo innego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
@@ -911,11 +1015,15 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast and Elprisprognos, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
-      "price_sensor_forecast_only": "Ten czujnik ma wiersze cen, ale żaden nie jest opublikowany, więc prawdopodobnie nie jest to czujnik ceny integracji (albo jego atrybuty różnią się od oczekiwanych). Wybierz czujnik ceny integracji; w Wattcast czujnik ceny, a jako czujnik prognozy jego czujnik prognozy (nie mogą być zamienione). Jeśli czujnik właśnie się uruchomił, spróbuj ponownie po opublikowaniu cen.",
+      "price_sensor_no_published": "Ten czujnik ma wiersze cen, ale żaden nie jest opublikowany, więc prawdopodobnie nie jest to czujnik ceny integracji (albo jego atrybuty różnią się od oczekiwanych). Wybierz czujnik ceny integracji; w Wattcast czujnik ceny, a jako czujnik prognozy jego czujnik prognozy (nie mogą być zamienione). Jeśli czujnik właśnie się uruchomił, spróbuj ponownie po opublikowaniu cen.",
+      "price_sensor_no_rows": "Ten czujnik nie ma wierszy cen, więc to nie jest czujnik ceny integracji (na przykład własny Nord Pool Home Assistanta ich nie ma). Wybierz czujnik ceny integracji.",
+      "price_sensor_not_exchange": "Ten czujnik EPEX Spot bierze ceny ze źródła, które nie podaje ceny giełdowej (Tibber podaje własną cenę całkowitą, Energyforecast.de prognozę). Wybierz czujnik innego źródła, na przykład Awattar, ENTSO-E lub Energy-Charts.",
+      "price_sensor_same_sensor": "Cena sprzedaży potrzebuje innego czujnika niż cena zakupu. Wybierz czujnik z ceną giełdową (bez VAT i kosztów), a w Octopus Energy stawki eksportowe.",
+      "price_sensor_wrong_role": "Ten czujnik nie pasuje do tego pola: w EPEX Spot cena zakupu to czujnik „Total Price”, a cena sprzedaży „Market Price”; w Octopus Energy cena zakupu to zdarzenie poboru energii elektrycznej, a cena sprzedaży zdarzenie eksportu, i dzień musi pasować (dzisiejszy lub jutrzejszy).",
       "price_currency_mismatch": "Ten czujnik jest w innej walucie niż pozostałe czujniki cen. Używaj czujników cen w jednej walucie (lub odznacz innego dostawcę cen)."
     },
     "abort": {
@@ -937,7 +1045,11 @@
         "energypriceforecast": "Energy Price Forecast (Europa)",
         "spotforecast": "Spot Forecast (DE, LU, NL, NO)",
         "elprognos": "Elprisprognos (Szwecja)",
-        "wattcast": "Wattcast (Finlandia, kraje bałtyckie)"
+        "wattcast": "Wattcast (Finlandia, kraje bałtyckie)",
+        "epexspot": "EPEX Spot (Europa, bez prognozy)",
+        "gespot": "GE-Spot (Europa i inne, bez prognozy)",
+        "octopus": "Octopus Energy (Wielka Brytania, bez prognozy)",
+        "nordpool": "Nord Pool (HACS, bez prognozy)"
       }
     },
     "restore_backup": {
@@ -1531,7 +1643,7 @@
     },
     "price_sensor_unit": {
       "title": "Czujniki cen używane przez Cable Juice Planner podają cenę w złej jednostce ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) używa czujników cen, które podają cenę w podjednostce waluty (np. ct/kWh lub p/kWh) lub, dla Energi Data Service, Spot Forecast and Elprisprognos, za MWh lub Wh:\n{entities}\n\nIch ceny są błędne o czynnik 100 lub 1000, więc Cable Juice Planner ich nie używa: planuje na podstawie zapisanych cen. Wybierz w ustawieniach cen czujnik z ceną za kWh w walucie (np. EUR/kWh) albo przywróć jednostkę czujnika.\n\nTa naprawa zniknie sama, gdy czujniki znów będą podawać cenę za kWh.\n\nCzujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna."
+      "description": "Cable Juice Planner ({prefix}) używa czujników cen, które podają cenę w podjednostce waluty (np. ct/kWh lub p/kWh) lub, dla Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh:\n{entities}\n\nIch ceny są błędne o czynnik 100 lub 1000, więc Cable Juice Planner ich nie używa: planuje na podstawie zapisanych cen. Wybierz w ustawieniach cen czujnik z ceną za kWh w walucie (np. EUR/kWh) albo przywróć jednostkę czujnika.\n\nTa naprawa zniknie sama, gdy czujniki znów będą podawać cenę za kWh.\n\nCzujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna."
     },
     "stromligning_entities": {
       "title": "Czujniki Strømligning potrzebne dla Cable Juice Planner są niedostępne ({prefix})",

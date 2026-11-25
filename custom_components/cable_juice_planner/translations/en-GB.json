@@ -207,6 +207,56 @@
           "wattcast_forecast_entity_id": "The Wattcast sensor “Forecast”. It says which prices are published (known_until) and holds the forecast of the days after tomorrow."
         }
       },
+      "prices_epexspot": {
+        "title": "EPEX Spot",
+        "description": "Sensors of the EPEX Spot integration (day-ahead prices for Germany, Austria, the Netherlands, Belgium, France and more). Choose its **Total Price** sensor as the buy price (it has the surcharge and tax you set in EPEX Spot) and its **Market Price** sensor as the sell price (the exchange price). The prices must be in the currency per kWh (€/kWh). It only gives today and tomorrow, so choose another price provider with a forecast too. Not the sources Tibber and Energyforecast.de: their prices are not the exchange price.",
+        "data": {
+          "epexspot_buy_entity_id": "Buy price (Total Price)",
+          "epexspot_sell_entity_id": "Sell price (Market Price)"
+        },
+        "data_description": {
+          "epexspot_buy_entity_id": "The EPEX Spot sensor “Total Price”: the exchange price with the surcharge and the tax you set in EPEX Spot.",
+          "epexspot_sell_entity_id": "The EPEX Spot sensor “Market Price”: the exchange price without surcharge and tax. The sell price is this price less the sell fee."
+        }
+      },
+      "prices_gespot": {
+        "title": "GE-Spot",
+        "description": "The price sensor of the GE-Spot integration (day-ahead prices from Nord Pool, ENTSO-E and others, with your VAT, tariff and tax). Choose the sensor “Current Price” of your area, with the price per kWh in the currency (not in cents or øre). It gives today and tomorrow (tomorrow once it is complete): its price is the buy price, and its market price (raw value) is the sell price when the source has one. It has no forecast, so choose another price provider with a forecast too.",
+        "data": {
+          "gespot_buy_entity_id": "Price sensor (Current Price)"
+        },
+        "data_description": {
+          "gespot_buy_entity_id": "The GE-Spot sensor “Current Price” of your area (its entity ends with the area, for example _se3)."
+        }
+      },
+      "prices_octopus": {
+        "title": "Octopus Energy",
+        "description": "The rates of the Octopus Energy integration (the United Kingdom, for example Agile): the events “Current Day Rates” and “Next Day Rates” hold the half-hourly prices in pounds per kWh with VAT. Choose the two of your import meter. If you export to the grid, also choose the same two of the export meter; without an export tariff a sale is worth nothing. It gives today and tomorrow (tomorrow once Octopus has published it), so choose another price provider with a forecast too.",
+        "data": {
+          "octopus_buy_entity_id": "Buy price: current day rates",
+          "octopus_buy_next_day_entity_id": "Buy price: next day rates",
+          "octopus_sell_entity_id": "Sell price: export current day rates (optional)",
+          "octopus_sell_next_day_entity_id": "Sell price: export next day rates (optional)"
+        },
+        "data_description": {
+          "octopus_buy_entity_id": "The event “Current Day Rates” of the import meter of Octopus Energy.",
+          "octopus_buy_next_day_entity_id": "The event “Next Day Rates” of the import meter. It is empty until tomorrow's rates are published.",
+          "octopus_sell_entity_id": "The event “Current Day Rates” of the export meter (its name has export). Leave it empty if you do not export.",
+          "octopus_sell_next_day_entity_id": "The event “Next Day Rates” of the export meter."
+        }
+      },
+      "prices_nordpool": {
+        "title": "Nord Pool",
+        "description": "Sensors of the Nord Pool integration from HACS (not Home Assistant's own Nord Pool, it has no price rows). Choose a sensor with the price per kWh including the VAT and costs you set in it as the buy price, and a second sensor without VAT and costs (the exchange price) as the sell price: add the integration twice, the second with VAT off. The prices must be per kWh in the currency (not in cents or øre, not per MWh). It gives today and tomorrow, so choose another price provider with a forecast too.",
+        "data": {
+          "nordpool_buy_entity_id": "Buy price (with VAT)",
+          "nordpool_sell_entity_id": "Sell price (without VAT)"
+        },
+        "data_description": {
+          "nordpool_buy_entity_id": "The Nord Pool sensor with the price including VAT and your costs.",
+          "nordpool_sell_entity_id": "The Nord Pool sensor without VAT and costs (the exchange price). The sell price is this price less the sell fee."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
@@ -362,7 +412,7 @@
       },
       "price_provider": {
         "title": "Electricity prices",
-        "description": "Choose where the hourly prices come from. With several, the priority is Strømligning, then Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour, and the next fills the gaps. The spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) come last; they give wholesale prices, so the VAT and the surcharge are asked on the fee page.",
+        "description": "Choose where the hourly prices come from. With several, the priority is Strømligning, then Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour, and the next fills the gaps. The spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) come last; they give wholesale prices, so the VAT and the surcharge are asked on the fee page. EPEX Spot, GE-Spot, Octopus Energy and Nord Pool give your own published prices (today and tomorrow): they need a provider with a forecast next to them, and they come right after Energi Data Service, before Energy Price Forecast and the other estimates.",
         "data": {
           "price_country": "Country",
           "price_providers": "Price providers"
@@ -447,7 +497,7 @@
       "prefix_in_use": "This prefix is already used by another Cable Juice Planner instance.",
       "prefix_entities_exist": "Entities with this prefix already exist (e.g. from the PyScript version). Choose another prefix or remove the old entities.",
       "no_price_provider": "Choose at least one price provider.",
-      "price_provider_country": "A chosen price provider has no prices in this country. Strømligning only works in Denmark, and Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the Netherlands, Belgium, Austria, Germany and Luxembourg. Choose Energy Price Forecast (most of Europe) or change the country. The spot forecast integrations: Spot Forecast in Germany, Luxembourg, the Netherlands and Norway, Elprisprognos in Sweden and Wattcast in Finland, Estonia, Latvia and Lithuania.",
+      "price_provider_country": "A chosen price provider has no prices in this country. Strømligning only works in Denmark, and Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the Netherlands, Belgium, Austria, Germany and Luxembourg. Choose Energy Price Forecast (most of Europe) or change the country. The spot forecast integrations: Spot Forecast in Germany, Luxembourg, the Netherlands and Norway, Elprisprognos in Sweden and Wattcast in Finland, Estonia, Latvia and Lithuania. EPEX Spot and GE-Spot: most of Europe (GE-Spot also Australia and the USA), Octopus Energy: Great Britain, Nord Pool: Denmark, Norway, Sweden, Finland, the Baltics, France, the Netherlands, Belgium, Austria and Germany.",
       "price_provider_no_forecast": "None of the chosen price providers gives a price forecast, so planning could only use the prices of today and tomorrow. Choose another price provider as well.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
@@ -456,11 +506,15 @@
       "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well.",
-      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast and Elprisprognos, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
+      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
       "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
-      "price_sensor_forecast_only": "This sensor has price rows but none of them is published, so it is probably not the price sensor of the integration (or its attributes differ from what is expected). Choose the price sensor of the integration; for Wattcast, the price sensor and, as the forecast sensor, its forecast sensor (they must not be swapped). If the sensor has just started, try again once the prices are published.",
+      "price_sensor_no_published": "This sensor has price rows but none of them is published, so it is probably not the price sensor of the integration (or its attributes differ from what is expected). Choose the price sensor of the integration; for Wattcast, the price sensor and, as the forecast sensor, its forecast sensor (they must not be swapped). If the sensor has just started, try again once the prices are published.",
+      "price_sensor_no_rows": "This sensor has no price rows, so it is not the price sensor of the integration (Home Assistant's own Nord Pool, for example, has none). Choose the price sensor of the integration.",
+      "price_sensor_not_exchange": "This EPEX Spot sensor gets its prices from a source that does not give the exchange price (Tibber gives its own total price, Energyforecast.de a forecast). Choose a sensor of another source, for example Awattar, ENTSO-E or Energy-Charts.",
+      "price_sensor_same_sensor": "The sell price needs another sensor than the buy price. Choose the sensor with the market price (without VAT and costs), or for Octopus Energy the export rates.",
+      "price_sensor_wrong_role": "This sensor does not belong in this field: for EPEX Spot the buy price is the sensor “Total Price” and the sell price “Market Price”; for Octopus Energy the buy price is an import event of electricity and the sell price an export event, and the day must match (current or next day).",
       "price_currency_mismatch": "This sensor is in another currency than the other price sensors. Use price sensors in one currency (or deselect the other price provider)."
     },
     "abort": {
@@ -689,6 +743,56 @@
           "wattcast_forecast_entity_id": "The Wattcast sensor “Forecast”. It says which prices are published (known_until) and holds the forecast of the days after tomorrow."
         }
       },
+      "prices_epexspot": {
+        "title": "EPEX Spot",
+        "description": "Sensors of the EPEX Spot integration (day-ahead prices for Germany, Austria, the Netherlands, Belgium, France and more). Choose its **Total Price** sensor as the buy price (it has the surcharge and tax you set in EPEX Spot) and its **Market Price** sensor as the sell price (the exchange price). The prices must be in the currency per kWh (€/kWh). It only gives today and tomorrow, so choose another price provider with a forecast too. Not the sources Tibber and Energyforecast.de: their prices are not the exchange price.",
+        "data": {
+          "epexspot_buy_entity_id": "Buy price (Total Price)",
+          "epexspot_sell_entity_id": "Sell price (Market Price)"
+        },
+        "data_description": {
+          "epexspot_buy_entity_id": "The EPEX Spot sensor “Total Price”: the exchange price with the surcharge and the tax you set in EPEX Spot.",
+          "epexspot_sell_entity_id": "The EPEX Spot sensor “Market Price”: the exchange price without surcharge and tax. The sell price is this price less the sell fee."
+        }
+      },
+      "prices_gespot": {
+        "title": "GE-Spot",
+        "description": "The price sensor of the GE-Spot integration (day-ahead prices from Nord Pool, ENTSO-E and others, with your VAT, tariff and tax). Choose the sensor “Current Price” of your area, with the price per kWh in the currency (not in cents or øre). It gives today and tomorrow (tomorrow once it is complete): its price is the buy price, and its market price (raw value) is the sell price when the source has one. It has no forecast, so choose another price provider with a forecast too.",
+        "data": {
+          "gespot_buy_entity_id": "Price sensor (Current Price)"
+        },
+        "data_description": {
+          "gespot_buy_entity_id": "The GE-Spot sensor “Current Price” of your area (its entity ends with the area, for example _se3)."
+        }
+      },
+      "prices_octopus": {
+        "title": "Octopus Energy",
+        "description": "The rates of the Octopus Energy integration (the United Kingdom, for example Agile): the events “Current Day Rates” and “Next Day Rates” hold the half-hourly prices in pounds per kWh with VAT. Choose the two of your import meter. If you export to the grid, also choose the same two of the export meter; without an export tariff a sale is worth nothing. It gives today and tomorrow (tomorrow once Octopus has published it), so choose another price provider with a forecast too.",
+        "data": {
+          "octopus_buy_entity_id": "Buy price: current day rates",
+          "octopus_buy_next_day_entity_id": "Buy price: next day rates",
+          "octopus_sell_entity_id": "Sell price: export current day rates (optional)",
+          "octopus_sell_next_day_entity_id": "Sell price: export next day rates (optional)"
+        },
+        "data_description": {
+          "octopus_buy_entity_id": "The event “Current Day Rates” of the import meter of Octopus Energy.",
+          "octopus_buy_next_day_entity_id": "The event “Next Day Rates” of the import meter. It is empty until tomorrow's rates are published.",
+          "octopus_sell_entity_id": "The event “Current Day Rates” of the export meter (its name has export). Leave it empty if you do not export.",
+          "octopus_sell_next_day_entity_id": "The event “Next Day Rates” of the export meter."
+        }
+      },
+      "prices_nordpool": {
+        "title": "Nord Pool",
+        "description": "Sensors of the Nord Pool integration from HACS (not Home Assistant's own Nord Pool, it has no price rows). Choose a sensor with the price per kWh including the VAT and costs you set in it as the buy price, and a second sensor without VAT and costs (the exchange price) as the sell price: add the integration twice, the second with VAT off. The prices must be per kWh in the currency (not in cents or øre, not per MWh). It gives today and tomorrow, so choose another price provider with a forecast too.",
+        "data": {
+          "nordpool_buy_entity_id": "Buy price (with VAT)",
+          "nordpool_sell_entity_id": "Sell price (without VAT)"
+        },
+        "data_description": {
+          "nordpool_buy_entity_id": "The Nord Pool sensor with the price including VAT and your costs.",
+          "nordpool_sell_entity_id": "The Nord Pool sensor without VAT and costs (the exchange price). The sell price is this price less the sell fee."
+        }
+      },
       "prices_stromligning": {
         "title": "Strømligning",
         "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
@@ -844,7 +948,7 @@
       },
       "price_provider": {
         "title": "Electricity prices",
-        "description": "Choose where the hourly prices come from. With several, the priority is Strømligning, then Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour, and the next fills the gaps. The spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) come last; they give wholesale prices, so the VAT and the surcharge are asked on the fee page.",
+        "description": "Choose where the hourly prices come from. With several, the priority is Strømligning, then Energi Data Service, then Energy Price Forecast: the price of the first one that has one is used for every hour, and the next fills the gaps. The spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) come last; they give wholesale prices, so the VAT and the surcharge are asked on the fee page. EPEX Spot, GE-Spot, Octopus Energy and Nord Pool give your own published prices (today and tomorrow): they need a provider with a forecast next to them, and they come right after Energi Data Service, before Energy Price Forecast and the other estimates.",
         "data": {
           "price_country": "Country",
           "price_providers": "Price providers"
@@ -902,7 +1006,7 @@
       "prefix_in_use": "This prefix is already used by another Cable Juice Planner instance.",
       "prefix_entities_exist": "Entities with this prefix already exist (e.g. from the PyScript version). Choose another prefix or remove the old entities.",
       "no_price_provider": "Choose at least one price provider.",
-      "price_provider_country": "A chosen price provider has no prices in this country. Strømligning only works in Denmark, and Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the Netherlands, Belgium, Austria, Germany and Luxembourg. Choose Energy Price Forecast (most of Europe) or change the country. The spot forecast integrations: Spot Forecast in Germany, Luxembourg, the Netherlands and Norway, Elprisprognos in Sweden and Wattcast in Finland, Estonia, Latvia and Lithuania.",
+      "price_provider_country": "A chosen price provider has no prices in this country. Strømligning only works in Denmark, and Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the Netherlands, Belgium, Austria, Germany and Luxembourg. Choose Energy Price Forecast (most of Europe) or change the country. The spot forecast integrations: Spot Forecast in Germany, Luxembourg, the Netherlands and Norway, Elprisprognos in Sweden and Wattcast in Finland, Estonia, Latvia and Lithuania. EPEX Spot and GE-Spot: most of Europe (GE-Spot also Australia and the USA), Octopus Energy: Great Britain, Nord Pool: Denmark, Norway, Sweden, Finland, the Baltics, France, the Netherlands, Belgium, Austria and Germany.",
       "price_provider_no_forecast": "None of the chosen price providers gives a price forecast, so planning could only use the prices of today and tomorrow. Choose another price provider as well.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
@@ -911,11 +1015,15 @@
       "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well.",
-      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast and Elprisprognos, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
+      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
       "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
-      "price_sensor_forecast_only": "This sensor has price rows but none of them is published, so it is probably not the price sensor of the integration (or its attributes differ from what is expected). Choose the price sensor of the integration; for Wattcast, the price sensor and, as the forecast sensor, its forecast sensor (they must not be swapped). If the sensor has just started, try again once the prices are published.",
+      "price_sensor_no_published": "This sensor has price rows but none of them is published, so it is probably not the price sensor of the integration (or its attributes differ from what is expected). Choose the price sensor of the integration; for Wattcast, the price sensor and, as the forecast sensor, its forecast sensor (they must not be swapped). If the sensor has just started, try again once the prices are published.",
+      "price_sensor_no_rows": "This sensor has no price rows, so it is not the price sensor of the integration (Home Assistant's own Nord Pool, for example, has none). Choose the price sensor of the integration.",
+      "price_sensor_not_exchange": "This EPEX Spot sensor gets its prices from a source that does not give the exchange price (Tibber gives its own total price, Energyforecast.de a forecast). Choose a sensor of another source, for example Awattar, ENTSO-E or Energy-Charts.",
+      "price_sensor_same_sensor": "The sell price needs another sensor than the buy price. Choose the sensor with the market price (without VAT and costs), or for Octopus Energy the export rates.",
+      "price_sensor_wrong_role": "This sensor does not belong in this field: for EPEX Spot the buy price is the sensor “Total Price” and the sell price “Market Price”; for Octopus Energy the buy price is an import event of electricity and the sell price an export event, and the day must match (current or next day).",
       "price_currency_mismatch": "This sensor is in another currency than the other price sensors. Use price sensors in one currency (or deselect the other price provider)."
     },
     "abort": {
@@ -937,7 +1045,11 @@
         "energypriceforecast": "Energy Price Forecast (Europe)",
         "spotforecast": "Spot Forecast (DE, LU, NL, NO)",
         "elprognos": "Elprisprognos (Sweden)",
-        "wattcast": "Wattcast (Finland, Baltics)"
+        "wattcast": "Wattcast (Finland, Baltics)",
+        "epexspot": "EPEX Spot (Europe, no forecast)",
+        "gespot": "GE-Spot (Europe and more, no forecast)",
+        "octopus": "Octopus Energy (Great Britain, no forecast)",
+        "nordpool": "Nord Pool (HACS, no forecast)"
       }
     },
     "restore_backup": {
@@ -1531,7 +1643,7 @@
     },
     "price_sensor_unit": {
       "title": "Price sensors that Cable Juice Planner uses give the price in the wrong unit ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) uses price sensors that give the price in a subunit of the currency (for example ct/kWh or p/kWh) or, for Energi Data Service, Spot Forecast and Elprisprognos, per MWh or Wh:\n{entities}\n\nTheir prices are 100 or 1000 times off, so Cable Juice Planner does not use them: it plans on the stored prices instead. Choose a sensor with the price per kWh in the currency (for example EUR/kWh) in the price settings, or set the unit of the sensor back.\n\nThis repair disappears by itself when the sensors give the price per kWh again.\n\nWattcast’s price sensor must give ct/kWh; any other unit is wrong for it."
+      "description": "Cable Juice Planner ({prefix}) uses price sensors that give the price in a subunit of the currency (for example ct/kWh or p/kWh) or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh:\n{entities}\n\nTheir prices are 100 or 1000 times off, so Cable Juice Planner does not use them: it plans on the stored prices instead. Choose a sensor with the price per kWh in the currency (for example EUR/kWh) in the price settings, or set the unit of the sensor back.\n\nThis repair disappears by itself when the sensors give the price per kWh again.\n\nWattcast’s price sensor must give ct/kWh; any other unit is wrong for it."
     },
     "stromligning_entities": {
       "title": "Strømligning sensors that Cable Juice Planner needs are not available ({prefix})",

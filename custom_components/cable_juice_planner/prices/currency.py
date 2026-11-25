@@ -55,7 +55,31 @@ PRICE_SENSOR_KEYS = (
     "spotforecast_buy_entity_id",
     "elprognos_buy_entity_id",
     "wattcast_buy_entity_id",
+    "epexspot_buy_entity_id",
+    "epexspot_sell_entity_id",
+    "gespot_buy_entity_id",
+    "nordpool_buy_entity_id",
+    "nordpool_sell_entity_id",
 )
+
+# the event entities of Octopus Energy have no unit; its rates are in pounds (the integration divides the pence of the API by 100)
+OCTOPUS_KEYS = ("octopus_buy_entity_id", "octopus_buy_next_day_entity_id", "octopus_sell_entity_id", "octopus_sell_next_day_entity_id")
+# the attribute with the rows of each sensor of the providers of published prices: a loaded sensor without it is not the price sensor
+# (HA's own Nord Pool integration has the domain of the HACS one and no rows on its sensors)
+PRICE_ROW_ATTRIBUTES = {
+    "epexspot_buy_entity_id": "data",
+    "epexspot_sell_entity_id": "data",
+    "gespot_buy_entity_id": "today_interval_prices",
+    "octopus_buy_entity_id": "rates",
+    "octopus_buy_next_day_entity_id": "rates",
+    "octopus_sell_entity_id": "rates",
+    "octopus_sell_next_day_entity_id": "rates",
+    "nordpool_buy_entity_id": "raw_today",
+    "nordpool_sell_entity_id": "raw_today",
+}
+# EPEX Spot sources whose market price is not the exchange price (Tibber gives its own total, Energyforecast.de a forecast): the unique
+# id of the sensors is "epex_spot <source> <area> <sensor>"
+EPEX_NOT_EXCHANGE_SOURCES = ("epex_spot Tibber ", "epex_spot Energyforecast")
 
 
 def is_forecast_only(state: Any) -> bool:
@@ -74,6 +98,8 @@ def _unit_of(key: str, state: Any) -> Any:
     unit = getattr(state, "attributes", {}).get("unit_of_measurement") if state is not None else None
     if key == WATTCAST_BUY_KEY and isinstance(unit, str) and unit.strip().lower() == "ct/kwh":
         return "EUR/kWh"
+    if key in OCTOPUS_KEYS:
+        return "GBP/kWh"
     return unit
 
 
@@ -152,7 +178,60 @@ def spot_without_published(key: str, values: Mapping[str, Any], get_state: Calla
     return bool(rows) and not any(is_published for _start, _price, is_published in rows)
 
 
-def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], Any]) -> dict[str, str]:
+# the sell sensor is another sensor than the buy sensor (the sell price would be the buy price): the buy keys each sell key must differ from
+SAME_SENSOR_AS = {
+    "epexspot_sell_entity_id": ("epexspot_buy_entity_id",),
+    "nordpool_sell_entity_id": ("nordpool_buy_entity_id",),
+    "octopus_buy_next_day_entity_id": ("octopus_buy_entity_id",),
+    "octopus_sell_entity_id": ("octopus_buy_entity_id", "octopus_buy_next_day_entity_id"),
+    "octopus_sell_next_day_entity_id": ("octopus_buy_entity_id", "octopus_buy_next_day_entity_id", "octopus_sell_entity_id"),
+}
+
+
+def price_role_errors(values: Mapping[str, Any], unique_id_of: Callable[[str], str | None] | None = None) -> dict[str, str]:
+    """The sensors of a provider of published prices that are in the wrong field: the same sensor as buy and sell price (the sell price
+    would be the buy price), EPEX Spot's Market Price as the buy price or its Total Price as the sell price (the unique id of the sensors ends
+    with the sensor), an export event as the buy price, an import event as the sell price, a gas event, or the rates of the wrong day (the
+    unique id of the events is "octopus_energy_electricity_<meter>_<mpan>[_export]_current_day_rates" / "..._next_day_rates")."""
+    errors: dict[str, str] = {}
+    for key, buy_keys in SAME_SENSOR_AS.items():
+        entity_id = values.get(key)
+        if entity_id and entity_id in {values.get(other) for other in buy_keys}:
+            errors[key] = "price_sensor_same_sensor"
+    if unique_id_of is not None:
+        for key in PRICE_ROW_ATTRIBUTES:
+            entity_id = values.get(key)
+            unique_id = str(unique_id_of(entity_id) or "") if entity_id else ""
+            if key in errors or not unique_id:
+                continue
+            if key.startswith("epexspot_") and unique_id.startswith("epex_spot ") and not unique_id.endswith("Total Price" if key == "epexspot_buy_entity_id" else "MarketPrice"):
+                errors[key] = "price_sensor_wrong_role"
+            elif key.startswith("octopus_") and unique_id.startswith("octopus_energy_"):
+                export = key.startswith("octopus_sell")
+                day = "_next_day_rates" if key.endswith("next_day_entity_id") else "_current_day_rates"
+                if not (unique_id.startswith("octopus_energy_electricity_") and ("_export_" in unique_id) == export and unique_id.endswith(day)):
+                    errors[key] = "price_sensor_wrong_role"
+    return errors
+
+
+
+def price_row_errors(values: Mapping[str, Any], get_state: Callable[[str], Any], unique_id_of: Callable[[str], str | None] | None = None) -> dict[str, str]:
+    """A sensor of a provider of published prices that is loaded but has no list of rows (not the price sensor of the integration), and
+    an EPEX Spot sensor of a source whose market price is not the exchange price. A sensor that is not loaded is not judged."""
+    errors: dict[str, str] = {}
+    for key, attribute in PRICE_ROW_ATTRIBUTES.items():
+        entity_id = values.get(key)
+        state = get_state(entity_id) if entity_id else None
+        if state is None or getattr(state, "state", None) in ("unavailable", "unknown"):
+            continue
+        if not isinstance(getattr(state, "attributes", {}).get(attribute), list):
+            errors[key] = "price_sensor_no_rows"
+        elif key.startswith("epexspot_") and unique_id_of is not None and str(unique_id_of(entity_id) or "").startswith(EPEX_NOT_EXCHANGE_SOURCES):
+            errors[key] = "price_sensor_not_exchange"
+    return errors
+
+
+def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], Any], unique_id_of: Callable[[str], str | None] | None = None) -> dict[str, str]:
     """Errors of the price sensors a price page has just been given (field -> translation key), for a sensor that is loaded.
 
     A sensor whose unit is a subunit of the currency (ct/kWh, p/kWh) is refused (so is a price per MWh of Energi Data Service): its prices are 100 or 1000 times too large. The buy
@@ -185,7 +264,7 @@ def price_sensor_errors(values: Mapping[str, Any], get_state: Callable[[str], An
         elif loaded and spot_without_published(key, values, get_state):
             # a spot forecast sensor whose rows are none of them published: not the sensor of the integration (or a shape it does not read)
             errors[key] = "price_sensor_no_published"
-    return errors
+    return {**price_role_errors(values, unique_id_of), **price_row_errors(values, get_state, unique_id_of), **errors}
 
 
 def price_currency_errors(options: Mapping[str, Any], page_keys: Any, get_state: Callable[[str], Any]) -> dict[str, str]:
