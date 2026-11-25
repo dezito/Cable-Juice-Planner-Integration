@@ -622,7 +622,7 @@ class Loss:
             "segments": [segment_attributes(s) for s in display_segments],
             "rejected_segments": [segment_attributes(s) for s in rejected_segments],
             "curve": curve,
-            # kWh per % per month and group: falling over the years = less battery capacity, rising = more charging loss
+            # kWh per % per month and group: falling over the years = less battery capacity (or less loss), rising = more loss
             "capacity_months": [
                 {"month": month, "group": group, "kwh_per_percent": round(v["kwh"] / v["soc"], 4), "segments": len(v["starts"])}
                 for month, groups in sorted(self.charging_loss_db.get("months", {}).items())
