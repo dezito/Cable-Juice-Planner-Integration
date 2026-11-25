@@ -220,17 +220,17 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nForecast.Solar og Helios Forecast læses fra deres solprognose til Energi-dashboardet; de timer, de ikke dækker, planlægges ud fra vejrudsigten og den gemte solhistorik; en time uden nogen af dem regnes som ingen sol.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
-          "forecast_entity_id": "Solprognose (Solcast)",
+          "forecast_entity_id": "Solprognose",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
           "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
           "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
-          "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar eller Helios Forecast. Solcast: f.eks. sensor.solcast_pv_forecast_forecast_today, de kommende dage findes automatisk. Forecast.Solar: en vilkårlig af dens sensorer; tagfladerne i samme solkilde i Energi-dashboardet lægges sammen. Helios Forecast: f.eks. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
           "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
           "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"
@@ -648,17 +648,17 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nForecast.Solar og Helios Forecast læses fra deres solprognose til Energi-dashboardet; de timer, de ikke dækker, planlægges ud fra vejrudsigten og den gemte solhistorik; en time uden nogen af dem regnes som ingen sol.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
-          "forecast_entity_id": "Solprognose (Solcast)",
+          "forecast_entity_id": "Solprognose",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
           "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
           "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
-          "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar eller Helios Forecast. Solcast: f.eks. sensor.solcast_pv_forecast_forecast_today, de kommende dage findes automatisk. Forecast.Solar: en vilkårlig af dens sensorer; tagfladerne i samme solkilde i Energi-dashboardet lægges sammen. Helios Forecast: f.eks. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
           "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
           "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"

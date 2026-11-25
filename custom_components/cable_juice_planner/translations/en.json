@@ -220,17 +220,17 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast (Solcast)",
+          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Fixed solar sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solar forecast (watts) (Supported integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar goes to EV charging. “Fixed solar sell price” must be −1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed sell price for solar, used to calculate solar surplus. Set to -1.0 to use the hourly spot price."
@@ -648,17 +648,17 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast (Solcast)",
+          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Fixed solar sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solar forecast (watts) (Supported integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar goes to EV charging. “Fixed solar sell price” must be −1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed sell price for solar, used to calculate solar surplus. Set to -1.0 to use the hourly spot price."

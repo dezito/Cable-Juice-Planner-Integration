@@ -44,6 +44,7 @@ from homeassistant.helpers.storage import Store
 
 from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, dashboard_icon, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
 from ..utils.formatting import load_texts
+from ..utils.solar_forecast import KEY_SEMANTICS
 from ..prices import price_dashboard_entities
 from .dashboard_cards import async_update_card_notification, async_watch_card_resources
 
@@ -172,8 +173,11 @@ def _car_base(config: dict[str, Any]) -> str:
     return ""
 
 
-def external_entities(config: dict[str, Any]) -> dict[str, str]:
-    """Template entity id -> configured entity id ("" = not configured)."""
+def external_entities(config: dict[str, Any], forecast_platform: str | None = None) -> dict[str, str]:
+    """Template entity id -> configured entity id ("" = not configured).
+
+    forecast_platform: the integration of the solar forecast sensor (entity registry), None when unknown.
+    """
     prices = config["prices"]["entity_ids"]
     charger = config["charger"]["entity_ids"]
     ev = config["ev_car"]["entity_ids"]
@@ -194,8 +198,10 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
     base = _car_base(config)
     for entity_id in _CAR_EXTRAS:
         mapping[entity_id] = entity_id.replace(_CAR, base, 1) if base else ""
-    # Solcast: forecast_today plus the per-day sensors next to it
-    forecast = config["solar"]["entity_ids"]["forecast_entity_id"]
+    # Solcast: forecast_today plus the per-day sensors next to it. The price charts read their detailedHourly, which
+    # Forecast.Solar and Helios Forecast don't have (and Forecast.Solar's energy_production_today would match the
+    # _today rule): with those the Solcast entities stay unmapped, so the charts show no solar forecast
+    forecast = config["solar"]["entity_ids"]["forecast_entity_id"] if forecast_platform not in KEY_SEMANTICS else ""
     solcast_base = forecast[: -len("today")] if forecast.endswith("_today") else ""
     mapping["sensor.solcast_pv_forecast_forecast_today"] = forecast
     for day in _SOLCAST_DAYS:
@@ -351,15 +357,17 @@ def _replace(text: str, replace: dict[str, str]) -> str:
 
 
 def render_dashboard(
-    config: dict[str, Any], prefix: str, entry_id: str, existing: set[str], currency: str | None = None, distance: str | None = None
+    config: dict[str, Any], prefix: str, entry_id: str, existing: set[str], currency: str | None = None, distance: str | None = None,
+    forecast_platform: str | None = None,
 ) -> str:
     """Build the dashboard YAML for one instance (blocking file I/O).
 
     prefix: the user's prefix (entity ids cjp_<prefix>_*)
     existing: entity ids that exist in Home Assistant (incl. the own entities)
+    forecast_platform: the integration of the solar forecast sensor (see external_entities)
     """
     own = object_prefix(prefix)
-    mapping = external_entities(config)
+    mapping = external_entities(config, forecast_platform)
     text = template_text(config).replace("__ENTRY_ID__", entry_id)
     replace = {source: target for source, target in mapping.items() if target and source != target}
     text = _replace(text, replace)
@@ -423,9 +431,16 @@ async def async_setup_dashboard(
     path = dashboard_file(hass, entry.entry_id)
     existing = set(hass.states.async_entity_ids())
     existing.update(entity.entity_id for entity in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id))
+    forecast_entity = config["solar"]["entity_ids"]["forecast_entity_id"]
+    forecast_entry = er.async_get(hass).async_get(forecast_entity) if forecast_entity else None
+    forecast_platform = forecast_entry.platform if forecast_entry else None
 
     def _render() -> bool:
-        return _write_if_changed(path, render_dashboard(config, prefix, entry.entry_id, existing, hass.config.currency, str(hass.config.units.length_unit))
+        return _write_if_changed(
+            path,
+            render_dashboard(
+                config, prefix, entry.entry_id, existing, hass.config.currency, str(hass.config.units.length_unit), forecast_platform
+            ),
         )
 
     try:

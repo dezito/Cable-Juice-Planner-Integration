@@ -358,6 +358,42 @@ async def test_a_restored_backup_wins_over_the_energy_dashboard(hass: HomeAssist
     assert result["options"]["powerwall_watt_flow_entity_id"] == BACKUP_BATTERY
 
 
+def test_the_solar_forecast_picker_offers_the_three_integrations() -> None:
+    """One filter per integration (the picker offers an entity that matches any of them), still a single sensor picker."""
+    from custom_components.cable_juice_planner.flow.schema import SELECTORS
+
+    config = SELECTORS["forecast_entity_id"].config
+    assert [item["integration"] for item in config["filter"]] == ["solcast_solar", "forecast_solar", "helios_forecast"]
+    assert all(item["domain"] == ["sensor"] for item in config["filter"]) and not config.get("multiple")
+    # the selector does not check the value against the filter: an old Solcast option (and a backup or a PyScript
+    # import with one) is still valid, as are the new integrations' sensors
+    for value in ("sensor.solcast_pv_forecast_forecast_today", "sensor.helios_forecast_power_now", "sensor.energy_production_today"):
+        assert SELECTORS["forecast_entity_id"](value) == value
+    # the other pickers are built as before
+    assert SELECTORS["energidataservice_buy_entity_id"].config["filter"] == [{"domain": ["sensor"], "integration": "energidataservice"}]
+    assert SELECTORS["production_entity_id"].config["filter"][0].get("integration") is None
+
+
+@pytest.mark.parametrize("forecast", ["sensor.helios_forecast_power_now", "sensor.energy_production_today"])
+async def test_a_forecast_solar_or_helios_sensor_is_accepted(hass: HomeAssistant, detection, forecast: str) -> None:
+    """The solar page takes these sensors and stores the option as it is; a forecast still needs the production sensor."""
+    await _energy_dashboard(hass)
+    result = await _to_solar(hass, await _to_powerwall(hass))
+    assert result["step_id"] == "solar"
+    values = {**form_defaults(result), "forecast_entity_id": forecast}
+    values.pop("production_entity_id", None)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], values)
+    assert result["step_id"] == "solar" and result["errors"] == {"production_entity_id": "production_required"}
+    hass.states.async_set("sensor.solar_power", "0", {"unit_of_measurement": "W", "device_class": "power"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {**values, "production_entity_id": "sensor.solar_power"})
+    assert result["step_id"] != "solar" and not result.get("errors")
+    result = await _submit_defaults_until(hass, result, "advanced")
+    result = await _configure(hass, result, "advanced", {**form_defaults(result), "dashboard": False})
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"]["forecast_entity_id"] == forecast
+
+
 async def test_a_sensor_of_another_car_is_still_suggested(hass: HomeAssistant, detection) -> None:
     """The cars of one house share its solar and battery sensors: another car's entry does not hide the suggestion."""
     await _energy_dashboard(hass)

@@ -51,6 +51,52 @@ def _cards(node):
             yield from _cards(item)
 
 
+@pytest.mark.parametrize(
+    ("platform", "forecast"),
+    [("forecast_solar", "sensor.energy_production_today"), ("helios_forecast", "sensor.helios_forecast_power_now")],
+)
+def test_the_solcast_entities_are_not_mapped_to_another_forecast_integration(platform: str, forecast: str) -> None:
+    """The price charts read Solcast's detailedHourly. Forecast.Solar's energy_production_today would match the _today
+    rule and Helios' power_now has no such attribute: with those the Solcast entities stay unmapped (no solar forecast in
+    the charts, as without a forecast)."""
+    from custom_components.cable_juice_planner.management.dashboard_build import external_entities
+
+    options = {**OPTIONS, "language": "da", "production_entity_id": "sensor.solar"}
+    config = const.build_config({**options, "forecast_entity_id": forecast})
+    solcast = {key: value for key, value in external_entities(config, platform).items() if key.startswith("sensor.solcast_pv_forecast_forecast_")}
+    assert len(solcast) == 7 and set(solcast.values()) == {""}
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price", forecast, "sensor.energy_production_tomorrow"}
+    content = render_dashboard(config, "tesla", "entry1", existing, forecast_platform=platform)
+    assert forecast not in content and "sensor.energy_production_tomorrow" not in content
+    assert content == render_dashboard(const.build_config({**options, "forecast_entity_id": ""}), "tesla", "entry1", existing)
+    # a Solcast sensor, and a sensor whose integration is unknown, are mapped as before
+    solcast_config = const.build_config({**options, "forecast_entity_id": "sensor.my_solcast_today"})
+    mapping = external_entities(solcast_config, "solcast_solar")
+    assert mapping["sensor.solcast_pv_forecast_forecast_today"] == "sensor.my_solcast_today"
+    assert mapping["sensor.solcast_pv_forecast_forecast_day_3"] == "sensor.my_solcast_day_3"
+    assert external_entities(solcast_config) == mapping
+    assert "sensor.my_solcast_day_3" in render_dashboard(solcast_config, "tesla", "entry1", existing, forecast_platform="solcast_solar")
+
+
+async def test_the_dashboard_setup_reads_the_integration_of_the_forecast_sensor(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
+    """async_setup_dashboard looks the forecast sensor up in the entity registry (on the event loop) and hands its
+    platform to the render in the executor."""
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.cable_juice_planner.management import dashboard_build
+
+    er.async_get(hass).async_get_or_create("sensor", "forecast_solar", "plane_today", suggested_object_id="energy_production_today")
+    seen: list[str | None] = []
+    monkeypatch.setattr(dashboard_build, "render_dashboard", lambda *args, **kwargs: seen.append(args[6] if len(args) > 6 else kwargs.get("forecast_platform")) or "")
+    monkeypatch.setattr(dashboard_build, "_write_if_changed", lambda path, content: False)
+    hass.data[LOVELACE_DATA] = SimpleNamespace(dashboards={})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "forecast_entity_id": "sensor.energy_production_today"})
+    entry.add_to_hass(hass)
+    config = const.build_config(dict(entry.options))
+    await dashboard_build.async_setup_dashboard(hass, entry, config, "test")
+    assert seen == ["forecast_solar"]
+
+
 def test_dashboard_for_a_car_without_solar() -> None:
     config = const.build_config({**OPTIONS, "language": "da"})
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}

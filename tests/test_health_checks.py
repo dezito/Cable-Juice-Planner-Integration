@@ -222,6 +222,34 @@ async def test_a_disabled_or_missing_entity_is_a_repair_until_it_is_back(hass, e
     assert issue(hass, entry, ISSUE_MISSING) is None
 
 
+@pytest.mark.parametrize(
+    ("platform", "entity_id", "unit"),
+    [("forecast_solar", "sensor.energy_production_today", "kWh"), ("helios_forecast", "sensor.helios_forecast_power_now", "W")],
+)
+async def test_a_forecast_solar_or_helios_sensor_gets_only_the_missing_check(hass, entry, automations, watchers, platform, entity_id, unit) -> None:
+    """The Solcast repair leaves these sensors to the health checks (Forecast.Solar's energy_production_today looks
+    like a Solcast day sensor by its name), and their unit (W or kWh) is not judged: the forecast comes from the energy
+    platform. Unavailable is no repair; a sensor that is gone is (entities_missing)."""
+    from custom_components.cable_juice_planner.management.dependency_checks import DependencyWatcher
+    from custom_components.cable_juice_planner.utils.solcast import solcast_endings_for_days
+
+    registry = er.async_get(hass)
+    assert registry.async_get_or_create("sensor", platform, f"x_{entity_id}", suggested_object_id=entity_id.split(".")[1]).entity_id == entity_id
+    hass.states.async_set(entity_id, "1200", {"unit_of_measurement": unit})
+    dependency = DependencyWatcher(hass, entry, "bm", [], entity_id, solcast_endings_for_days(7))
+    assert dependency.watched_entities == frozenset()
+    await start(hass, make(hass, entry, automations, watchers, entities=[entity_id], watched=dependency.watched_entities))
+    for name in (ISSUE_MISSING, ISSUE_UNITS, ISSUE_POWER_UNIT):
+        assert issue(hass, entry, name) is None, name
+    hass.states.async_set(entity_id, "unavailable")
+    await start(hass, make(hass, entry, automations, watchers, entities=[entity_id], watched=dependency.watched_entities))
+    assert issue(hass, entry, ISSUE_MISSING) is None
+    registry.async_remove(entity_id)
+    hass.states.async_remove(entity_id)
+    await start(hass, make(hass, entry, automations, watchers, entities=[entity_id], watched=dependency.watched_entities))
+    assert issue(hass, entry, ISSUE_MISSING).translation_placeholders["missing"] == f"- {entity_id}"
+
+
 async def test_the_entities_of_a_registry_change_are_checked_a_minute_later(hass, entry, automations, watchers) -> None:
     watcher = await start(hass, make(hass, entry, automations, watchers, entities=["sensor.later"]))
     assert issue(hass, entry, ISSUE_MISSING)

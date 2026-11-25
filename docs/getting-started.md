@@ -18,7 +18,10 @@ Optional:
 
 - an **EV integration** with battery level, range and odometer (and preferably charge port, charge limit
   and location). Without one, you enter the battery level yourself when you plug in (virtual EV).
-- **solar production** (W), [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and a weather
+- **solar production** (W), a solar forecast
+  ([Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
+  [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/), built into Home Assistant, or
+  [Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast)) and a weather
   integration with `weather.get_forecasts`, e.g.
   [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
   [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
@@ -46,7 +49,8 @@ Not in the HACS search? Add it as a custom repository first: **HACS** → ⋮ �
 
 The setup is split into pages. Every field has a help text – here are the ones that matter most. The entity
 selectors only show relevant entities: battery level only `battery` sensors, power only `power` sensors, kWh only
-`energy` sensors, prices only entities from the price integrations and the forecast only Solcast.
+`energy` sensors, prices only entities from the price integrations and the solar forecast only Solcast,
+Forecast.Solar and Helios Forecast.
 
 ### Car
 
@@ -191,6 +195,38 @@ Solcast switches the forecast sensors of day 3 and on off by default: enable `�
 (**Settings → Devices & services → Entities**, *Show disabled entities*), and keep *Hourly detail* on under *Forecast attributes breakdown* in the
 Solcast options. A **repair** lists the sensors that are disabled, named differently or without hourly detail;
 the days without Solcast use the weather forecast and the stored solar history.
+
+#### Forecast.Solar or Helios Forecast
+
+Instead of Solcast the **Solar forecast** field also takes a sensor of
+[Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+[Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast). CJP reads the hourly forecast these integrations
+give the Energy dashboard of Home Assistant, not the state of the sensor, so any sensor of the integration works. The
+sensor must still exist and be available: like every configured sensor, a missing or unavailable one makes CJP wait
+for it at startup and notify you.
+
+- **Helios Forecast:** e.g. `sensor.helios_forecast_power_now`. Helios learns your roof from your production, so give
+  it your solar production sensor in its own setup.
+- **Forecast.Solar:** any sensor of it, e.g. `sensor.energy_production_today`. Forecast.Solar has one entry per roof
+  plane. If you added the planes as the forecast of a solar source in the Energy dashboard
+  (**Settings → Dashboards → Energy**, the solar panels), every plane of that source is added up; otherwise only the
+  plane of the selected sensor is used. An hour that one of the planes does not cover gets no forecast at all (never
+  half of one), and while a plane is not loaded the whole forecast waits for it. A plane you disabled is left out.
+- The free plan of Forecast.Solar covers today and tomorrow (about 2 days). CJP plans the hours a forecast does not
+  cover (and every hour while the integration has no forecast) from the weather forecast and the stored solar history,
+  the same as without a forecast integration. An hour with neither counts as no sun, so without a weather integration
+  the days after the forecast have no solar surplus in the plan.
+- Only whole hours are used: the hour of the first sunrise in the forecast and an hour at the end of the forecast that
+  is only covered in part are planned the same way.
+- Helios Forecast sums its own forecast points per hour. If it had to drop some of them, the hour looks complete to
+  CJP and is too low.
+- The forecast counts 75 % and the stored solar history 25 %, as with Solcast (see
+  [How it works](how-it-works.md#solar-surplus)). Forecast.Solar does not learn from your production; Helios does, so
+  with Helios your own production counts in both parts.
+- CJP does not check how old the forecast is: if the integration stops updating but still answers, its last forecast
+  is used for the hours ahead it covers (as with Solcast); values more than a day old are ignored.
+- The Solcast repair does not apply to these integrations, and the solar forecast in the price charts of the
+  dashboard is drawn only for Solcast.
 
 ### Notifications and advanced
 

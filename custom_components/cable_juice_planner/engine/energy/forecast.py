@@ -128,18 +128,26 @@ class EnergyForecast:
         return new_database
 
     def get_solar_kwh_forecast(self) -> dict:
-        """(kWh available after the house consumption, sell price) per hour from Solcast."""
+        """(kWh available after the house consumption, sell price) per hour from the solar forecast integration.
+
+        The rows are Solcast's detailedHourly of its day sensors, or the hourly rows of Forecast.Solar or Helios Forecast
+        in the same shape (utils/solar_forecast.py), which the coordinator puts under the configured sensor: period_start
+        in the local time zone and pv_estimate in kW over the hour (the kWh of the hour). An hour without a row has no
+        forecast (never 0).
+        """
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"]
         if not forecast_entity:
             return {}
         forecast: dict = {}
         hour_prices = self.get_sell_prices()
-        if self.get_integration(forecast_entity) != "solcast_solar":
-            return forecast
-        base_entity_id = strip_forecast_suffix(forecast_entity, SOLCAST_ENDINGS)
         solcast = self._snap.solcast if self._snap else {}
-        for ending in SOLCAST_ENDINGS:
-            entity_id = f"{base_entity_id}_{ending}"
+        if self.get_integration(forecast_entity) == "solcast_solar":
+            base_entity_id = strip_forecast_suffix(forecast_entity, SOLCAST_ENDINGS)
+            entity_ids = [f"{base_entity_id}_{ending}" for ending in SOLCAST_ENDINGS]
+        else:
+            # Forecast.Solar / Helios Forecast: the coordinator gives rows only for these, under the selected sensor
+            entity_ids = [forecast_entity]
+        for entity_id in entity_ids:
             try:
                 for data in solcast.get(entity_id) or {}:
                     date = data["period_start"].replace(tzinfo=None)
@@ -159,6 +167,10 @@ class EnergyForecast:
 
         With powerwall_charging_timestamps=True: the hours where the home battery is
         expected to charge from solar instead.
+
+        An hour with neither weather nor a forecast row (e.g. Forecast.Solar has no row for the sunrise hour, and none
+        after its last day) adds nothing: no known sun. Nothing reads the hours by position: the planner reads them by
+        time (solar_prediction_timestamps) and a day is the sum of its hours, so a missing hour moves no other hour.
         """
         config = self.config
         stop_prediction_before = 3
@@ -231,7 +243,8 @@ class EnergyForecast:
                 power_cost = get_database_kwh(cloudiness, loop_datetime)
                 total_db.append(round(power_cost[0], 3))
                 total_db_sell.append(round(power_cost[1], 3))
-                # no solar history for the hour and weather: Solcast alone instead of averaging with an unknown 0
+                # no solar history for the hour and weather: the forecast integration alone instead of averaging with an
+                # unknown 0
                 if power_cost[2] or loop_datetime not in solar_forecast_from_integration:
                     database_used = True
                     power_factor = 0.5 if loop_datetime in solar_forecast_from_integration else 1.0

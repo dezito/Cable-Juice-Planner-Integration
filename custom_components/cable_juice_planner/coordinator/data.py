@@ -12,6 +12,7 @@ from typing import Any
 import astral
 from homeassistant.core import Event, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
@@ -20,6 +21,7 @@ from ..engine import Snapshot
 from ..engine.energy.forecast import SOLCAST_ENDINGS, strip_forecast_suffix
 from ..engine.history.history import merge_rows
 from ..prices import PRICE_SNAPSHOT_SECONDS
+from ..utils.solar_forecast import KEY_SEMANTICS, async_solar_forecast_rows
 from .constants import FORECAST_TIMEOUT, STATISTICS_REFRESH_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,7 +73,9 @@ class CoordinatorData:
             self._price_snapshot_time = time.monotonic()
         if include_forecast and self.solar_configured:
             snapshot.forecast_dict = await self._async_weather_forecasts()
-            snapshot.solcast = self._solcast_snapshot()
+            # the hourly solar forecast rows: Solcast's own detailedHourly, else the energy platform of Forecast.Solar
+            # or Helios Forecast (utils/solar_forecast.py), normalised to the same rows
+            snapshot.solcast = self._solcast_snapshot() or await self._async_energy_forecast_snapshot()
         return snapshot
 
     def _price_snapshot(self) -> dict:
@@ -88,6 +92,28 @@ class CoordinatorData:
             if (state := self.hass.states.get(f"{base}_{ending}")) is not None:
                 result[state.entity_id] = list(state.attributes.get("detailedHourly") or [])
         return result
+
+    async def _async_energy_forecast_snapshot(self) -> dict[str, list]:
+        """The rows of a Forecast.Solar or Helios Forecast sensor, under the configured sensor (the debug export and its
+        replay keep them there). No rows (the forecast is unavailable, see utils/solar_forecast.py) is the same as no
+        forecast: the weather forecast and the stored solar history are used. A changed reason is logged once, not at
+        every plan.
+
+        The integration is the sensor's platform in the entity registry (what utils/solar_forecast.py reads), not
+        self._platforms, which takes the domain of the device's first identifier."""
+        forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"]
+        registered = er.async_get(self.hass).async_get(forecast_entity) if forecast_entity else None
+        platform = registered.platform if registered else None
+        if platform not in KEY_SEMANTICS:
+            return {}
+        rows, problem = await async_solar_forecast_rows(self.hass, forecast_entity, dt_util.get_default_time_zone())
+        if problem != self._solar_forecast_problem:
+            if problem:
+                _LOGGER.warning("No solar forecast from %s (%s): the weather forecast and the stored solar history are used instead", platform, problem)
+            elif self._solar_forecast_problem:
+                _LOGGER.info("The solar forecast from %s is available again", platform)
+            self._solar_forecast_problem = problem
+        return {forecast_entity: rows} if rows else {}
 
     async def _async_weather_forecasts(self) -> dict:
         result: dict[str, Any] = {"hourly": {}, "daily": {}}

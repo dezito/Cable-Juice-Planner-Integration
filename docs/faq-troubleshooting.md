@@ -63,6 +63,25 @@ If the price integration is down completely, CJP keeps the last prices for 2 hou
 days with the database. The database fills up over time, so right after the first installation it has
 little to go on – unless it was imported from the PyScript version or a backup.
 
+## The solar forecast from Forecast.Solar or Helios Forecast is not used
+
+CJP reads the forecast that the integration gives the Energy dashboard. When it gets none, the log has a warning
+*No solar forecast from forecast_solar (…)* (or `helios_forecast`) with the reason, once until the reason changes,
+and the solar surplus is planned from the weather forecast and the stored solar history only (an hour with neither
+counts as no sun). Usual reasons:
+
+- the integration's config entry is not loaded (still starting, or its setup failed): check it under
+  **Settings → Devices & services**
+- Forecast.Solar with several roof planes: one plane listed with the selected one in the Energy dashboard's solar
+  source is not loaded. CJP never uses half a forecast, so it waits for every plane
+- the forecast covers no whole hour yet
+
+Hours after the end of the forecast (the free plan of Forecast.Solar covers today and tomorrow) are always planned
+from the weather forecast and the history. CJP does not check how old the forecast is: if the integration stops
+updating but still answers, its last forecast is used for the hours ahead it covers (as with Solcast), and values more
+than a day old are ignored. Check the integration itself when the forecast looks stale. See
+[Forecast.Solar or Helios Forecast](getting-started.md#forecastsolar-or-helios-forecast).
+
 ## The plan isn't recalculated
 
 It is only recalculated when something it depends on has changed. Press **Force planning** (or call

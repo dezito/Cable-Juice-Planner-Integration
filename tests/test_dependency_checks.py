@@ -161,6 +161,33 @@ async def test_a_forecast_sensor_of_another_integration_is_not_checked(hass: Hom
     assert solcast_problems(hass, "sensor.not_registered_today", solcast_endings_for_days(7)) is None
 
 
+@pytest.mark.parametrize(
+    ("platform", "entity_id"),
+    [("forecast_solar", "sensor.energy_production_today"), ("helios_forecast", "sensor.helios_forecast_power_now")],
+)
+async def test_no_solcast_repair_for_forecast_solar_or_helios(hass: HomeAssistant, platform: str, entity_id: str) -> None:
+    """Also when Solcast is installed with disabled sensors: the selected sensor decides (it is read through the energy
+    platform, see utils/solar_forecast.py), and the health checks are not told to leave it out. The same Solcast sensors
+    still give the repair, and are left out of the health checks, for a Solcast sensor."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    solcast(hass, disabled={"day_3"})
+    register(hass, platform, f"x_{entity_id}", entity_id)
+    hass.states.async_set(entity_id, "1.0")
+    watched = watcher(hass, entry, [], entity_id, days=3)
+    try:
+        assert solcast_problems(hass, entity_id, solcast_endings_for_days(3)) is None
+        # Forecast.Solar's energy_production_today looks like a Solcast day sensor by its name
+        assert watched.watched_entities == frozenset()
+        assert issue(hass, entry, ISSUE_SOLCAST) is None
+    finally:
+        watched.stop()
+    solcast_watcher = watcher(hass, entry, [], f"{BASE}_today", days=3)
+    solcast_watcher.stop()
+    assert issue(hass, entry, ISSUE_SOLCAST)
+    assert solcast_watcher.watched_entities == frozenset({f"{BASE}_today", f"{BASE}_tomorrow", f"{BASE}_day_3"})
+
+
 async def test_the_repair_follows_the_sensors(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(domain=DOMAIN)
     entry.add_to_hass(hass)

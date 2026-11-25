@@ -220,17 +220,17 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
@@ -648,17 +648,17 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."

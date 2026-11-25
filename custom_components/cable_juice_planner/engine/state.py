@@ -23,6 +23,8 @@ class Snapshot:
     statistics: dict[str, list] = field(default_factory=dict)
     price_data: dict | None = None
     forecast_dict: dict | None = None
+    # normalised hourly solar forecast rows by entity id: Solcast's detailedHourly, or the rows of Forecast.Solar or Helios
+    # Forecast in the same shape (utils/solar_forecast.py); the name stays for the debug exports that hold it
     solcast: dict[str, list] = field(default_factory=dict)
     astral: Any = None  # astral.Observer
     site: dict | None = None  # load balancing, see engine/site

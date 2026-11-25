@@ -383,6 +383,14 @@ place and extend them to new code:
   stays 1 % under the charge limit, a value the user enters is simulated from,
   and plug-in sends a "does it match the car?" notification. Planning/control
   use `battery_level()`; history and measurements use `battery_level(real=True)`.
+- Solar forecast sources: `forecast_entity_id` accepts Solcast, Forecast.Solar or Helios Forecast. Solcast keeps
+  `detailedHourly`; the other two are read through the HA energy platform by `utils/solar_forecast.py`, which must stay
+  byte-identical with BattMind together with `tests/test_solar_forecast.py`.
+  - They are gated on the entity-registry platform (not `_platforms`), and their rows are stored under the configured
+    sensor in `snapshot.solcast`. No rows means no forecast, and a missing hour is never 0.
+  - CJP's solar prediction is keyed by time, not by position (`solar_prediction_timestamps`).
+  - The Solcast repair and the dashboard mapping stay Solcast-only. `DependencyWatcher.watched_entities` covers the
+    Solcast sensors only while `solcast_problems` judges the selection.
 
 ### Sell price (`calculate_sell_price()` in `prices/base.py`)
 
