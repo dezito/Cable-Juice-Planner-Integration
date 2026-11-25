@@ -660,8 +660,9 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   than 30 minutes later is a re-plug and costs the day, and a weekday whose entered departure is not before its entered
   homecoming (a night shift) keeps its entered times. The plan uses the earlier departure and the later homecoming of the
   entered and the learned, never the other way, and always through `effective_workday_times(day, date)`:
-  the planner and the consumption forecast do; preheating, the economy analysis of past connections
-  (`_next_departure`) and the What-if replay deliberately keep the entered times (a guard test in
+  the planner, the consumption forecast and preheating do (decided with the user: preheating follows the departure the
+  plan uses, also when the early learned departure preheats on days the car leaves later); the economy analysis of past
+  connections (`_next_departure`) and the What-if replay deliberately keep the entered times (a guard test in
   `tests/test_workplan_learning.py` lists the allowed direct readers). The entered times are used on a day with a trip,
   and for today's departure while the newest connection window is still open (positive proof that the car is plugged in
   at home: never `ready_to_charge()` or a missing status, which would drop today's work day). The trip settings are

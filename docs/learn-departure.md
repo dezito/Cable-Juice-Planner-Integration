@@ -51,10 +51,13 @@ car is unplugged from and plugged in to the charger at home.
     connection means plugged in at home, and a charger status that drops out is never taken as the car having left. The
     homecoming of today is still the later of the entered and the learned,
   - on a weekday with a night shift (the departure entered later than the homecoming).
-- It is used by the work plan and the plan's consumption forecast. **Preheating keeps the entered departure**: it is a
-  comfort setting, and preheating for a departure that is early on a quarter of the days would run on all the others. The
-  *Ready at departure* analysis measures at the departure the plan uses. The *What-if* replay and the analysis of the past
-  connections keep using the entered times.
+- It is used by the work plan, the plan's consumption forecast and **preheating**: the car is preheated before the
+  departure the plan uses. The learned departure is an early one (the 25th percentile), so on the days the car leaves
+  later it is preheated earlier than needed. A preheating that was started for the learned departure is stopped as
+  before when the car has not moved three times the *Preheat minutes before* after it; today, while the car is still plugged in after the learned
+  departure, the entered departure is used again, and the car is preheated once more before it. With the switch off, or
+  fewer than 3 days, preheating uses the entered departure as before. The *Ready at departure* analysis measures at the departure the
+  plan uses. The *What-if* replay and the analysis of the past connections keep using the entered times.
 - If anything about the learned times cannot be read, the entered times are used.
 - *Analysis → Learned departure and homecoming* shows the entered, the learned and the used times per weekday – see
   [Dashboard](dashboard-analysis.md#learned-departure-and-homecoming).

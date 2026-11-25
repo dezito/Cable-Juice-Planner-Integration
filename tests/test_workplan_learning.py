@@ -325,23 +325,21 @@ def test_the_plan_is_unchanged_when_learning_is_off_even_with_learned_times() ->
 
 def test_the_plan_forecast_and_preheat_read_the_times_only_through_the_helper() -> None:
     """The entered times are read directly only by the helper itself and by the two readers that deliberately keep them:
-    the economy analysis of past connections (_next_departure), the What-if replay of the entered settings and the preheating.
-    Everything else (the plan, the consumption forecast) goes through effective_workday_times, so a new reader cannot skip it."""
+    the economy analysis of past connections (_next_departure) and the What-if replay of the entered settings.
+    Everything else (the plan, the consumption forecast, the preheating) goes through effective_workday_times, so a new reader
+    cannot skip it."""
     from pathlib import Path  # noqa: PLC0415
 
     engine_dir = Path(__file__).resolve().parent.parent / "custom_components" / "cable_juice_planner" / "engine"
-    allowed = {"workplan.py", "economy.py", str(Path("whatif") / "engine_part.py"), str(Path("control") / "preheat.py")}
+    allowed = {"workplan.py", "economy.py", str(Path("whatif") / "engine_part.py")}
     direct = []
     for path in engine_dir.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
         if re.search(r"""setting\(\s*f?["']workday_(departure|homecoming)_""", text) and str(path.relative_to(engine_dir)) not in allowed:
             direct.append(str(path.relative_to(engine_dir)))
     assert direct == [], direct
-    for name in ("planner/planner.py", "energy/forecast.py"):
+    for name in ("planner/planner.py", "energy/forecast.py", "control/preheat.py"):
         assert "effective_workday_times(" in (engine_dir / name).read_text(encoding="utf-8"), name
-    # preheating is a comfort setting: it keeps the entered departure (a learned early departure would preheat on the many days
-    # the car leaves later)
-    assert "effective_workday_times(" not in (engine_dir / "control" / "preheat.py").read_text(encoding="utf-8")
 
 
 def _effective_at(engine: CJPEngine, settings: dict, date: datetime.date | None, now: datetime.datetime | None = None, **state):
@@ -677,3 +675,110 @@ def test_the_switch_and_its_help_are_in_the_advanced_settings() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "en"}), "tesla", "entry1", existing)
     assert "state_attr('switch.cjp_tesla_learn_departure_time', 'help')" in text
     assert "switch.cjp_tesla_learn_departure_time" in yaml.safe_dump(yaml.safe_load(text)["views"][1])
+
+
+def _preheat_at(engine: CJPEngine, settings: dict, now: datetime.datetime, integration: str = "tessie", climate_state: str = "off", **state) -> list[tuple[str, dict]]:
+    """The preheat requests preheat_ev() makes at `now` for a car with a climate entity and 20 minutes of lead time."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    fired: list[tuple[str, dict]] = []
+    engine.config["ev_car"]["entity_ids"]["climate_entity_id"] = "climate.car"
+    settings = {**settings, "preheat_minutes_before": 20.0, "preheat_thursday": True}
+    with (
+        patch.object(engine, "is_ev_configured", return_value=True),
+        patch.object(engine, "workplan_charging_enabled", return_value=True),
+        patch.object(engine, "is_entity_available", return_value=True),
+        patch.object(engine, "ready_to_charge", return_value=True),
+        patch.object(engine, "get_integration", return_value=integration),
+        patch.object(engine, "get_state", return_value=climate_state),
+        patch.object(engine, "drive_efficiency", side_effect=lambda state: setattr(engine, "preheating", state == "preheat_start") if state in ("preheat_start", "preheat_cancel") else None),
+        patch.object(engine, "my_notify"),
+        patch.object(engine, "fire_ev_request", side_effect=lambda kind, **data: fired.append((kind, data))),
+    ):
+        assert engine.run_job(snapshot(now, level=20, settings=settings, **state), engine.preheat_ev).error is None
+    return fired
+
+
+def test_preheating_follows_the_departure_the_plan_uses() -> None:
+    """Learned departure 06:30, entered 14:00: with learning on the car is preheated before 06:30, not before 14:00."""
+    engine, settings = _thursday_engine()
+    early = datetime.datetime.combine(DAY, datetime.time(6, 15))
+    assert _preheat_at(engine, settings, early, **PLUGGED_IN) == [("preheat_start", {"departure": "06:30", "defrost": False})]
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(13, 45)), **PLUGGED_IN) == [
+        ("preheat_start", {"departure": "14:00", "defrost": False})  # it did not leave at 06:30: the entered departure again
+    ]
+
+
+def test_preheating_keeps_the_entered_departure_with_learning_off() -> None:
+    engine, settings = _thursday_engine()
+    settings = {**settings, "learn_departure_time": False}
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(6, 15)), **PLUGGED_IN) == []
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(13, 45)), **PLUGGED_IN) == [
+        ("preheat_start", {"departure": "14:00", "defrost": False})
+    ]
+
+
+def test_preheating_before_the_learned_departure_needs_enough_learned_days() -> None:
+    """Fewer than 3 days of the weekday: the entered departure counts, so nothing is preheated at 06:15."""
+    engine, settings = _thursday_engine()
+    engine.economy_db["windows"] = engine.economy_db["windows"][-2:]
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(6, 15)), **PLUGGED_IN) == []
+
+
+def test_a_preheating_for_the_learned_departure_is_stopped_when_the_car_did_not_leave_and_started_again_for_the_entered_one() -> None:
+    """A car (switch or climate entity) preheated before 06:30 that is still plugged in at 07:35: the stop is judged against 06:30, not
+    against the entered 14:00 the plan moved to, so the climate does not run until the afternoon. Then it is preheated for 14:00."""
+    engine, settings = _thursday_engine()
+    at = lambda hour, minute: datetime.datetime.combine(DAY, datetime.time(hour, minute))  # noqa: E731
+    run = lambda now: _preheat_at(engine, settings, now, integration="other", **PLUGGED_IN)  # noqa: E731
+    assert run(at(6, 15)) == [("preheat_start", {"departure": "06:30", "defrost": False})]
+    assert run(at(6, 20)) == []  # running: no second start
+    assert run(at(7, 0)) == []  # not yet: the stop comes 3 x the lead time after the departure
+    assert run(at(7, 35)) == [("preheat_stop", {"departure": "06:30"})]
+    assert engine.preheating is False
+    assert run(at(13, 45)) == [("preheat_start", {"departure": "14:00", "defrost": False})]
+    assert run(at(15, 5)) == [("preheat_stop", {"departure": "14:00"})]
+
+
+def test_a_tessie_car_that_heats_for_the_learned_departure_is_stopped_at_the_same_time() -> None:
+    engine, settings = _thursday_engine()
+    engine._preheat_departure = datetime.datetime.combine(DAY, datetime.time(6, 30))
+    stopped = _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(7, 35)), climate_state="heat_cool", **PLUGGED_IN)
+    assert stopped == [("preheat_stop", {"departure": "06:30"})]
+    # after a restart nothing is remembered: today's learned departure stands in for it, the car is still stopped
+    engine._preheat_departure = None
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(7, 35)), climate_state="heat_cool", **PLUGGED_IN) == [
+        ("preheat_stop", {"departure": "06:30"})
+    ]
+    assert engine._preheat_departure is None
+    # a start remembers the learned departure it was for
+    assert _preheat_at(engine, settings, datetime.datetime.combine(DAY, datetime.time(6, 15)), **PLUGGED_IN) == [
+        ("preheat_start", {"departure": "06:30", "defrost": False})
+    ]
+    assert engine._preheat_departure == datetime.datetime.combine(DAY, datetime.time(6, 30))
+
+
+def test_a_missed_stop_window_is_still_corrected_by_the_departure_the_plan_uses() -> None:
+    """Preheating for 06:30 whose stop window (07:30-07:40) was missed (the climate entity was unavailable): the next window is the
+    entered departure's, 15:00-15:10, and it stops then (as the old code did), also for a switch car."""
+    engine, settings = _thursday_engine()
+    at = lambda hour, minute: datetime.datetime.combine(DAY, datetime.time(hour, minute))  # noqa: E731
+    run = lambda now: _preheat_at(engine, settings, now, integration="other", **PLUGGED_IN)  # noqa: E731
+    assert run(at(6, 15)) == [("preheat_start", {"departure": "06:30", "defrost": False})]
+    assert run(at(9, 0)) == []  # the window was missed: the preheating is still marked as running
+    assert engine.preheating is True
+    assert run(at(15, 5)) == [("preheat_stop", {"departure": "14:00"})]
+    assert engine.preheating is False
+
+
+def test_with_learning_off_nothing_is_remembered_and_the_stop_is_the_one_departure_alone() -> None:
+    """Exactly as before: a start for a trip and then a work day (switch car): the stop is judged against the departure now."""
+    engine, settings = _thursday_engine()
+    settings = {**settings, "learn_departure_time": False}
+    at = lambda hour, minute: datetime.datetime.combine(DAY, datetime.time(hour, minute))  # noqa: E731
+    assert _preheat_at(engine, settings, at(13, 45), integration="other", **PLUGGED_IN) == [("preheat_start", {"departure": "14:00", "defrost": False})]
+    assert engine._preheat_departure is None
+    # 07:35 is 3 x lead after the learned 06:30 - with learning off there is no such departure to stop for
+    engine.preheating = True
+    assert _preheat_at(engine, settings, at(7, 35), integration="other", **PLUGGED_IN) == []
+    assert engine._preheat_departure is None
