@@ -58,7 +58,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 ## Features
 
 - **Works with or without an EV integration** (a virtual EV needs only the battery level when you plug in)
-- **Solar, Solcast and a home battery** (optional), and **[load balancing](docs/load-balancing.md)** for several cars on one main fuse
+- **Solar, a solar forecast (Solcast, Forecast.Solar or Helios Forecast) and a home battery** (optional), and **[load balancing](docs/load-balancing.md)** for several cars on one main fuse
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning), with the forecast corrected for its measured bias
 - **[Charging loss](docs/charging-loss.md) measured continuously** and **[learned driving distance](docs/learn-distance.md)**
 - **[Public charging](docs/public-charging.md)** detected automatically and added to the history and the economy
@@ -79,7 +79,10 @@ The complete list is in [Features and charging rules](docs/features.md).
   its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
 - A charger with **status**, **power** (W) and **kWh** sensors
 - Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning)
-- Optional: an EV integration, solar production and [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar), a weather
+- Optional: an EV integration, solar production and a solar forecast
+  ([Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
+  [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+  [Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast)), a weather
   integration with `weather.get_forecasts` and a home battery. See [Getting started](docs/getting-started.md#1-check-what-you-need)
 - For the dashboard (install these HACS frontend cards): [Mushroom](https://github.com/piitaya/lovelace-mushroom),
   [ApexCharts Card](https://github.com/RomRider/apexcharts-card),

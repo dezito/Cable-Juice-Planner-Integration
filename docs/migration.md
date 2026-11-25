@@ -42,7 +42,8 @@ PyScript files but never changes them, and stores its own data in `.storage`.
 
 - No commands to the charger or car. See the [action entities](charger-control.md#the-action-entities).
 - Load balancing between multiple cars with priority and main fuse.
-- Consumption history is also stored without solar panels and Solcast.
+- Consumption history is also stored without solar panels and a solar forecast.
+- The solar forecast can also come from Forecast.Solar or Helios Forecast; an imported Solcast sensor is kept.
 - Public charging sessions are remembered across restarts.
 - Optimal weekly charging: always enough for the day's driving, the rest only in the week's cheapest hours
   (instead of splitting the need in 3 parts).

@@ -1,7 +1,8 @@
 """Power values, local energy, solar prediction, prices and the hourly databases (engine part).
 
 Port of the corresponding ev.py functions. Window values come from :mod:`history`
-(buffers), the weather forecast and the Solcast attributes from the job snapshot.
+(buffers), the weather forecast and the solar forecast rows (Solcast, Forecast.Solar or Helios
+Forecast) from the job snapshot.
 """
 from __future__ import annotations
 

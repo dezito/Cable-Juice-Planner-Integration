@@ -33,10 +33,31 @@ battery % the car really uses, also in winter.
 ### Solar surplus
 
 With solar panels, the plan uses the forecast **surplus** (production minus the house's consumption) from
-Solcast and/or CJP's own history per weather type. With both, Solcast counts 75 % and the history 25 %;
-when the history has no measurement for the hour and weather type (e.g. on a new installation), Solcast is
-used alone. The surplus the car can use is subtracted from what has to be bought. See
+the solar forecast integration (Solcast, Forecast.Solar or Helios Forecast) and/or CJP's own history per weather
+type. With both, the forecast integration counts 75 % and the history 25 %; when the history has no measurement for
+the hour and weather type (e.g. on a new installation), the forecast integration is used alone. An hour with neither
+counts as no sun. The surplus the car can use is subtracted from what has to be bought. See
 [Solar surplus charging](rules/solar.md).
+
+Solcast gives the production per hour in the `detailedHourly` attribute of its day sensors. Forecast.Solar and Helios
+Forecast are read from the forecast they give the Energy dashboard (energy per period, keyed by time), turned into
+the same hourly rows:
+
+- Helios Forecast keys a value by the **start** of its hour, Forecast.Solar by the **end** of its period (the sunrise,
+  the whole hours and the sunset). A Forecast.Solar value therefore counts in the hour before its key; its first value
+  has no known start and is not used.
+- The energy of a period is spread over the time it covers and added up per hour of the Home Assistant time zone. On
+  the day the clocks go back, the hour that occurs twice gets the energy of both; the hour skipped in spring gets none.
+- Only hours the forecast covers completely are used. A missing hour, a value that is not a number or is negative,
+  and a partly covered hour at either end of the forecast are not counted as a forecast of 0: they are planned from
+  the weather forecast and the stored solar history, and an hour with neither counts as no sun. The hours are kept by
+  their time, so a missing hour never moves another one. Values more than a day old or more than 16 days ahead are
+  ignored.
+- Forecast.Solar has one entry per roof plane. The planes listed together with the selected one as the forecast of a
+  solar source in the Energy dashboard are added up, only for the hours every plane covers; a plane that is not
+  loaded means no forecast until it is.
+- How old the forecast is, is not checked (as with Solcast). See
+  [Forecast.Solar or Helios Forecast](getting-started.md#forecastsolar-or-helios-forecast).
 
 ### Prices
 
@@ -151,7 +172,8 @@ daily minimum, or the max. recommended limit.
   the plan starts from the last level it reported in the last 24 hours. When the value is broken (`nan`,
   `inf`, text), it only looks 6 hours back. Without a level in that time the plan starts from 0 %, so it plans
   more charging, never less.
-- **Solcast missing:** the solar forecast uses CJP's own history.
+- **The solar forecast integration missing** (Solcast, Forecast.Solar or Helios Forecast, or an hour it does not
+  cover): the solar forecast uses CJP's own history with the weather forecast; an hour with neither counts as no sun.
 - **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the max.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.
 - **The charger doesn't charge although it should:** it is stopped and started again (or `charger_enabled`

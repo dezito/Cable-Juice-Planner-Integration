@@ -36,8 +36,10 @@
   battery level yourself when the cable is plugged in. For a car integration that updates the battery level
   slowly, it can be [simulated from the charger's meter](cookbook.md#car-integration-that-updates-slowly)
   while charging
-- **Solar and Solcast (optional):** surplus now and forecast ahead, from
-  [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and/or own history
+- **Solar and a solar forecast (optional):** surplus now and forecast ahead, from
+  [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
+  [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+  [Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast) and/or own history
 - **Home battery (optional):** charge the home battery to a certain level first, and charge the car from
   the home battery above a minimum
 - **Multiple cars on the same main fuse:** [load balancing](load-balancing.md) with priority and phase order,

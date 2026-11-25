@@ -135,8 +135,16 @@ class DependencyWatcher:
 
     @property
     def watched_entities(self) -> frozenset[str]:
-        """The sensors this watcher judges: the health checks leave them out (they are repaired here)."""
-        return frozenset(self._watched)
+        """The sensors this watcher judges: the health checks leave them out (they are repaired here).
+
+        The Strømligning sensors always; the Solcast forecast sensors only while the Solcast repair judges the selected
+        sensor (solcast_problems): for another forecast integration (Forecast.Solar, Helios Forecast) nothing is judged
+        here, so nothing is left out. Forecast.Solar's energy_production_today would otherwise look like a Solcast day
+        sensor and escape the missing-sensor repair.
+        """
+        if self.forecast_entity and solcast_problems(self.hass, self.forecast_entity, self.solcast_endings) is not None:
+            return frozenset(self._watched)
+        return frozenset(self.stromligning_entities)
 
     @callback
     def start(self) -> None:

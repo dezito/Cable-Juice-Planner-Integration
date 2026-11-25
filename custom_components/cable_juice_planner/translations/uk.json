@@ -220,17 +220,17 @@
       },
       "solar": {
         "title": "Сонячні панелі (необов’язково)",
-        "description": "Заповніть, якщо маєте сонячні панелі.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
+        "description": "Заповніть, якщо маєте сонячні панелі.\n\nForecast.Solar і Helios Forecast зчитуються з їхнього сонячного прогнозу для панелі «Енергія»; години, які вони не охоплюють, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Сонячне виробництво",
-          "forecast_entity_id": "Сонячний прогноз (Solcast)",
+          "forecast_entity_id": "Сонячний прогноз",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
           "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
           "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
-          "forecast_entity_id": "Прогноз сонця (Вт) (Підтримка: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar або Helios Forecast. Solcast: напр. sensor.solcast_pv_forecast_forecast_today, наступні дні знаходяться автоматично. Forecast.Solar: будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Helios Forecast: напр. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
           "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
           "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
@@ -648,17 +648,17 @@
       },
       "solar": {
         "title": "Сонячні панелі (необов’язково)",
-        "description": "Заповніть, якщо маєте сонячні панелі.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
+        "description": "Заповніть, якщо маєте сонячні панелі.\n\nForecast.Solar і Helios Forecast зчитуються з їхнього сонячного прогнозу для панелі «Енергія»; години, які вони не охоплюють, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Сонячне виробництво",
-          "forecast_entity_id": "Сонячний прогноз (Solcast)",
+          "forecast_entity_id": "Сонячний прогноз",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
           "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
           "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
-          "forecast_entity_id": "Прогноз сонця (Вт) (Підтримка: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar або Helios Forecast. Solcast: напр. sensor.solcast_pv_forecast_forecast_today, наступні дні знаходяться автоматично. Forecast.Solar: будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Helios Forecast: напр. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
           "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
           "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."

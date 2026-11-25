@@ -113,6 +113,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self._statistics_refreshed = 0.0
         self._statistics_hour: datetime.datetime | None = None
         self._platforms: dict[str, str | None] = {}
+        # why the last read of a Forecast.Solar / Helios Forecast forecast gave no rows (None: it gave rows), logged once
+        self._solar_forecast_problem: str | None = None
         self._price_snapshot_time = 0.0
         self._log_listener: QueueListener | None = None
         self._log_handler: QueueHandler | None = None

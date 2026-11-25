@@ -50,7 +50,8 @@ the first step it doesn't charge, and the last step is used for any surplus abov
 
 ## In the plan
 
-The expected surplus of the week (Solcast and/or CJP's own history per weather type) is used by the
+The expected surplus of the week (the solar forecast integration – Solcast, Forecast.Solar or Helios Forecast –
+and/or CJP's own history per weather type) is used by the
 [work plan](workplan.md) and [optimal weekly charging](weekly.md): grid charging is only planned for what
 the sun won't cover before departure.
 

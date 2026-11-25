@@ -2078,6 +2078,181 @@ def test_solcast_alone_when_there_is_no_solar_history() -> None:
     assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
 
 
+# ---------------------------------------------------------------------------------------------------------------- #
+# The solar forecast sources: Solcast's detailedHourly, and Forecast.Solar / Helios Forecast normalised to the same rows
+# by utils/solar_forecast.py (the coordinator puts them under the configured sensor)
+# ---------------------------------------------------------------------------------------------------------------- #
+
+# a Saturday: no work day takes hours out of the solar prediction, and a week before the clocks go back (25 October)
+SAT = DAY - datetime.timedelta(days=5)
+SOLAR_OPTIONS = {**OPTIONS, "production_entity_id": "sensor.solar", "enable_selling_during_expensive_hours": False}
+HELIOS_SENSOR = "sensor.helios_forecast_power_now"
+FORECAST_SOLAR_SENSOR = "sensor.energy_production_today"
+
+
+def _sun_kw(day: int, hour: int) -> float:
+    """A sunny day: 0 at night, up to 4 kW at noon, a little less every day."""
+    return round(max(0.0, 4.0 - abs(hour - 12) * 0.9) * (1 - 0.1 * day), 3) if 9 <= hour <= 16 else 0.0
+
+
+def _solcast_rows(days: int = 3) -> dict[str, list]:
+    """The detailedHourly rows of Solcast's day sensors (period_start: a datetime with the local offset)."""
+    rows = {}
+    for day, ending in enumerate(("today", "tomorrow", "day_3", "day_4")[:days]):
+        date = SAT + datetime.timedelta(days=day)
+        rows[f"sensor.solcast_{ending}"] = [
+            {
+                "period_start": datetime.datetime.combine(date, datetime.time(hour), tzinfo=TZ),
+                "pv_estimate": _sun_kw(day, hour),
+                "pv_estimate10": round(_sun_kw(day, hour) * 0.7, 3),
+            }
+            for hour in range(24)
+        ]
+    return rows
+
+
+def _helios_wh_hours(days: int = 3) -> dict[str, float]:
+    """The same forecast as Helios Forecast gives the Energy dashboard: Wh per UTC hour, keyed by its start."""
+    return {
+        datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(hour), tzinfo=TZ).astimezone(datetime.UTC).isoformat(): _sun_kw(day, hour) * 1000
+        for day in range(days)
+        for hour in range(24)
+    }
+
+
+def _forecast_solar_wh_hours(first_key: int = 11, days: int = 2) -> dict[str, float]:
+    """Forecast.Solar's Energy dashboard forecast: the key is the END of its period, so the value at <hour> is the
+    energy of the hour before it. Today starts at first_key (no row for the hours before it), the forecast ends after
+    the sunset of the last day (the free plan: today and tomorrow)."""
+    keys = {}
+    for day in range(days):
+        date = SAT + datetime.timedelta(days=day)
+        for hour in range(first_key if day == 0 else 8, 19):
+            keys[datetime.datetime.combine(date, datetime.time(hour), tzinfo=TZ).isoformat()] = _sun_kw(day, hour - 1) * 1000
+    return keys
+
+
+def _solar_engine(forecast_entity: str, platform: str | None, rows: dict[str, list], weather: bool = True, now: datetime.datetime | None = None):
+    """A started engine and a snapshot with the given solar forecast rows (snapshot.solcast) and platform."""
+    now = now or datetime.datetime.combine(SAT, datetime.time(3, 30))
+    engine = CJPEngine(const.build_config({**SOLAR_OPTIONS, "forecast_entity_id": forecast_entity}), "cjp_test", TEXTS)
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    snap.platforms = {forecast_entity: platform}
+    daily = [{"datetime": datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(0)).isoformat(), "condition": "sunny"} for day in range(8)]
+    # without weather the coordinator still gives the dict (with no forecasts in it)
+    snap.forecast_dict = {"hourly": [], "daily": daily if weather else []}
+    snap.solcast = rows
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    return engine, snap
+
+
+def _prediction(engine: CJPEngine, snap: Snapshot) -> tuple:
+    result = engine.run_job(snap, engine.local_energy_prediction)
+    assert result.error is None, result.error
+    return result.value, deepcopy(engine.local_energy_prediction_db)
+
+
+def _rows_from(wh_hours: dict[str, float], semantics: str) -> list[dict]:
+    from custom_components.cable_juice_planner.utils.solar_forecast import rows_from_wh_hours
+
+    return rows_from_wh_hours([wh_hours], semantics, TZ)
+
+
+def test_solcast_rows_are_read_as_before() -> None:
+    """Regression: the Solcast surplus per hour from detailedHourly of every day sensor is pv_estimate (kW over the
+    hour) minus the consumption history (none here), keyed by the local hour, for every hour with a price."""
+    engine, snap = _solar_engine("sensor.solcast_today", "solcast_solar", _solcast_rows())
+    forecast = engine.run_job(snap, engine.get_solar_kwh_forecast)
+    assert forecast.error is None
+    expected = {datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(hour)): _sun_kw(day, hour) for day in range(3) for hour in range(24)}
+    # the prices cover today, tomorrow and two forecast days: every Solcast hour has one
+    assert {key: value[0] for key, value in forecast.value.items()} == expected
+    # rows under the selected sensor alone are not Solcast's day sensors: a Solcast sensor reads only <base>_<day>
+    engine, snap = _solar_engine("sensor.solcast_today", "solcast_solar", {"sensor.solcast_today_x": _solcast_rows()["sensor.solcast_today"]})
+    assert engine.run_job(snap, engine.get_solar_kwh_forecast).value == {}
+
+
+def test_energy_platform_rows_plan_like_the_same_solcast_rows() -> None:
+    """Helios Forecast's wh_hours, normalised by utils/solar_forecast.py, give exactly the prediction and the plan of the
+    same numbers from Solcast: the engine reads both the same way."""
+    helios_rows = _rows_from(_helios_wh_hours(), "start")
+    assert len(helios_rows) == 72
+    results = []
+    for entity_id, platform, rows in (
+        ("sensor.solcast_today", "solcast_solar", _solcast_rows()),
+        (HELIOS_SENSOR, "helios_forecast", {HELIOS_SENSOR: helios_rows}),
+    ):
+        engine, snap = _solar_engine(entity_id, platform, rows)
+        prediction = _prediction(engine, snap)
+        plan = engine.run_job(snap, engine.charge_if_needed, True)
+        assert plan.error is None, plan.error
+        results.append((prediction, plan.states, plan.attributes))
+    assert results[1] == results[0]
+    # the forecast is really used: the noon hour of tomorrow is the forecast alone (no solar history yet)
+    timestamps = results[0][0][1]["solar_prediction_timestamps"]
+    assert timestamps[datetime.datetime.combine(SAT + datetime.timedelta(days=1), datetime.time(12))] == pytest.approx(_sun_kw(1, 12))
+
+
+def test_a_sensor_of_another_integration_without_rows_has_no_forecast() -> None:
+    engine, snap = _solar_engine("sensor.other_forecast", "open_meteo_solar_forecast", {})
+    assert engine.run_job(snap, engine.get_solar_kwh_forecast).value == {}
+
+
+def test_forecast_solar_rows_from_after_sunrise_keep_every_hour_in_its_place() -> None:
+    """Regression check for the positional-list hazard BattMind had: no weather and a Forecast.Solar forecast whose
+    first row is 11:00. The hours before it have no value (no known sun) and every later hour keeps its own time:
+    the planner reads them by time (solar_prediction_timestamps), the day is their sum."""
+    rows = _rows_from(_forecast_solar_wh_hours(first_key=11), "end")
+    # the key at 11:00 has no start: the first row is 11:00-12:00
+    assert rows[0]["period_start"] == datetime.datetime.combine(SAT, datetime.time(11), tzinfo=TZ)
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", {FORECAST_SOLAR_SENSOR: rows}, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    timestamps = db["solar_prediction_timestamps"]
+    today = [key for key in timestamps if key.date() == SAT]
+    assert sorted(key.hour for key in today) == [11, 12, 13, 14, 15, 16]
+    for key in today:
+        assert timestamps[key] == pytest.approx(_sun_kw(0, key.hour))
+    assert timestamps[datetime.datetime.combine(SAT, datetime.time(12))] == pytest.approx(4.0)
+    assert output[datetime.datetime.combine(SAT, datetime.time(0))] == pytest.approx(sum(_sun_kw(0, hour) for hour in range(11, 17)), abs=0.001)
+    # tomorrow is complete (the night period covers the morning), every sun hour at its own time
+    tomorrow = SAT + datetime.timedelta(days=1)
+    assert {key.hour: value for key, value in timestamps.items() if key.date() == tomorrow} == pytest.approx(
+        {hour: _sun_kw(1, hour) for hour in range(9, 17)}
+    )
+
+
+def test_a_missing_forecast_solar_hour_mid_day_is_no_sun_and_moves_no_other_hour() -> None:
+    wh_hours = _forecast_solar_wh_hours()
+    tomorrow = SAT + datetime.timedelta(days=1)
+    wh_hours[datetime.datetime.combine(tomorrow, datetime.time(13), tzinfo=TZ).isoformat()] = math.nan  # the energy of 12:00-13:00
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", {FORECAST_SOLAR_SENSOR: _rows_from(wh_hours, "end")}, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    found = {key.hour: value for key, value in db["solar_prediction_timestamps"].items() if key.date() == tomorrow}
+    assert found == pytest.approx({hour: _sun_kw(1, hour) for hour in range(9, 17) if hour != 12})
+    assert output[datetime.datetime.combine(tomorrow, datetime.time(0))] == pytest.approx(sum(_sun_kw(1, hour) for hour in range(9, 17) if hour != 12), abs=0.001)
+
+
+def test_the_days_after_the_forecast_without_weather_have_no_known_sun() -> None:
+    """Forecast.Solar's free plan covers today and tomorrow: without weather the later days are 0 kWh (no known sun),
+    never another day's sun; with weather they are planned from the stored solar history as without a forecast."""
+    rows = {FORECAST_SOLAR_SENSOR: _rows_from(_forecast_solar_wh_hours(first_key=8), "end")}
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", rows, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    for day in range(2, 8):
+        date = SAT + datetime.timedelta(days=day)
+        assert output[datetime.datetime.combine(date, datetime.time(0))] == 0.0
+        assert not [key for key in db["solar_prediction_timestamps"] if key.date() == date]
+    # the same days with weather and no forecast integration at all are predicted the same way
+    with_weather, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", rows)
+    without_forecast, plain = _solar_engine("", None, {})
+    (forecast_days, _), _ = _prediction(with_weather, snap)
+    (plain_days, _), _ = _prediction(without_forecast, plain)
+    for day in range(2, 8):
+        date = datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(0))
+        assert forecast_days[date] == plain_days[date]
+
+
 def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home",
                 location_history: list | None = None, odometer: float | str | None = None, when: datetime.datetime | None = None,
                 charger_meter: float | None = None):

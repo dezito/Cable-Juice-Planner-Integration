@@ -28,6 +28,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 ├── management/                          Storage, backups, dashboard, and blueprint setup
 │   └── voltage_issue.py                 Fixable repair for a grid voltage still at the old 240 V default (sets 230 V)
 ├── utils/                               Shared utilities and datetime/time platform implementations
+│   └── solar_forecast.py                Forecast.Solar / Helios Forecast energy platform -> hourly solar rows (shared with BattMind)
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
 ├── select.py / button.py / binary_sensor.py  Other HA entity platforms
 ├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base
@@ -49,6 +50,8 @@ tests/                                   Pytest suite
 ├── test_workplan_learning.py            Learned departure and homecoming: samples, percentiles, the times the plan uses
 ├── test_charger_test.py                 Charger automation test: judging, voltage, runner parts, charge limit step
 ├── test_dashboard.py                    Dashboard generation and content
+├── test_solar_forecast.py               utils/solar_forecast.py (the same file as in BattMind)
+├── test_solar_forecast_sources.py       The solar forecast of the snapshot: Solcast, Forecast.Solar, Helios Forecast, debug replay
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests
 └── debug_replay.py                      Debug/replay helper
