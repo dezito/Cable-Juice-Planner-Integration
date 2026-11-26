@@ -186,6 +186,10 @@ Read the relevant documentation before changing behavior. In particular:
   `PROVIDER_CLASSES`), included by a `# @include` line, and the provider's `dashboard_entities()` maps the
   external entities that chart uses; a test checks that both name the same entities. A new price integration
   needs a provider class and a chart file. Keep `expand_includes()` in sync with BattMind.
+- Analysis sections that need the car integration are listed in `EV_SECTIONS` (`management/dashboard_build.py`) and are
+  dropped by configuration, not by missing entities. The analysis view is grouped under full-width group headings (a
+  span 4 section with one `heading_style: title` heading); `_drop_empty_groups()` removes a group heading with no section
+  left below it, and `dense_section_placement` stays off in that view so no section moves above its heading.
 - Do not edit generated/cache files such as `__pycache__`, `.pytest_cache`, or
   `.ruff_cache`.
 

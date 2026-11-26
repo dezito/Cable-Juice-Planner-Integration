@@ -841,7 +841,7 @@ def test_economy_section_on_analysis() -> None:
     assert "@@" not in text
     analysis = yaml.safe_load(text)["views"][2]
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
-    assert headings[0] == "Økonomi"
+    assert headings[:2] == ["Resultater og plan", "Økonomi"]  # (the group heading first)
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]
     assert len(charts) == 2
     # the simulated subscription comparison lives on the What-if view, not under Economy
@@ -963,6 +963,59 @@ def test_analysis_sections_without_a_car() -> None:
     assert any("attributes.forecast or {}" in content and "Husets forbrug pr. time i kWh" in content for content in contents)
 
 
+def _analysis_groups(dashboard: dict) -> list[tuple[str, list[str]]]:
+    """The analysis view as (group heading, [section headings]); the History has its own heading and closes the last group."""
+    view = next(view for view in dashboard["views"] if view["path"] == "analysis")
+    assert "dense_section_placement" not in view  # dense placement could pull a section above its group heading
+    groups: list[tuple[str, list[str]]] = []
+    for section in view["sections"]:
+        cards = section.get("cards") or []
+        headings = [card for card in cards if card.get("type") == "heading"]
+        if len(cards) == 1 and headings and headings[0].get("heading_style") == "title":
+            assert section["column_span"] == 4
+            groups.append((headings[0]["heading"], []))
+        elif not headings:  # the History: its heading and Read more are dropped as empty (as before), the graphs stay
+            if groups[-1][0] != "Historik":
+                groups.append(("Historik", []))
+        else:
+            groups[-1][1].append(headings[0]["heading"])
+    return groups
+
+
+def test_the_analysis_sections_are_grouped_under_full_width_headings() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    dashboard = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing))
+    assert [view["path"] for view in dashboard["views"]] == ["overview", "settings", "analysis", "what-if"]
+    assert [group for group in _analysis_groups(dashboard) if group[0] != "Historik"] == [
+        ("Resultater og plan", ["Økonomi", "Planlagt mod faktisk ladet", "Klar til afgang"]),
+        ("Kørsel og læring", ["Kørsel og temperatur", "Lært kørselsafstand", "Lært afgang og hjemkomst"]),
+        ("Prognoser", ["Prisprognose", "Prognosens træfsikkerhed"]),
+        ("Bilens batteri", ["Batterikapacitet", "Ladetab pr. effekt", "Ladeeffekt efter batteriniveau"]),
+    ]
+
+
+def test_the_car_battery_group_goes_with_its_sections_without_a_car() -> None:
+    """A group heading never stands alone: without a car integration the car's battery group is left out with its sections."""
+    no_ev_entities = {f"sensor.cjp_tesla_{key}" for key, info in const.SENSOR_DEFS.items() if info[3] == "ev"} | {
+        "sensor.cjp_tesla_charging_loss_model",
+        "sensor.cjp_tesla_soc_charging_power_model",
+        "button.cjp_tesla_recalculate_charging_loss",
+        "switch.cjp_tesla_use_measured_charging_loss",
+        "switch.cjp_tesla_learn_soc_charge_power",
+    }
+    config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": "", "energidataservice_buy_entity_id": "sensor.eds"})
+    for existing in (
+        (_own("tesla") - no_ev_entities) | {"sensor.charger_status", "sensor.eds"},
+        # the car integration was removed afterwards: its entities can stay registered
+        _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds"},
+    ):
+        groups = _analysis_groups(yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing)))
+        names = [name for name, _ in groups]
+        assert "Bilens batteri" not in names
+        assert all(sections for name, sections in groups if name != "Historik"), groups
+        assert dict(groups)["Prognoser"] == ["Prisprognose", "Prognosens træfsikkerhed"]
+
+
 async def test_sidebar_dashboard_can_be_edited_and_reset(hass: HomeAssistant, hass_ws_client, tmp_path) -> None:
     hass.config.config_dir = str(tmp_path)
     set_source_states(hass)
@@ -1013,3 +1066,26 @@ async def test_sidebar_icon_follows_the_dashboard_icon_option(hass: HomeAssistan
     await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.data["frontend_panels"]["cjp-test"].sidebar_icon == "mdi:ev-station"
     await async_unload_and_join(hass, entry)
+
+
+def _group(title: str) -> dict:
+    return {"type": "grid", "column_span": 4, "cards": [{"type": "heading", "heading": title, "heading_style": "title"}]}
+
+
+def _section(title: str, icon: str = "mdi:x") -> dict:
+    return {"type": "grid", "column_span": 2, "cards": [{"type": "heading", "heading": title, "icon": icon}, {"type": "markdown", "content": "x"}]}
+
+
+def test_a_group_heading_never_stands_alone() -> None:
+    """Without a section below it (before the next group or the History) the group heading goes; other views are left alone."""
+    from custom_components.cable_juice_planner.management.dashboard_build import _drop_empty_groups
+
+    history = _section("History", "mdi:chart-line")
+    graphs = {"type": "grid", "cards": [{"type": "history-graph"}]}  # (a History whose heading was dropped as empty)
+    sections = [_group("A"), _section("a1"), _group("B"), _group("C"), _section("c1"), _group("D"), history, _group("E")]
+    kept = _drop_empty_groups({"views": [{"path": "analysis", "sections": sections}]})["views"][0]["sections"]
+    assert [s["cards"][0]["heading"] for s in kept] == ["A", "a1", "C", "c1", "History"]
+    kept = _drop_empty_groups({"path": "analysis", "sections": [_group("A"), _section("a1"), _group("B"), graphs]})["sections"]
+    assert [s["cards"][0].get("heading") for s in kept] == ["A", "a1", None]
+    other = {"path": "what-if", "sections": [_group("A"), _group("B")]}
+    assert _drop_empty_groups(other) == other
