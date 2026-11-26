@@ -129,6 +129,8 @@ class ControlActions:
         text = self.site_text(charger_amps, limited)
         stopped = sum(charger_amps) > 0 and sum(limited) <= 0
         held = self._charger_hold if self.charger_hold_active() else None
+        if held is None:  # the charger test holds its own current
+            self.notify_site_limit([int(a) for a in charger_amps], list(limited), stopped)
         if limited != [int(a) for a in charger_amps]:
             _LOGGER.info("Site limit: %s A -> %s A per phase", [int(a) for a in charger_amps], limited)
             circuit_amps = [min(int(c), a) if a > 0 else 0 for c, a in zip(circuit_amps, limited)]

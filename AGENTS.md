@@ -396,6 +396,21 @@ place and extend them to new code:
   in the runtime state. Missing, unknown or stale data never gives a notification. HA's `last_reported` is no proof
   of a new car report (cloud integrations rewrite cached values): only the car's own last-update time or a changed
   value counts.
+- More notifications (`engine/control/notices.py`): charger offline before a departure, cheap power while unplugged,
+  manual charging in an expensive hour, monthly summary (from `economy_update`), load balancing (from
+  `_apply_site_limit`, never during a charger-test hold), battery full, charging loss rise. Each is sent once per event
+  via the runtime store `sent_notices` (key -> ISO time it is forgotten; pruned on each new notice; restore keeps only
+  str -> str). Keys and forget times: `charger_offline <kind> <event>` departure + 1 day (keyed like readiness: a work
+  day by its date, a trip by its time); `cheap_power <start date>` start + 1 day; `manual_expensive <date>` and
+  `site_limit <kind> <date>` the next midnight + 1 day; `monthly_summary <month>` and `charging_loss <month>` 40 days;
+  `battery_full` (no event) 30 days, or at once when the level is below 99 now or the history shows a level below 99
+  after the notice. The site_limit hold (two cron intervals and 10 minutes, per kind, `readiness._held`) is in memory
+  in `_notice_seen`; a gap of more than two cron intervals between load balancing decisions starts it again, and the
+  message shows the time the limit began.
+  The charging loss rise must also hold against the same months a year earlier (12 and 13 back) when they have enough
+  measurements; without them the 3-6 months base alone decides. Every notice is wrapped and must never raise into the
+  cron, economy or site job. Missing, unknown or stale data never sends a notice, except load balancing, which
+  reports what it did.
 - Virtual EV level (`charging_power_to_emulated_battery_level`): counted from the runtime anchor
   `virtual_charge_anchor` {meter, level, base}. Only whole percents are added and the anchor moves by their kWh.
   A reset always counts from the meter now, never from an older meter. Only a level that differs from the counted

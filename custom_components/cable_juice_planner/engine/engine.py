@@ -171,6 +171,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
         self.trip_days: set[str] = set()  # ISO dates of the trips seen (engine/workplan.py)
         self.departure_notices: dict[str, str] = {}  # "<kind> <departure>" -> departure ISO of the sent notices (control/readiness.py)
+        self.sent_notices: dict[str, str] = {}  # "<notice> <event>" -> ISO time it is forgotten (control/notices.py)
+        self._notice_seen: dict[str, tuple] = {}  # load balancing limit -> (state, first seen), in memory (control/notices.py)
         self._readiness_seen: dict[str, tuple] = {}  # charging check -> (state, first seen) while the plan charges (control/readiness.py)
         self._plug_in_seen: dict[str, tuple] = {}  # the same for the car's limit at plug-in (control/readiness.py)
         # the virtual EV's level counted from the charger meter: {"meter": kWh, "level": %} (history/combine.py)
@@ -299,6 +301,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             "daily_odometer": dict(self.daily_odometer),
             "trip_days": sorted(self.trip_days),
             "departure_notices": dict(self.departure_notices),
+            "sent_notices": dict(self.sent_notices),
             "virtual_charge_anchor": dict(self.virtual_charge_anchor) if self.virtual_charge_anchor else None,
             "charging_loss_measurement": {
                 "car_begin_battery_level": self.charging_loss_car_begin_battery_level,

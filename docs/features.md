@@ -59,6 +59,11 @@
   a car integration), or it charges so slowly that the departure is missed (also for a virtual EV). And a reminder to plug in when the charging planned for the departure starts while the car is home and
   unplugged. Each departure gets each notification once, also across a restart; it can be turned off under
   *Notifications*
+- **More push notifications**, each with its own switch under *Notifications*: the charger does not respond before a
+  departure, cheap power while the car is home and not plugged in, manual charging in one of the day's most
+  expensive hours, a monthly summary (kWh, cost and the saving compared with daily charging), load balancing that
+  stopped or lowered the charging, a battery that has stood full for long, and a charging loss that rose against 3–6
+  months back (and against the same months a year earlier, when they have enough measurements). Each is sent once per event, also across a restart
 - **[Charging loss](charging-loss.md)**
   - **measured continuously** from the charger's kWh meter and the car's battery level, also back in Home
     Assistant's history – no full charge needed
