@@ -15,7 +15,8 @@ At setup it is rewritten for this config entry:
 * settings the configuration doesn't use are removed (preheating without the car's climate
   entity, the min. charge limit without its charge limit entity: ``hidden_settings()``)
 * cards bound to an entity that does not exist are removed, and a heading left
-  without settings below it; without a car also the analysis sections with only its data
+  without settings below it, a section left without cards and a group heading of the analysis left without
+  sections; without a car also the analysis sections with only its data (the car's battery group goes with them)
   and the What-if scenarios that replay recorded drives (A, B, no solar)
 * ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
 
@@ -70,7 +71,10 @@ _CAR_EXTRAS = (
 _DROP = object()
 PREHEAT_ENTITIES = (("switch", "trip_preheat"), ("number", "preheat_minutes_before"), *(("switch", f"preheat_{day}") for day in WEEKDAYS))
 # analysis sections with only the car's data (sensor.cjp_analysis also exists without a car)
-EV_SECTIONS = ("@@section_drive_temperature@@", "@@section_departures@@", "@@section_learn_distance@@")
+EV_SECTIONS = (
+    "@@section_drive_temperature@@", "@@section_departures@@", "@@section_learn_distance@@",
+    "@@section_capacity@@", "@@section_loss@@", "@@section_soc_power@@",
+)
 # What-if scenarios A, B and the no-solar plan replay the connections between recorded drives. Without a car integration
 # (virtual EV) no drive is ever recorded or derived, so they never give a result: left out of the view.
 # The solar scenario (D) and the fixed monthly price do not use drives and stay.
@@ -279,12 +283,61 @@ def _drop_empty_headings(node: Any) -> Any:
                     c.get("type") == "markdown" and ("@@read_more@@" in str(c.get("content", "")) or "{" not in str(c.get("content", "")))
                     for c in block[1:]
                 )
-                if not block or block[0].get("type") != "heading" or not read_more_only:
+                # (a group heading of the analysis stands alone on purpose: _drop_empty_groups removes it)
+                if not block or block[0].get("type") != "heading" or block[0].get("heading_style") == "title" or not read_more_only:
                     kept.extend(block)
                 block = [card]
             else:
                 block.append(card)
         node["cards"] = kept
+    return node
+
+
+def _drop_empty_sections(node: Any) -> Any:
+    """Remove the sections (grids) left without cards (a heading and its read more removed with the rest)."""
+    if isinstance(node, list):
+        items = [_drop_empty_sections(item) for item in node]
+        return [item for item in items if not (isinstance(item, dict) and item.get("type") == "grid" and item.get("cards") == [])]
+    if isinstance(node, dict):
+        return {key: _drop_empty_sections(value) for key, value in node.items()}
+    return node
+
+
+def _is_group_heading(item: Any) -> bool:
+    """A full-width section with only a title heading: the heading of a group of analysis sections."""
+    cards = item.get("cards") if isinstance(item, dict) else None
+    return (
+        isinstance(item, dict) and item.get("type") == "grid" and item.get("column_span") == 4
+        and isinstance(cards, list) and len(cards) == 1 and isinstance(cards[0], dict)
+        and cards[0].get("type") == "heading" and cards[0].get("heading_style") == "title"
+    )
+
+
+def _starts_history(item: Any) -> bool:
+    """The History ends the last group: its section has the heading icon mdi:chart-line, or (when that heading was dropped as
+    empty) its graphs are sections without any heading."""
+    if not isinstance(item, dict) or item.get("type") != "grid":
+        return False
+    cards = [card for card in item.get("cards") or () if isinstance(card, dict)]
+    headings = [card for card in cards if card.get("type") == "heading"]
+    return not headings or any(card.get("icon") == "mdi:chart-line" for card in headings)
+
+
+def _drop_empty_groups(node: Any) -> Any:
+    """In the analysis view: a group heading with no section below it (before the next group or the History) is removed."""
+    if isinstance(node, list):
+        return [_drop_empty_groups(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: _drop_empty_groups(value) for key, value in node.items()}
+    sections = node.get("sections")
+    if node.get("path") == "analysis" and isinstance(sections, list):
+        node["sections"] = [
+            item for index, item in enumerate(sections)
+            if not (_is_group_heading(item) and (
+                index + 1 >= len(sections) or _is_group_heading(sections[index + 1]) or _starts_history(sections[index + 1])
+            ))
+        ]
     return node
 
 
@@ -395,7 +448,7 @@ def render_dashboard(
     texts = load_texts(normalize_language(config.get("language")), currency, distance)
     # the sell price chart subtracts the same sell fee as the planner
     texts["dashboard.sell_fee_value"] = f"{abs(float(config['prices'].get('sell_fee', 0.0))):g}"
-    template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
+    template = _translate(_drop_empty_groups(_drop_empty_sections(_drop_empty_headings(_prune(template, missing)))), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 
 

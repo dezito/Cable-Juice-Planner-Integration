@@ -868,8 +868,21 @@ views:
   path: analysis
   title: '@@view_analysis@@'
   max_columns: 4
-  dense_section_placement: true
   sections:
+  # group: group_results_plan (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_results_plan@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:chart-box-outline
   # charging economy per month (engine/economy.py)
   - type: grid
     column_span: 2
@@ -1029,6 +1042,115 @@ views:
           return (entity.attributes.months || []).filter(m => m.lowest_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.lowest_unit]; });
       grid_options:
         columns: full
+  # planned against actually charged
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_planned@@'
+      icon: mdi:calendar-check
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@planned_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% if a.planned_days -%}
+        @@planned_summary_1@@ **{{ a.planned_total }} kWh**, @@planned_summary_2@@ **{{ a.actual_total }} kWh**, @@planned_summary_3@@ **{{ a.unplanned_total }} kWh** @@planned_summary_4@@
+        {%- else -%}
+        <ha-alert alert-type="info">@@planned_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@planned_title@@'
+        show_states: false
+      graph_span: 31d
+      span:
+        end: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 0
+      all_series_config:
+        type: column
+        unit: ' kWh'
+        float_precision: 1
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        tooltip:
+          shared: true
+          intersect: false
+        chart:
+          height: 260px
+        dataLabels:
+          enabled: false
+      series:
+      - entity: sensor.cjp_analysis
+        name: '@@planned_plan@@'
+        color: '#6250d6'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.plan]);
+      - entity: sensor.cjp_analysis
+        name: '@@planned_actual@@'
+        color: '#1baf7a'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.actual]);
+      - entity: sensor.cjp_analysis
+        name: '@@planned_unplanned@@'
+        color: '#e34948'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.manual + d.low_battery + d.other]);
+      grid_options:
+        columns: full
+  # ready at departure
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_departures@@'
+      icon: mdi:car-clock
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@departures_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% if a.departures -%}
+        @@departures_met_1@@ **{{ (a.departures_met * 100) | round(0) }} %** @@departures_met_2@@ {{ a.departures_count }} @@departures_met_3@@
+
+        | @@departures_day@@ | @@departures_level@@ | @@departures_target@@ | @@departures_required@@ | |
+        |:---|---:|---:|---:|:---:|
+        {% for d in a.departures | reverse -%}
+        | {{ d.date[8:10] }}/{{ d.date[5:7] }} {{ d.time }} | {{ d.level | round(0) }} % | {{ d.target | round(0) }} % | {{ d.required | round(0) }} % | {{ '✅' if d.met else '❌' }} |
+        {% endfor %}
+        {%- else -%}
+        <ha-alert alert-type="info">@@departures_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+  # group: group_driving (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_driving@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:road-variant
   # driving against the outdoor temperature: apexcharts only has a time axis, so -30 °C is drawn at midnight and 1 °C as 1 hour
   - type: grid
     column_span: 2
@@ -1138,34 +1260,6 @@ views:
           return (entity.attributes.temperature_bins || []).map(x => [b.getTime() + ((x.from + x.to) / 2 + 30) * 3600000, x.km_per_kwh]);
       grid_options:
         columns: full
-  # ready at departure
-  - type: grid
-    column_span: 2
-    cards:
-    - type: heading
-      heading: '@@section_departures@@'
-      icon: mdi:car-clock
-    - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@departures_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: markdown
-      card_mod: *id003
-      content: |-
-        {% set a = states.sensor.cjp_analysis.attributes %}
-        {% if a.departures -%}
-        @@departures_met_1@@ **{{ (a.departures_met * 100) | round(0) }} %** @@departures_met_2@@ {{ a.departures_count }} @@departures_met_3@@
-
-        | @@departures_day@@ | @@departures_level@@ | @@departures_target@@ | @@departures_required@@ | |
-        |:---|---:|---:|---:|:---:|
-        {% for d in a.departures | reverse -%}
-        | {{ d.date[8:10] }}/{{ d.date[5:7] }} {{ d.time }} | {{ d.level | round(0) }} % | {{ d.target | round(0) }} % | {{ d.required | round(0) }} % | {{ '✅' if d.met else '❌' }} |
-        {% endfor %}
-        {%- else -%}
-        <ha-alert alert-type="info">@@departures_no_data@@</ha-alert>
-        {%- endif %}
-      grid_options:
-        columns: full
   # learned driving distance per weekday (engine/distance.py): entered number against the learned_distance attribute
   - type: grid
     column_span: 2
@@ -1248,73 +1342,20 @@ views:
         {% endfor -%}
       grid_options:
         columns: full
-  # planned against actually charged
+  # group: group_forecasts (a full-width heading; removed with the group when no section of it is left)
   - type: grid
-    column_span: 2
+    column_span: 4
     cards:
     - type: heading
-      heading: '@@section_planned@@'
-      icon: mdi:calendar-check
-    - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@planned_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: markdown
-      content: |-
-        {% set a = states.sensor.cjp_analysis.attributes %}
-        {% if a.planned_days -%}
-        @@planned_summary_1@@ **{{ a.planned_total }} kWh**, @@planned_summary_2@@ **{{ a.actual_total }} kWh**, @@planned_summary_3@@ **{{ a.unplanned_total }} kWh** @@planned_summary_4@@
-        {%- else -%}
-        <ha-alert alert-type="info">@@planned_no_data@@</ha-alert>
-        {%- endif %}
-      grid_options:
-        columns: full
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@planned_title@@'
-        show_states: false
-      graph_span: 31d
-      span:
-        end: day
-      now:
-        show: false
-      yaxis:
-      - min: 0
-        decimals: 0
-      all_series_config:
-        type: column
-        unit: ' kWh'
-        float_precision: 1
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        tooltip:
-          shared: true
-          intersect: false
-        chart:
-          height: 260px
-        dataLabels:
-          enabled: false
-      series:
-      - entity: sensor.cjp_analysis
-        name: '@@planned_plan@@'
-        color: '#6250d6'
-        data_generator: |
-          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.plan]);
-      - entity: sensor.cjp_analysis
-        name: '@@planned_actual@@'
-        color: '#1baf7a'
-        data_generator: |
-          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.actual]);
-      - entity: sensor.cjp_analysis
-        name: '@@planned_unplanned@@'
-        color: '#e34948'
-        data_generator: |
-          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.manual + d.low_battery + d.other]);
-      grid_options:
-        columns: full
+      heading: '@@group_forecasts@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:chart-timeline-variant
   # the price forecast of the price integration against the real prices (engine/analysis)
   - type: grid
     column_span: 2
@@ -1626,6 +1667,20 @@ views:
         {%- endif %}
       grid_options:
         columns: full
+  # group: group_car_battery (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_car_battery@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:car-battery
   # battery capacity over time: kWh from the charger per % and month
   - type: grid
     column_span: 2
@@ -1934,7 +1989,7 @@ views:
         | @@soc_power_phases@@ | @@soc_power_soc@@ | @@soc_power_samples@@ | @@soc_power_tapers@@ | @@soc_power_observed@@ | @@soc_power_cap@@ |
         |:---:|:---:|---:|---:|---:|---:|
         {% for row in rows -%}
-        | {{ row.phases }} | {{ row.soc_start }}-{{ row.soc_end }} % | {{ row.sample_sessions }} | {{ row.sessions }} / {{ minimum }} | {{ (row.observed_kw ~ ' kW') if row.observed_kw is not none else '-' }} | {{ (row.cap_kw ~ ' kW' ~ (' 📊' if row.source == 'statistics' else '')) if row.cap_kw is not none else '@@soc_power_no_cap@@' }} |
+        | {{ row.phases }} | {{ row.soc_start }}-{{ row.soc_end }} % | {{ row.sample_sessions }} | {{ row.sessions }} / {{ minimum }} | {{ (row.observed_kw ~ ' kW') if row.observed_kw is not none else '-' }} | {{ (row.cap_kw ~ ' kW' ~ (' 📊' if row.get('source') == 'statistics' else '')) if row.cap_kw is not none else '@@soc_power_no_cap@@' }} |
         {% endfor -%}
         {% else %}
         @@soc_power_no_data@@

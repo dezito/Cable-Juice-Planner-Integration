@@ -52,9 +52,12 @@ Charging-loss and battery-level power learning update hourly. The comparisons ne
 which the recorder has for its `purge_keep_days` – the longer, the more there is from the first day (e.g. 30
 days). After that CJP saves the prices every hour itself.
 
+The page is organised in groups, each with its own heading: **Results and plan**, **Driving and learning**,
+**Forecasts** and **Car battery**, and last the **History**.
+
 Without a car integration, *Driving and temperature*, *Ready at departure*, *Learned driving distance*,
-*Battery capacity*, *Charging loss per power* and *Charging power by battery level* are left out, and *Forecast
-accuracy* shows only the house consumption.
+*Battery capacity*, *Charging loss per power* and *Charging power by battery level* are left out (the **Car battery**
+group with them), and *Forecast accuracy* shows only the house consumption.
 
 ### Economy
 
@@ -82,17 +85,15 @@ attributes.
 
 </details>
 
-### Driving and temperature
+### Planned against actually charged
 
-km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
-temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C. Below it: with
-[*Adjust driving efficiency to temperature*](temperature-efficiency.md) on, the km/kWh the plan uses for each planned
-drive at its forecast temperature next to the learned one, or why the learned one is used.
+The kWh planned the evening before against what was charged, and how much was charged outside the plan
+(manual, forced charging …). Saved every evening from the first start.
 
 <details>
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
+<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
 
 </details>
 
@@ -105,6 +106,20 @@ the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 depa
 <summary>Screenshot</summary>
 
 <p align="center"><img src="../images/ready-at-departure.png" alt="Battery level at each work plan departure" width="760"></p>
+
+</details>
+
+### Driving and temperature
+
+km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
+temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C. Below it: with
+[*Adjust driving efficiency to temperature*](temperature-efficiency.md) on, the km/kWh the plan uses for each planned
+drive at its forecast temperature next to the learned one, or why the learned one is used.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
 
 </details>
 
@@ -147,18 +162,6 @@ Per weekday (Monday to Sunday): the departure and homecoming entered in the work
 Above the table it says whether *Learn departure and homecoming* is on. The section is empty until the car has been
 unplugged between 04:00 and 12:00 and plugged in again the same day on a workday; CJP records the connections from the
 start and keeps them as far back as its charging history reaches. The switch is under *Settings → Advanced*.
-
-### Planned against actually charged
-
-The kWh planned the evening before against what was charged, and how much was charged outside the plan
-(manual, forced charging …). Saved every evening from the first start.
-
-<details>
-<summary>Screenshot</summary>
-
-<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
-
-</details>
 
 ### Price forecast
 

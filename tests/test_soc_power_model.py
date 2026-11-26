@@ -5,7 +5,7 @@ import datetime
 import re
 
 import yaml
-from jinja2 import Environment
+from jinja2 import Environment, StrictUndefined
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
@@ -230,11 +230,13 @@ def test_the_table_and_the_chart_read_only_what_the_sensor_publishes() -> None:
     assert any(row["cap_kw"] is None for row in rows)  # a band that is still learning
 
     _explanation, _switch, table, chart = _soc_section()["cards"][1:]
-    row_fields = set(re.findall(r"\brow\.(\w+)", table["content"]))
-    assert row_fields >= {"phases", "soc_start", "soc_end", "sample_sessions", "sessions", "observed_kw", "cap_kw", "source"}
+    optional_fields = set(re.findall(r"\brow\.get\('(\w+)'\)", table["content"]))
+    assert optional_fields == {"source"}  # only on a row that takes its starting value from the statistics: read with .get()
+    row_fields = set(re.findall(r"\brow\.(\w+)", table["content"])) - {"get"}
+    assert row_fields >= {"phases", "soc_start", "soc_end", "sample_sessions", "sessions", "observed_kw", "cap_kw"}
     keys = set().union(*(row.keys() for row in rows))
-    assert row_fields <= keys, row_fields - keys
-    for field in row_fields - {"source"}:  # source only exists on a row that takes its starting value from the statistics
+    assert (row_fields | optional_fields) <= keys, (row_fields | optional_fields) - keys
+    for field in row_fields:  # a field read directly has to be in every row: Home Assistant renders strictly
         assert all(field in row for row in rows), field
     attributes_read = set(re.findall(r"state_attr\('[^']+', '(\w+)'\)", table["content"]))
     assert attributes_read <= set(published["attributes"]), attributes_read - set(published["attributes"])
@@ -271,6 +273,29 @@ def test_the_status_line_and_the_table_render_from_what_the_sensor_publishes() -
 
     empty = render(_published([], []))
     assert "no usable measurements yet" in empty.lower()
+
+
+def test_the_table_renders_when_only_some_rows_have_a_source() -> None:
+    """Home Assistant renders a dashboard template strictly: a field that is missing is an error, not an empty value. `source`
+    exists only on a row that takes its starting value from the statistics, so the table has to read it with `.get()`."""
+    table = _soc_section("en")["cards"][3]
+    # three own sessions: a band with a learned limit (the table reads `source` only in a row that has one) and no `source`
+    own = [*_session(1_760_000_000.0), *_session(1_760_086_400.0), *_session(1_760_172_800.0)]
+    statistics = [
+        {**segment, "source": "statistics", "phase_observed": False, "phases": 1}
+        for start in (1_760_259_200.0, 1_760_345_600.0, 1_760_432_000.0)
+        for segment in _session(start, phases=1, low_kw=3.6, high_kw=2.0)
+    ]
+    published = _published(own, statistics)
+    rows = published["attributes"]["bands"]
+    assert any("source" in row for row in rows)
+    assert any("source" not in row and row["cap_kw"] is not None for row in rows)  # the mix that failed in Home Assistant
+
+    attributes = published["attributes"]
+    rendered = Environment(undefined=StrictUndefined).from_string(table["content"]).render(
+        state_attr=lambda _entity, attribute: attributes.get(attribute), states=lambda _entity: published["state"]
+    )
+    assert "📊" in rendered  # the row that takes its value from the statistics is marked
 
 
 def test_power_model_is_phase_specific_and_only_clamps_crossed_soc_bands() -> None:
