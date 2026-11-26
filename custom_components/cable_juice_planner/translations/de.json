@@ -277,13 +277,27 @@
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
           "preheating": "Vorheizen Start/Stopp",
-          "departure_readiness": "Auto nicht bereit / anschließen"
+          "departure_readiness": "Auto nicht bereit / anschließen",
+          "notify_charger_offline": "Ladegerät antwortet nicht vor einer Abfahrt",
+          "notify_cheap_power": "Günstiger Strom, Auto nicht angeschlossen",
+          "notify_manual_expensive": "Manuelles Laden in einer teuren Stunde",
+          "notify_monthly_summary": "Monatsübersicht",
+          "notify_site_limit": "Lastverteilung hat das Laden begrenzt",
+          "notify_battery_full": "Akku seit Langem voll",
+          "notify_charging_loss": "Ladeverlust ist gestiegen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
           "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
-          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist."
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist.",
+          "notify_charger_offline": "Benachrichtigt einmal pro Abfahrt, wenn der Status des Ladegeräts 30 Minuten lang nicht verfügbar oder unbekannt war, während Laden für eine Abfahrt innerhalb von 24 Stunden geplant ist.",
+          "notify_cheap_power": "Benachrichtigt höchstens einmal am Tag, wenn Laden zu einem sehr günstigen Preis oder einem Preis unter 0 innerhalb der nächsten Stunde geplant ist und das Auto zu Hause, aber nicht angeschlossen ist. Nicht für das Laden, das eine Abfahrt braucht (das deckt Auto nicht bereit / anschließen ab).",
+          "notify_manual_expensive": "Benachrichtigt höchstens einmal am Tag, wenn manuelles Laden an ist und das Auto in einer der 4 teuersten Stunden des Tages lädt.",
+          "notify_monthly_summary": "Benachrichtigt einmal im Monat mit den geladenen kWh, den Kosten, dem Durchschnittspreis und der Ersparnis im Vergleich zum täglichen Laden des letzten Monats. Nicht für einen Monat, den CJP nicht von Anfang an gesehen hat, oder ohne bekannte Kosten.",
+          "notify_site_limit": "Benachrichtigt, wenn die Lastverteilung (die Hauptsicherung oder das Limit der Anlage) das Laden des angeschlossenen Autos zwei Prüfintervalle und mindestens 10 Minuten lang gestoppt oder gesenkt hat, jeweils höchstens einmal am Tag. Nicht während des Tests des Ladegeräts.",
+          "notify_battery_full": "Benachrichtigt, wenn der eigene Akkustand des Autos 12 Stunden lang bei 99 % oder mehr stand (24 Stunden, wenn eine Vollladung alle X Tage eingestellt oder unbekannt ist), einmal pro Vollstand. Erneut nach 30 Tagen, wenn er noch voll ist. Braucht die Integration des Autos.",
+          "notify_charging_loss": "Benachrichtigt höchstens einmal im Monat, wenn die kWh pro 1 % bei 4 kW oder mehr in den letzten 30 Tagen mindestens 15 % über denen vor 3–6 Monaten liegen, mit genug Messungen in beiden, und auch über denselben Monaten im Vorjahr, wenn es dort genug Messungen gibt. Kälte erhöht ihn auch."
         }
       },
       "advanced": {
@@ -707,13 +721,27 @@
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
           "preheating": "Vorheizen Start/Stopp",
-          "departure_readiness": "Auto nicht bereit / anschließen"
+          "departure_readiness": "Auto nicht bereit / anschließen",
+          "notify_charger_offline": "Ladegerät antwortet nicht vor einer Abfahrt",
+          "notify_cheap_power": "Günstiger Strom, Auto nicht angeschlossen",
+          "notify_manual_expensive": "Manuelles Laden in einer teuren Stunde",
+          "notify_monthly_summary": "Monatsübersicht",
+          "notify_site_limit": "Lastverteilung hat das Laden begrenzt",
+          "notify_battery_full": "Akku seit Langem voll",
+          "notify_charging_loss": "Ladeverlust ist gestiegen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
           "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
-          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist."
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist.",
+          "notify_charger_offline": "Benachrichtigt einmal pro Abfahrt, wenn der Status des Ladegeräts 30 Minuten lang nicht verfügbar oder unbekannt war, während Laden für eine Abfahrt innerhalb von 24 Stunden geplant ist.",
+          "notify_cheap_power": "Benachrichtigt höchstens einmal am Tag, wenn Laden zu einem sehr günstigen Preis oder einem Preis unter 0 innerhalb der nächsten Stunde geplant ist und das Auto zu Hause, aber nicht angeschlossen ist. Nicht für das Laden, das eine Abfahrt braucht (das deckt Auto nicht bereit / anschließen ab).",
+          "notify_manual_expensive": "Benachrichtigt höchstens einmal am Tag, wenn manuelles Laden an ist und das Auto in einer der 4 teuersten Stunden des Tages lädt.",
+          "notify_monthly_summary": "Benachrichtigt einmal im Monat mit den geladenen kWh, den Kosten, dem Durchschnittspreis und der Ersparnis im Vergleich zum täglichen Laden des letzten Monats. Nicht für einen Monat, den CJP nicht von Anfang an gesehen hat, oder ohne bekannte Kosten.",
+          "notify_site_limit": "Benachrichtigt, wenn die Lastverteilung (die Hauptsicherung oder das Limit der Anlage) das Laden des angeschlossenen Autos zwei Prüfintervalle und mindestens 10 Minuten lang gestoppt oder gesenkt hat, jeweils höchstens einmal am Tag. Nicht während des Tests des Ladegeräts.",
+          "notify_battery_full": "Benachrichtigt, wenn der eigene Akkustand des Autos 12 Stunden lang bei 99 % oder mehr stand (24 Stunden, wenn eine Vollladung alle X Tage eingestellt oder unbekannt ist), einmal pro Vollstand. Erneut nach 30 Tagen, wenn er noch voll ist. Braucht die Integration des Autos.",
+          "notify_charging_loss": "Benachrichtigt höchstens einmal im Monat, wenn die kWh pro 1 % bei 4 kW oder mehr in den letzten 30 Tagen mindestens 15 % über denen vor 3–6 Monaten liegen, mit genug Messungen in beiden, und auch über denselben Monaten im Vorjahr, wenn es dort genug Messungen gibt. Kälte erhöht ihn auch."
         }
       },
       "advanced": {

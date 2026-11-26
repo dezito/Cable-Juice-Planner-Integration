@@ -277,13 +277,27 @@
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
           "preheating": "Forvarmning start/stop",
-          "departure_readiness": "Bil ikke klar / sæt stik i"
+          "departure_readiness": "Bil ikke klar / sæt stik i",
+          "notify_charger_offline": "Laderen svarer ikke før en afgang",
+          "notify_cheap_power": "Billig strøm, bilen er ikke sat til",
+          "notify_manual_expensive": "Manuel opladning i en dyr time",
+          "notify_monthly_summary": "Månedsoversigt",
+          "notify_site_limit": "Lastfordelingen begrænsede opladningen",
+          "notify_battery_full": "Batteriet længe fuldt",
+          "notify_charging_loss": "Ladetabet er steget"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
           "preheating": "Notifikation ved start/stop af forvarmning",
-          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til."
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til.",
+          "notify_charger_offline": "Giver besked én gang pr. afgang, når laderens status har været utilgængelig eller ukendt i 30 minutter, mens der er planlagt opladning til en afgang inden for 24 timer.",
+          "notify_cheap_power": "Giver højst besked én gang om dagen, når opladning til en meget billig pris eller en pris under 0 er planlagt inden for en time, og bilen er hjemme uden at være sat til. Ikke for den opladning, en afgang kræver (det dækker Bil ikke klar / sæt stik i).",
+          "notify_manual_expensive": "Giver højst besked én gang om dagen, når manuel opladning er slået til, og bilen lader i en af dagens 4 dyreste timer.",
+          "notify_monthly_summary": "Giver besked én gang om måneden med sidste måneds ladede kWh, pris, gennemsnitspris og besparelsen i forhold til daglig opladning. Ikke for en måned, CJP ikke har set fra starten, eller uden kendt pris.",
+          "notify_site_limit": "Giver besked, når lastfordelingen (hovedsikringen eller grænsen for installationen) har stoppet eller sænket opladningen af den tilsluttede bil i to kontrolintervaller og mindst 10 minutter, hver højst én gang om dagen. Ikke under testen af laderen.",
+          "notify_battery_full": "Giver besked, når bilens egen batteriprocent har stået på 99 % eller mere i 12 timer (24 timer, når fuld opladning hver X. dag er sat eller ukendt), én gang pr. gang den er fuld. Igen efter 30 dage, hvis det stadig er fuldt. Kræver bilens integration.",
+          "notify_charging_loss": "Giver højst besked én gang om måneden, når kWh pr. 1 % ved 4 kW eller mere de sidste 30 dage er mindst 15 % over for 3–6 måneder siden, med nok målinger i begge, og også over de samme måneder året før, når de har nok målinger. Kulde hæver det også."
         }
       },
       "advanced": {
@@ -707,13 +721,27 @@
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
           "preheating": "Forvarmning start/stop",
-          "departure_readiness": "Bil ikke klar / sæt stik i"
+          "departure_readiness": "Bil ikke klar / sæt stik i",
+          "notify_charger_offline": "Laderen svarer ikke før en afgang",
+          "notify_cheap_power": "Billig strøm, bilen er ikke sat til",
+          "notify_manual_expensive": "Manuel opladning i en dyr time",
+          "notify_monthly_summary": "Månedsoversigt",
+          "notify_site_limit": "Lastfordelingen begrænsede opladningen",
+          "notify_battery_full": "Batteriet længe fuldt",
+          "notify_charging_loss": "Ladetabet er steget"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
           "preheating": "Notifikation ved start/stop af forvarmning",
-          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til."
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til.",
+          "notify_charger_offline": "Giver besked én gang pr. afgang, når laderens status har været utilgængelig eller ukendt i 30 minutter, mens der er planlagt opladning til en afgang inden for 24 timer.",
+          "notify_cheap_power": "Giver højst besked én gang om dagen, når opladning til en meget billig pris eller en pris under 0 er planlagt inden for en time, og bilen er hjemme uden at være sat til. Ikke for den opladning, en afgang kræver (det dækker Bil ikke klar / sæt stik i).",
+          "notify_manual_expensive": "Giver højst besked én gang om dagen, når manuel opladning er slået til, og bilen lader i en af dagens 4 dyreste timer.",
+          "notify_monthly_summary": "Giver besked én gang om måneden med sidste måneds ladede kWh, pris, gennemsnitspris og besparelsen i forhold til daglig opladning. Ikke for en måned, CJP ikke har set fra starten, eller uden kendt pris.",
+          "notify_site_limit": "Giver besked, når lastfordelingen (hovedsikringen eller grænsen for installationen) har stoppet eller sænket opladningen af den tilsluttede bil i to kontrolintervaller og mindst 10 minutter, hver højst én gang om dagen. Ikke under testen af laderen.",
+          "notify_battery_full": "Giver besked, når bilens egen batteriprocent har stået på 99 % eller mere i 12 timer (24 timer, når fuld opladning hver X. dag er sat eller ukendt), én gang pr. gang den er fuld. Igen efter 30 dage, hvis det stadig er fuldt. Kræver bilens integration.",
+          "notify_charging_loss": "Giver højst besked én gang om måneden, når kWh pr. 1 % ved 4 kW eller mere de sidste 30 dage er mindst 15 % over for 3–6 måneder siden, med nok målinger i begge, og også over de samme måneder året før, når de har nok målinger. Kulde hæver det også."
         }
       },
       "advanced": {

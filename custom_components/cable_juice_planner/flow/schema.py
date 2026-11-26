@@ -160,6 +160,13 @@ SELECTORS: dict[str, Any] = {
     "efficiency_on_cable_plug_in": BOOLEAN,
     "preheating": BOOLEAN,
     "departure_readiness": BOOLEAN,
+    "notify_charger_offline": BOOLEAN,
+    "notify_cheap_power": BOOLEAN,
+    "notify_manual_expensive": BOOLEAN,
+    "notify_monthly_summary": BOOLEAN,
+    "notify_site_limit": BOOLEAN,
+    "notify_battery_full": BOOLEAN,
+    "notify_charging_loss": BOOLEAN,
     # advanced / database
     "cron_interval": selector.SelectSelector(selector.SelectSelectorConfig(options=CRON_INTERVALS, mode=selector.SelectSelectorMode.DROPDOWN)),
     "dashboard": BOOLEAN,

@@ -277,13 +277,27 @@
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
           "preheating": "Podgrzewanie start/stop",
-          "departure_readiness": "Samochód niegotowy / podłącz"
+          "departure_readiness": "Samochód niegotowy / podłącz",
+          "notify_charger_offline": "Ładowarka nie odpowiada przed wyjazdem",
+          "notify_cheap_power": "Tani prąd, samochód niepodłączony",
+          "notify_manual_expensive": "Ręczne ładowanie w drogiej godzinie",
+          "notify_monthly_summary": "Podsumowanie miesiąca",
+          "notify_site_limit": "Rozdział mocy ograniczył ładowanie",
+          "notify_battery_full": "Akumulator długo pełny",
+          "notify_charging_loss": "Straty ładowania wzrosły"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
           "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
-          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony."
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony.",
+          "notify_charger_offline": "Powiadamia raz na wyjazd, gdy stan ładowarki był niedostępny lub nieznany przez 30 minut, a zaplanowano ładowanie przed wyjazdem w ciągu 24 godzin.",
+          "notify_cheap_power": "Powiadamia najwyżej raz dziennie, gdy w ciągu godziny zaplanowano ładowanie po bardzo niskiej cenie lub cenie poniżej 0, a samochód jest w domu, ale nie jest podłączony. Nie dotyczy ładowania potrzebnego do wyjazdu (to obejmuje Samochód niegotowy / podłącz).",
+          "notify_manual_expensive": "Powiadamia najwyżej raz dziennie, gdy ręczne ładowanie jest włączone, a samochód ładuje się w jednej z 4 najdroższych godzin dnia.",
+          "notify_monthly_summary": "Powiadamia raz w miesiącu o naładowanych kWh, koszcie, średniej cenie i oszczędności w porównaniu z codziennym ładowaniem w poprzednim miesiącu. Nie dla miesiąca, którego CJP nie widział od początku, ani bez znanego kosztu.",
+          "notify_site_limit": "Powiadamia, gdy rozdział mocy (bezpiecznik główny lub limit instalacji) przez dwa interwały kontroli i co najmniej 10 minut zatrzymywał lub obniżał ładowanie podłączonego samochodu, każde najwyżej raz dziennie. Nie podczas testu ładowarki.",
+          "notify_battery_full": "Powiadamia, gdy własny poziom akumulatora samochodu wynosi 99 % lub więcej przez 12 godzin (24 godziny, gdy ustawiono pełne ładowanie co X dni lub nie jest to znane), raz na każde pełne naładowanie. Ponownie po 30 dniach, jeśli nadal jest pełny. Wymaga integracji samochodu.",
+          "notify_charging_loss": "Powiadamia najwyżej raz w miesiącu, gdy kWh na 1 % przy 4 kW lub więcej w ostatnich 30 dniach jest co najmniej o 15 % wyższe niż 3–6 miesięcy temu, przy wystarczającej liczbie pomiarów w obu okresach, a także wyższe niż w tych samych miesiącach rok wcześniej, jeśli jest tam wystarczająco pomiarów. Zimno też je zwiększa."
         }
       },
       "advanced": {
@@ -707,13 +721,27 @@
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
           "preheating": "Podgrzewanie start/stop",
-          "departure_readiness": "Samochód niegotowy / podłącz"
+          "departure_readiness": "Samochód niegotowy / podłącz",
+          "notify_charger_offline": "Ładowarka nie odpowiada przed wyjazdem",
+          "notify_cheap_power": "Tani prąd, samochód niepodłączony",
+          "notify_manual_expensive": "Ręczne ładowanie w drogiej godzinie",
+          "notify_monthly_summary": "Podsumowanie miesiąca",
+          "notify_site_limit": "Rozdział mocy ograniczył ładowanie",
+          "notify_battery_full": "Akumulator długo pełny",
+          "notify_charging_loss": "Straty ładowania wzrosły"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
           "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
-          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony."
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony.",
+          "notify_charger_offline": "Powiadamia raz na wyjazd, gdy stan ładowarki był niedostępny lub nieznany przez 30 minut, a zaplanowano ładowanie przed wyjazdem w ciągu 24 godzin.",
+          "notify_cheap_power": "Powiadamia najwyżej raz dziennie, gdy w ciągu godziny zaplanowano ładowanie po bardzo niskiej cenie lub cenie poniżej 0, a samochód jest w domu, ale nie jest podłączony. Nie dotyczy ładowania potrzebnego do wyjazdu (to obejmuje Samochód niegotowy / podłącz).",
+          "notify_manual_expensive": "Powiadamia najwyżej raz dziennie, gdy ręczne ładowanie jest włączone, a samochód ładuje się w jednej z 4 najdroższych godzin dnia.",
+          "notify_monthly_summary": "Powiadamia raz w miesiącu o naładowanych kWh, koszcie, średniej cenie i oszczędności w porównaniu z codziennym ładowaniem w poprzednim miesiącu. Nie dla miesiąca, którego CJP nie widział od początku, ani bez znanego kosztu.",
+          "notify_site_limit": "Powiadamia, gdy rozdział mocy (bezpiecznik główny lub limit instalacji) przez dwa interwały kontroli i co najmniej 10 minut zatrzymywał lub obniżał ładowanie podłączonego samochodu, każde najwyżej raz dziennie. Nie podczas testu ładowarki.",
+          "notify_battery_full": "Powiadamia, gdy własny poziom akumulatora samochodu wynosi 99 % lub więcej przez 12 godzin (24 godziny, gdy ustawiono pełne ładowanie co X dni lub nie jest to znane), raz na każde pełne naładowanie. Ponownie po 30 dniach, jeśli nadal jest pełny. Wymaga integracji samochodu.",
+          "notify_charging_loss": "Powiadamia najwyżej raz w miesiącu, gdy kWh na 1 % przy 4 kW lub więcej w ostatnich 30 dniach jest co najmniej o 15 % wyższe niż 3–6 miesięcy temu, przy wystarczającej liczbie pomiarów w obu okresach, a także wyższe niż w tych samych miesiącach rok wcześniej, jeśli jest tam wystarczająco pomiarów. Zimno też je zwiększa."
         }
       },
       "advanced": {

@@ -17,9 +17,10 @@ from .charger_test import ChargerTest
 from .charging_loss import ControlChargingLoss
 from .events import ControlEvents
 from .preheat import ControlPreheat
+from .notices import ControlNotices
 from .readiness import ControlReadiness
 from .schedule import ControlSchedule
 
 
-class Control(ControlActions, ControlSchedule, ControlPreheat, ControlChargingLoss, ControlEvents, ChargerTest, ControlReadiness):
+class Control(ControlActions, ControlSchedule, ControlPreheat, ControlChargingLoss, ControlEvents, ChargerTest, ControlReadiness, ControlNotices):
     """charge_if_needed and the event handlers of ev.py."""

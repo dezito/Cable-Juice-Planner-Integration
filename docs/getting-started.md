@@ -277,6 +277,40 @@ for it at startup and notify you.
   test and the hour after it, the charging loss measurement, manual charging, without any charging mode, with another
   car on the charger, or while a departure is moved later for a car still plugged in. A limit, level, age of the
   level, status or power that is not known gives no notification.
+- **More push notifications** (each default on, each with its own switch). Each event is sent once, also across a
+  restart, and missing, unknown or stale data never sends one (except load balancing: it reports what it did, also
+  when missing measurements made it limit the charging):
+  - **Charger not responding before a departure:** the charger's status has been unavailable or unknown for 30
+    minutes while charging for a departure within 24 hours is planned and not over. Once per departure.
+  - **Cheap power, car not plugged in:** charging at the planner's very cheap price levels, or at a price below 0,
+    is planned within the hour (or has started) while the car is home and has been unplugged for at least 15
+    minutes. Not for the charging a departure needs (*Car not ready / plug in* reminds you of that), not while a
+    price of the window is unknown, and not for a car without its integration at 0 %. At most once a day.
+  - **Manual charging in an expensive hour:** manual charging is on and the car charges in one of the day's 4 most
+    expensive hours. At most once a day.
+  - **Monthly summary:** after the daily economy update in a new month: last month's kWh, cost, average price and
+    the saving (or extra cost) compared with daily charging, the same figures as the economy (the saving covers the
+    compared home connections, the kWh and cost all charging). It waits up to 3 days for a connection of last month
+    that is not compared yet (still open, just closed, or its prices are not in the statistics yet), and is not sent
+    when CJP's data (charging history or connections) does not begin before the month, for a month without charging
+    or with a cost that is not known.
+  - **Load balancing limited the charging:** load balancing (the main fuse or the site limit) has stopped or lowered
+    the charging of the plugged-in car for two check intervals and at least 10 minutes, each by itself (a kettle, or
+    a short stop during a longer reduction, is no notice), with
+    the time it began and the power before and after. At most once a day each. Not during the charger test.
+  - **Battery full for a long time:** with a car integration, the car's own level has stood at 99 % or more for 12
+    hours, or 24 hours when *Full charge every X days* is set or not known (a full charge on purpose, often an LFP
+    battery that stands it well). Once per time it is full, and again after 30 days if it is still full. Not when the
+    car's *Last update* entity is more than 24 hours old, or when its level is not known (an asleep car keeps its last
+    level for a day).
+  - **Charging loss has risen:** the kWh from the charger per 1 % at 4 kW or more over the last 30 days (at least 3
+    measurements and 20 %) is at least 15 % above the months 3 to 6 back (at least 5 measurements and 40 %). Cold
+    weather raises it too. When the same months a year earlier (12 and 13 months back) have as many measurements, the
+    rise must also be at least 15 % against them, and the message shows that value, so a cold winter alone sends
+    nothing. Without that year of data, a rise in winter against the summer may still be the season. These months come
+    from the charging loss measurement. At the first start it reads the long-term statistics up to about two years
+    back, but stops after 180 days once every power group has 10 measurements, and reads nothing older when the power
+    sensor has no statistics: then the year comparison only begins after CJP has run for a year. At most once a month.
 - **Interval:** the minutes between each check of the plan and the charging.
 - **Dashboard** in the sidebar (default on).
 - **Diagnostic file log:** writes a detailed log to `cable_juice_planner_<prefix>.log` in the config folder (2 MB per file, 3 rotations). See [Report a problem](faq-troubleshooting.md#report-a-problem).

@@ -277,13 +277,27 @@
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
           "preheating": "Preheating start/stop",
-          "departure_readiness": "Car not ready / plug in"
+          "departure_readiness": "Car not ready / plug in",
+          "notify_charger_offline": "Charger not responding before a departure",
+          "notify_cheap_power": "Cheap power, car not plugged in",
+          "notify_manual_expensive": "Manual charging in an expensive hour",
+          "notify_monthly_summary": "Monthly summary",
+          "notify_site_limit": "Load balancing limited the charging",
+          "notify_battery_full": "Battery full for a long time",
+          "notify_charging_loss": "Charging loss has risen"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
           "preheating": "Notify on preheating start/stop",
-          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in."
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in.",
+          "notify_charger_offline": "Notify once per departure when the charger's status has been unavailable or unknown for 30 minutes while charging for a departure within 24 hours is planned.",
+          "notify_cheap_power": "Notify at most once a day when charging at a very cheap price or a price below 0 is planned within the hour, and the car is home but not plugged in. Not for the charging a departure needs (Car not ready / plug in covers that).",
+          "notify_manual_expensive": "Notify at most once a day when manual charging is on and the car charges in one of the day's 4 most expensive hours.",
+          "notify_monthly_summary": "Notify once a month with last month's charged kWh, cost, average price and the saving compared with daily charging. Not for a month CJP did not see from its start or without a known cost.",
+          "notify_site_limit": "Notify when load balancing (the main fuse or the site limit) has stopped or lowered the charging of the plugged-in car for two check intervals and at least 10 minutes, each at most once a day. Not during the charger test.",
+          "notify_battery_full": "Notify when the car's own battery level has stood at 99 % or more for 12 hours (24 hours when a full charge every X days is set or not known), once per time it is full. Again after 30 days if it is still full. Needs the car integration.",
+          "notify_charging_loss": "Notify at most once a month when the kWh per 1 % at 4 kW or more over the last 30 days is at least 15 % above 3–6 months ago, with enough measurements in both, and also above the same months a year earlier when they have enough measurements. Cold weather raises it too."
         }
       },
       "advanced": {
@@ -707,13 +721,27 @@
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
           "preheating": "Preheating start/stop",
-          "departure_readiness": "Car not ready / plug in"
+          "departure_readiness": "Car not ready / plug in",
+          "notify_charger_offline": "Charger not responding before a departure",
+          "notify_cheap_power": "Cheap power, car not plugged in",
+          "notify_manual_expensive": "Manual charging in an expensive hour",
+          "notify_monthly_summary": "Monthly summary",
+          "notify_site_limit": "Load balancing limited the charging",
+          "notify_battery_full": "Battery full for a long time",
+          "notify_charging_loss": "Charging loss has risen"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
           "preheating": "Notify on preheating start/stop",
-          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in."
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in.",
+          "notify_charger_offline": "Notify once per departure when the charger's status has been unavailable or unknown for 30 minutes while charging for a departure within 24 hours is planned.",
+          "notify_cheap_power": "Notify at most once a day when charging at a very cheap price or a price below 0 is planned within the hour, and the car is home but not plugged in. Not for the charging a departure needs (Car not ready / plug in covers that).",
+          "notify_manual_expensive": "Notify at most once a day when manual charging is on and the car charges in one of the day's 4 most expensive hours.",
+          "notify_monthly_summary": "Notify once a month with last month's charged kWh, cost, average price and the saving compared with daily charging. Not for a month CJP did not see from its start or without a known cost.",
+          "notify_site_limit": "Notify when load balancing (the main fuse or the site limit) has stopped or lowered the charging of the plugged-in car for two check intervals and at least 10 minutes, each at most once a day. Not during the charger test.",
+          "notify_battery_full": "Notify when the car's own battery level has stood at 99 % or more for 12 hours (24 hours when a full charge every X days is set or not known), once per time it is full. Again after 30 days if it is still full. Needs the car integration.",
+          "notify_charging_loss": "Notify at most once a month when the kWh per 1 % at 4 kW or more over the last 30 days is at least 15 % above 3–6 months ago, with enough measurements in both, and also above the same months a year earlier when they have enough measurements. Cold weather raises it too."
         }
       },
       "advanced": {

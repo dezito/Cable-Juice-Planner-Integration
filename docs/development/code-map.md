@@ -14,6 +14,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
 │   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
 │   │   ├── readiness.py                 Departure notifications: not ready (the shortfall scheduled_planner records; while charging the car's limit, a car that stops, slow charging; the car's limit at plug-in when the automation has no limit step: `car_limit_steps` from `coordinator/status_states.py`), plug in; sent once per departure (runtime state)
+│   │   ├── notices.py                   More notifications: charger offline before a departure, cheap power unplugged, manual charging in an expensive hour, monthly summary (from `economy_update`), load balancing (from `_apply_site_limit`), battery full, charging loss rise; sent once per event (`sent_notices`, runtime state)
 │   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
 │   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
 │   ├── energy/                          Prices, solar, forecasts, and power inputs (`meter_check.py`: does the house sensor include the charger?)
@@ -59,6 +60,7 @@ tests/                                   Pytest suite
 ├── test_weather_forecast_fetch.py       The weather forecast of the snapshot: also without solar with a weather entity, never without one
 ├── test_forecast_timezone.py            Times with an offset in local time: the weather forecast in UTC, the car's last update
 ├── test_departure_readiness.py          Departure notifications: the planner's shortfall, once per departure and across a restart, plug in, the checks while charging and at plug-in, the virtual EV's level from the charger meter
+├── test_notices.py                      More notifications: each fires once, not after a restart, not from missing or stale data, not with its switch off
 ├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
 ├── fixtures/                            Legacy PyScript config for the import tests
 └── debug_replay.py                      Debug/replay helper

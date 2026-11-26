@@ -72,6 +72,7 @@ class ControlEvents:
         self.daily_odometer = {str(date): float(value) for date, value in (runtime.get("daily_odometer") or {}).items()}
         self.trip_days = {date for date in (runtime.get("trip_days") or []) if isinstance(date, str)}
         self.restore_departure_notices(runtime.get("departure_notices"))
+        self.restore_sent_notices(runtime.get("sent_notices"))
         anchor = runtime.get("virtual_charge_anchor")
         # meter None: unplugged, the next charge counts from the meter then
         valid = isinstance(anchor, dict) and all(
@@ -201,6 +202,7 @@ class ControlEvents:
         self.is_battery_fully_charged()
         # from the stored plan, also when the plan hash skipped the calculation
         self.notify_departure_readiness()
+        self.notify_notices()
         if self.is_ev_configured():
             self.analysis_check_departure()
         self.set_estimated_range()
