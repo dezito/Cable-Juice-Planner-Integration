@@ -309,42 +309,6 @@ class EnergySolar:
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Cant set solar_charged_percentage: %s", err)
 
-    def calc_co2_emitted(self, period=None, added_kwh=None):
-        if added_kwh is None:
-            return 0.0
-        co2_entity = self.config["charger"]["entity_ids"]["co2_entity_id"]
-        if not self.is_entity_available(co2_entity):
-            return None
-        if not co2_entity.startswith("sensor.") or not self.entity_exists(co2_entity):
-            return None
-        try:
-            minutes = self.now().minute if period is None else period
-            now = self.now()
-            past = now - datetime.timedelta(minutes=minutes)
-            ev_kwh = round(abs(float(self.history.get_average_value(self.config["charger"]["entity_ids"]["charger_power_entity_id"], past, now, convert_to="W", error_state=0.0))) / 1000.0, 3)
-            solar_kwh_available = round(max(self.local_energy_available(period=minutes, without_all_exclusion=True, solar_only=True), 0.0) / 1000.0, 3)
-            ev_solar_kwh = round(solar_kwh_available, 3)
-            ev_grid_kwh = round(max(ev_kwh - solar_kwh_available, 0.0), 3)
-            grid_co2_emitted = 0.0
-            grid_co2_kwh = float(self.get_state(co2_entity, float_type=True, error_state=0.0))
-            try:
-                solar_co2_emitted = (ev_solar_kwh / ev_kwh) * (10 / 1000.0)
-                grid_co2_emitted = (ev_grid_kwh / ev_kwh) * (grid_co2_kwh / 1000.0)
-                grid_co2_emitted = round((solar_co2_emitted + grid_co2_emitted) * added_kwh, 3)
-            except Exception:  # noqa: BLE001
-                pass
-            co2_emitted = self.own_state("co2_emitted", float_type=True, error_state=None)
-            if co2_emitted is not None and grid_co2_emitted > 0.0:
-                co2_emitted = round(float(co2_emitted) + grid_co2_emitted, 3)
-                _LOGGER.info("Setting co2_emitted to %s increased by %s", co2_emitted, grid_co2_emitted)
-                self.set_state("co2_emitted", co2_emitted)
-                self.mark_dirty("runtime")
-                return co2_emitted
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.error("Error calculating co2 emitted: %s %s", err, type(err))
-            self.persistent_notification(f"Error calculating co2 emitted: {err} {type(err)}", title=f"{self.title} error", notification_id=f"{self.name}_calc_co2_emitted_error")
-        return 0.0
-
     def get_solar_sell_price(self, set_entity_attr=False, get_avg_offline_sell_price=False):  # noqa: C901
         if not self.is_solar_configured():
             return 0.0
@@ -357,7 +321,7 @@ class EnergySolar:
             if get_avg_offline_sell_price:
                 sun_events = self.get_sun_events()
                 return self.sell_value(average([
-                    self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
+                    self.get_price_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
                     for hour in range(sun_events["sunrise"].hour, sun_events["sunset"].hour)
                 ]))
 
@@ -432,7 +396,7 @@ class EnergySolar:
             sell_price = None
             using_text = "default"
             try:
-                sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week]))
+                sell_price = self.sell_value(self.get_price_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week]))
                 using_text = "database forecast"
             except Exception:  # noqa: BLE001
                 pass

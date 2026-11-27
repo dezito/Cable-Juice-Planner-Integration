@@ -9,15 +9,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from ..const import FLOW_STEPS
-from ..utils.helpers import to_datetime
-from .base import BasePriceProvider, _naive, is_number
+from .base import BasePriceProvider, _naive, is_number, price_timestamp
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _derive(entity_id: str, old: str, new: str) -> str:
-    """The entity of the same device: the configured one with `old` in its id replaced by `new` ("" when it has no `old`)."""
-    return entity_id.replace(old, new) if old in entity_id else ""
 
 
 class StromligningPriceProvider(BasePriceProvider):
@@ -25,6 +19,7 @@ class StromligningPriceProvider(BasePriceProvider):
 
     source_name = "stromligning"
     buy_key = "stromligning_buy_current_price"
+    countries = frozenset({"DK"})  # Strømligning is a Danish service
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
@@ -53,17 +48,9 @@ class StromligningPriceProvider(BasePriceProvider):
 
     @classmethod
     def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
-        buy, sell = prices["stromligning_buy_current_price"], prices["stromligning_sell_current_price"]
-        return {
-            "sensor.stromligning_current_price_vat": buy,
-            "sensor.stromligning_forecasts_vat": prices["stromligning_buy_forecasts"],
-            "binary_sensor.stromligning_tomorrow_available_vat": prices["stromligning_buy_tomorrow_available"],
-            "sensor.stromligning_nettariff_vat": _derive(buy, "current_price", "nettariff"),
-            "sensor.stromligning_systemtariff_vat": _derive(buy, "current_price", "systemtariff"),
-            "sensor.stromligning_15min_spotprice_ex_vat": _derive(sell, "current_price", "spotprice"),
-            "sensor.stromligning_15min_forecasts_ex_vat": prices["stromligning_sell_forecasts"],
-            "binary_sensor.stromligning_15min_tomorrow_available_ex_vat": prices["stromligning_sell_tomorrow_available"],
-        }
+        # the chart draws the plan's prices (attribute price_chart of the plan entity) and only watches the buy sensor of the provider:
+        # the card with the restart button when it is unavailable
+        return {"sensor.stromligning_current_price_vat": prices["stromligning_buy_current_price"]}
 
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_current_price, self.buy_tomorrow_available)
@@ -106,7 +93,7 @@ class StromligningPriceProvider(BasePriceProvider):
         if "prices" not in attr:
             raise ValueError(f"prices not in {entity_id} attributes")
         for raw in attr["prices"]:
-            timestamp = _naive(to_datetime(raw.get("start")))
+            timestamp = price_timestamp(raw.get("start"), self.tz)
             price = raw.get("price")
             if not isinstance(timestamp, datetime.datetime) or not is_number(price):
                 continue
@@ -137,10 +124,10 @@ class StromligningPriceProvider(BasePriceProvider):
             self._distribution_prices = {}
             if self._entity_exists(self.sell_distribution):
                 for raw in self._get_entity_attr(self.sell_distribution).get("prices", []):
-                    price_timestamp = _naive(to_datetime(raw.get("start")))
+                    row_timestamp = price_timestamp(raw.get("start"), self.tz)
                     price = raw.get("price")
-                    if isinstance(price_timestamp, datetime.datetime) and isinstance(price, (int, float)):
-                        self._distribution_prices[price_timestamp] = price
+                    if isinstance(row_timestamp, datetime.datetime) and isinstance(price, (int, float)):
+                        self._distribution_prices[row_timestamp] = price
         result = self.get_price_at_timestamp(self._distribution_prices, timestamp)
         if result is None and self._distribution_prices:
             # The sensor only has today's tariffs, but tomorrow's and the forecast prices include

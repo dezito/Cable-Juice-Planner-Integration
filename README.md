@@ -59,7 +59,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 
 - **Works with or without an EV integration** (a virtual EV needs only the battery level when you plug in)
 - **Solar, a solar forecast (Solcast, Forecast.Solar or Helios Forecast) and a home battery** (optional), and **[load balancing](docs/load-balancing.md)** for several cars on one main fuse
-- **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning), with the forecast corrected for its measured bias
+- **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning), [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant), the spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) and your own published prices (EPEX Spot, GE-Spot, Octopus Energy, Nord Pool), with the forecast corrected for its measured bias
 - **[Charging loss](docs/charging-loss.md) measured continuously** and **[learned driving distance](docs/learn-distance.md)**
 - **[Public charging](docs/public-charging.md)** detected automatically and added to the history and the economy
 - **Departure notifications:** a push when the car will not be ready for the next departure (also at plug-in and while it charges: the car's own limit too low, the car stops early, or charging too slow), and a reminder to plug in when the charging planned for it starts
@@ -79,7 +79,7 @@ The complete list is in [Features and charging rules](docs/features.md).
 - Home Assistant **2025.12** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
   its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
 - A charger with **status**, **power** (W) and **kWh** sensors
-- Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning)
+- Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning), [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) and/or a spot forecast integration, EPEX Spot, GE-Spot, Octopus Energy or Nord Pool (HACS)
 - Optional: an EV integration, solar production and a solar forecast
   ([Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
   [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or

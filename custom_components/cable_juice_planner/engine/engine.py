@@ -252,7 +252,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
         self._job_cache = {}
         self._changed_sensors = set()
         if self.price_provider is not None:
-            self.price_provider.set_now(snapshot.now)
+            self.price_provider.set_now(snapshot.now, snapshot.tz)
             if snapshot.price_data is not None:
                 self.price_provider.set_snapshot(snapshot.price_data)
         try:
@@ -290,7 +290,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
 
     def _runtime_state(self) -> dict:
         """State the PyScript version kept in helpers and sensor attributes."""
-        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "co2_emitted", "kwh_charged_by_solar", "last_full_charge")
+        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "kwh_charged_by_solar", "last_full_charge")
         return {
             "sensors": {key: self.sensor_states.get(key) for key in keep if self.sensor_states.get(key) is not None},
             "last_battery_level_attributes": dict(self.sensor_attrs.get("drive_efficiency_last_battery_level", {})),
@@ -494,10 +494,10 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
         return output
 
     def is_day(self, timestamp: datetime.datetime | None = None) -> bool:
-        """mytime.is_day: sunrise <= timestamp <= sunset.
+        """mytime.is_day: sunrise <= timestamp <= sunset, all in Home Assistant's time zone.
 
-        Like the PyScript version the sun events are UTC with the timezone removed and
-        compared with the local timestamp.
+        (The PyScript version compared the UTC sun events with the local timestamp, which was
+        1-2 hours off in Denmark and further off elsewhere.)
         """
         if not timestamp:
             timestamp = self.now()
@@ -507,7 +507,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             events = []
             for name in ("sunrise", "sunset"):
                 try:
-                    value = getattr(astral.sun, name)(self._snap.astral, date)
+                    value = getattr(astral.sun, name)(self._snap.astral, date, tzinfo=self._snap.tz)
                 except ValueError:
                     value = None
                 events.append(value.replace(tzinfo=None) if value else None)

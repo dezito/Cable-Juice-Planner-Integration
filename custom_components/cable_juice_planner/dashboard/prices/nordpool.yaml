@@ -1,0 +1,451 @@
+- type: vertical-stack
+  cards:
+    - type: conditional
+      conditions:
+        - condition: state
+          entity: sensor.nordpool
+          state: unavailable
+      card:
+        type: horizontal-stack
+        cards:
+          - type: markdown
+            content: '# Nord Pool @@is_down@@ <font color=red>!!!</font>'
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: sensor.nordpool
+            tap_action:
+              action: call-service
+              service: homeassistant.reload_config_entry
+              target:
+                entity_id: sensor.nordpool
+            hold_action:
+              action: none
+            icon: mdi:reload
+            name: '@@restart@@ Nord Pool'
+            show_state: true
+    - type: conditional
+      conditions:
+        - condition: state
+          entity: sensor.nordpool
+          state_not: unavailable
+      card:
+        type: custom:config-template-card
+        variables:
+          today_prices: |
+            const adapt = (states, mode) => {
+              const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+              });
+              return rows;
+            };
+            adapt(states, 'buy').raw_today.map(item => Number(item.value)).filter(Number.isFinite)
+          tomorrow_prices: |
+            const adapt = (states, mode) => {
+              const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+              });
+              return rows;
+            };
+            adapt(states, 'buy').raw_tomorrow.map(item => Number(item.value)).filter(Number.isFinite)
+          forecast_prices: |
+            const adapt = (states, mode) => {
+              const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+              // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+              const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+              (Array.isArray(planned) ? planned : []).forEach(r => {
+                const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+              });
+              return rows;
+            };
+            adapt(states, 'buy').raw_forecast.map(item => Number(item.value)).filter(Number.isFinite)
+          total_hours: |
+            const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.length
+          lowest_price: |
+            let min = 999; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+              if (price < min) min = price;
+            }); min * 1.05
+          highest_price: |
+            let max = -999; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+              if (price > max) max = price;
+            }); max * 0.95
+          mean_price: |
+            let sum = 0.0; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+              sum += price;
+            }); const mean = sum / vars.total_hours; mean
+          step_under_mean: |
+            (vars.mean_price - vars.lowest_price) / 5
+          step_over_mean: |
+            (vars.highest_price - vars.mean_price) / 5
+          price1: vars.lowest_price
+          price2: vars.mean_price - vars.step_under_mean * 4
+          price3: vars.mean_price - vars.step_under_mean * 3
+          price4: vars.mean_price - vars.step_under_mean * 2
+          price5: vars.mean_price - vars.step_under_mean * 1
+          price6: vars.mean_price
+          price7: vars.mean_price + vars.step_over_mean * 1
+          price8: vars.mean_price + vars.step_over_mean * 2
+          price9: vars.mean_price + vars.step_over_mean * 3
+          price10: vars.mean_price + vars.step_over_mean * 4
+          price11: vars.highest_price
+          total_span: 24 * 7 - 1
+        entities:
+          - sensor.cjp_current_charging_rule
+        card:
+          type: custom:apexcharts-card
+          apex_config:
+            chart:
+              height: 300px
+            xaxis:
+              tooltip:
+                enabled: false
+            tooltip:
+              shared: true
+              intersect: false
+              followCursor: true
+              fixed:
+                enabled: false
+              x:
+                show: true
+              enabledOnSeries:
+                - 0
+                - 1
+                - 2
+                - 4
+              custom: |
+                EVAL:function({ series, dataPointIndex, w }) {
+                  const indices = [0, 1, 2, 4];
+                  const xValues = w.globals.seriesX[0] || [];
+                  const time = xValues[dataPointIndex];
+                  const title = Number.isFinite(time)
+                    ? new Date(time).toLocaleString(undefined, {
+                        weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                      })
+                    : '';
+                  const rows = indices.map(index => {
+                    const values = series[index] || [];
+                    const value = values[dataPointIndex];
+                    const valid = value !== null && value !== undefined && Number.isFinite(Number(value));
+                    const suffix = index < 2 ? ' @@valuta@@' : ' kWh';
+                    const shown = valid ? Number(value).toFixed(2) + suffix : '-';
+                    const color = w.globals.colors[index] || '#888';
+                    const name = w.globals.seriesNames[index] || '';
+                    return '<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;">' +
+                      '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';"></span>' +
+                      '<span>' + name + ':</span><strong style="margin-left:auto;">' + shown + '</strong></div>';
+                  }).join('');
+                  return '<div class="apexcharts-tooltip-title" style="padding:6px 10px;">' + title + '</div>' + rows;
+                }
+            stroke:
+              curve: straight
+            markers:
+              size: 0
+          all_series_config:
+            unit: kWh
+            extend_to: false
+            fill_raw: zero
+            show:
+              legend_value: false
+              offset_in_name: false
+          experimental:
+            color_threshold: true
+            brush: true
+          brush:
+            selection_span: ${total_span + "h"}
+          header:
+            title: '${vars.total_hours ? ("@@price_chart_title@@ 🔵" + vars.lowest_price.toFixed(2) + " 🟢" + vars.mean_price.toFixed(2) + " 🟣" + vars.highest_price.toFixed(2)) : "@@price_chart_title@@"}'
+            show: true
+            standard_format: false
+            show_states: false
+            colorize_states: true
+          now:
+            show: true
+            label: '@@now@@'
+          graph_span: ${total_span +"h"}
+          span:
+            start: day
+          yaxis:
+            - id: price
+            - id: solar
+              opposite: true
+              decimals: 1
+              max: ~6.0
+              min: 0
+            - id: charge
+              min: 0
+              opposite: true
+              show: false
+          show:
+            loading: true
+            last_updated: true
+          series:
+            - entity: sensor.nordpool
+              yaxis_id: price
+              type: column
+              name: '@@incl_taxes@@'
+              unit: '@@valuta@@'
+              color: green
+              data_generator: |
+                const adapt = (states, mode) => {
+                  const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+                  });
+                  return rows;
+                };
+                const buy = adapt(hass.states, 'buy');
+                const sell = adapt(hass.states, 'spot');
+                const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
+                const buyDiv = String(buy.unit_of_measurement || '').toLowerCase().endsWith('mwh') ? 1000 : 1;
+                const values = new Map(buyRows.map(row => [new Date(row.start).getTime(), Number(row.value) / buyDiv]));
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const hourlyValues = new Map(buyRows.map(row => [hourKey(row.start), Number(row.value) / buyDiv]));
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => {
+                  const value = values.has(time) ? values.get(time) : hourlyValues.get(hourKey(time));
+                  return [time, Number.isFinite(value) ? value : null];
+                });
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              color_threshold:
+                - value: ${vars.price1}
+                  color: '#0064FF'
+                - value: ${vars.price2}
+                  color: '#0096FF'
+                - value: ${vars.price3}
+                  color: '#00B496'
+                - value: ${vars.price4}
+                  color: '#00FA50'
+                - value: ${vars.price5}
+                  color: '#00FF32'
+                - value: ${vars.price6}
+                  color: '#00FF00'
+                - value: ${vars.price7}
+                  color: '#FFFF00'
+                - value: ${vars.price8}
+                  color: '#FFA500'
+                - value: ${vars.price9}
+                  color: '#FF5000'
+                - value: ${vars.price10}
+                  color: '#C81919'
+                - value: ${vars.price11}
+                  color: '#C800C8'
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.nordpool
+              yaxis_id: price
+              type: area
+              name: '@@sell_price@@'
+              unit: '@@valuta@@'
+              color: white
+              stroke_width: 0
+              data_generator: |
+                const adapt = (states, mode) => {
+                  const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+                  });
+                  return rows;
+                };
+                const sell = adapt(hass.states, 'spot');
+                const buy = adapt(hass.states, 'buy');
+                const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
+                const sellDiv = String(sell.unit_of_measurement || '').toLowerCase().endsWith('mwh') ? 1000 : 1;
+                const values = new Map(sellRows.map(row => [new Date(row.start).getTime(), Number(row.value) / sellDiv]));
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => [time, values.has(time) && Number.isFinite(values.get(time)) ? values.get(time) : null]);
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.nordpool
+              yaxis_id: solar
+              type: area
+              name: '@@solar_forecast@@'
+              data_generator: |
+                const adapt = (states, mode) => {
+                  const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+                  });
+                  return rows;
+                };
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const buy = adapt(hass.states, 'buy');
+                const sell = adapt(hass.states, 'spot');
+                const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                const solarByHour = new Map();
+                const overlay = (series) => {
+                  (series || []).forEach(row => {
+                    const value = Number(row.pv_estimate);
+                    if (Number.isFinite(value)) solarByHour.set(hourKey(row.period_start), value);
+                  });
+                };
+
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_today']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
+                return times.map(time => [time, solarByHour.get(hourKey(time)) || 0]);
+              color: orange
+              stroke_width: 0
+              opacity: 0.5
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: true
+            - entity: sensor.nordpool
+              yaxis_id: price
+              type: area
+              name: '@@forecast@@'
+              unit: ''
+              stroke_width: 0
+              opacity: 0.25
+              color: purple
+              data_generator: |
+                const adapt = (states, mode) => {
+                  const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+                  });
+                  return rows;
+                };
+                try {
+                  var eds = adapt(hass.states, 'buy');
+                  if (!(eds.raw_forecast || []).length) return [];
+
+                  // Start: the first forecast hour (most accurate)
+                  var start = null;
+                  if (eds.raw_forecast && eds.raw_forecast.length && eds.raw_forecast[0] && eds.raw_forecast[0].start) {
+                    start = new Date(eds.raw_forecast[0].start).getTime();
+                  }
+
+                  // Fallback: tomorrow 00:00 local time
+                  if (!start || isNaN(start)) {
+                    var now = new Date();
+                    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();
+                  }
+
+
+                  // Use the same rows as the ones plotted
+                  var rows = [];
+                  if (eds.raw_today) rows = rows.concat(eds.raw_today);
+                  if (eds.raw_forecast) rows = rows.concat(eds.raw_forecast);
+                  if (eds.raw_tomorrow) rows = rows.concat(eds.raw_tomorrow);
+
+                  // Max price to fill "the full height"
+                  var maxP = 0;
+                  for (var i = 0; i < rows.length; i++) {
+                    var p = Number(rows[i] && rows[i].value) / (String(eds.unit_of_measurement || '').toLowerCase().endsWith('mwh') ? 1000 : 1);
+                    if (!isNaN(p) && p > maxP) maxP = p;
+                  }
+                  if (maxP <= 0) maxP = 10;
+
+                  // Unique times, sorted
+                  var map = {};
+                  for (var j = 0; j < rows.length; j++) {
+                    var h = rows[j] && rows[j].start;
+                    if (!h) continue;
+                    var t = new Date(h).getTime();
+                    if (isNaN(t)) continue;
+                    map[t] = 1;
+                  }
+                  var times = Object.keys(map).map(function(x){ return Number(x); }).sort(function(a,b){ return a-b; });
+
+                  // Fail-safe: without times, make 2 points so the card doesn't hang
+                  if (!times.length) {
+                    return [
+                      [new Date(start), maxP],
+                      [new Date(start + 3600000), maxP]
+                    ];
+                  }
+
+                  // 0 before the start, max after it => fills the rest
+                  var out = [];
+                  for (var k = 0; k < times.length; k++) {
+                    var tt = times[k];
+                    out.push([new Date(tt), (tt >= start) ? maxP : 0]);
+                  }
+                  return out;
+
+                } catch (e) {
+                  console.log("forecast_zone error", e);
+                  return [];
+                }
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: false
+                legend_value: false
+            - entity: sensor.cjp_current_charging_rule
+              yaxis_id: charge
+              type: area
+              name: '@@planned_charging@@'
+              unit: kWh
+              color: '#2196F3'
+              opacity: 0.6
+              stroke_width: 1
+              curve: stepline
+              extend_to: false
+              float_precision: 2
+              data_generator: |
+                const adapt = (states, mode) => {
+                  const rows = { raw_today: [], raw_tomorrow: [], raw_forecast: [], unit_of_measurement: '' };
+                  // the prices the plan is made on, one row per price period (real, or a forecast), the sell price less the sell fee
+                  const planned = states['sensor.cjp_current_charging_rule']?.attributes?.price_chart;
+                  (Array.isArray(planned) ? planned : []).forEach(r => {
+                    const value = r ? (mode === 'buy' ? r.buy : r.sell) : null;
+                    if (r && r.time && typeof value === 'number' && Number.isFinite(value)) (r.forecast ? rows.raw_forecast : rows.raw_today).push({ start: r.time, value: value });
+                  });
+                  return rows;
+                };
+                const plan = entity.attributes.charge_plan || [];
+                const buy = adapt(hass.states, 'buy');
+                const sell = adapt(hass.states, 'spot');
+                const buyRows = [...(buy.raw_today || []), ...(buy.raw_forecast || []), ...(buy.raw_tomorrow || [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.raw_forecast || []), ...(sell.raw_tomorrow || [])];
+                const times = [...new Set([...[...buyRows, ...sellRows].map(row => new Date(row.start).getTime()), ...plan.map(p => new Date(p.time).getTime())].filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => {
+                  const charging = plan.find(p => {
+                    const start = new Date(p.time).getTime();
+                    const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                    return time >= start && time < end;
+                  });
+                  return [time, charging ? Number(charging.kwh) : 0];
+                });
+              show:
+                in_brush: true
+                legend_value: false
+  grid_options:
+    columns: full
+    rows: auto

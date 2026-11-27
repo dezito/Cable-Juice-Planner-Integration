@@ -150,6 +150,14 @@ views:
         rows: auto
     # @include prices/energidataservice.yaml
     # @include prices/stromligning.yaml
+    # @include prices/energypriceforecast.yaml
+    # @include prices/spotforecast.yaml
+    # @include prices/elprognos.yaml
+    # @include prices/wattcast.yaml
+    # @include prices/epexspot.yaml
+    # @include prices/gespot.yaml
+    # @include prices/octopus.yaml
+    # @include prices/nordpool.yaml
     column_span: 2
   - type: grid
     cards:

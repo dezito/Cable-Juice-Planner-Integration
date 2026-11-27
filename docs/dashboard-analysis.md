@@ -178,7 +178,7 @@ what the forecast said 1, 2, 3 … days before.
 | Bias | > 0: the forecast was too high on average |
 | Worst hour | the biggest error in a single hour |
 | Cheapest found | how many of the day's 4 cheapest hours by the forecast really were among the 4 cheapest – the hours the plan prefers to charge in. In brackets the extra price per kWh of picking them by the forecast |
-| Correction | what the plan adds to the forecast prices for that day ahead: minus the bias, after 7 days of measurements and at most ±0.50 kr. – while there are too few days, or when *Correct the price forecast* (*Settings → Advanced*) is off |
+| Correction | what the plan adds to the forecast prices for that day ahead: minus the bias, after 7 days of measurements and at most ±0.50 kr. (converted for another currency, see [how it works](how-it-works.md)) – while there are too few days, or when *Correct the price forecast* (*Settings → Advanced*) is off |
 
 The level of the forecast matters less than the order of the hours: a forecast that is 0.30 kr too high but
 finds the right cheap hours plans almost as well as the real prices. The charts show the real price against
@@ -399,7 +399,7 @@ aside: the next run has it. A night in which CJP charged nothing is a connection
 long-term statistics first (the mean, else the state), and every hour they lack from the recorder's own states (a day at a time,
 only the days that have a missing hour and only as far back as the recorder keeps raw states; the mean of an hour is
 time-weighted and an hour is only filled when its states cover it completely: nothing is made up). That is done for the buy and sell
-price entities of every price provider (Energi Data Service and Strømligning, each hour from the first provider that has it), the
+price entities of every price provider (Energi Data Service, Strømligning, Energy Price Forecast, EPEX Spot, Nord Pool and GE-Spot's buy sensor, each hour from the first provider that has it; the spot forecast integrations have none, their recorded state is a wholesale price, and Octopus Energy has none either, its state is a time), the
 battery level and the charger power of the estimated connections, and the solar, house and charger power of the comparison without
 solar (power in whatever unit the entity has, brought to W). An hour taken from the statistics always wins. Hours
 from the recorded history of a price entity are an ordinary source.

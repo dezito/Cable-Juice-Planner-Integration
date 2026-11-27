@@ -26,7 +26,7 @@ import math
 from collections.abc import Iterable
 from typing import Any
 
-from ..const import WEEKDAYS
+from ..const import WEEKDAYS, price_scale
 from .analysis.helpers import ANALYSIS_DRIVES
 from .whatif.charts import points_subscription
 from ..prices.intervals import hourly_price_averages
@@ -34,6 +34,7 @@ from ..prices.intervals import hourly_price_averages
 _LOGGER = logging.getLogger(__name__)
 
 ECONOMY_MONTHS = 13
+ECONOMY_MIN_POSSIBLE = 0.01  # kroner (times price_scale): a month with less to save than this has no score
 ECONOMY_DB_VERSION = 2
 ECONOMY_PRICE_DAYS = 400  # hourly prices kept for the comparisons: at least this many days (see economy_keep_days)
 ECONOMY_WINDOW_SETTLE = 2 * 3600  # s after unplugging before a window is calculated (the last hour is recalculated)
@@ -460,7 +461,7 @@ class Economy:
                 row[f"{ref}_unit"] = round(m[ref] / compared, 3) if compared else None
             row["saving_daily"] = round(m["daily"] - m["achieved"], 2) if compared else None
             possible = m["average"] - m["lowest"]
-            row["score"] = round(min(max((m["average"] - m["achieved"]) / possible, -1.0), 1.0), 3) if compared and possible > 0.01 else None
+            row["score"] = round(min(max((m["average"] - m["achieved"]) / possible, -1.0), 1.0), 3) if compared and possible > ECONOMY_MIN_POSSIBLE * price_scale(self.config) else None
             row["subscription_recorded_cost"] = round(m["cost"], 2) if m["cost_valid"] and m["charging_sessions"] else None
             row["subscription_price"] = round(subscription_price, 2) if subscription_price else None
             row["subscription_saving"] = None
@@ -485,7 +486,7 @@ class Economy:
             sum(row["cost"] for row in result), 2)
         totals["saving_daily"] = round(totals["daily"] - totals["achieved"], 2)
         possible = totals["average"] - totals["lowest"]
-        totals["score"] = round(min(max((totals["average"] - totals["achieved"]) / possible, -1.0), 1.0), 3) if possible > 0.01 else None
+        totals["score"] = round(min(max((totals["average"] - totals["achieved"]) / possible, -1.0), 1.0), 3) if possible > ECONOMY_MIN_POSSIBLE * price_scale(self.config) else None
         comparable = [row for row in result if row["subscription_status"] == "recorded"]
         subscription_total = {
             "enabled": bool(subscription_price),

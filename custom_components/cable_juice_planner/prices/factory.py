@@ -4,11 +4,22 @@ from __future__ import annotations
 from ..const import PRICE_PROVIDER_PRIORITY
 from .base import BasePriceProvider, CombinedPriceProvider
 from .energidataservice import EnergiDataServicePriceProvider
+from .energypriceforecast import EnergyPriceForecastPriceProvider
+from .publishedprices import EpexSpotPriceProvider, GeSpotPriceProvider, NordpoolPriceProvider, OctopusPriceProvider
+from .spotprices import ElprognosPriceProvider, SpotForecastPriceProvider, WattcastPriceProvider
 from .stromligning import StromligningPriceProvider
 
 PROVIDER_CLASSES: dict[str, type[BasePriceProvider]] = {
     "stromligning": StromligningPriceProvider,
     "energidataservice": EnergiDataServicePriceProvider,
+    "energypriceforecast": EnergyPriceForecastPriceProvider,
+    "spotforecast": SpotForecastPriceProvider,
+    "elprognos": ElprognosPriceProvider,
+    "wattcast": WattcastPriceProvider,
+    "epexspot": EpexSpotPriceProvider,
+    "gespot": GeSpotPriceProvider,
+    "octopus": OctopusPriceProvider,
+    "nordpool": NordpoolPriceProvider,
 }
 
 
@@ -25,7 +36,7 @@ def create_price_provider(config: dict) -> CombinedPriceProvider:
     return CombinedPriceProvider(config, providers)
 
 
-FLOW_PROVIDER_ORDER = ("energidataservice", "stromligning")
+FLOW_PROVIDER_ORDER = ("energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast", "epexspot", "gespot", "octopus", "nordpool")
 
 
 def providers_from_options(options: dict) -> list[str]:

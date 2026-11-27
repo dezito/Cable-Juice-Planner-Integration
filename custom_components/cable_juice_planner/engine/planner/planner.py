@@ -93,7 +93,12 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 title=f"{self.title} warning",
                 notification_id=f"{self.name}_{func_name}_real_prices_not_found"
             )
-            return
+            if not self.price_provider.prices_loaded():
+                return
+            # prices have been loaded but none are online (every price sensor is down or in the wrong unit): plan on the
+            # cached prices, else the price history (offline prices). Neither exists: this raises, as it always did
+            # (charge_if_needed's error mode), the plan must not silently stop
+            self.get_grid_prices()
 
         try:
             self.get_forecast_type()

@@ -1951,6 +1951,20 @@ def test_price_history_averages_mixed_intervals_by_covered_duration() -> None:
     assert engine.kwh_avg_prices_db["history"][12][DAY.weekday()][0] == pytest.approx(0.225)
 
 
+def test_price_history_never_stores_a_forecast_as_a_real_price() -> None:
+    """A market without published prices (Energy Price Forecast in Finland, ...): today is only a forecast, nothing is stored."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    # (before the startup: it stores the day already)
+    engine.price_provider.get_buy_real_prices = lambda: {}
+    engine.price_provider.get_sell_real_prices = lambda: {}
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    assert engine.price_provider.get_buy_prices()  # the prices are there for the plan, only not as real prices
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    assert engine.kwh_avg_prices_db["history"][12][DAY.weekday()] == _price_history()["history"][12][DAY.weekday()]
+
+
 def _assert_price_history_repaired(engine: CJPEngine, good: dict) -> None:
     today, other = DAY.weekday(), (DAY.weekday() + 1) % 7
     for name in ("history", "history_sell"):
@@ -2035,6 +2049,25 @@ def test_history_sell_prices_get_the_adder_that_makes_a_sale_worth_less(fixed: f
     assert sell.value[target] == pytest.approx(2.5 + sign * 2 / 30, abs=0.006)
 
 
+def test_the_engine_gives_the_price_provider_home_assistants_time_zone() -> None:
+    """Price rows in UTC give the same prices as the same rows in local time: the engine passes the snapshot's time zone on."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+
+    def buy_prices(utc: bool) -> dict:
+        snap = snapshot(now)
+        if utc:
+            for key in ("raw_today", "raw_tomorrow", "forecast"):
+                for row in snap.attributes["sensor.price"][key]:
+                    row["hour"] = datetime.datetime.fromisoformat(row["hour"]).astimezone(datetime.timezone.utc).isoformat()
+        engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+        assert engine.run_job(snap, engine.startup, {}).error is None
+        assert engine.run_job(snap, engine.update_grid_prices).error is None
+        return dict(engine.price_provider.get_buy_prices())
+
+    local = buy_prices(False)
+    assert local and buy_prices(True) == local
+
+
 def test_sell_value_with_fixed_solar_sell_price() -> None:
     """A fixed price settles the difference to the hourly price: fixed - hourly, also negative."""
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
@@ -2078,6 +2111,139 @@ def test_solcast_alone_when_there_is_no_solar_history() -> None:
     assert engine.local_energy_prediction_db["solar_prediction_timestamps"][noon] == pytest.approx(2.0)
 
 
+def _as_utc(moment: datetime.datetime) -> datetime.datetime:
+    return moment.replace(tzinfo=TZ).astimezone(datetime.timezone.utc)
+
+
+def test_weather_forecast_times_are_read_in_the_home_assistant_time_zone() -> None:
+    """Home Assistant gives forecast times in UTC: 12:00 local (CEST) is 10:00 UTC, and a day starts at 22:00 UTC the day before."""
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    tomorrow = datetime.datetime.combine(DAY + datetime.timedelta(days=1), datetime.time(0))
+    hourly = {"datetime": _as_utc(tomorrow.replace(hour=12)).isoformat(), "condition": "sunny"}
+    daily = {"datetime": _as_utc(tomorrow).isoformat(), "condition": "rainy"}
+    snap = snapshot(now)
+    snap.forecast_dict = {"hourly": [hourly], "daily": [daily]}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    for moment, expected in (
+        (tomorrow.replace(hour=12), hourly),
+        (tomorrow.replace(hour=5), daily),
+        (tomorrow - datetime.timedelta(hours=1), None),  # 23:00 the evening before is still the day before
+    ):
+        result = engine.run_job(snap, engine.get_forecast, snap.forecast_dict, moment)
+        assert result.error is None, result.error
+        assert result.value == expected
+
+
+@pytest.mark.parametrize("stamp", ["2026-10-23T00:00:00+00:00", "2026-10-23T04:00:00+00:00", "2026-10-23T00:00:00-04:00"])
+def test_a_daily_forecast_keeps_its_day_west_of_utc(stamp: str) -> None:
+    """New York: a daily row stamped with the date at 00:00Z, the local midnight in UTC (04:00Z) and the local midnight keep the 23rd."""
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    daily = {"datetime": stamp, "condition": "rainy"}
+    snap = snapshot(now)
+    snap.tz = zoneinfo.ZoneInfo("America/New_York")
+    snap.forecast_dict = {"hourly": [], "daily": [daily]}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    for moment, expected in ((datetime.datetime(2026, 10, 23, 5), daily), (datetime.datetime(2026, 10, 22, 23), None)):
+        result = engine.run_job(snap, engine.get_forecast, snap.forecast_dict, moment)
+        assert result.error is None, result.error
+        assert result.value == expected
+
+
+@pytest.mark.parametrize("period_start", [
+    lambda noon: noon.replace(tzinfo=TZ).astimezone(datetime.timezone.utc),
+    lambda noon: noon.replace(tzinfo=TZ),
+    lambda noon: noon.replace(tzinfo=TZ).astimezone(datetime.timezone.utc).isoformat(),
+], ids=["utc", "local-offset", "text"])
+def test_solcast_hours_are_read_in_the_home_assistant_time_zone(period_start) -> None:
+    """Solcast's period_start has its own offset: the hour of the price is the one in Home Assistant's time zone."""
+    options = {**OPTIONS, "production_entity_id": "sensor.solar", "forecast_entity_id": "sensor.solcast_today"}
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    noon = datetime.datetime.combine(DAY, datetime.time(12))
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    snap.solcast = {"sensor.solcast_today": [{"period_start": period_start(noon), "pv_estimate": 2.0}]}
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine.get_integration = lambda entity_id: "solcast_solar"
+    result = engine.run_job(snap, engine.get_solar_kwh_forecast)
+    assert result.error is None, result.error
+    assert list(result.value) == [noon]
+
+
+def test_solcast_keeps_the_first_row_of_a_repeated_hour() -> None:
+    """The repeated hour of the autumn change has one key: the first row wins, like in the weather forecast."""
+    options = {**OPTIONS, "production_entity_id": "sensor.solar", "forecast_entity_id": "sensor.solcast_today"}
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    noon = datetime.datetime.combine(DAY, datetime.time(12))
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    snap.solcast = {"sensor.solcast_today": [{"period_start": noon, "pv_estimate": 1.0}, {"period_start": noon, "pv_estimate": 3.0}]}
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine.get_integration = lambda entity_id: "solcast_solar"
+    result = engine.run_job(snap, engine.get_solar_kwh_forecast)
+    assert result.error is None, result.error
+    assert result.value[noon][0] == pytest.approx(1.0)
+
+
+def test_is_day_uses_the_sun_in_the_home_assistant_time_zone() -> None:
+    """Copenhagen 22 October (CEST): the sun is up about 07:50-18:10 local time, not 05:50-16:10."""
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12)))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    for hour, minute, expected in ((7, 0, False), (12, 0, True), (17, 30, True), (19, 0, False)):
+        result = engine.run_job(snap, engine.is_day, datetime.datetime.combine(DAY, datetime.time(hour, minute)))
+        assert result.error is None, result.error
+        assert result.value is expected, (hour, minute)
+
+
+def test_a_manual_public_charging_session_start_with_an_offset_is_converted() -> None:
+    """A start given in UTC ({{ utcnow() }}) is stored as Home Assistant's local time."""
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12)))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    start = datetime.datetime.combine(DAY, datetime.time(10, 30))
+    result = engine.run_job(snap, engine.manual_add_public_charging_session, _as_utc(start), battery_level_added=10.0, total_charging_cost=25.0)
+    assert result.error is None, result.error
+    assert result.value["status"] == "success", result.value
+    assert result.value["data"]["Charging Session Start"] == start.isoformat()
+
+
+def test_wake_up_when_the_cars_last_update_is_not_a_time() -> None:
+    """A last update that cannot be read means unknown: the car is woken up, not skipped for ever."""
+    options = {**OPTIONS, "last_update_entity_id": "sensor.car_last_update"}
+    now = datetime.datetime.combine(DAY, datetime.time(12, 10))
+    snap = snapshot(now)
+    snap.states["sensor.car_last_update"] = "garbage"
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    requests: list = []
+    engine.fire_ev_request = requests.append
+    result = engine.run_job(snap, engine.wake_up_ev)
+    assert result.error is None, result.error
+    assert requests == ["wake_up"]
+
+
+@pytest.mark.parametrize(("minutes_ago", "wakes_up"), [(5, False), (30, True)])
+def test_wake_up_reads_the_cars_last_update_in_the_home_assistant_time_zone(minutes_ago: int, wakes_up: bool) -> None:
+    """The car's timestamp sensor is in UTC (2 hours behind in CEST): an update 5 minutes ago is recent, not 125 minutes old."""
+    options = {**OPTIONS, "last_update_entity_id": "sensor.car_last_update"}
+    now = datetime.datetime.combine(DAY, datetime.time(12, 10))
+    snap = snapshot(now)
+    snap.states["sensor.car_last_update"] = _as_utc(now - datetime.timedelta(minutes=minutes_ago)).isoformat()
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    requests: list = []
+    engine.fire_ev_request = requests.append
+    result = engine.run_job(snap, engine.wake_up_ev)
+    assert result.error is None, result.error
+    assert requests == (["wake_up"] if wakes_up else [])
+
+
+def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home", location_history: list | None = None):
+    now = datetime.datetime.combine(DAY, datetime.time(12, minute))
 # ---------------------------------------------------------------------------------------------------------------- #
 # The solar forecast sources: Solcast's detailedHourly, and Forecast.Solar / Helios Forecast normalised to the same rows
 # by utils/solar_forecast.py (the coordinator puts them under the configured sensor)
@@ -2698,6 +2864,111 @@ def test_startup_publishes_the_charging_amps_table_with_solar() -> None:
     assert result.value["amps_report"] == engine.charging_amps_table()
 
 
+def _engine_with_a_price_sensor_in_ct(history: bool):
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+    snap.price_data["attributes"]["sensor.price"]["unit_of_measurement"] = "øre/kWh"
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()} if history else {}).error is None
+    return engine, snap
+
+
+def test_a_price_sensor_in_the_wrong_unit_is_planned_on_the_price_history_and_booked_at_its_price() -> None:
+    """The only price sensor gives øre/kWh: no online prices. The plan runs on the price history (offline prices), the charger
+    is not in the error mode, and the charging is booked at the price of the hour from the history, never at 0."""
+    engine, snap = _engine_with_a_price_sensor_in_ct(history=True)
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_mode != "error"
+    assert engine.grid_price_cache["using_offline_prices"] is True
+    assert charge_hours(engine)
+    assert engine.run_job(snap, engine.calc_kwh_price).value > 0.0
+
+
+def test_a_price_sensor_in_the_wrong_unit_without_any_price_history_is_the_error_mode_as_before() -> None:
+    engine, snap = _engine_with_a_price_sensor_in_ct(history=False)
+    engine.run_job(snap, engine.charge_if_needed, True)
+    assert engine.charger_mode == "error"
+
+
+def test_the_booking_at_a_history_price_does_not_take_the_refund_off_twice() -> None:
+    """The price history is stored net of the refund: booked at it, the charging costs the history price, not less."""
+    expected = {}
+    for refund in (0.0, 0.5):
+        now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+        snap = snapshot(now, **PLUGGED_IN, settings={"fill_up": True})
+        snap.price_data["attributes"]["sensor.price"]["unit_of_measurement"] = "øre/kWh"
+        engine = CJPEngine(const.build_config({**OPTIONS, "refund": refund}), "cjp_test", TEXTS)
+        assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+        assert engine.run_job(snap, engine.get_grid_prices, True).error is None
+        assert engine.grid_price_cache["using_offline_prices"] is True
+        expected[refund] = engine.run_job(snap, engine.calc_kwh_price).value
+    assert expected[0.0] == pytest.approx(2.0 + DAY.weekday() / 10, abs=0.01)
+    assert expected[0.5] == pytest.approx(expected[0.0], abs=0.01)
+
+
+def test_without_any_price_the_second_call_fails_like_the_first_not_with_a_key_error() -> None:
+    """The last successful prices are only used when there are any: the sell side without prices and without history used to
+    answer the first call with an error and the next ones with a KeyError that the planner swallowed (no plan, no error)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    snap.price_data = {"attributes": {}, "values": {}}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    engine.run_job(snap, engine.startup, {})
+    for _ in range(2):
+        result = engine.run_job(snap, engine.get_hour_prices, True, True)
+        assert isinstance(result.error, ValueError), repr(result.error)  # not the KeyError of a missing cached price
+
+
+def test_every_price_update_publishes_the_prices_the_plan_is_made_on_for_the_price_chart() -> None:
+    """Attribute price_chart of sensor.cjp_current_charging_rule, set with every price update (not by the plan, which may not run): one row
+    per price period for 7 days, real and forecast in one list. The dashboard's price chart of every provider is drawn from it."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine, _ = run(12, level=20, **PLUGGED_IN)
+    result = engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.update_grid_prices)
+    assert result.error is None, result.error
+    rows = result.attributes["current_charging_rule"]["price_chart"]
+    times = [datetime.datetime.fromisoformat(row["time"]) for row in rows]
+    midnight = datetime.datetime.combine(DAY, datetime.time())
+    assert times == sorted(set(times)) and times[0] == midnight and times[-1] < midnight + datetime.timedelta(days=7)
+    provider = engine.price_provider.get_buy_prices()  # what the provider gives (the rows are the plan's prices: these, and the price history for the rest)
+    sell = engine.get_sell_prices()
+    for row, time in zip(rows, times):
+        if time in provider:
+            assert row["buy"] == pytest.approx(provider[time], abs=0.006)
+        assert row["sell"] == (pytest.approx(sell[time], abs=0.006) if time in sell else None)
+    # today and tomorrow are published prices, the days after a forecast
+    assert not any(row["forecast"] for row, time in zip(rows, times) if time < midnight + datetime.timedelta(days=2))
+    assert any(row["forecast"] for row in rows)
+    # the sell price is the wholesale (here: the buy) price less the sell fee, once
+    fee = abs(float(engine.config["prices"]["sell_fee"]))
+    real = next(row for row in rows if not row["forecast"] and row["sell"] is not None)
+    assert real["sell"] == pytest.approx(real["buy"] - fee, abs=0.011)
+    # the next plan keeps it
+    assert "price_chart" in engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.charge_if_needed, True).attributes["current_charging_rule"]
+
+
+def test_a_failed_price_update_publishes_what_the_plan_has_never_the_rows_of_an_earlier_update(monkeypatch) -> None:
+    """A sell price that cannot be had is no sell price (never the buy price); without buy prices there is nothing to draw: the chart
+    must not keep the rows of an update that worked."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine, _ = run(12, level=20, **PLUGGED_IN)
+
+    def published() -> list:
+        result = engine.run_job(snapshot(now, level=20, **PLUGGED_IN), engine.update_grid_prices)
+        return result.attributes["current_charging_rule"]["price_chart"]
+
+    rows = published()
+    assert rows and any(row["sell"] is not None for row in rows)
+
+    def fail(*args, **kwargs):
+        raise ValueError("no prices")
+
+    monkeypatch.setattr(engine, "get_sell_prices", fail)
+    without_sell = published()
+    assert [row["buy"] for row in without_sell] == [row["buy"] for row in rows] and all(row["sell"] is None for row in without_sell)
+    monkeypatch.setattr(engine, "get_grid_prices", fail)
+    assert published() == []
 # --- providers with different price intervals are planned on one common interval ---
 
 

@@ -43,7 +43,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import cached_json_fragment, json_fragment
 from homeassistant.helpers.storage import Store
 
-from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, dashboard_icon, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
+from ..const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, PRICE_CORRECTION_MAX, WEEKDAYS, dashboard_icon, hidden_settings, is_battery_simulation_enabled, is_ev_configured, is_public_charging_configured, normalize_language, normalize_prefix, object_prefix, price_scale, sidebar_title
 from ..utils.formatting import load_texts
 from ..utils.solar_forecast import KEY_SEMANTICS
 from ..prices import price_dashboard_entities
@@ -445,9 +445,7 @@ def render_dashboard(
         missing |= {f"binary_sensor.{own}_public_charging_session_done", f"number.{own}_public_charging_session_cost"}
     if not is_ev_configured(config):
         template = _drop_sections(template, (*EV_SECTIONS, *EV_WHAT_IF_SECTIONS))
-    texts = load_texts(normalize_language(config.get("language")), currency, distance)
-    # the sell price chart subtracts the same sell fee as the planner
-    texts["dashboard.sell_fee_value"] = f"{abs(float(config['prices'].get('sell_fee', 0.0))):g}"
+    texts = load_texts(normalize_language(config.get("language")), currency, distance, PRICE_CORRECTION_MAX * price_scale(config))
     template = _translate(_drop_empty_groups(_drop_empty_sections(_drop_empty_headings(_prune(template, missing)))), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 

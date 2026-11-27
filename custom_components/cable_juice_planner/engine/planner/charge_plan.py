@@ -333,7 +333,7 @@ class ChargePlan:
                 return [False, False]
 
             _LOGGER.warning(f"Using local low prices to calc very/ultra cheap price: {e} {type(e)}")
-            forecast_price = round(self.get_forecast_value(minimums), 3)
+            forecast_price = round(self.get_price_forecast_value(minimums), 3)
             if round(price, 3) <= forecast_price:
                 very_cheap_price = True
             if round(price, 3) <= ultra_cheap_limit(forecast_price):

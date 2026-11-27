@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 from homeassistant.core import HomeAssistant
 
 from .conftest import OBJECT_PREFIX
@@ -76,6 +77,25 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
     assert data["power_hours"] == {start.timestamp(): {"solar": 1500.0, "house": 800.0, "ev": 800.0}}
     # the power is asked for in watts (kWh for a power sensor in an h unit) whatever unit the sensors have, hourly means
     assert seen[("sensor.charger", "sensor.house", "sensor.solar")] == ("hour", {"power": "W", "energy": "kWh"}, {"mean"})
+
+
+async def test_the_recorded_sell_price_of_a_sensor_per_mwh_is_converted_to_kwh(hass: HomeAssistant, loaded_entry) -> None:
+    from datetime import UTC, datetime
+
+    coordinator = loaded_entry.runtime_data
+    start = datetime(2026, 10, 1, 10, tzinfo=UTC)
+    provider = coordinator.price_provider
+
+    def statistics(hass_, begin, end, ids, period, units, kinds):
+        return {entity_id: [{"start": start, "mean": 80.0}] for entity_id in ids}
+
+    # the Energy Price Forecast sensor gives EUR/MWh: 80 per MWh is 0.08 per kWh in the history too
+    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.object(
+        provider, "sell_price_entity_ids", return_value=["sensor.sell"]
+    ), patch.object(provider, "price_unit_divisors", return_value={"sensor.sell": 1000.0}):
+        data: dict = {}
+        await coordinator._async_economy_solar_statistics(_FakeRecorder(), provider, data, datetime(2026, 10, 2, tzinfo=UTC), lambda row: row["start"].timestamp())
+    assert data["sell_history"] == {start.timestamp(): pytest.approx(0.08)}
 
 
 async def test_a_failing_statistics_read_never_stops_the_economy_refresh(hass: HomeAssistant, loaded_entry) -> None:

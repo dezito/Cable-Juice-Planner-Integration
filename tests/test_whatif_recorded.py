@@ -46,6 +46,14 @@ def _rows(history: dict, battery: float | None = BATTERY) -> list[dict]:
     return history_rows(history, _to_ts, battery)
 
 
+@pytest.mark.parametrize(("scale", "kept"), [(1.0, False), (0.1, True)])
+def test_an_entry_with_a_tiny_cost_is_only_public_charging_in_kroner(scale: float, kept: bool) -> None:
+    """No home charging and a booked cost of 0.003: nothing in kroner (limit 0.005), but 0.003 is real money in a currency worth a tenth."""
+    history = _entry(1, 2, "04:00", **{"kWh": 0.0, "kWh_from_grid": 0.0, "percentage": 0.0, "cost": 0.003})
+    assert bool(history_rows(history, _to_ts, BATTERY, scale)) is kept
+    assert bool(_rows(history)) is False  # without a scale: kroner, as before
+
+
 def test_a_session_inside_one_connection_gives_all_of_its_figures_to_it() -> None:
     window = _window(0)
     result = allocate(_rows({**_older(), **_entry(1, 2, "04:00")}), [window], NOW, 7200.0)

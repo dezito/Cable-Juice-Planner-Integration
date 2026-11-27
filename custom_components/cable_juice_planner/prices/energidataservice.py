@@ -4,8 +4,8 @@ from __future__ import annotations
 import datetime
 import logging
 
-from ..utils.helpers import days_between, reset_time_to_hour, to_datetime
-from .base import BasePriceProvider, _ZERO_TARIFFS, _naive, is_number, sell_price_parts
+from ..utils.helpers import days_between, reset_time_to_hour
+from .base import BasePriceProvider, _ZERO_TARIFFS, is_number, price_timestamp, sell_price_parts
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,6 +15,8 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
 
     source_name = "energidataservice"
     buy_key = "energidataservice_buy_entity_id"
+    # the regions of the Energi Data Service integration (its REGIONS): DK1/DK2, FI, EE, LT, LV, NO1-5, SE1-4, FR, NL, BE, AT, DE, LU
+    countries = frozenset({"DK", "FI", "EE", "LT", "LV", "NO", "SE", "FR", "NL", "BE", "AT", "DE", "LU"})
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
@@ -29,10 +31,9 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
 
     @classmethod
     def dashboard_entities(cls, prices: dict[str, str]) -> dict[str, str]:
-        return {
-            "sensor.energi_data_service": prices["energidataservice_buy_entity_id"],
-            "sensor.energi_data_service_salg": prices["energidataservice_sell_entity_id"],
-        }
+        # the chart draws the plan's prices (attribute price_chart of the plan entity) and only watches the buy sensor of the provider:
+        # the card with the restart button when it is unavailable
+        return {"sensor.energi_data_service": prices["energidataservice_buy_entity_id"]}
 
     def _load_buy_real_prices(self):
         return self._get_real_prices(self.buy_entity_id)
@@ -52,10 +53,9 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
             prices[timestamp] = self.calculate_sell_price(timestamp, price)
         return prices
 
-    @staticmethod
-    def _rows(rows):
+    def _rows(self, rows):
         for raw in rows or []:
-            timestamp = _naive(to_datetime(raw["hour" if "hour" in raw else "time"]))
+            timestamp = price_timestamp(raw["hour" if "hour" in raw else "time"], self.tz)
             price = raw["price"]
             if isinstance(timestamp, datetime.datetime) and is_number(price):
                 yield timestamp, price
@@ -64,6 +64,8 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         attr = self._get_entity_attr(entity_id)
         prices = {ts: p for ts, p in self._rows(attr.get("raw_today", [])) if days_between(current_hour, ts) == 0}
         if attr.get("tomorrow_valid"):
@@ -74,6 +76,8 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
         current_hour = reset_time_to_hour(self.now)
         if not self._entity_exists(entity_id):
             raise ValueError(f"{entity_id} not loaded")
+        if self._wrong_unit(entity_id):
+            return {}
         prices = {}
         for timestamp, price in self._rows(self._get_entity_attr(entity_id).get("forecast", [])):
             if days_between(current_hour, timestamp) > 0:
@@ -150,7 +154,7 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
             tariff = {"transmissions_nettarif": values[0], "systemtarif": values[1], "elafgift": values[2], "tariffs": values[3], "surcharge": 0.0, "tariff_sum": sum(values)}
         else:
             return None
-        return sell_price_parts(price, tariff, costs, abs(fee))[2]
+        return sell_price_parts(price, tariff, costs, abs(fee), self.decimals)[2]
 
 
 def eds_tariff_schedule(tariffs) -> dict | None:

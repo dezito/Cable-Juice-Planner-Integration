@@ -46,7 +46,9 @@
   and chargers sharing one circuit limit (e.g. an Easee master)
 - **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
-  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund;
+  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund, and
+  [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) for prices and forecasts in most of Europe, and the
+  spot forecast integrations Spot Forecast, Elprisprognos and Wattcast (wholesale prices with your VAT and surcharge), and EPEX Spot, GE-Spot, Octopus Energy and Nord Pool (your own published prices, next to a provider with a forecast);
   forecast prices are corrected with their measured bias
 - **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
 - **[Public charging](public-charging.md)** (with EV integration and location)

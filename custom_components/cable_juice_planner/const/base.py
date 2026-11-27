@@ -10,7 +10,8 @@ ENTITY_ID_PREFIX = "cjp"
 
 # Price providers in priority order. For each hour the planner and the economy use the
 # first configured provider that has a price, then fall back to the next one.
-PRICE_PROVIDER_PRIORITY = ("stromligning", "energidataservice")
+# the user's own tariff or sensor (the providers of published prices) before the estimates made with a VAT and a surcharge
+PRICE_PROVIDER_PRIORITY = ("stromligning", "energidataservice", "octopus", "nordpool", "epexspot", "gespot", "energypriceforecast", "spotforecast", "elprognos", "wattcast")
 
 
 def normalize_prefix(prefix: str | None) -> str:
@@ -70,6 +71,49 @@ SOLAR_PRODUCTION_AVAILABLE_DB_VERSION = 2.0
 KWH_AVG_PRICES_DB_VERSION = 2.0
 
 PRICE_ADDER_DAY_BETWEEN_DIVIDER = 30
+
+# The money limits of the planner (the forecast adder, the tolerances of the economy, the rounding of prices) were
+# chosen for prices in Danish kroner (about 1-3 per kWh). A config entry whose prices are in another currency stores
+# prices.price_scale: how many of its units one krone is worth (EUR 0.134), so a limit of 0.01 kr becomes 0.00134 EUR.
+# A missing or invalid value is 1.0 (kroner): an entry made before is unchanged. The rates are only rough, they set
+# the order of magnitude of a limit and are never used to convert a price.
+CURRENCY_PRICE_SCALE = {
+    "DKK": 1.0,
+    "SEK": 1.4,
+    "NOK": 1.5,
+    "EUR": 0.134,
+    "GBP": 0.115,
+    "CHF": 0.125,
+    "PLN": 0.57,
+    "RON": 0.67,
+    "BGN": 0.26,
+    "USD": 0.145,
+}
+# Currencies that are worth much less than a krone (CZK, HUF, ISK, UAH) are left out: their amounts would be above the
+# limits of the number entities and the flow fields, so an unknown unit keeps the scale as it is.
+# what a price sensor writes before the "/kWh" of its unit: the symbols and "kr" (kroner, in practice DKK)
+CURRENCY_UNIT_ALIASES = {"KR": "DKK", "KR.": "DKK", "€": "EUR", "£": "GBP", "ZŁ": "PLN", "$": "USD"}
+# the most the price forecast is corrected by (kroner per kWh, times the price scale), see engine/analysis
+PRICE_CORRECTION_MAX = 0.5
+# a stored scale outside this range is not a currency of the table (a hand edit, a damaged backup): kroner
+PRICE_SCALE_RANGE = (0.01, 100.0)
+# a scale below this rounds prices to 3 decimals instead of 2 (EUR 0.134: a price of 0.134 would lose most of its precision)
+PRICE_DECIMALS_SCALE_LIMIT = 0.5
+
+
+def price_scale(config: dict) -> float:
+    """prices.price_scale of the config: 1.0 (kroner) when it is missing, not a number or outside PRICE_SCALE_RANGE."""
+    value = (config.get("prices") or {}).get("price_scale", 1.0)
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and PRICE_SCALE_RANGE[0] <= value <= PRICE_SCALE_RANGE[1]:
+        return float(value)
+    return 1.0
+
+
+def price_decimals(config: dict) -> int:
+    """Decimals a per kWh price is rounded to: 2 for kroner, 3 for a currency worth much more (EUR, GBP)."""
+    return 2 if price_scale(config) >= PRICE_DECIMALS_SCALE_LIMIT else 3
+
+
 CHARGING_ALLOWED_AFTER_GOTO_TIME = -120  # minutes
 
 SOLAR_PRODUCTION_TRIGGER = 500.0

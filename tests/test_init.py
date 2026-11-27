@@ -530,7 +530,7 @@ async def test_migration_moves_solar_sell_price_to_options(hass: HomeAssistant, 
     set_source_states(hass)
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert mock_entry.minor_version == 5  # and on through the later migrations
+    assert mock_entry.minor_version == 6  # and on through the later migrations
     assert mock_entry.options["solar_sell_fixed_price"] == 0.85
     assert mock_entry.runtime_data.config["solar"]["production_price"] == 0.85
     assert all(ent_reg.async_get(entity_id) is None for entity_id in removed.values())
@@ -547,7 +547,7 @@ async def test_migration_moves_last_full_charge_to_the_sensor(hass: HomeAssistan
     set_source_states(hass)
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert mock_entry.minor_version == 5
+    assert mock_entry.minor_version == 6
     assert ent_reg.async_get(old) is None
     sensor = hass.states.get(f"sensor.{OBJECT_PREFIX}_last_full_charge")
     assert sensor is not None and dt_util.parse_datetime(sensor.state) == dt_util.parse_datetime("2026-10-14T08:00:00+00:00")
@@ -563,7 +563,7 @@ async def test_migration_drops_the_removed_testing_mode(hass: HomeAssistant, moc
     set_source_states(hass)
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert mock_entry.minor_version == 5
+    assert mock_entry.minor_version == 6
     assert "testing_mode" not in mock_entry.options
     assert mock_entry.options["battery_size"] == options["battery_size"]
     await async_unload_and_join(hass, mock_entry)
@@ -578,12 +578,35 @@ async def test_migration_renames_the_charger_power_option(hass: HomeAssistant, m
     set_source_states(hass)
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert mock_entry.minor_version == 5
+    assert mock_entry.minor_version == 6
     assert "power_consumtion_entity_id" not in mock_entry.options
     assert mock_entry.options["charger_power_entity_id"] == "sensor.charger_power"
     assert mock_entry.options["power_consumption_entity_id"] == options["power_consumption_entity_id"]  # the house sensor stays
     assert mock_entry.runtime_data.config["charger"]["entity_ids"]["charger_power_entity_id"] == "sensor.charger_power"
     await async_unload_and_join(hass, mock_entry)
+
+
+async def test_migration_removes_the_co2_option_and_the_co2_sensor(hass: HomeAssistant, mock_entry) -> None:
+    """2.5 -> 2.6: CO2 is gone from Cable Juice Planner: the option co2_entity_id and the sensor co2_emitted are removed."""
+    ent_reg = er.async_get(hass)
+    mock_entry.add_to_hass(hass)
+    options = {**mock_entry.options, "co2_entity_id": "sensor.energi_data_service_co2"}
+    hass.config_entries.async_update_entry(mock_entry, options=options, minor_version=5)
+    old = ent_reg.async_get_or_create("sensor", DOMAIN, f"{mock_entry.entry_id}_co2_emitted", suggested_object_id=f"{OBJECT_PREFIX}_co2_emitted").entity_id
+    set_source_states(hass)
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert mock_entry.minor_version == 6
+    assert "co2_entity_id" not in mock_entry.options and mock_entry.options["battery_size"] == options["battery_size"]
+    assert ent_reg.async_get(old) is None and hass.states.get(old) is None
+    assert hass.states.get(f"sensor.{OBJECT_PREFIX}_co2_emitted") is None
+    await async_unload_and_join(hass, mock_entry)
+
+
+def test_a_backup_with_the_co2_option_is_restored_without_it() -> None:
+    from custom_components.cable_juice_planner.const import upgrade_options
+
+    assert upgrade_options({"co2_entity_id": "sensor.x", "battery_size": 60}) == {"battery_size": 60}
 
 
 async def test_migration_keeps_the_new_charger_power_option_when_both_are_stored(hass: HomeAssistant, mock_entry) -> None:
@@ -607,7 +630,7 @@ async def test_migration_of_the_site_entry_drops_the_removed_testing_mode(hass: 
     hass.config_entries.async_update_entry(site, minor_version=3)
     assert await hass.config_entries.async_setup(site.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert site.minor_version == 5
+    assert site.minor_version == 6
     assert "testing_mode" not in site.options
     assert site.options["fuse_l1"] == SITE_DEFAULTS["fuse_l1"]
     await hass.config_entries.async_unload(site.entry_id)

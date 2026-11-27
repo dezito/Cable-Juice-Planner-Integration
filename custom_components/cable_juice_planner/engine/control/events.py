@@ -87,7 +87,7 @@ class ControlEvents:
             self.charging_loss_car_begin_kwh = measurement.get("car_begin_kwh", 0.0)
             self.charging_loss_charger_begin_kwh = measurement.get("charger_begin_kwh", 0.0)
             self.charging_loss_charging_completed = bool(measurement.get("charging_completed"))
-        for key in ("co2_emitted", "kwh_charged_by_solar"):
+        for key in ("kwh_charged_by_solar",):
             if self.sensor_states.get(key) is None:
                 self.sensor_states[key] = 0.0
             self._changed_sensors.add(key)

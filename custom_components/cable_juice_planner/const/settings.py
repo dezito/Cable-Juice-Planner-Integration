@@ -140,7 +140,6 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "estimated_range": ("{distance}", "distance", "measurement", "ev"),
     "drive_efficiency_last_battery_level": ("%", None, None, None),
     "drive_efficiency_last_odometer": ("{distance}", "distance", None, "ev"),
-    "co2_emitted": ("kg", "weight", "total_increasing", None),
     "kwh_charged_by_solar": ("kWh", "energy", "total_increasing", "solar"),
     # set by the integration when the battery was full (was a settable datetime / input_datetime)
     "last_full_charge": (None, "timestamp", None, None),
@@ -168,7 +167,6 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
 MIGRATED_LAST_FULL_CHARGE = "migrated_last_full_charge"
 
 PERSISTENT_SENSOR_KEYS = (
-    "co2_emitted",
     "kwh_charged_by_solar",
     "drive_efficiency_last_battery_level",
     "drive_efficiency_last_odometer",

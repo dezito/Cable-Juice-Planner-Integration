@@ -22,11 +22,12 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dis
 from homeassistant.util import dt as dt_util
 
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
-from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language
+from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, PRICE_CORRECTION_MAX, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language, price_scale
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
 from ..management.health_checks import HealthWatcher
 from ..prices import stromligning_entities_to_watch
+from ..prices.currency import energypriceforecast_entities
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none
@@ -40,7 +41,8 @@ class CoordinatorLifecycle:
 
     async def async_setup(self) -> None:
         language = normalize_language(self.config.get("language"), normalize_language(self.hass.config.language))
-        self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit)
+        cap = PRICE_CORRECTION_MAX * price_scale(self.config)
+        self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit, cap)
         # entity names in the same language (HA would name translation_key entities in its own UI
         # language), English is the fallback for missing keys
         translations = await translation.async_get_translations(self.hass, language, "entity", {DOMAIN})
@@ -84,11 +86,14 @@ class CoordinatorLifecycle:
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
 
     def _start_dependency_checks(self) -> frozenset[str]:
-        """Repairs for Strømligning and Solcast sensors this car needs but that are disabled or not provided. Returns the sensors
-        they judge (the health checks leave them out)."""
+        """Repairs for Strømligning, Solcast and Energy Price Forecast sensors this car needs but that are disabled or not provided.
+        Returns the sensors they judge (the health checks leave them out)."""
         stromligning = stromligning_entities_to_watch(self.config["prices"]["entity_ids"])
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"] if self.solar_configured else ""
-        watcher = DependencyWatcher(self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7))
+        watcher = DependencyWatcher(
+            self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7),
+            price_forecast_entities=energypriceforecast_entities(self.config["prices"]["entity_ids"]),
+        )
         watcher.start()
         self.entry.async_on_unload(watcher.stop)
         return watcher.watched_entities
@@ -368,7 +373,6 @@ class CoordinatorLifecycle:
         public_session = f"binary_sensor.{legacy}_public_charging_session_done"
         legacy_full_charge = self.hass.states.get(f"input_datetime.{legacy}_last_full_charge")
         numeric = {
-            "co2_emitted": f"input_number.{legacy}_co2_emitted",
             "kwh_charged_by_solar": f"input_number.{legacy}_kwh_charged_by_solar",
             "drive_efficiency_last_battery_level": last_battery_level,
             "drive_efficiency_last_odometer": f"sensor.{legacy}_drive_efficiency_last_odometer",

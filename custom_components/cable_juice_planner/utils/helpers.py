@@ -129,6 +129,29 @@ def to_datetime(date, tz: datetime.tzinfo | None = None):
     return parsed.replace(tzinfo=None)
 
 
+def to_local_datetime(value, tz: datetime.tzinfo | None = None):
+    """A timestamp (ISO string or datetime) from an entity as naive local time.
+
+    Home Assistant gives timestamps with any offset (weather forecasts and timestamp sensors in UTC): an aware
+    timestamp is converted to tz (Home Assistant's time zone) before the offset is dropped. A naive one is taken
+    as local time already; without a tz the offset is just dropped (like to_datetime). Anything that is no
+    timestamp is returned unchanged.
+    """
+    if isinstance(value, str):
+        try:
+            value = dateutil_parser.isoparse(value)
+        except (ValueError, OverflowError):
+            return value
+    if isinstance(value, datetime.datetime):
+        if tz is not None and value.tzinfo is not None:
+            try:
+                value = value.astimezone(tz)
+            except OverflowError:  # a timestamp at the edge of the calendar: keep its own wall time
+                pass
+        return value.replace(tzinfo=None)
+    return value
+
+
 def parse_datetime(value):
     """dateutil.parser.parse like hass_manager.get_state did for input_datetime."""
     try:

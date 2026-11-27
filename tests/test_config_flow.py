@@ -9,7 +9,7 @@ import pytest
 from homeassistant import config_entries
 from homeassistant.components.energy.data import async_get_manager
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from custom_components.cable_juice_planner.const import CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN
 from custom_components.cable_juice_planner.const.config import build_config, default_options
@@ -61,6 +61,7 @@ async def _submit_defaults_until(hass: HomeAssistant, result, step_id: str | Non
 
 
 async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
+    hass.config.country = "SE"
     result = await _start_instance(hass, dashboard_icon="mdi:car-electric")
     result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
     result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
@@ -86,12 +87,122 @@ async def test_full_flow_creates_entry(hass: HomeAssistant) -> None:
     assert result["title"] == "Cable Juice Planner (flow)"
     assert result["data"][CONF_ENTITY_PREFIX] == "flow"
     options = result["options"]
+    assert options["price_country"] == "SE"  # a new entry: the country of Home Assistant is suggested and stored
     assert options["status_entity_id"] == CHARGER_OPTIONS["status_entity_id"]
     assert options["charging_loss"] == -0.05  # shown in %, stored as a fraction
     assert options["usable_battery_level_entity_id"] == EV_LEVEL
     assert options["dashboard"] is False
     assert options["dashboard_icon"] == "mdi:car-electric"
     assert options["outdoor_temp_entity_id"] == "sensor.outdoor"
+
+
+async def _to_the_price_pages(hass: HomeAssistant):
+    """A new car up to the price provider page (like test_full_flow_creates_entry)."""
+    result = await _start_instance(hass)
+    result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
+    result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
+    result = await _configure(
+        hass, result, "ev",
+        {"usable_battery_level_entity_id": EV_LEVEL, "estimated_battery_range_entity_id": EV_RANGE, "odometer_entity_id": EV_ODOMETER},
+    )
+    result = await _configure(hass, result, "ev_specs", {"battery_size": 75, "last_charging_hour_before_departure_buffer": 1})
+    result = await _configure(hass, result, "home", {"power_consumption_entity_id": CONSUMPTION})
+    result = await _configure(hass, result, "powerwall", form_defaults(result))
+    result = await _configure(hass, result, "price_provider", {"price_providers": ["energidataservice"]})
+    return await _configure(hass, result, "prices_energidataservice", {"energidataservice_buy_entity_id": PRICE})
+
+
+@pytest.mark.parametrize(
+    ("unit", "scale", "fee"),
+    [("DKK/kWh", 1.0, 0.03), ("EUR/kWh", 0.134, 0.004), ("kr/kWh", 1.0, 0.03), ("XYZ/kWh", None, 0.03), (None, None, 0.03)],
+)
+async def test_a_new_entry_gets_the_price_scale_of_its_price_sensor(hass: HomeAssistant, unit, scale, fee) -> None:
+    """The scale comes from the unit of the price sensor, not from Home Assistant's currency (EUR by default)."""
+    hass.states.async_set(PRICE, "0.5", {"unit_of_measurement": unit} if unit else {})
+    result = await _to_the_price_pages(hass)
+    assert result["step_id"] == "price_fees"
+    assert form_defaults(result)["sell_fee"] == fee  # the suggestion is 0.03 kroner in the price currency
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    options = result["options"]
+    assert options.get("price_scale", 1.0) == (scale or 1.0)
+    assert options["sell_fee"] == fee
+
+
+async def test_a_sell_fee_the_user_changed_is_kept_when_the_scale_is_found(hass: HomeAssistant) -> None:
+    hass.states.async_set(PRICE, "0.5", {"unit_of_measurement": "EUR/kWh"})
+    result = await _to_the_price_pages(hass)
+    result = await _configure(hass, result, "price_fees", {"refund": 0.0, "sell_fee": 0.05})
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["options"]["price_scale"] == 0.134 and result["options"]["sell_fee"] == 0.05
+
+
+async def _to_the_epf_page(hass: HomeAssistant):
+    result = await _start_instance(hass)
+    result = await _configure(hass, result, "charger", CHARGER_ENTITIES)
+    result = await _configure(hass, result, "charger_specs", {"power_voltage": 230, "charging_phases": 3, "charging_max_amp": 16, "charging_loss": -5})
+    result = await _configure(
+        hass, result, "ev",
+        {"usable_battery_level_entity_id": EV_LEVEL, "estimated_battery_range_entity_id": EV_RANGE, "odometer_entity_id": EV_ODOMETER},
+    )
+    result = await _configure(hass, result, "ev_specs", {"battery_size": 75, "last_charging_hour_before_departure_buffer": 1})
+    result = await _configure(hass, result, "home", {"power_consumption_entity_id": CONSUMPTION})
+    result = await _configure(hass, result, "powerwall", form_defaults(result))
+    return await _configure(hass, result, "price_provider", {"price_providers": ["energypriceforecast"]})
+
+
+async def test_energy_price_forecast_page_refuses_cents_and_a_wholesale_buy_sensor_and_sets_the_scale(hass: HomeAssistant) -> None:
+    retail = {"unit_of_measurement": "EUR/kWh", "raw_today": [], "retail_source": "estimate"}
+    hass.states.async_set("sensor.epf_retail", "0.2", retail)
+    hass.states.async_set("sensor.epf_cents", "20", {**retail, "unit_of_measurement": "ct/kWh"})
+    hass.states.async_set("sensor.epf_wholesale", "0.1", {"unit_of_measurement": "EUR/kWh", "raw_today": []})
+    hass.states.async_set("sensor.epf_wholesale_2", "0.1", {"unit_of_measurement": "EUR/kWh", "raw_today": []})
+    result = await _to_the_epf_page(hass)
+    assert result["step_id"] == "prices_energypriceforecast"
+    sell = {"energypriceforecast_sell_entity_id": "sensor.epf_wholesale"}
+    # the sell sensor is required: a retail price is more than a sale pays, so it is not taken for one
+    with pytest.raises(InvalidData):
+        await hass.config_entries.flow.async_configure(result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf_retail"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf_cents", **sell})
+    assert result["step_id"] == "prices_energypriceforecast" and result["errors"] == {"energypriceforecast_buy_entity_id": "price_unit_subunit"}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf_wholesale", "energypriceforecast_sell_entity_id": "sensor.epf_wholesale_2"})
+    assert result["errors"] == {"energypriceforecast_buy_entity_id": "price_sensor_not_retail"}
+    # the retail price is more than a sale pays: it is refused as the sell sensor
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf_retail", "energypriceforecast_sell_entity_id": "sensor.epf_retail"}
+    )
+    assert result["errors"] == {"energypriceforecast_sell_entity_id": "price_sensor_not_wholesale"}
+    result = await _configure(
+        hass, result, "prices_energypriceforecast", {"energypriceforecast_buy_entity_id": "sensor.epf_retail", "energypriceforecast_sell_entity_id": "sensor.epf_wholesale"}
+    )
+    assert result["step_id"] == "price_fees" and form_defaults(result)["sell_fee"] == 0.004
+    result = await _submit_defaults_until(hass, result, None)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    options = result["options"]
+    assert options["price_scale"] == 0.134
+    assert options["energypriceforecast_buy_entity_id"] == "sensor.epf_retail" and options["energypriceforecast_sell_entity_id"] == "sensor.epf_wholesale"
+    assert options["energidataservice_buy_entity_id"] == ""
+
+
+async def test_options_flow_finds_the_price_scale_and_keeps_it_without_a_unit(hass: HomeAssistant, loaded_entry) -> None:
+    async def save():
+        result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_ev"})
+        result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+        result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    price_entity = loaded_entry.options["energidataservice_buy_entity_id"]
+    hass.states.async_set(price_entity, "0.5", {"unit_of_measurement": "GBP/kWh"})
+    await save()
+    assert loaded_entry.options["price_scale"] == 0.115
+    sell_fee = loaded_entry.options["sell_fee"]
+    # a sensor without a known unit (not loaded yet at startup): the entry keeps its scale
+    hass.states.async_set(price_entity, "unavailable", {})
+    await save()
+    assert loaded_entry.options["price_scale"] == 0.115
+    assert loaded_entry.options["sell_fee"] == sell_fee  # an existing entry's fee is never rescaled
 
 
 async def test_ev_entities_all_or_nothing(hass: HomeAssistant) -> None:
@@ -172,6 +283,7 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     """A PyScript ev_config.yaml in the config dir is offered and its values prefill the pages."""
     shutil.copy(FIXTURES / "ev_config.yaml", tmp_path / "ev_config.yaml")
     hass.config.config_dir = str(tmp_path)
+    hass.config.country = "DE"
     result = await _start_instance(hass, prefix="ev")
     assert result["step_id"] == "import_legacy"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"import_source": "ev"})
@@ -190,6 +302,7 @@ async def test_import_legacy_pyscript_config(hass: HomeAssistant, tmp_path: Path
     assert options["charge_port_door_entity_id"] == "cover.my_car_charge_port_door"
     assert options["notify_list"] == ["notify.mobile_app_phone"]
     assert options["language"] == "da"
+    assert options["price_country"] == "DK"  # an import keeps its own: Denmark, not the country of Home Assistant
     # the removed testing mode in the legacy file (testing_mode: true) is ignored, not imported
     assert "testing_mode" not in options
     assert options["charger_power_entity_id"] == "sensor.ev_charger_power"

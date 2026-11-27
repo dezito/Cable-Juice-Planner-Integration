@@ -5,7 +5,7 @@ import datetime
 import logging
 import math
 
-from ...const import ENTITY_UNAVAILABLE_STATES
+from ...const import ENTITY_UNAVAILABLE_STATES, price_decimals
 from ...utils.formatting import (
     emoji_parse,
     emoji_sorting,
@@ -467,7 +467,7 @@ class HistoryCombine:
                     f"{self.title} failed",
                     f"{self.name}__charging_history_calc_local_energy_kwh_or_price_failed",
                 )
-            cost = round(kwh * price, 2)
+            cost = round(kwh * price, price_decimals(self.config))
             entry = db[when]
             entry["percentage"] = round(added_percentage, 1)
             entry["kWh"] = round(kwh, 3)
@@ -512,7 +512,6 @@ class HistoryCombine:
             if session["start"] is not None and charging_type != session["charging_type"]:
                 added_kwh, when = get_current_statistic(True)
                 self.charging_power_to_emulated_battery_level()
-                self.calc_co2_emitted(minutes_between(session["start"], self.now(), error_value=self.now().minute), added_kwh=added_kwh)
                 if added_kwh <= 0.1 and f"{emoji_parse({'charging_error': True})}" not in session["emoji"]:
                     _LOGGER.warning("Removing unfinished string added_kwh:%s <= min_kwh:0.1: %s", added_kwh, db[when])
                     del db[when]

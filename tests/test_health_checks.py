@@ -1581,6 +1581,51 @@ def test_the_price_units_the_provider_judges() -> None:
     assert judged is False
 
 
+def test_energy_price_forecast_converts_a_price_per_mwh_but_a_price_per_wh_is_wrong_on_it() -> None:
+    from custom_components.cable_juice_planner.prices.base import price_unit_error
+
+    key = "energypriceforecast_buy_entity_id"
+    assert price_unit_error(key, "EUR/MWh") is False and price_unit_error(key, "EUR/kWh") is False
+    assert price_unit_error(key, "EUR/Wh") is True and price_unit_error(key, "ct/kWh") is True
+
+
+def test_the_price_unit_repair_judges_each_sensor_by_the_unit_rules_of_its_key() -> None:
+    """A price per MWh is wrong on a sensor that is read per kWh, but Energy Price Forecast converts its own and Wattcast gives ct/kWh
+    (euro cents): neither is named. A price per Wh is wrong on Energy Price Forecast too. Any other entity (a tariff) is judged by its
+    unit alone, and Wattcast's forecast sensor, which its provider checks, is not judged here."""
+    def state(value, unit):
+        return SimpleNamespace(state=value, attributes={"unit_of_measurement": unit})
+
+    entity_ids = {
+        "energypriceforecast_buy_entity_id": "sensor.epf",
+        "energypriceforecast_sell_entity_id": "sensor.epf_sell",
+        "energidataservice_buy_entity_id": "sensor.eds",
+        "energidataservice_sell_entity_id": "sensor.eds",  # one sensor under two keys: named once
+        "nordpool_buy_entity_id": "sensor.nordpool",
+        "wattcast_buy_entity_id": "sensor.wattcast",
+        "wattcast_forecast_entity_id": "sensor.wattcast_forecast",
+        "epexspot_buy_entity_id": "sensor.epex",
+        "stromligning_buy_current_price": "sensor.sl",
+    }
+    states = {
+        "sensor.epf": state("25", "EUR/MWh"),  # converted by its provider
+        "sensor.epf_sell": state("0.2", "EUR/Wh"),
+        "sensor.eds": state("2.0", "DKK/MWh"),
+        "sensor.nordpool": state("unavailable", "EUR/MWh"),  # the unit stays while a sensor is down
+        "sensor.wattcast": state("9.0", "ct/kWh"),  # its own unit
+        "sensor.wattcast_forecast": state("9.0", "ct/kWh"),
+        "sensor.epex": state("9.0", "ct/kWh"),
+        "sensor.sl": state("1.0", "øre/kWh"),
+    }
+    provider = CombinedPriceProvider({"solar": {"production_price": -1}, "prices": {"entity_ids": entity_ids}}, [])
+    problems, judged = provider.price_unit_problems(states.get)
+    assert sorted(problems) == [
+        ("sensor.eds", "DKK/MWh"), ("sensor.epex", "ct/kWh"), ("sensor.epf_sell", "EUR/Wh"), ("sensor.nordpool", "EUR/MWh"), ("sensor.sl", "øre/kWh"),
+    ] and judged
+    states["sensor.wattcast"] = state("9.0", "EUR/kWh")  # anything else is wrong for Wattcast
+    assert ("sensor.wattcast", "EUR/kWh") in provider.price_unit_problems(states.get)[0]
+
+
 # ---------------------------------------------------------------------- #
 # The texts: the same keys and placeholders in every language
 # ---------------------------------------------------------------------- #

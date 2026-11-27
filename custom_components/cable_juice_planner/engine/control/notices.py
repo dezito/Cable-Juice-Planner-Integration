@@ -19,7 +19,7 @@ import datetime
 import logging
 import math
 
-from ...const import CHARGER_CHARGING_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES
+from ...const import CHARGER_CHARGING_STATUS, CHARGER_READY_STATUS, ENTITY_UNAVAILABLE_STATES, price_decimals
 from ...prices.intervals import naive_timestamp, price_interval_at
 from ..loss import _outlier_segments
 from .readiness import DEPARTURE_NOTICE_HOURS, PLUG_IN_NOTICE_MINUTES, WORK, _for_departure
@@ -214,7 +214,7 @@ class ControlNotices:
         t = self.t
         message = t(
             "ui.notify_more.cheap_power", start=max(start, now).strftime("%H:%M"), end=end.strftime("%H:%M"),
-            price=f"{min(prices):.2f}", valuta=t("ui.common.valuta"),
+            price=f"{min(prices):.{price_decimals(self.config)}f}", valuta=t("ui.common.valuta"),
         )
         self._send_notice("title_cheap_power", message, self.own_entity_id("sensor", "current_charging_rule"), "action_plan")
 
@@ -239,7 +239,7 @@ class ControlNotices:
         if not self._new_notice(f"{MANUAL_EXPENSIVE} {now.date().isoformat()}", _next_midnight(now) + datetime.timedelta(days=1)):
             return
         t = self.t
-        message = t("ui.notify_more.manual_expensive", price=f"{price:.2f}", valuta=t("ui.common.valuta"))
+        message = t("ui.notify_more.manual_expensive", price=f"{price:.{price_decimals(self.config)}f}", valuta=t("ui.common.valuta"))
         self._send_notice("title_manual_expensive", message, self.own_entity_id("switch", "allow_manual_charging_now"), "action_manual")
 
     # ------------------------------------------------------------------ #
@@ -284,7 +284,7 @@ class ControlNotices:
         name = t(f"ui.calendar.month_names.{MONTH_KEYS[int(month[5:]) - 1]}")
         lines = [t("ui.notify_more.monthly_summary", month=name, kwh=round(row["kwh"]), cost=f"{row['cost']:.2f}", valuta=valuta)]
         if row.get("unit_price") is not None:
-            lines.append(t("ui.notify_more.monthly_unit_price", price=f"{row['unit_price']:.2f}", valuta=valuta))
+            lines.append(t("ui.notify_more.monthly_unit_price", price=f"{row['unit_price']:.{price_decimals(self.config)}f}", valuta=valuta))
         saving = row.get("saving_daily")
         if saving is not None:
             text = "monthly_saving" if saving >= 0 else "monthly_extra"

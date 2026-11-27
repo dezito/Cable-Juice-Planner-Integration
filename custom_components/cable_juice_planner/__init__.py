@@ -234,7 +234,19 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _async_migrate_removed_testing_mode(hass, entry)
     if entry.version == 2 and entry.minor_version < 5:
         _async_migrate_renamed_charger_power(hass, entry)
+    if entry.version == 2 and entry.minor_version < 6:
+        _async_migrate_removed_co2(hass, entry)
     return True
+
+
+@callback
+def _async_migrate_removed_co2(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Version 2.6: CO2 is gone: the option co2_entity_id is dropped and so is the sensor co2_emitted (its stored value is not used)."""
+    ent_reg = er.async_get(hass)
+    if entity_id := ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_co2_emitted"):
+        ent_reg.async_remove(entity_id)
+    hass.config_entries.async_update_entry(entry, options=strip_removed_options(entry.options), minor_version=6)
+    _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2.6 (CO2 removed)", entry.title)
 
 
 @callback

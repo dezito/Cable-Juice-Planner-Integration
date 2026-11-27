@@ -213,3 +213,22 @@ async def test_restoring_an_old_backup_renames_the_charger_power_option(hass: Ho
     assert loaded_entry.state is ConfigEntryState.LOADED
     assert "power_consumtion_entity_id" not in loaded_entry.options
     assert loaded_entry.options["charger_power_entity_id"] == "sensor.restored_charger"
+
+
+async def test_restoring_an_old_backup_without_a_country_puts_the_entry_in_denmark(hass: HomeAssistant, config_dir: Path, loaded_entry) -> None:
+    """A backup from before the country existed is in Denmark: the country the entry has now is not kept for it."""
+    first = loaded_entry.runtime_data
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "price_country": "DE"})
+    await _settle(hass)
+    await hass.async_add_executor_job(first._executor.shutdown, True)
+    response = await hass.services.async_call(DOMAIN, "export_data", {}, blocking=True, return_response=True)
+    path = config_dir.parent / next(iter(response["files"].values()))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["options"].pop("price_country", None)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    old_coordinator = loaded_entry.runtime_data
+    await backup.async_import(hass, loaded_entry, path.name, restore_configuration=True)
+    await _settle(hass)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+    assert loaded_entry.options["price_country"] == "DK"

@@ -13,7 +13,7 @@ The repairs (the keys of "issues" in strings.json):
 - charger_not_following: the charger repeatedly did not follow the plan (the restarts gave up, or it charged without a rule).
 - power_without_unit: a power sensor without a unit whose values look like kW (read as W it is 1000 times too small).
 - battery_level_fraction: a battery level sensor whose values look like a share (0..1), not a percentage.
-- price_unit_scale: a price sensor in a subunit of its currency (øre, ct), per MWh or per Wh (no price is converted).
+- price_unit_scale: a price sensor in a subunit of its currency (øre, ct), per MWh or per Wh (the repair converts nothing; the providers do not use the prices of the price sensors they recognise as wrong).
 - consumption_frozen: the house consumption power sensor has shown the same value for FROZEN_AFTER or longer (the plan uses it for
   the house). Only that sensor is judged: the others (solar, battery flow, charger power) are legitimately 0 for hours.
 - charger_outside_house_meter: the house consumption looks not to include this car's charger while the option
@@ -721,7 +721,7 @@ class HealthWatcher:
         )
 
     def _check_price_scale(self) -> None:
-        """Price sensors in a subunit (øre, ct), per MWh or per Wh: no price is converted, so the prices are 100 or 1000 times too
+        """Price sensors in a subunit (øre, ct), per MWh or per Wh: the prices are 100 or 1000 times too
         large, or 1000 times too small (per Wh). Judged by the price provider (no provider yet: not judged, the repair stays).
         Without a wrong one and with all judged it goes; a price entity that is not judged yet keeps it."""
         if self._price_problems is None:

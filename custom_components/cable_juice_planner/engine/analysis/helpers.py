@@ -48,7 +48,7 @@ PRICE_CORRECTION_DAYS = 30  # days the bias of the price forecast is measured ov
 PRICE_CORRECTION_MIN_DAYS = 7  # days needed per days ahead before the forecast is corrected
 
 
-PRICE_CORRECTION_MAX = 0.5  # currency/kWh the forecast is corrected by at most
+from ...const import PRICE_CORRECTION_MAX  # noqa: E402,F401 - kroner/kWh the forecast is corrected by at most (times the price scale)
 
 
 FORECAST_TYPES = ("ema", "trend", "average")

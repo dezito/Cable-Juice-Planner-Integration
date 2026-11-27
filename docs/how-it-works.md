@@ -63,8 +63,8 @@ the same hourly rows:
 
 ### Prices
 
-Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
-solar surplus.
+Buy prices per hour (or 15 minutes) from Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast
+integration, and sell prices for the solar surplus.
 
 **Two price integrations with different intervals.** The providers can have different interval lengths
 (Strømligning's buy price is hourly, Energi Data Service's is every 15 minutes). CJP puts all prices on one common
@@ -86,9 +86,28 @@ covered by prices. The four most expensive hours and the average of the 15 cheap
 per hour; interval prices are combined into duration-weighted hourly averages for those comparisons.
 
 **Sell price:** the spot price less what selling a kWh costs. Every tariff, tax and surcharge in the sell
-price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings) plus Energinet's net tariff
+price is subtracted first, then the *Sell fee* (*Refund and fees* in the settings: what the buyer of your electricity charges for buying it) plus Energinet's net tariff
 and system tariff. A sell sensor from Energi Data Service without tariffs is already the spot price, so its
-net and system tariff come from the buy sensor.
+net and system tariff come from the buy sensor. Energy Price Forecast has no tariffs in its prices: the sell price is
+the price of its sell sensor (the wholesale price, required: the retail price is higher than what a sale pays) less the sell fee.
+
+**Spot forecast integrations** (Spot Forecast, Elprisprognos, Wattcast) give a wholesale price: the buy price is the spot price ×
+(1 + VAT) + surcharge, both from the fee page with no default (without them there are no prices), and the sell price is the
+spot price less the sell fee (Wattcast's ct/kWh is read as euro). The published prices are real; the forecast follows them
+from tomorrow on, and today's hours without a published price are not planned. The recorded state of these sensors is not used.
+
+**Providers of your own published prices** (EPEX Spot, GE-Spot, Octopus Energy, Nord Pool) give the buy price of the sensor as it is (the
+VAT, surcharge and fees are the user's, set in the integration); the sell price is the wholesale price of a second sensor, a field of the
+same sensor (GE-Spot) or the export rates (Octopus Energy), less the sell fee, and 0 less the fee for Octopus without an export tariff.
+They give today and tomorrow, no forecast, and stand before the estimating providers: a provider with a forecast fills the days after. An hourly
+price is repeated over the quarters of the hour when another provider has 15-minute prices (one common interval for the whole plan), so the
+quarters of a later provider never fill a slot of it.
+
+**A market without published prices** (Energy Price Forecast in Finland, Great Britain, SE1/SE2 and others) needs
+the own price source of Energy Price Forecast (a Nord Pool or ENTSO-e sensor), which gives it published prices from
+midnight: with only a forecast, today has no price before the present, so the price page refuses the sensor, and an existing setup gets a repair when a sensor has had only a forecast for at least an hour (it goes by itself when published prices are back). A
+forecast never fills a slot that has a real price, also not one of another provider with other periods, and only
+real prices are stored in the price history.
 
 **Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
 prices: a forecast buy price is raised and a forecast sell price lowered (a sale is worth less; with a
@@ -98,6 +117,18 @@ forecast was the last 30 days for that day ahead: if the forecast 2 days ahead w
 average, the plan subtracts 0.15 kr. A day ahead is only corrected after 7 days of measurements, and by at
 most ±0.50 kr. The [price forecast analysis](dashboard-analysis.md#price-forecast) shows the measurements
 and the correction used.
+
+**Prices in another currency.** The amounts above (and a few small limits, such as the smallest saving that
+gives a score) are chosen for Danish kroner. When a car is set up, and again each time its options are saved,
+CJP reads the unit of the price sensor (e.g. `EUR/kWh`) and stores a *price scale*, so these amounts follow the
+currency: with euro prices the adder is about 0.0045 € per day and the correction limit about ±0.07 €, and
+prices are rounded to 3 decimals instead of 2. Your own settings are never changed: only the *Sell fee*
+suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
+to prices in another currency, check the *Sell fee*. A sensor without a known unit
+leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
+this. The price pages of Energi Data Service, Energy Price Forecast and the spot forecast integrations refuse a sensor in cents or pence (Wattcast gives ct/kWh and is read as euro) (and Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool one per MWh or Wh, Energy Price Forecast one per Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). The forecast sensor of Wattcast says its unit too (`forecast_unit`): in another unit than ct/kWh it gives no prices, with a warning in the log and no repair. Every
+price sensor must be in the same currency (a backup provider in another currency is refused). The rates are rough: they only set the size of the limits, no price is ever converted between currencies. Currencies worth
+much less than a krone (CZK, HUF, ISK) are not recognised yet.
 
 <p align="center">
   <img src="../images/settings-advanced.png" alt="The Advanced settings: forecast type, choose the forecast type automatically and correct the price forecast" width="380">

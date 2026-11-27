@@ -280,6 +280,7 @@ def test_hours_from_the_price_history_get_every_slot_of_the_grid() -> None:
         now=lambda: now,
         current_hour=lambda: _at(DAY, 10),
         get_forecast_value=lambda values: values[-1],
+        get_price_forecast_value=lambda values: values[-1],
         config={"solar": {"production_price": -1.0}},
     )
     known = {**_series(DAY, 15, lambda h, m: 2.0, hours=range(0, 12)), **_series(DAY, 15, lambda h, m: 2.0, hours=range(14, 24))}

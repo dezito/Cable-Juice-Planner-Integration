@@ -6,6 +6,7 @@ import logging
 import math
 from copy import deepcopy
 
+from ...const import price_decimals
 from ...utils.helpers import average, in_between, reset_time_to_hour, ultra_cheap_limit
 from ...prices.intervals import hourly_price_averages
 
@@ -57,7 +58,7 @@ class EnergyPrice:
                 if charging > 0.0 and sum(powerwall_kwh) < kwh:
                     history_key = "history_sell" if solar_available_production > 0 else "history"
                     # the hour offset (not the hour of day) indexes the price history, like ev.py
-                    kwh_price = self.get_forecast_value(self.kwh_avg_prices_db[history_key][hour][loop_timestamp.weekday()])
+                    kwh_price = self.get_price_forecast_value(self.kwh_avg_prices_db[history_key][hour][loop_timestamp.weekday()])
                     if history_key == "history_sell":
                         kwh_price = self.sell_value(kwh_price)
                     kwh_price_list.append(round(kwh_price, 3))
@@ -77,6 +78,22 @@ class EnergyPrice:
         total_kwh = sum(powerwall_kwh)
         total_cost = sum(powerwall_total_cost)
         return total_cost / total_kwh if total_kwh > 0.0 else 0.0
+
+    def current_buy_price(self) -> float:
+        """The buy price of now: the provider's (real, else forecast), else the price of the hour from get_grid_prices (the cached
+        prices or the price history) when there are no online prices at all, e.g. every price sensor is down or in the wrong unit.
+        A missing price would book the charging at 0; the price of the history is an estimate, not marked as one in the charging
+        history."""
+        try:
+            return self.price_provider.get_buy_price()
+        except ValueError:
+            result = self.price_provider.get_price_at_timestamp(self.get_grid_prices(), self.now())
+            if result is None:
+                raise
+            price = result["price"]
+            if self.grid_price_cache.get("sources", {}).get(result["price_timestamp"]) in ("database", "offline"):
+                price += self.price_provider.refund  # the price history is stored net of the refund (append_kwh_prices), calc_kwh_price takes it off
+            return price
 
     def calc_kwh_price(self, period=60, update_entities=False, solar_period_current_hour=False) -> float:
         ev_total_price_kwh = 0.0
@@ -103,7 +120,7 @@ class EnergyPrice:
             ev_grid_watt = round(max(ev_used_consumption - watts_from_local_energy, 0.0), 3)
 
             refund = self.price_provider.refund
-            grid_kwh_price = self.price_provider.get_buy_price() - refund
+            grid_kwh_price = self.current_buy_price() - refund
             solar_kwh_price = self.get_solar_sell_price(set_entity_attr=update_entities)
             powerwall_kwh_price = self.get_powerwall_kwh_price()
 
@@ -130,7 +147,7 @@ class EnergyPrice:
                 _LOGGER.debug("kWh cost price %s", ev_total_price_kwh)
                 self.set_state(key, ev_total_price_kwh)
                 if not self.is_solar_configured():
-                    raw_price = self.price_provider.get_buy_price()
+                    raw_price = self.current_buy_price()
                     self.set_attr(key, "raw_price", f"{raw_price:.2f} {valuta_kwh}")
                     self.set_attr(key, "refund", f"{refund:.2f} {valuta_kwh}")
                     self.set_attr(key, "price", f"{raw_price - refund:.2f} {valuta_kwh}")
@@ -248,9 +265,10 @@ class EnergyPrice:
             _LOGGER.info("KWH avg prices already updated today, skipping append")
             return
         try:
-            # only the provider's prices - the hours filled from the history must not be stored again
-            grid_prices = self.price_provider.get_buy_prices()
-            sell_prices = self.price_provider.get_sell_prices() if self.is_solar_configured() else {}
+            # only the provider's real prices - never a forecast (a market without published prices stores nothing), and
+            # the hours filled from the history must not be stored again
+            grid_prices = self.price_provider.get_buy_real_prices()
+            sell_prices = self.price_provider.get_sell_real_prices() if self.is_solar_configured() else {}
             today = self.now().date()
             day_of_week = self.now().weekday()
             max_length = self.config["database"]["kwh_avg_prices_db_data_to_save"]
@@ -309,6 +327,7 @@ class EnergyPrice:
             _LOGGER.error("Can't append KWH avg prices: %s %s", err, type(err))
 
     def set_low_forecast_price(self) -> None:
-        price = round(self.get_forecast_value(self.kwh_avg_prices_db["min"]), 3)
-        self.set_attr("charge_very_cheap_battery_level", "low_forecast_price", round(price, 2))
-        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round(ultra_cheap_limit(price), 2))
+        price = round(self.get_price_forecast_value(self.kwh_avg_prices_db["min"]), 3)
+        decimals = price_decimals(self.config)
+        self.set_attr("charge_very_cheap_battery_level", "low_forecast_price", round(price, decimals))
+        self.set_attr("charge_ultra_cheap_battery_level", "low_forecast_price", round(ultra_cheap_limit(price), decimals))

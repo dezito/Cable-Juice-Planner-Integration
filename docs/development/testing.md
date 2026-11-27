@@ -11,14 +11,17 @@ Inside it, run `python -m pytest` from the repository root; it is Linux, so no
 shims are needed. The dev HA runs on `http://localhost:8123`; after a code
 change run `bash ha-dev/devcontainer/restart.sh`, and
 `bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates seven car profiles, each with its own prefix ("Car with
+Seeding creates eleven car profiles, each with its own prefix ("Car with
 everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
 without car entities, "Car without climate entity"/`car_no_climate` without the
 climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
 updates every 30 minutes with the battery level simulation on, "Car without
 Energi Data Service"/`car_no_eds` with only Strømligning as price provider, and two
 cars with load balancing priority 1 and 2 (`car_priority_1`, `car_priority_2`) each with
-its own charger power sensor) plus the shared site entry. Use them to test
+its own charger power sensor, "Car with Energy Price Forecast"/`car_epf` on the simulated
+Energy Price Forecast sensors, which are in euro, and "Car with Spot Forecast"/`car_spotforecast`, "Car with
+Elprisprognos"/`car_elprognos` and "Car with Wattcast"/`car_wattcast` on the simulated spot forecast sensors, which are only
+seeded where the mounted integration has the providers) plus the shared site entry. Use them to test
 missing-entity and single-provider cases. The dev HA, the dev user's profile
 and the seeded entries are in English.
 
