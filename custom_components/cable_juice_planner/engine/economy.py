@@ -377,7 +377,9 @@ class Economy:
         oldest = min((s["ts"] for s in sessions), default=now) - 86400
         self.economy_db["windows"] = [w for w in windows if (w["end"] or now) >= oldest]
         self.mark_dirty("economy")
+        self.update_learned_workplan()  # the windows just changed
         self.publish_economy(data.get("odometer_months") or {})
+        self.notify_monthly_summary()
         try:
             self.store_derived_windows(data)
         except Exception as err:  # noqa: BLE001
@@ -473,6 +475,7 @@ class Economy:
                 row["subscription_status"] = "recorded"
                 row["subscription_saving"] = round(m["cost"] - subscription_price, 2)
             result.append(row)
+        self.economy_months = result  # the monthly summary (control/notices.py)
 
         current = result[-1] if result else {}
         self.set_state("economy", current.get("saving_daily"))

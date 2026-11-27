@@ -8,7 +8,7 @@ from copy import deepcopy
 from ..const import PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
 from ..prices.base import sell_adder_sign
 from ..prices.chart_rows import price_chart_rows
-from ..prices.intervals import hourly_price_averages
+from ..prices.intervals import hourly_price_averages, interval_slots, price_grid_minutes
 from ..utils.formatting import get_list_values
 from ..utils.helpers import (
     average,
@@ -54,7 +54,7 @@ class Pricing:
         corrections = self.price_forecast_corrections()
         try:
             if "prices" in database and database.get("using_offline_prices") is False and update_prices is False and database.get("corrections") == corrections:
-                hour_prices = deepcopy(database["prices"])
+                hour_prices = dict(database["prices"])
             else:
                 provider = self.price_provider
                 if provider is None:
@@ -63,7 +63,7 @@ class Pricing:
                 sources = provider.get_price_sources(sell_prices)
                 if not hour_prices:
                     raise ValueError(f"No {'sell' if sell_prices else 'grid'} prices returned from {type(provider).__name__}")
-                hour_prices = deepcopy(hour_prices)
+                hour_prices = dict(hour_prices)
                 sources = deepcopy(sources)
                 if corrections:
                     current_hour = self.current_hour()
@@ -80,13 +80,13 @@ class Pricing:
                     sources.update({timestamp: "database" for timestamp in missing_hours})
                 database["missing_hours"] = missing_hours
                 database["last_update"] = now
-                database["prices"] = deepcopy(hour_prices)
+                database["prices"] = dict(hour_prices)
                 database["sources"] = sources
                 database["corrections"] = corrections
                 database["using_offline_prices"] = False
         except Exception as err:  # noqa: BLE001
             if "prices" in database and "last_update" in database and minutes_between(database["last_update"], now) <= 120:
-                hour_prices = deepcopy(database["prices"])
+                hour_prices = dict(database["prices"])
                 _LOGGER.warning("Can't get online %s prices, using last successful: %s", "sell" if sell_prices else "grid", err)
             else:
                 _LOGGER.warning("Can't get online %s prices, using database: %s", "sell" if sell_prices else "grid", err)
@@ -101,7 +101,7 @@ class Pricing:
                     hour_prices = dict(missing_hours)
                     database["sources"] = {timestamp: "offline" for timestamp in missing_hours}
                     database["missing_hours"] = missing_hours
-                    database["prices"] = deepcopy(hour_prices)
+                    database["prices"] = dict(hour_prices)
                 except Exception as ex:  # noqa: BLE001
                     message = f"Can't get offline prices: {ex} {type(ex)}"
                     _LOGGER.error(message)
@@ -121,6 +121,8 @@ class Pricing:
         current_hour = self.current_hour()
         end = start_of_day(self.now()) + datetime.timedelta(days=days)
         priced_hours = {reset_time_to_hour(timestamp) for timestamp in prices}
+        # the price history is hourly: an hour is as many slots as the prices around it have (every slot the same price)
+        grid = price_grid_minutes(prices)
         missing = {}
         timestamp = start_of_day(self.now()) if from_start_of_day else current_hour
         while timestamp < end:
@@ -130,7 +132,9 @@ class Pricing:
                 if history_key == "history_sell":
                     # a sale at a price from the history is worth less too (see sell_adder_sign)
                     adder *= sell_adder_sign(self.config)
-                missing[timestamp] = round(self.get_price_forecast_value(values) + adder, price_decimals(self.config))
+                price = round(self.get_price_forecast_value(values) + adder, price_decimals(self.config))
+                for slot in interval_slots(timestamp, timestamp + datetime.timedelta(hours=1), grid):
+                    missing[slot] = price
             timestamp += datetime.timedelta(hours=1)
         return missing
 

@@ -19,64 +19,11 @@ automations or the included blueprint.
 
 ## Code map
 
-```text
-custom_components/cable_juice_planner/  The HA integration (HACS payload)
-├── __init__.py                          Integration setup and platform forwarding
-├── coordinator/                         Shared data, refresh, events, and lifecycle
-├── config_flow.py / flow/               Setup/options flow, pages, and schemas
-├── const/                               Configuration, settings, and site constants
-├── engine/                              Charging plans, calculations, and current actions
-│   ├── engine.py / planning.py          Calculation orchestration
-│   ├── planner/                         Charge plan and price-level decisions
-│   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
-│   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
-│   ├── energy/                          Prices, solar, forecasts, and power inputs
-│   ├── history/                         Charging sessions, consumption, cost, and efficiency
-│   ├── analysis/                        Economy/forecast analysis and published results
-│   ├── economy.py                       Monthly charging economy comparison
-│   ├── pricing.py / state.py            Price helpers (incl. `sell_value()`) and engine state
-│   ├── debug.py                         Engine debug information
-│   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
-│   └── public_charging.py / distance.py Public sessions and driving-distance calculations
-├── prices/                              Price providers; CombinedPriceProvider is the only entry point
-│   ├── energypriceforecast.py           Energy Price Forecast: buy = its retail sensor, sell = its wholesale sensor
-│   ├── spotprices.py                    Spot Forecast, Elprisprognos, Wattcast: wholesale prices, buy = spot × (1 + VAT) + surcharge
-│   ├── spot_rows.py                     Pure row parsers of the three (the same file in both repositories)
-│   ├── publishedprices.py               EPEX Spot, GE-Spot, Octopus Energy, Nord Pool: the user's own published prices, no forecast
-│   ├── published_rows.py                Pure row parsers of the first three (the same file in both repositories)
-│   └── chart_rows.py                    The prices of the plan per price period for the price chart of every provider (the same file in both repositories)
-├── management/                          Storage, backups, dashboard, and blueprint setup
-├── utils/                               Shared utilities and datetime/time platform implementations
-├── sensor.py / number.py / switch.py    Main HA entity platforms
-├── select.py / button.py / binary_sensor.py  Other HA entity platforms
-├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base
-├── repairs.py / site.py                 Repairs and site-related entities
-├── translations/ texts/                 HA strings and user-facing descriptions
-├── dashboard/ blueprints/               Bundled dashboard and automation blueprint
-│   └── dashboard/prices/                One price chart per price integration (the key of PROVIDER_CLASSES)
-└── manifest.json                        HA integration metadata
-
-tests/                                   Pytest suite
-├── conftest.py                          Shared fixtures and simulated HA entities
-├── test_engine.py / test_economy.py     Engine and cost/economy behavior
-├── test_site.py / test_charging_loss_model.py  Site and charging-loss calculations
-├── test_analysis.py / test_config_flow.py      Analysis and setup/options
-├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
-├── test_dashboard.py                    Dashboard generation and content
-├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
-├── fixtures/                            Legacy PyScript config for the import tests
-└── debug_replay.py                      Debug/replay helper
-
-docs/                                    User documentation and behavior details
-.github/workflows/validate.yml           CI: hassfest and HACS validation
-.github/workflows/release.yml            Attaches cable_juice_planner.zip to published releases
-.github/workflows/release-notes.yml      Draft release with notes written by Claude
-pytest.ini / requirements_test.txt       Pytest configuration and pinned test deps
-```
-
-Use this as a map, not an exhaustive inventory; check the current files before
-editing. Prefer the narrowest relevant module and test file over changing a
-broad layer for a local behavior change.
+The module and test map is in `docs/development/code-map.md`; read it before
+working in an unfamiliar part of the code. Use it as a guide, not an exhaustive
+inventory; check the current files before editing. Prefer the narrowest
+relevant module and test file over changing a broad layer for a local behavior
+change.
 
 Read the relevant documentation before changing behavior. In particular:
 
@@ -113,8 +60,8 @@ Read the relevant documentation before changing behavior. In particular:
 - Timestamps from other integrations (price rows, the weather forecast, Solcast `period_start`, the car's
   `last_update` sensor) can carry any offset, often UTC. Read them with `to_local_datetime(value, tz)`
   (`utils/helpers.py`; `price_timestamp()` in `prices/base.py` is the same call for price rows): it converts to Home
-  Assistant's time zone (`snapshot.tz`) before it drops the offset. `to_datetime()` only drops the offset, so use it
-  for values that are local already. A naive timestamp is local time. The providers get the zone through
+  Assistant's time zone (`snapshot.tz`) before it drops the offset (`to_datetime(value, tz)` does the same for an ISO string only; without a tz it
+  only drops the offset, for CJP's own naive timestamps). A naive timestamp is local time. The providers get the zone through
   `CombinedPriceProvider.set_now(now, tz)`. A daily weather forecast whose time is midnight in its own offset names a
   date and keeps it (`forecast_day()`); any other time is converted. The repeated hour of the autumn change shares
   one price key; which row wins depends on the provider (Energi Data Service: the last row; Strømligning: the
@@ -133,7 +80,12 @@ Read the relevant documentation before changing behavior. In particular:
   Octopus Energy or Nord Pool. Energy Price Forecast converts a
   price per MWh to kWh (`price_unit_divisor()`): its rows in the provider and its recorded history where the history is
   read (`CombinedPriceProvider.price_unit_divisors()`; the unit is the sensor's current one); units are read case-sensitively (`GBp` is not `GBP`), and all price sensors must be in one
-  currency (`price_currency_errors()`), so a backup provider with a known unit is never in another currency.
+  currency (`price_currency_errors()`), so a backup provider with a known unit is never in another currency. The health check repair
+  `price_unit_scale` (`CombinedPriceProvider.price_unit_problems()`) names a sensor in the wrong unit: a price sensor of `PRICE_SENSOR_KEYS` by
+  `price_unit_error()` of its key (Wattcast's ct/kWh and Energy Price Forecast's own per MWh are right; per Wh is wrong on Energy Price Forecast
+  too), any other entity of a price integration (Strømligning, Octopus Energy, the tariffs) by its unit alone (`price_unit_wrong()`), and
+  Wattcast's forecast sensor not at all (its provider checks its unit). Only the first group is refused by the providers (`_wrong_unit()`: the next
+  provider or the stored prices fill in); a Strømligning sensor in the wrong unit is flagged but still used.
 - Preserve compatibility of config-entry options, entity IDs/unique IDs,
   stored history, backups, and import from the PyScript version. Changes to
   these formats or identifiers require a migration/compatibility path and
@@ -144,9 +96,33 @@ Read the relevant documentation before changing behavior. In particular:
   history) are the same file as in BattMind. Change both together and keep
   `tests/test_detection.py` in sync. What the history cannot decide stays
   unknown and keeps the current value; never turn unknown into a default.
+- The config flow pre-fills the solar and battery power sensors from the Energy dashboard (`flow/energy_prefs.py`, the same
+  file as in BattMind; change both together and keep `tests/test_energy_prefs.py` in sync): `suggested_value` only, on empty
+  fields of the first setup; only a sole solar or battery source with an existing `sensor.` whose unit passes
+  `unit_factor_to_w()` in `flow/detection.py` (W, kW, MW, mW, GW; not kWh, not no unit; deliberately stricter than
+  `power_unit_known()`); not skipped for a sensor another car entry uses (`skip_used=False`), because the cars of one house
+  share its solar and battery sensors, so every car gets the suggestion. For an inverted or two-sensor battery the
+  suggestion is the sensor the Energy dashboard generates for it, which disappears if that Energy configuration is changed.
+  The battery sign still comes from the recorder; a PyScript import or a restored backup wins.
 - BattMind reads the option `charger_power_entity_id` of this integration's
   config entries to leave the chargers out of its house consumption. Do not
-  rename or move that option without changing BattMind too.
+  rename or move that option without changing BattMind too. It also reads
+  `charger_in_house_meter` (only an explicit False counts); keep both in sync.
+- `charger_in_house_meter` (home page, default True): False means the car's
+  charger is on its own meter that the house sensor does not include. The
+  engine then adds the charger to `power_consumption` (`engine/energy/power.py`)
+  so everything downstream keeps one-meter semantics, and no other car or
+  BattMind subtracts it. The cars behind it and with the same priority add it
+  to their house instead (`own_meter_chargers_ahead()` in `utils/chargers.py`,
+  `home.added_consumption`: sensor -> max W), always, whatever
+  `ignore_cjp_chargers` says. A charger in these paths without a number in
+  the window counts its current state (only for a window that ends now),
+  else its max W (the safe side); that window is marked `estimated` and
+  `hour_end` stores it neither in `power_values_db` nor in
+  `solar_available_db`. A stale number is counted as it is (an idle charger
+  that reports only changes reads 0 for hours). The stuck-reading list `charger_entity_ids`
+  keeps own-meter chargers (`include_own_meter=True`). The what-if statistics
+  add only this car's own charger, not those of other cars.
 - The integration supports Home Assistant from the `hacs.json` minimum
   version up to the newest release. Use a fallback when a Home Assistant API
   changes. For example, read stored restore states only through
@@ -163,6 +139,28 @@ Read the relevant documentation before changing behavior. In particular:
   then Spot Forecast, Elprisprognos and Wattcast) and the prices themselves. Other
   code calls its methods (the coordinator via `coordinator.price_provider`)
   and never reads price entities, config keys or provider attributes itself.
+- Providers are merged on one common price interval, never a fixed one: the
+  finest interval all configured providers fit on, which is the greatest
+  common divisor of their own intervals, read from each provider's data (60,
+  30, 15 or 10 minutes, or any other length that divides an hour; for example
+  hourly plus 15 minute gives 15, 30 plus 60 gives 30, 10 plus 15 gives 5).
+  A coarser provider's price is repeated over every slot of its own interval,
+  and the provider priority applies per slot: the first provider with a real
+  price for the slot wins, then forecasts, as before. Never hardcode 15
+  minutes and never merge by timestamp alone: an hourly price at :00 next to
+  a lower-priority provider's :15, :30 and :45 made the planner see a falsely
+  cheap first quarter of every hour and plan only 15 minutes of charging per
+  hour. The dashboard plan overview and the charging history still group
+  adjacent periods into whole hours or continuous windows (for example
+  03:00-03:52). Cable Juice Planner and BattMind share this rule; change both
+  together. Tests must cover an hourly and a sub-hourly provider in the same
+  hour, three providers with different resolutions, and intervals that have
+  no common slot of 15 minutes (10 plus 15).
+  A provider's price is never repeated beyond that provider's own interval
+  that day (the most common gap between its prices that day): a row the
+  provider left out (it drops a price that is not a number) is a gap in the
+  combined prices. The next provider fills the slot; the price history only
+  fills an hour that has no price at all.
 - Keep network and blocking work out of the event loop. Follow the existing
   coordinator/executor lifecycle and ensure workers and resources are cleaned
   up on unload.
@@ -213,6 +211,10 @@ Read the relevant documentation before changing behavior. In particular:
   `PROVIDER_CLASSES`), included by a `# @include` line, and the provider's `dashboard_entities()` maps the
   external entities that chart uses; a test checks that both name the same entities. A new price integration
   needs a provider class and a chart file. Keep `expand_includes()` in sync with BattMind.
+- Analysis sections that need the car integration are listed in `EV_SECTIONS` (`management/dashboard_build.py`) and are
+  dropped by configuration, not by missing entities. The analysis view is grouped under full-width group headings (a
+  span 4 section with one `heading_style: title` heading); `_drop_empty_groups()` removes a group heading with no section
+  left below it, and `dense_section_placement` stays off in that view so no section moves above its heading.
 - Do not edit generated/cache files such as `__pycache__`, `.pytest_cache`, or
   `.ruff_cache`.
 
@@ -227,8 +229,8 @@ These rules apply to code, tests, documentation, and the dashboard.
 - Clearly distinguish historical hindsight from a realistic forecast. Do not
   present an optimistic backtest result as expected savings, earnings, or
   payback time.
-- Add regression tests for bugs found and for scenarios with missing or
-  incomplete data.
+- Add regression tests for bugs found (write the test first and confirm it
+  fails without the fix) and for scenarios with missing or incomplete data.
 - Use Home Assistant data for validation when an environment is available and
   access is approved. Keep credentials and sensitive data out of code, logs,
   and reports.
@@ -258,26 +260,14 @@ private agent memory). Update or remove a note when it stops being true.
 - README/docs audience: first-time installs, possibly migrating from PyScript. The HACS integration is new, so no release notes or "changed since" text
   about removed/renamed entities between development versions. Detailed docs
   live in `docs/` (English); the README is a short landing page that links into
-  it. Anchor links to emoji headings need a leading hyphen.
-- Releases: `hacs.json` has `zip_release` with
-  `filename: cable_juice_planner.zip`, so HACS installs from that release asset
-  (its download count is the install count). `.github/workflows/release.yml`
-  builds it from `custom_components/cable_juice_planner/` (files at the zip
-  root) when a release is published; run it by hand with a tag for a release
-  that lacks the zip. It sets `manifest.json` `version` in the zip from the
-  tag (`v1.0.9` -> `1.0.9`), so the version in the repository need not be
-  bumped by hand. `.github/workflows/release-notes.yml` (*Draft release*, run
-  by hand; with an empty tag it suggests the next one from the git tags via
-  `.github/next_version.py`, using the *beta* checkbox and the *bump* choice;
-  covered by `tests/test_next_version.py`, keep the copy in BattMind in sync)
-  lets Claude write the notes from the changes since
-  the previous release and creates or updates a draft release; it never
-  touches a published one. It needs the secret `CLAUDE_CODE_OAUTH_TOKEN`. Keep
-  its prompt in sync with the BattMind copy. A tag with a letter (`-beta.1`,
-  `b1`, `rc1`) becomes a pre-release, compared with the latest release; a
-  stable tag is compared with the latest stable release. Both workflows run
-  `.github/check_version.py`, which rejects versions Home Assistant won't load
-  (e.g. `1.0.7.1-beta.1`; use `1.0.7.1b1`).
+  it. Anchor links to emoji headings need a leading hyphen. `docs/development/`
+  is for contributors and coding agents, not for users.
+- Releases (`hacs.json` `zip_release`, `.github/workflows/release.yml` and
+  `release-notes.yml`, `.github/next_version.py`, `.github/check_version.py`):
+  read `docs/development/releases.md` before changing them. Keep
+  `next_version.py` and the release-notes prompt in sync with the BattMind
+  copies. Do not bump `manifest.json` `version` by hand: the release workflow
+  sets it in the zip from the tag.
 - What-if Scenario A (CJP against Smart and charging at once): the CJP column is
   not replayed. It is what CJP booked in the charging history (kWh, battery
   percent and cost, with solar and the home battery at CJP's own value), without
@@ -314,6 +304,26 @@ private agent memory). Update or remove a note when it stops being true.
   must contain no ASCII apostrophe or quote character (`'`, `"`): use wording
   without possessives (the typographic ’ is fine). Only keys inserted as plain
   markup, such as the "Read more" explanations, may contain them.
+- Charger and car states (`CHARGER_*_STATUS`, `EV_PLUGGED_STATES`, `EV_UNPLUGGED_STATES` in `const/base.py`) are
+  `StateSet`s: `in` ignores case and surrounding blanks, and `+` keeps the type. Never build one from a plain tuple
+  (`(*A, *B)` loses it; use `StateSet(*A, *B)` or `+`), and never compare a status with `==` to a literal; use
+  `normalize_state()`. A state is listed only when it surely means one thing. States that can mean either (paused,
+  suspended, sleeping, idle, occupied), a fault (error, faulted) or no data (unknown, unavailable) are deliberately
+  not listed, so the unknown-status repair shows. OCPP states (Available, Preparing, SuspendedEV, Finishing) are left
+  out by user decision: Preparing is also shown while charging on OCPP 2.0.1. `CHARGER_HELD_STATUS` (a subset of ready:
+  the charger itself holds the charging back, e.g. Easee smart start or load balancing) is never restarted
+  (`is_charging`), does not end the charging loss measurement and does not start the charger test. A new state needs
+  its source (the integration's `strings.json` or `const.py`) and a test in `tests/test_ev_wake_away.py`.
+- The charger blueprint's "States that mean charging" and "States that mean done" count for CJP's own status entity
+  (`management/automation_inputs.py` `status_aliases`, `coordinator/status_states.py`): only when that entity is among the
+  automation's status entities, read only from `automations.yaml`. They can only add states: the built in states always
+  win, a state listed as both is dropped, and no data or fault state is mapped. "States that mean the charger is not
+  ready" is not used, because it also holds states CJP reads as plugged in (`awaiting_start`). The mapping happens at
+  the boundary (snapshot, history buffers, status events, the recorder history, repairs, load balancing) through
+  `coordinator.canonical_status()`, so the engine only knows the built in states; a new place that reads the raw
+  status state of the charger from Home Assistant must use it too.
+- A car that is away from home is never woken: `ready_to_charge()` checks `is_ev_home()` before every `wake_up_ev()`,
+  whatever the cable sensor or the charger status says. Away and not plugged in shows the `ev_not_home` text.
 
 ### HACS default-catalog review
 
@@ -399,7 +409,7 @@ place and extend them to new code:
   help texts leave out `min_charge_limit_battery_level` (`hidden_settings()` in
   `const/config.py`; the entity still exists). `max_recommended_charge_limit_battery_level`
   stays visible: the plan charges up to it with or without the car's limit
-  (user decision 2026-11-05).
+  (user decision).
 - Battery level simulation (`simulate_battery_level_while_charging`, EV page):
   user choices: it uses the virtual EV's `number.<prefix>_battery_level` (other
   name/help via `EV_TEXT_KEYS`), counts the charger's kWh meter regardless of
@@ -407,10 +417,46 @@ place and extend them to new code:
   stays 1 % under the charge limit, a value the user enters is simulated from,
   and plug-in sends a "does it match the car?" notification. Planning/control
   use `battery_level()`; history and measurements use `battery_level(real=True)`.
+- Departure notifications (`engine/control/readiness.py`): not ready (the planner's shortfall), plug in, and while
+  the plan charges `car_limit`, `car_stopped` (car integration only) and `slow` (also a virtual EV). `car_limit` is
+  also sent at plug-in when the charger automation has no `car_limit_actions` step (`car_limit_steps` False, read
+  from `automations.yaml` by `coordinator/status_states.py`; None is not known and gives no notice), with the need
+  capped at `_plan_cap()`. Each is sent once per departure (a work day by its date, a trip by its set time) and kept
+  in the runtime state. Missing, unknown or stale data never gives a notification. HA's `last_reported` is no proof
+  of a new car report (cloud integrations rewrite cached values): only the car's own last-update time or a changed
+  value counts.
+- More notifications (`engine/control/notices.py`): charger offline before a departure, cheap power while unplugged,
+  manual charging in an expensive hour, monthly summary (from `economy_update`), load balancing (from
+  `_apply_site_limit`, never during a charger-test hold), battery full, charging loss rise. Each is sent once per event
+  via the runtime store `sent_notices` (key -> ISO time it is forgotten; pruned on each new notice; restore keeps only
+  str -> str). Keys and forget times: `charger_offline <kind> <event>` departure + 1 day (keyed like readiness: a work
+  day by its date, a trip by its time); `cheap_power <start date>` start + 1 day; `manual_expensive <date>` and
+  `site_limit <kind> <date>` the next midnight + 1 day; `monthly_summary <month>` and `charging_loss <month>` 40 days;
+  `battery_full` (no event) 30 days, or at once when the level is below 99 now or the history shows a level below 99
+  after the notice. The site_limit hold (two cron intervals and 10 minutes, per kind, `readiness._held`) is in memory
+  in `_notice_seen`; a gap of more than two cron intervals between load balancing decisions starts it again, and the
+  message shows the time the limit began.
+  The charging loss rise must also hold against the same months a year earlier (12 and 13 back) when they have enough
+  measurements; without them the 3-6 months base alone decides. Every notice is wrapped and must never raise into the
+  cron, economy or site job. Missing, unknown or stale data never sends a notice, except load balancing, which
+  reports what it did.
+- Virtual EV level (`charging_power_to_emulated_battery_level`): counted from the runtime anchor
+  `virtual_charge_anchor` {meter, level, base}. Only whole percents are added and the anchor moves by their kWh.
+  A reset always counts from the meter now, never from an older meter. Only a level that differs from the counted
+  one is entered and becomes the new base; a meter that went back or an unplug (meter None) keeps the base, and the
+  0 % reset of an unplugged car clears it. Base 0 means the level is not the car's: no departure notifications.
+- Solar forecast sources: `forecast_entity_id` accepts Solcast, Forecast.Solar or Helios Forecast. Solcast keeps
+  `detailedHourly`; the other two are read through the HA energy platform by `utils/solar_forecast.py`, which must stay
+  byte-identical with BattMind together with `tests/test_solar_forecast.py`.
+  - They are gated on the entity-registry platform (not `_platforms`), and their rows are stored under the configured
+    sensor in `snapshot.solcast`. No rows means no forecast, and a missing hour is never 0.
+  - CJP's solar prediction is keyed by time, not by position (`solar_prediction_timestamps`).
+  - The Solcast repair and the dashboard mapping stay Solcast-only. `DependencyWatcher.watched_entities` covers the
+    Solcast sensors only while `solcast_problems` judges the selection.
 
 ### Sell price (`calculate_sell_price()` in `prices/base.py`)
 
-Decided with the user (2026-11-08, same as BattMind): selling a kWh costs the **sell fee + Energinet's net
+Decided with the user (same as BattMind): selling a kWh costs the **sell fee + Energinet's net
 tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 
 `sell price = price − every tariff/tax/surcharge in the price − (sell_fee + transmissions_nettarif + systemtarif)`
@@ -420,9 +466,11 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   once more as selling costs. Key mapping as Energi Data Service: distribution -> `tariffs`, nettariff ->
   `transmissions_nettarif`. The distribution sensor only has today's periods; other days use the same time of
   day from the latest known day (0 = too high a sell price). It is still 0 without a distribution sensor, when
-  it is unavailable, or for a time before its first row on the latest known day.
+  it is unavailable, when its `prices` attribute has no valid rows, or for a time before its first row on the
+  latest known day (`_get_distribution_price()` in `prices/stromligning.py`).
 - Missing tariff sensors (unavailable at startup) count as 0, which makes the sell price too high: net and system
-  tariff are in the price and subtracted again as selling costs. Open fail-safe gap, same as in BattMind.
+  tariff are in the price and subtracted again as selling costs. Both are a known, unfixed breach of the
+  no-favourable-default rule, same as in BattMind.
 - Energi Data Service: a sell sensor with a `tariffs` attribute includes them. A sell sensor without it is a raw
   price (tariffs in the price = 0); the selling costs (net and system tariff) then come from the buy sensor's
   `tariffs` attribute (`get_sell_costs()` / `eds_sell_costs()`).
@@ -433,7 +481,7 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - Energy Price Forecast in a market without published prices (empty `raw_today`/`raw_tomorrow`, today only in
   `raw_forecast`) is refused on the price page (`price_sensor_forecast_only`), for both the buy and the sell sensor: past
   hours of today would have no price. Its own price source (Nord Pool/ENTSO-e) gives such a market published prices. A
-  forecast never enters an hour with a real price (`_combine`, also across providers), and the price history stores only
+  forecast never fills a slot that has a real price (`_combine`, per slot of the common interval, also across providers), and the price history stores only
   real prices.
 - An entry that already has such a sensor (set up before, restored from a backup, or whose own price source was removed
   later) gets the repair `energypriceforecast_forecast_only` (`DependencyWatcher._check_forecast_only()`), only once the
@@ -447,13 +495,13 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   (`price_unit_divisors()`); Energy Price Forecast converts its own per MWh) is refused on the price
   page and, while running, gives no prices (`_wrong_unit()` in the providers: the next provider or the stored prices fill in,
   never a price that is too high). Its recorded history is left out of the what-if (`price_unit_divisors()` returns None), and the
-  repair `price_sensor_unit` names it (no grace time, an ignored repair stays ignored).
+  health check repair `price_unit_scale` names it (see the money limits rule: key-aware judging, no grace time).
 - Spot forecast providers (`prices/spotprices.py`: Spot Forecast, Elprisprognos, Wattcast; pure row parsers in
   `prices/spot_rows.py`, the same file in both repositories) give wholesale prices, not retail prices. Buy price = spot ×
   (1 + `spot_vat`/100) + `spot_surcharge`; sell price = spot − `sell_fee`, with no VAT or surcharge. `spot_vat` and
   `spot_surcharge` have no default (None), are asked on the fee page only when such a provider is chosen, and a provider
   without them raises instead of giving prices, never a default of 0 (a 0 entered by the user is valid). Published rows are
-  real; a forecast row never enters an hour that has a published price, and today's hours without a published price are not
+  real; a forecast row never fills a slot that has a published price, and today's hours without a published price are not
   planned. Their recorded state is a wholesale price, so `records_history = False` keeps the recorded state of the sensors out of the
   price history, the analysis and the what-if (the combined provider still names the sensor in messages); their published
   prices are still stored in the integration's own price database. Wattcast needs its forecast sensor too and gives
@@ -472,8 +520,8 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   or Amber), Octopus Energy's export rates. A missing sell sensor means no sell prices (never the buy price). Octopus Energy
   without an export tariff sells at 0 less the fee (`sells_nothing`) in every hour of the buy prices, also on the days a
   provider with a forecast fills (`_apply_sells_nothing()` in `CombinedPriceProvider`). Only today's and tomorrow's rows are
-  prices (GE-Spot's tomorrow only while `tomorrow_valid is True`). The real prices of a provider are the price of the whole
-  hour: the rows of another period of a later provider are not mixed into it (`claimed_hours` in `_combine()`). Octopus rates
+  prices (GE-Spot's tomorrow only while `tomorrow_valid is True`). An hourly price is repeated over every slot of the
+  common interval (`_combine()`), so the quarters of a later provider never fill a slot of it. Octopus rates
   are pounds (an event entity has no unit; a rate above `OCTOPUS_MAX_PLAUSIBLE` is pence, so no prices), `records_history` is
   False for Octopus Energy (the state of its entity is a time), and GE-Spot has no recorded sell sensor. The price pages refuse
   a sensor without price rows (`price_sensor_no_rows`), the same sensor as buy and sell price (`price_sensor_same_sensor`), a
@@ -517,7 +565,7 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `kwh_avg_prices_db["history_sell"]` averages stored before this fix used the old sign (too high) and only
   phase out as new days are stored.
 - The forecast adder (`PRICE_ADDER_DAY_BETWEEN_DIVIDER`) makes a forecast sale worth less (decided with the
-  user 2026-11-08, same as BattMind): it is subtracted from a forecast SELL price, and added with a fixed solar
+  user, same as BattMind): it is subtracted from a forecast SELL price, and added with a fixed solar
   sell price (`sell_adder_sign()` in `prices/base.py`; used by the providers, `get_sell_forecast_prices(adder=False)`
   and `Pricing._database_prices` for `history_sell`). A forecast buy price is raised.
 - Default `sell_fee` is 0.03 (like BattMind); it is always subtracted.
@@ -533,6 +581,87 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
 - `site.update_from_result` recalculates all cars incl. the one that turned
   urgent; a changed live request recalculates the cars behind only when
   something changed (no ping-pong). Covered by `tests/test_site.py`.
+- User choice: current a car ahead was given but doesn't draw goes to the cars
+  behind. With working phase sensors (`_metered()`) the measured draw counts
+  (`_car_draw`). User choice: stale data never frees current here either. A
+  phase sensor not reported within `STALE_SECONDS` is no reading (`_measured`
+  None, so the power-sensor path below). The house then counts
+  `max(_last_house, house_forecast[hour])` per phase (`_house`; the
+  forecast's highest hour when this hour is missing), in the budget and added
+  to `_cars_draw` in the overload check. User choice: with no measurement
+  since start and no forecast the house is the whole budget (`fuse()`), so no
+  current for the cars until the meter reports. The forecast asks the
+  statistics in `FORECAST_UNITS` (W/A, no energy). A charger power reading that is stale
+  counts the request for the cars behind (`_car_draw` fallback), and in the
+  house subtraction at most the request, or 0 A when the charger's fresh
+  status is in `SETTLED_STATUS` (a full car can't hide the house, a steady
+  charge with a change-only sensor doesn't limit itself); one without a power
+  unit counts 0 A there.
+- Without phase sensors, or when one measures nothing, each charger's power
+  sensor is the measurement (`_ahead_draw` for the budget, `_cars_draw` for
+  the overload check), counted carefully:
+  - A car ahead counts with its request unless it is `_settled`: past
+    `RAMP_UP` (120 s) since its request rose, and its status in
+    `SETTLED_STATUS` (an allowlist of surely-not-charging statuses), and both
+    its status and power sensor reported (`last_reported`) within
+    `STALE_SECONDS` (300 s; user choice: a lost cloud push keeps the last
+    values, so stale data never frees current, even though a sensor that only
+    reports on change then frees for at most 5 minutes after its last change).
+    Going stale sends no event, so the overload check also runs every
+    `STALE_CHECK_SECONDS` (30 s). Tests make a sensor stale with
+    `async_set(..., timestamp=...)`, not with `freezer`. Ambiguous (`on`,
+    `connected`, `ready`), unknown or missing status counts as charging.
+  - No reading, a unit that is no power, or a power sensor shared with another
+    member also counts the request. A shared sensor is counted once per sensor
+    in the overload check.
+  - `_worst_case`: the power may all be on one phase, but never more than the
+    request per phase. Power above request × (1 + `OVERDRAW_SHARE`) (10 %,
+    voltage margin) is spread over the phases the charger can use (an
+    overdraw). Without a request: all of it on each phase for the budget
+    (`careful`), spread for the overload check (no false limits).
+  - Overload is checked on power and status events of the members' chargers
+    and on a raised request, against the raw fuse, limiting the last car with
+    a request (`OVERLOAD_THROTTLE`), rechecked while over and while a car has a
+    request.
+  - Open: `ready_to_charge`/`awaiting_start` frees current although a car on
+    its own timer may start (protection is then reactive, as fast as its
+    sensors report). An overdraw on fewer phases than given, or on a shared
+    sensor in the budget, is not seen.
+  - The circuit sum (`circuit_amps`) is capped at the fuse minus margin; the
+    cap ignores the house and cars outside the circuit.
+- The site repair `site_fuse_exceeded` (`fuse_issue_id`, information only):
+  judged in the house forecast from the phases' hourly means before the cars
+  are subtracted, against the raw `fuse_lN` (not minus margin). Raised when a
+  phase has at least `FUSE_OVER_HOURS` hours above `FUSE_OVER_FACTOR` × fuse
+  in the last `FORECAST_DAYS`; removed only when every phase has
+  `FUSE_MIN_HOURS` hours of data and none is over, or the site has no phase
+  sensors. A forecast that returns early judges nothing. An unload keeps it;
+  removing the site deletes it (`async_remove_entry`).
+- `site_in_phase_meter` (option `charger_in_phase_meter`, per car entry, load
+  balancing page, default True; only an explicit False counts): False means
+  the site's phase sensors do not measure this car's charger. Protection is
+  never lower: `_house()` and the house forecast take only cars inside the
+  meter off the measurement (a power sensor shared by an inside and an
+  outside car is taken off for neither); the metered overload check adds
+  `_cars_draw(outside cars)` to the phase sensors (a shared sensor counts all
+  its cars) and also runs on the outside car's power/status events and on a
+  raised request; an outside car ahead counts in `snapshot_for` with
+  `_ahead_draw` (request until settled), not the metered `_car_draw`; the
+  fuse repair adds the outside draw to the phases and judges nothing when the
+  car's statistics don't cover every hour. A car outside without a fresh
+  reading counts its request. `register()` refreshes the house forecast, so a
+  changed option does not wait for the next hourly refresh; the forecast takes
+  a car off the phases only when it is inside and its power sensor is not
+  also an outside car's. Cars without a power sensor never share one
+  (`_cars_draw` groups them by entry). Setting it wrongly on (the sensors
+  don't include the charger) is the unsafe direction; wrongly off counts the
+  charger twice (more limiting, maybe the fuse repair). While the phase
+  sensors measure nothing the cars are counted from their power sensors and
+  the house from the last measured value or the forecast (both calculated
+  with the option). Separate from `charger_in_house_meter` (the house
+  consumption sensor of the solar surplus): the two answer different meters.
+  Without phase sensors it changes nothing (the power sensors are the
+  measurement).
 - Shared circuit (Easee master): user choices: chargers are picked as HA
   devices on each car's load balancing page; the circuit is stored once in the
   site options (`circuits`), so a change from one car applies to all of it; a
@@ -547,18 +676,62 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   `sensor.py`, from the attributes actually written, incl. the site's circuit
   patch) and compares from/to state into the `changed` variable. Not
   `mode: restart` + delay: a restart can cancel a start and lose what changed.
-- `stop_charging(force=True)` (charging without a rule, restart of a charger
-  that doesn't charge) counts `charger_stop_request` up; it is published as
+- `stop_charging(force=True)` (charging without a rule) counts
+  `charger_stop_request` up; it is published as
   `stop_request` and, when above 0, in `decision`, so the blueprint sends stop
   again although the action already is `stop` (`'stop'` in `changed` only when
   it rises; 0 after a restart). Without it a car/charger that starts by itself
   on plug-in is never stopped (Easee resets its dynamic charger limit to max
   on every new session).
+- The restart of a charger that doesn't start (`is_charging`) publishes a
+  plain stop at 0 A, or a disable with an enabled entity. That changes
+  `decision` by itself, so it does not count `stop_request`.
 - `charging_without_rule` has no blind minutes after the hour (the PyScript
   version skipped minute 0–4). Instead it skips the average's window after
   the action went charge → stop or the charger was disabled
   (`charger_stopped_at`), when the charger may still give power; a stop in
   the future (clock went back) is ignored.
+
+### Charger test: charge limit step
+
+- User choice: with the car's charge limit entity, the charger test ends with
+  a "limit" step (`_async_limit_step` in `coordinator/charger_test.py`,
+  `limit_test_value` / `charger_test_limit*` in `engine/control/charger_test.py`).
+  It publishes a test limit under the engine hold and waits for the car's limit
+  entity to show it.
+- Blueprint semantics it relies on: the limit is sent with every new `charge`
+  and on a limit change with the action unchanged, never together with a
+  switch to `stop`. So the test limit and the put-back are published with the
+  held action unchanged; the put-back runs in `finally` before the release.
+- The test value is 10 percentage points from the car's limit now, above it
+  first, below only while above a known battery level
+  (`battery_level(unknown=None)`), within the entity's min/max, the min. charge
+  limit and 100, rounded like `verify_charge_limit`. It is never the published
+  limit or the car's limit from before the test (no change would be sent).
+- What is put back is the car's limit from before the test (`own`); the charge
+  steps may have sent the plan's limit meanwhile. The put-back is confirmed
+  (`limit_put_back.ok`) only when the car showed the test limit first and then
+  its own. No wait on unload or `hass.is_stopping`.
+- `limit_put_back {"ok": None}` is published before the test limit, so a
+  restored `running` state (`sensor.py` passes it on) becomes `stopped` with
+  the "check the limit" note. A normal running test is not restored.
+
+### Charger test: parts and voltage
+
+- The default grid voltage is 230 V. A car entry with exactly 240 V gets the
+  fixable repair `voltage_old_default` (`management/voltage_issue.py`). It is
+  not migrated automatically, because a deliberate 240 V (UK, PyScript
+  imports) can't be told apart from the old default.
+- The test has three independent parts: the charging steps, the stop and the
+  charge limit. A stop reason ends the charging steps (the rest of them and the
+  stop are `not_reached`). The charge limit step still runs, with a stop held
+  first. Only the switch or an internal error ends the whole test.
+- `charger_test_hold("stop")` is accepted over the test's own hold whatever
+  the charger status, so a held charge never stays published after
+  `completed` or `not_connected`.
+- The shown steps are `_judged(raw)`: they are judged again at the measured
+  voltage from the raw steps after every step. `already_charging` is applied
+  after the judging.
 
 ### PyScript import
 
@@ -576,14 +749,10 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
 
 ### Debug export
 
-- `management/debug_export.py`, service `cable_juice_planner.export_debug`,
-  diagnostic button `export_debug`, and a discreet "Problem or error?" section
-  at the bottom of the dashboard's Settings view (not an overview badge).
-  Writes `<config>/cable_juice_planner_debug/<prefix>_debug_<ts>.json.gz`
-  (newest 5 kept) plus a persistent notification with a signed 24 h link and a
-  prefilled `.github/ISSUE_TEMPLATE/bug_report.yml` link. CJP snapshots carry
-  prices only once an hour, so the export adds `price_data`.
-- Keep this file in sync with the BattMind copy.
+- The export is offered in the dashboard's Settings view, not as an overview
+  badge. Where it is written, why it adds `price_data`, and how to replay a
+  file handed in by the user: `docs/development/debug-export.md`.
+- Keep `management/debug_export.py` in sync with the BattMind copy.
 - Besides the coordinator data the export holds `blueprints` (the bundled
   blueprint's automations from `automations.yaml`, read only, with inputs and
   automation state; the installed blueprint files with their content only
@@ -594,9 +763,10 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   entities after their input and keeps registered service names
   (`number.set_value`), except `notify`/`script` services. Since 2026.10 a
   device has `config_entry_id`; `config_entries` is deprecated, so support
-  both (minimum is 2025.1).
-- To analyse a file handed in by the user, run from the repo root:
-  `PYTHONPATH=../ha-dev/windows %LOCALAPPDATA%/ha-dev-tests/venv/Scripts/python.exe tests/debug_replay.py <file> [failed|planning|<index>]`.
+  both (minimum is 2025.12).
+
+### Planning notes
+
 - An hour with no price from any price integration and none in the price
   history is not planned; it is never given another hour's price. A price that
   is not a finite number (`nan`, `inf`) is dropped like a missing hour, also
@@ -630,86 +800,208 @@ stay easy (`find_legacy_sources`, `load_legacy_config` in
   average of the lowest prices stay in whole hours.
 - The autumn night with two 02:00 hours shares one price key (wall-clock
   time); this is accepted (twice a year) and only covered by a test.
+- Learned departure and homecoming (`engine/workplan.py`, switch `learn_departure_time`, default off): the 25th
+  percentile (rounded down) of the first unplug of a workday between 04:00 and 12:00 and the 75th percentile (rounded up)
+  of the plug-in the same day, per weekday, last 8 weeks, at least 3 days, from the measured connection windows
+  `economy_db["windows"]` only (never the modelled ones). Two rules are CJP's own: an unplug followed by a plug-in less
+  than 30 minutes later is a re-plug and costs the day, and a weekday whose entered departure is not before its entered
+  homecoming (a night shift) keeps its entered times. The plan uses the earlier departure and the later homecoming of the
+  entered and the learned, never the other way, and always through `effective_workday_times(day, date)`:
+  the planner, the consumption forecast and preheating do (decided with the user: preheating follows the departure the
+  plan uses, also when the early learned departure preheats on days the car leaves later); the economy analysis of past
+  connections (`_next_departure`) and the What-if replay deliberately keep the entered times (a guard test in
+  `tests/test_workplan_learning.py` lists the allowed direct readers). The entered times are used on a day with a trip,
+  and for today's departure while the newest connection window is still open (positive proof that the car is plugged in
+  at home: never `ready_to_charge()` or a missing status, which would drop today's work day). The trip settings are
+  reset two hours after departure, so the dates of every trip that has started are kept in `trip_days` (runtime
+  database); a trip not yet started is excluded while set but never remembered. Anything that goes wrong in the helper
+  gives the entered times. The times the plan uses are part of the plan hash (`WORKPLAN_TIMES`). The learned values are
+  shown as the attributes `learned_time` and `learned_days` of the `time` entities and in the Analysis section.
+- Adjust driving efficiency to temperature (`engine/temperature_efficiency.py`, switch `temperature_efficiency`, default
+  off, requires EV): only the planner converts km to battery % with the adjusted km/kWh, through the `*_for()` helpers in
+  `engine/battery.py` (a guard test in `tests/test_temperature_efficiency.py` lists the allowed callers); measurements,
+  the range, the drive efficiency, the startup info and the What-if keep the learned km/kWh. Each learned
+  `km_kwh_efficiency_db` entry is moved from the temperature of its analysis drive (ended within 600 s) to the forecast
+  temperature of the planned drive along a km-weighted line from the newest `ANALYSIS_DRIVES` analysis drives, and the
+  same forecast type runs over the moved entries, so the cold is not counted twice. The result is clamped to
+  [0.5 × learned, learned]; too few drives, no forecast, too few matched entries or any error give the learned value.
+  Drive windows: work departure to homecoming (a homecoming at or before the departure is the next morning), trip
+  departure to homecoming, spread driving 06:00–22:00 (the chart still spreads the km over the whole day). The switch is
+  part of the plan hash.
+
+### Health checks (repairs)
+
+- `management/health_checks.py` (`HealthWatcher`) raises the repairs
+  `entities_missing`, `entity_units`, `blueprint_automation_lost`,
+  `charger_status_unknown`, `charger_not_following`, `consumption_frozen` and the value scale
+  repairs below (`power_without_unit`, `battery_level_fraction`,
+  `price_unit_scale`). They only inform; none
+  of them controls anything. Thresholds are the module constants
+  (`STATUS_UNKNOWN_MINUTES`, `STATUS_UNKNOWN_DAYS`, `NOT_FOLLOWING_EVENTS`,
+  `NOT_FOLLOWING_DAYS`). Being unavailable is not a repair: the planner's own notification covers it
+  (`Engine.is_entity_available`, `engine/engine.py`). It comes only for an entity with an entity registry entry (its platform is
+  read once at setup, `coordinator/lifecycle.py`), when the planner reads the entity and finds no number for it in the last 24
+  hours (`get_state` falls back to the history), and once the entity has stayed unavailable for more than 30 minutes at those
+  reads (the 30 minutes are counted per integration). The house sensor is read at the end of each hour (`hour_end`, minute 59), and with solar also in each charge-hour calculation (`cheap_grid_charge_hours` -> `local_energy_prediction` ->
+  `inverter_available`, every planner cron, `min(cron_interval, 15)` minutes). It is also read when a charger charges without a
+  rule (the charging-without-a-rule alarm in `engine/control/schedule.py`, which lists the unavailable entities through `get_all_unavailable_entities`; `configured_entity_ids()` includes the house sensor).
+- `consumption_frozen` judges only the house consumption power sensor
+  (`home.entity_ids.power_consumption_entity_id`), not solar, battery flow or
+  charger power, which are legitimately 0 for hours. It is raised when the value
+  has not changed for `FROZEN_AFTER` (6 hours, by `last_changed`), checked hourly,
+  so the repair appears 6 to 7 hours after the last change. The frozen value and
+  its start are kept in the `.health` store (`consumption_frozen`), so a restart
+  keeps the repair.
+- Startup grace: for `CONSUMPTION_GRACE` (30 minutes) after a start or reload of
+  the entry, until the next check (in practice up to about an hour), nothing is
+  deleted, the stored value and time are not replaced, no baseline is taken from a
+  lost store, and the state listener ignores the sensor. An open repair is shown
+  again from its stored value (`async_create_issue` keeps its Ignore); a new one is
+  raised by the 6 hours only while no such repair is open. The grace ends at the
+  first check that is at least 30 minutes after the start and reads a number, or
+  finds no house sensor or another one.
+- After the grace the repair is deleted only on a positive answer: a finite number
+  other than the stored one, no house sensor configured, another one configured, a
+  repair that names another sensor while the stored value is lost, or a change the
+  state listener saw to another number since the last check (decided by that check).
+  Unavailable, unknown or text keeps the repair as it is.
+- Without a readable stored value (lost or malformed store), a repair that names
+  this sensor takes the value of the first check after the grace as its baseline;
+  without such a repair, the value is the baseline once it has been the same for
+  `FROZEN_AFTER`.
+- Delete an issue only on a positive answer (the problem is gone), never on an
+  unclear one (unavailable/unknown state, unreadable `automations.yaml`).
+  Delete + create resets the user's "Ignore", while `async_create_issue` on an
+  existing issue keeps it. Stop, unload and reload never delete the issues;
+  only removing the entry does, and it also deletes the `.health` store.
+- The store `cable_juice_planner.<entry_id>.health` is deliberately not in
+  `DB_NAMES`, so it is not in CJP's own backup (`backup.py`) nor in the debug
+  export. A full Home Assistant backup still contains it.
+- Units: power sensors pass in every unit `utils/power.py` reads (mW, W, kW,
+  MW, GW; a unit with an `h` such as kWh is read as the unit without it, as
+  in BattMind). The charger power too, except while the update repair of the
+  charger blueprint (`blueprint_update_charger_control`) is open, also when
+  ignored: the installed older blueprint reads only W and kW
+  (`OLD_BLUEPRINT_POWER_UNITS`). kWh meters pass only in kWh, because the
+  history and the sessions read them raw. Battery levels pass only in %. No
+  unit passes. Keep this in line with the code that reads each sensor.
+- `blueprint_automation_lost` needs the automation to have been seen on first,
+  so users with their own automation never get it. Automations without an
+  `id` or outside `automations.yaml` (packages, YAML mode) are not found. A
+  registry-disabled automation counts as off.
+- `charger_not_following` gets its events (`gave_up`, `no_rule`) from the
+  engine through `JobResult.charger_problems`. Events while a charger test
+  holds the charger and within `NOT_FOLLOWING_AFTER_TEST` minutes
+  (`engine/control/schedule.py`) after it are not counted.
+- `charger_outside_house_meter` (information only) gets the verdict of
+  `engine/energy/meter_check.py` through `JobResult.charger_meter`, judged at
+  start and at every hour end from `power_values_db` (last `METER_CHECK_DAYS`
+  = 7 days; only hours with the charger at least 1 kW and solar, battery
+  charging and discharging under 100 W, house above 0). True: at least 3
+  hours with the house under 50 % of the charger. False (the positive answer)
+  only when at least 3 hours were judged and every one is at least 90 %; an
+  hour between 50 % and 90 % is unclear and keeps the repair. A False becomes
+  None while `home.added_consumption` is not empty (the added chargers can
+  hide it). Also removed when the option is False or no house or charger
+  power sensor is set. Another house sensor does not remove it (the stored
+  hours are not reset, so it would come back at once and lose an Ignore); a
+  True updates the sensor it names. The verdict is kept in memory only, and
+  computing it must never stop the job.
+- Value scale repairs (decided with the user: inform only, no fix flow and no
+  conversion, because the blueprint reads the charger power itself):
+  `power_without_unit` (a power or charger power sensor without a unit whose
+  values over `POWER_SCALE_DAYS` stay at most `KW_LOOKING_MAX` with fractions,
+  so kW read as W), `battery_level_fraction` (home battery or car level, every
+  value 0..1 with fractions) and `price_unit_scale` (a price entity in a
+  subunit, per MWh or per Wh, judged by its unit (and, for a price sensor, the key it is configured under), through
+  `CombinedPriceProvider.price_unit_problems`). The verdicts are in
+  `management/value_checks.py`, the same file as in BattMind (change both
+  together, with `tests/test_value_checks.py`): True, False or None, and None
+  never clears a repair. History is read in the recorder's executor, at most
+  once per `VALUE_RECHECK` per sensor, and only for a sensor whose current
+  state could be in the wrong scale. The flagged sensors are kept in the
+  `.health` store (`scale_flagged`); with a known list the repair goes when no
+  sensor is flagged any more. A repair's list is known only when it was read
+  intact from the store or one check judged every sensor of that repair (True
+  or False), or when the repair is not in the issue registry (nothing to
+  forget: a fresh start knows its empty list). A lost store or an unreadable
+  stored value while the repair is open leaves it unknown, and then every
+  sensor must be judged fine before the repair goes. A sensor that
+  is no longer configured is dropped from the list. Phase sensors are not in these checks (a unitless phase sensor is
+  read as amps, which no value range can tell from kW).
+
+### Power units
+
+- The readers of a power sensor use `utils/power.py`: `power_factor_to_w`,
+  `power_to_w` (no unit = W, h-variants read as the unit without the h,
+  anything else None: never guessed). Its factors equal `power_convert`'s
+  table (`tests/test_power_units.py`); the module imports nothing from the
+  engine (the engine imports it). Exceptions: the history's `power_convert`
+  still reads an unknown unit as W; `flow/detection.py` keeps its own
+  stricter table (synced with BattMind); load balancing takes nothing from the
+  house for a charger power in an energy unit (the fuse: never lower than
+  before). A phase sensor in an energy unit is no measurement, live and in the
+  forecast (which keeps the previous one), with the site repair
+  `site_phase_units` (`phase_units_issue_id`): raised per such sensor, removed
+  only when every phase sensor has an available state in a non-energy unit or
+  the site has no phase sensors; an unload keeps it, removing the site deletes
+  it (`async_remove_entry`). `_phase_changed` checks it after
+  `_check_overload` (information never holds the protection up). The forecast
+  judges by the statistics' recorded unit, so it can stay skipped after the
+  sensor is fixed until the recorder's own repair is resolved; that is
+  logged as a warning once per sensor. Any other non-power unit is still read
+  as amps.
+- Power statistics are asked for with `STATISTICS_POWER_UNITS`
+  (`{"power": "W", "energy": "kWh"}`): Home Assistant converts by the unit
+  class the statistic was recorded in, and a power sensor in kWh has energy
+  statistics. Convert the values with
+  `statistic_power_factor_to_w(<metadata unit>)`; raw and live states use the
+  current state unit. Exception: `coordinator/data.py` asks with
+  `units=None` and `history.get_longterm_values` converts with the current
+  unit; change both together or neither (a double conversion otherwise).
+- The blueprint has the same factor table in Jinja
+  (`tests/test_blueprint_power_units.py`), but still reads an unknown unit as
+  W, as it always did.
+- `charging_without_rule` reads the charger power in its unit, so it now also
+  fires for kW sensors (an unknown unit or an unavailable sensor without a
+  unit is 0 W: it never triggers). kW users who charge outside the plan (car
+  timer, a shared charger) now get the forced stop and notification W users
+  always had. Load balancing caps a car's draw taken from the house, live and
+  in the forecast, at `charging_max_amp × (1 + OVERDRAW_SHARE)` per phase.
+- Data stored before this rule with a mis-scaled power (a power sensor in an
+  h unit, or a statistics unit other than the state unit) is not migrated:
+  the What-if hours are reread daily, the charging loss learns from new
+  charging (a recalculation rereads older statistics).
 
 ## Tests and validation
 
-### Devcontainer
+On Windows run the suite with `../ha-dev/run_tests_windows.ps1 cjp
+[pytest args]`; the Docker run `../ha-dev/dev.ps1 test cjp [pytest args]` is
+the reference, and in the devcontainer `python -m pytest` works directly. Run
+the focused test file(s) first, then the full suite when practical. Do not
+create the venv on a network drive; it installs extremely slowly. Tests must
+not depend on the run being slow: wait for real conditions or real time, not a
+fixed number of `sleep(0)` yields. When calling the test venv's Python
+directly, put `../ha-dev/windows` (shims) on `PYTHONPATH`. Test the PyScript
+import with `../ha-dev/dev.ps1 import-legacy` before adding the integration.
 
-`../.devcontainer/devcontainer.json` opens the workspace folder (both
-integration repos and `ha-dev`) in a container with Home Assistant installed.
-Inside it, run `python -m pytest` from the repository root; it is Linux, so no
-shims are needed. The dev HA runs on `http://localhost:8123`; after a code
-change run `bash ha-dev/devcontainer/restart.sh`, and
-`bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates eleven car profiles, each with its own prefix ("Car with
-everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
-without car entities, "Car without climate entity"/`car_no_climate` without the
-climate entity, "Car with slow battery level"/`car_slow_soc` whose battery level
-updates every 30 minutes with the battery level simulation on, "Car without
-Energi Data Service"/`car_no_eds` with only Strømligning as price provider, and two
-cars with load balancing priority 1 and 2 (`car_priority_1`, `car_priority_2`) each with
-its own charger power sensor, "Car with Energy Price Forecast"/`car_epf` on the simulated
-Energy Price Forecast sensors, which are in euro, and "Car with Spot Forecast"/`car_spotforecast`, "Car with
-Elprisprognos"/`car_elprognos` and "Car with Wattcast"/`car_wattcast` on the simulated spot forecast sensors, which are only
-seeded where the mounted integration has the providers) plus the shared site entry. Use them to test
-missing-entity and single-provider cases. The dev HA, the dev user's profile
-and the seeded entries are in English.
+Keep test runs short (user decision). While fixing, run only the test files
+that cover the change (`'-n' '0'` for a single file); after a failure rerun
+only what failed (`--lf`, `-x` to stop at the first failure). Run the full
+suite once, after the last change and before reporting the task done: not
+after every fix or review round, and in a multi-agent task only once, by the
+main agent, not by each subagent. `--durations=25` shows the slowest tests.
 
-The seed data and simulator entities are in `../ha-dev/devcontainer/seed.py`
-(`SIM_ENTITIES`/`SEEDS`), the simulator in
-`../ha-dev/config/packages/simulator.yaml`, synthetic history and backups in
-`../ha-dev/devcontainer/history.py`, and HA config in
-`../ha-dev/devcontainer/configuration.yaml`. Test the PyScript import with
-`../ha-dev/dev.ps1 import-legacy` before adding the integration.
-
-### Outside the devcontainer, on Windows
-
-Run the suite with `../ha-dev/run_tests_windows.ps1 cjp
-[pytest args]`. The first run installs Python 3.14 and the test requirements
-in `%LOCALAPPDATA%\ha-dev-tests\venv`; the shims in `../ha-dev/windows`
-(fcntl, resource, a pytest plugin that disables the socket guard and linecache's
-file-staleness check) must be on `PYTHONPATH` when calling that venv directly.
-The runner executes the suite in parallel with pytest-xdist; pass `'-n' '0'`
-(quoted, otherwise PowerShell reads it as a script parameter) to debug in one
-process with `-x`, `-s` or `--pdb`. Tests must not depend on the run being slow:
-wait for real conditions or real time, not a fixed number of `sleep(0)` yields.
-The system Python 3.11 lacks
-HA/astral. Do not create the venv on a network drive; it installs extremely
-slowly. The Docker run `../ha-dev/dev.ps1 test cjp [pytest args]` is the
-reference. The dev HA runs locally in Docker Desktop, not on a remote server;
-see `../ha-dev/README.md` (`ha-dev/dev.ps1 up|restart|reset|test`).
+The devcontainer, the eleven seeded car profiles (for missing-entity and
+single-provider cases), the Windows venv and its shims, debugging in one
+process (`'-n' '0'`), the pinned test dependencies, and where the ha-dev seed
+and simulator data live: `docs/development/testing.md`.
 
 Test pitfalls: never use the `freezer` fixture (FakeDatetime breaks the
 strict-type `in_between`); advance timers with
 `async_fire_time_changed(utcnow() + n)` or `async_advance()` from
 `tests/conftest.py`. Cron triggers reschedule from the fired time, so advance
 cron k by k × 300 s. Engine snapshots need `astral`.
-
-The test configuration is in `pytest.ini`; test dependencies are pinned in
-`requirements_test.txt`. Those dependencies target the Home Assistant
-2026.10.x / Python 3.14 environment noted in that file.
-
-From the repository root, run the focused test file(s) first, then the full
-suite when practical:
-
-```bash
-python -m pytest tests/test_<area>.py
-python -m pytest
-```
-
-Keep test runs short (user decision). While fixing, run only the test files
-that cover the change; after a failure rerun only what failed (`--lf`, `-x` to
-stop at the first failure). Run the full suite once, after the last change and
-before reporting the task done: not after every fix or review round, and in a
-multi-agent task only once, by the main agent, not by each subagent.
-`--durations=25` shows the slowest tests.
-
-If test dependencies are not installed, install the repository's declared
-test requirements in the active environment:
-
-```bash
-python -m pip install -r requirements_test.txt
-```
 
 The GitHub validation workflow runs Home Assistant `hassfest` and the HACS
 integration validation action. Run the relevant checks when available for

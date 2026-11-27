@@ -6,6 +6,7 @@ import logging
 
 from ...utils.helpers import average, days_between, end_of_day, in_between, reset_time_to_hour, ultra_cheap_limit
 from ...prices.intervals import hourly_price_averages, naive_timestamp, price_interval_at
+from .. import temperature_efficiency
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -383,6 +384,18 @@ class ChargePlan:
         start = self.charge_plan_start(timestamp)
         return min(start + datetime.timedelta(hours=kwh / capacity), period_end)
 
+    @staticmethod
+    def day_drive_window(plan_day, now) -> tuple:
+        """(start, end) of a day's spread driving (fill up's typical daily distance) for its km/kWh at the forecast
+        temperature: the daytime driving hours, today only what is left of them; the same window in the plan and in the
+        planned driving (which still spreads the km over the whole day)."""
+        return temperature_efficiency.day_drive_window(plan_day["start_of_day"], now)
+
+    @staticmethod
+    def trip_drive_window(plan_day) -> tuple:
+        """(start, end) of a planned trip: departure to homecoming, without a homecoming to the end of the departure day."""
+        return plan_day["trip_goto"], plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"])
+
     def planned_driving(self, charging_plan, now):
         """The driving of every active rule for the dashboard chart, for the bars and the battery
         level alike, added up when more are active the same day: fill up's typical daily
@@ -397,15 +410,17 @@ class ChargePlan:
             start, end = max(plan_day["start_of_day"], now), plan_day["end_of_day"]
             if typical_distance > 0.0 and end > start:
                 part = (end - start) / (end - plan_day["start_of_day"])
+                # the km/kWh of the driving hours (the same window as the plan's), spread over the whole day as before
+                level = self.calc_distance_to_battery_level_for(typical_distance, *self.day_drive_window(plan_day, now))
                 driving.append({"start": start, "end": end, "km": typical_distance * part,
-                                "battery_level": self.calc_distance_to_battery_level(typical_distance) * part, "away": False, "spread": True})
+                                "battery_level": level * part, "away": False, "spread": True})
             if plan_day["workday"]:
                 driving.append({"start": plan_day["work_departure"] or plan_day["work_goto"], "end": plan_day["work_homecoming"], "km": plan_day["work_range_needed"],
                                 "battery_level": plan_day["work_battery_level_needed"], "away": plan_day["work_away"], "spread": False})
             if plan_day["trip"]:
                 used = max(plan_day["trip_battery_level_needed"] + plan_day["trip_battery_level_above_max"] - self.get_min_trip_battery_level(), 0.0)
                 driving.append({"start": plan_day["trip_departure"] or plan_day["trip_goto"], "end": plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"]),
-                                "km": trip_range or self.calc_battery_level_to_distance(used), "battery_level": used, "away": False, "spread": False})
+                                "km": trip_range or self.calc_battery_level_to_distance_for(used, *self.trip_drive_window(plan_day)), "battery_level": used, "away": False, "spread": False})
         return driving
 
     def battery_forecast_flow(self, charging_plan, chargeHours, now, driving):

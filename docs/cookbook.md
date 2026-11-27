@@ -22,6 +22,9 @@ Settings for typical setups.
 - When you plug in, set *Virtual EV battery level* to the car's level (the dashboard shows the field).
 - *Completed charging battery level* is where the car stops, and *Virtual EV max range* its realistic range.
 - The charger must be controllable – the blueprint's **charger** section.
+- While it charges, CJP counts the level up from the charger's kWh meter, also across hours and when it charges
+  slowly; entering a level starts the count again from it, and unplugging ends it. Without an entered level the
+  count starts at 0 %, and the departure notifications are not sent.
 
 Without a car integration there is no charge limit for the car, no public charging and no continuous
 charging loss measurement.

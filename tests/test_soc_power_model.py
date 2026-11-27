@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import datetime
+import re
+
+import yaml
+from jinja2 import Environment, StrictUndefined
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
@@ -58,9 +62,39 @@ def test_learns_a_taper_only_after_three_distinct_stable_sessions() -> None:
 
     assert model["status"] == "ready"
     assert model["bands"] == [
-        {"phases": 3, "soc_start": 60, "soc_end": 70, "sessions": 0, "sample_sessions": 3, "cap_kw": None},
-        {"phases": 3, "soc_start": 80, "soc_end": 90, "sessions": 3, "sample_sessions": 3, "cap_kw": 5.0},
+        {"phases": 3, "soc_start": 60, "soc_end": 70, "sessions": 0, "sample_sessions": 3, "observed_kw": 10.0, "cap_kw": None},
+        {"phases": 3, "soc_start": 80, "soc_end": 90, "sessions": 3, "sample_sessions": 3, "observed_kw": 5.0, "cap_kw": 5.0},
     ]
+    assert model["best_sessions"] == 3
+
+
+def test_a_level_without_a_limit_still_shows_what_the_car_typically_drew() -> None:
+    """While learning (here 2 of 3 sessions) the bands have no cap, but the typical power and the closest count are there."""
+    model = build_soc_power_model([*_session(1_760_000_000.0), *_session(1_760_086_400.0, low_kw=12.0)])
+
+    assert model["status"] == "learning"
+    assert model["best_sessions"] == 2
+    assert [(row["soc_start"], row["cap_kw"], row["observed_kw"]) for row in model["bands"]] == [(60, None, 11.0), (80, None, 5.0)]
+    # the plan never reads it: no limit, so no clamp
+    assert planning_power_cap(model, 3, 60.0, 90.0, 11.0) == 11.0
+
+
+def test_the_typical_power_is_the_median_not_the_highest_and_phases_are_kept_apart() -> None:
+    sessions = [
+        *_session(1_760_000_000.0, low_kw=9.0),
+        *_session(1_760_086_400.0, low_kw=10.0),
+        *_session(1_760_172_800.0, low_kw=14.0),
+        *_session(1_760_259_200.0, phases=1, low_kw=3.5, high_kw=3.5),
+    ]
+    model = build_soc_power_model(sessions)
+    by_key = {(row["phases"], row["soc_start"]): row for row in model["bands"]}
+    assert by_key[(3, 60)]["observed_kw"] == 10.0
+    assert by_key[(1, 60)]["observed_kw"] == 3.5
+
+
+def test_no_data_has_no_closest_count() -> None:
+    model = build_soc_power_model([])
+    assert (model["status"], model["best_sessions"], model["bands"]) == ("no_data", 0, [])
 
 
 def test_insufficient_or_unstable_sessions_do_not_create_a_cap() -> None:
@@ -145,6 +179,123 @@ def test_model_rebuilds_from_the_persisted_charging_loss_database() -> None:
     assert result.attributes["soc_charging_power_model"]["bands"][-1]["cap_kw"] == 5.0
     assert engine.soc_power_model["status"] == "ready"
     assert engine.soc_power_model["bands"][-1]["cap_kw"] == 5.0
+
+
+def _published(segments: list[dict], statistics: list[dict]) -> dict:
+    """What the engine publishes on sensor.cjp_soc_charging_power_model for these stored segments: (state, attributes)."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+
+    def load_and_publish() -> None:
+        engine.load_charging_loss_db({
+            "segments": [],
+            "soc_power_segments": segments,
+            "soc_power_statistics": statistics,
+            "segment_version": LOSS_SEGMENT_VERSION,
+        })
+        engine.publish_soc_power_model()
+
+    result = engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0))), load_and_publish)
+    assert result.error is None, result.error
+    return {"state": result.states["soc_charging_power_model"], "attributes": result.attributes["soc_charging_power_model"]}
+
+
+def _soc_section(language: str = "da") -> dict:
+    from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard  # noqa: PLC0415
+
+    from .test_dashboard import _own  # noqa: PLC0415
+
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
+    assert "@@" not in text
+    views = yaml.safe_load(text)["views"]
+    return next(
+        section for section in views[2]["sections"]
+        if any(card.get("icon") == "mdi:car-electric-outline" for card in section["cards"] if card.get("type") == "heading")
+    )
+
+
+def test_the_table_and_the_chart_read_only_what_the_sensor_publishes() -> None:
+    """The table and the four chart series are built from the attribute `bands` (and its siblings): every field they read
+    exists in the published rows, so a renamed or removed field cannot leave the graph or the table empty unnoticed."""
+    own = [*_session(1_760_000_000.0), *_session(1_760_086_400.0, low_kw=12.0)]
+    statistics = [
+        {**segment, "source": "statistics", "phase_observed": False, "phases": 1}
+        for start in (1_760_259_200.0, 1_760_345_600.0, 1_760_432_000.0)
+        for segment in _session(start, phases=1, low_kw=3.6, high_kw=2.0)
+    ]
+    published = _published(own, statistics)
+    rows = published["attributes"]["bands"]
+    assert rows and {row["phases"] for row in rows} == {1, 3}
+    assert any(row.get("source") == "statistics" for row in rows)  # the marked starting value
+    assert any(row["cap_kw"] is None for row in rows)  # a band that is still learning
+
+    _explanation, _switch, table, chart = _soc_section()["cards"][1:]
+    optional_fields = set(re.findall(r"\brow\.get\('(\w+)'\)", table["content"]))
+    assert optional_fields == {"source"}  # only on a row that takes its starting value from the statistics: read with .get()
+    row_fields = set(re.findall(r"\brow\.(\w+)", table["content"])) - {"get"}
+    assert row_fields >= {"phases", "soc_start", "soc_end", "sample_sessions", "sessions", "observed_kw", "cap_kw"}
+    keys = set().union(*(row.keys() for row in rows))
+    assert (row_fields | optional_fields) <= keys, (row_fields | optional_fields) - keys
+    for field in row_fields:  # a field read directly has to be in every row: Home Assistant renders strictly
+        assert all(field in row for row in rows), field
+    attributes_read = set(re.findall(r"state_attr\('[^']+', '(\w+)'\)", table["content"]))
+    assert attributes_read <= set(published["attributes"]), attributes_read - set(published["attributes"])
+
+    chart_fields: set[str] = set()
+    for series in chart["series"]:
+        assert series["entity"] == "sensor.cjp_tesla_soc_charging_power_model"
+        generator = series["data_generator"]
+        chart_fields |= set(re.findall(r"\br\.(\w+)", generator))
+        assert set(re.findall(r"entity\.attributes\.(\w+)", generator)) <= set(published["attributes"])
+        assert {int(phases) for phases in re.findall(r"r\.phases === (\d)", generator)} <= {row["phases"] for row in rows}
+    assert chart_fields >= {"phases", "soc_start", "cap_kw", "observed_kw"}
+    assert chart_fields <= keys
+    assert len(chart["series"]) == 4
+
+
+def test_the_status_line_and_the_table_render_from_what_the_sensor_publishes() -> None:
+    table = _soc_section("en")["cards"][3]
+    template = Environment().from_string(table["content"])
+
+    def render(published: dict) -> str:
+        attributes = published["attributes"]
+        return template.render(state_attr=lambda _entity, attribute: attributes.get(attribute), states=lambda _entity: published["state"])
+
+    learning = render(_published([*_session(1_760_000_000.0), *_session(1_760_086_400.0, low_kw=12.0)], []))
+    assert "learning, no limit yet" in learning
+    assert "2 / 3" in learning  # the line: the most slower sessions in one level so far
+    assert "11.0 kW" in learning  # the typical power, while no limit is learned
+    assert "No limit learned" in learning
+
+    ready = render(_published([*_session(1_760_000_000.0), *_session(1_760_086_400.0), *_session(1_760_172_800.0)], []))
+    assert "at least one limit is learned" in ready
+    assert "5.0 kW" in ready
+
+    empty = render(_published([], []))
+    assert "no usable measurements yet" in empty.lower()
+
+
+def test_the_table_renders_when_only_some_rows_have_a_source() -> None:
+    """Home Assistant renders a dashboard template strictly: a field that is missing is an error, not an empty value. `source`
+    exists only on a row that takes its starting value from the statistics, so the table has to read it with `.get()`."""
+    table = _soc_section("en")["cards"][3]
+    # three own sessions: a band with a learned limit (the table reads `source` only in a row that has one) and no `source`
+    own = [*_session(1_760_000_000.0), *_session(1_760_086_400.0), *_session(1_760_172_800.0)]
+    statistics = [
+        {**segment, "source": "statistics", "phase_observed": False, "phases": 1}
+        for start in (1_760_259_200.0, 1_760_345_600.0, 1_760_432_000.0)
+        for segment in _session(start, phases=1, low_kw=3.6, high_kw=2.0)
+    ]
+    published = _published(own, statistics)
+    rows = published["attributes"]["bands"]
+    assert any("source" in row for row in rows)
+    assert any("source" not in row and row["cap_kw"] is not None for row in rows)  # the mix that failed in Home Assistant
+
+    attributes = published["attributes"]
+    rendered = Environment(undefined=StrictUndefined).from_string(table["content"]).render(
+        state_attr=lambda _entity, attribute: attributes.get(attribute), states=lambda _entity: published["state"]
+    )
+    assert "📊" in rendered  # the row that takes its value from the statistics is marked
 
 
 def test_power_model_is_phase_specific_and_only_clamps_crossed_soc_bands() -> None:

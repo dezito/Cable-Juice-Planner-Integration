@@ -49,10 +49,12 @@ from ..const import (
     is_powerwall_configured,
     is_public_charging_configured,
     is_solar_configured,
+    normalize_state,
 )
 from .analysis.analysis import Analysis
 from .control.control import Control
 from .distance import Distance
+from .workplan import Workplan
 from .economy import Economy
 from .whatif.engine_part import WhatIf
 from .whatif.plan_part import WhatIfNoSolar
@@ -89,7 +91,7 @@ _LOGGER = logging.getLogger(__name__)
 NOTIFY_SUPPRESS = datetime.timedelta(minutes=60)
 
 
-class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, WhatIf, WhatIfSettings, WhatIfNoSolar, WhatIfSolar, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
+class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Economy, WhatIf, WhatIfSettings, WhatIfNoSolar, WhatIfSolar, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
     """Holds the Cable Juice Planner state and implements the algorithm."""
 
     def __init__(self, config: dict, prefix: str, texts: dict[str, str], title: str | None = None) -> None:
@@ -137,12 +139,23 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
 
         # runtime state (the globals of ev.py)
         self.preheating = False
+        # the departure a preheating was started for when that was the learned one (control/preheat.py). Not persisted
+        self._preheat_departure: datetime.datetime | None = None
         self.last_hash_results: dict = {}
         self.grid_price_cache: dict = {"using_offline_prices": False}
         self.sell_price_cache: dict = {"using_offline_prices": False}
-        self.charging_is_beginning = False
-        self.restarting_charger = False
+        # the restart of a charger that does not charge (control/schedule.is_charging). Not persisted
+        self.charging_is_beginning = False  # marked: it gets one more cron interval
+        self.restarting_charger = False  # stopped (or disabled) for the restart, started again on a later cron
         self.restarting_charger_count = 0
+        self._charger_restart_waiting_since: datetime.datetime | None = None  # first seen ready with a current, not charging
+        self._charger_restart_marked_at: datetime.datetime | None = None
+        self._charger_restart_stopped_at: datetime.datetime | None = None
+        self._charger_restart_started_at: datetime.datetime | None = None
+        self._charger_restart_enabled_seen_at: datetime.datetime | None = None  # the enabled entity on again after it
+        self._charger_restart_gave_up = False  # after the last restart: none until it charges, is done or is unplugged
+        self._charger_restart_rule = ""  # the reason shown while it restarts, or while the plan charges after it gave up
+        self._charger_restart_unplug_pending = False  # off/disconnected while the restart had the charger disabled
         self.current_charging_amps = [0, 0, 0]
         self.current_circuit_amps = [0, 0, 0]
         # amps asked for before the site limit (site_limit re-applies them)
@@ -156,12 +169,22 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         self.charging_loss_charger_begin_kwh = 0.0
         self.charging_loss_charging_completed = False
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
+        self.trip_days: set[str] = set()  # ISO dates of the trips seen (engine/workplan.py)
+        self.departure_notices: dict[str, str] = {}  # "<kind> <departure>" -> departure ISO of the sent notices (control/readiness.py)
+        self.sent_notices: dict[str, str] = {}  # "<notice> <event>" -> ISO time it is forgotten (control/notices.py)
+        self._notice_seen: dict[str, tuple] = {}  # load balancing limit -> (state, first seen), in memory (control/notices.py)
+        self._readiness_seen: dict[str, tuple] = {}  # charging check -> (state, first seen) while the plan charges (control/readiness.py)
+        self._plug_in_seen: dict[str, tuple] = {}  # the same for the car's limit at plug-in (control/readiness.py)
+        # the virtual EV's level counted from the charger meter: {"meter": kWh, "level": %} (history/combine.py)
+        self.virtual_charge_anchor: dict | None = None
         self.learned_distances: dict[str, float] = {}  # number key -> learned distance with enough days
         self.charging_loss_db: dict = {"segments": [], "soc_power_segments": [], "backfilled": False}
-        self.soc_power_model: dict = {"status": "no_data", "min_sessions": 3, "bands": []}
+        self.soc_power_model: dict = {"status": "no_data", "min_sessions": 3, "best_sessions": 0, "bands": []}
         self.economy_db: dict = {"windows": []}
         self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
         self.charging_no_rule_count = 0
+        # the charging without a rule was noted for this run of it (it is one event, not one per cron; control/schedule.py)
+        self._charging_no_rule_noted = False
         self.error_count = 0
         self.forecast_type = "ema"
         # with the switch auto_forecast_type the type each forecast uses (engine/pricing.get_forecast_type)
@@ -191,6 +214,14 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         # counts the forced stops (charging without a rule): a new value makes the charger
         # automation send stop again, also when the action already was stop. Not persisted.
         self.charger_stop_request = 0
+        # the current the test of the user's charger automation holds on the action sensor for a while (control/charger_test.py),
+        # and why a hold ended by itself. Not persisted: a restart is the end of a test.
+        self._charger_hold: dict | None = None
+        self._charger_abort: str | None = None
+        # what was published before the first hold of a test, put back when it ends
+        self._charger_saved: dict | None = None
+        # when the last test ended: the restart of a charger that does not charge waits as after a new session
+        self._charger_test_released_at: datetime.datetime | None = None
         # when the action last went from charge to stop (or the charger was disabled): the
         # charger may still give power for a moment, which isn't charging without a rule
         self.charger_stopped_at: datetime.datetime | None = None
@@ -268,6 +299,10 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
             "public_charging_session_done": self.sensor_states.get("public_charging_session_done"),
             "charging_loss": self.config["charger"]["charging_loss"],
             "daily_odometer": dict(self.daily_odometer),
+            "trip_days": sorted(self.trip_days),
+            "departure_notices": dict(self.departure_notices),
+            "sent_notices": dict(self.sent_notices),
+            "virtual_charge_anchor": dict(self.virtual_charge_anchor) if self.virtual_charge_anchor else None,
             "charging_loss_measurement": {
                 "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
                 "car_begin_kwh": self.charging_loss_car_begin_kwh,
@@ -573,7 +608,10 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
     # ------------------------------------------------------------------ #
 
     def set_charging_rule(self, text: str = "", fresh: bool = True) -> None:
-        if self.restarting_charger_count >= 3:
+        if not text.startswith("🧪") and getattr(self, "_charger_hold", None) is not None and self.charger_hold_active():
+            # the test of the charger automation holds the charger: its rule stays (other jobs, e.g. a notification that
+            # checks whether the car is ready, would replace it). The plan's rule comes back when the test ends; a hold
+            # that ran out is dropped here first (charger_hold_active), so the newer text then wins
             return
         self.rule_set_this_run = self.rule_set_this_run or fresh
         self.last_charging_rule_text = text
@@ -685,7 +723,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
                     if state not in disconnected_states:
                         break
                     values = self.history.get_values(entity_id, now - datetime.timedelta(minutes=15), now, include_timestamps=False, error_state=[connected_states[0]])
-                    if set(connected_states) & set(values):
+                    if any(value in connected_states for value in values):
                         break
                 else:
                     if configured:
@@ -693,7 +731,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, What
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Error getting current location: %s", err)
             current_location = "home"
-        return current_location == "home"
+        return normalize_state(current_location) == "home"
 
     # ------------------------------------------------------------------ #
     # Prices

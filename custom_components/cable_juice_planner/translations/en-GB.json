@@ -56,11 +56,13 @@
         "data": {
           "site_priority": "Priority",
           "site_phase_order": "Charger phase order",
+          "charger_in_phase_meter": "Phase sensors include this car's charger",
           "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
           "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "charger_in_phase_meter": "On (default): the phase current sensors of the shared grid connection also measure this car's charger. Turn off if the charger is on its own meter that the phase sensors do not include (but behind the same main fuse): its draw is then added to the measured phase current in the overload check and the main fuse check, and is not taken off the measured current to get the house, so the protection is never lower. If you are unsure, let the car charge and watch the phase sensors: if they rise by what it draws, they include it. Turning it off is the safe side for the fuse, but for a charger that the sensors do measure it counts twice: the car then gets less current, and the main fuse repair may appear. Without phase sensors the setting has no effect. Without a reading from the charger's power sensor the car counts with the current it was given.",
           "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
@@ -109,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "House consumption",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "charger_in_house_meter": "House consumption includes this car's charger",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home load (watts), not grid consumption",
           "ignore_consumption_from_entity_ids": "List of sensors to ignore",
+          "charger_in_house_meter": "On (default): the house consumption sensor also measures this car's charger, so Cable Juice Planner subtracts the charger from it. Turn off if the charger has its own meter that the house consumption sensor does not include, behind the same grid connection as the solar (not a separate connection): the charger is then not subtracted, neither here nor by the cars behind or by BattMind, and the cars behind this one (or with the same priority) add its charging to their house consumption instead, as one meter would. Without a number from the charger power sensor the charger counts with its most. If unsure, leave it on: a repair tells you when the history shows a house consumption under half of what the charger draws.",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
@@ -312,17 +316,17 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast (Solcast)",
+          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solar forecast (watts) (Supported: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
@@ -350,7 +354,7 @@
       },
       "weather": {
         "title": "Weather",
-        "description": "The weather forecast is used to predict the solar surplus and for preheating.",
+        "description": "The weather forecast is used to predict the solar surplus (with solar), for preheating and for the “Adjust driving efficiency to temperature” switch. The page can be filled in without solar too.",
         "data": {
           "hourly_service_entity_id": "Hourly forecast",
           "daily_service_entity_id": "Daily forecast",
@@ -359,7 +363,7 @@
         "data_description": {
           "hourly_service_entity_id": "Hourly forecast entity",
           "daily_service_entity_id": "Daily forecast entity",
-          "outdoor_temp_entity_id": "Used for preheat/defrost with more accurate temp than forecast"
+          "outdoor_temp_entity_id": "Used for preheat/defrost with more accurate temp than forecast, and gives the drives under Analysis their outdoor temperature"
         }
       },
       "notifications": {
@@ -368,12 +372,28 @@
         "data": {
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
-          "preheating": "Preheating start/stop"
+          "preheating": "Preheating start/stop",
+          "departure_readiness": "Car not ready / plug in",
+          "notify_charger_offline": "Charger not responding before a departure",
+          "notify_cheap_power": "Cheap power, car not plugged in",
+          "notify_manual_expensive": "Manual charging in an expensive hour",
+          "notify_monthly_summary": "Monthly summary",
+          "notify_site_limit": "Load balancing limited the charging",
+          "notify_battery_full": "Battery full for a long time",
+          "notify_charging_loss": "Charging loss has risen"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
-          "preheating": "Notify on preheating start/stop"
+          "preheating": "Notify on preheating start/stop",
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in.",
+          "notify_charger_offline": "Notify once per departure when the charger's status has been unavailable or unknown for 30 minutes while charging for a departure within 24 hours is planned.",
+          "notify_cheap_power": "Notify at most once a day when charging at a very cheap price or a price below 0 is planned within the hour, and the car is home but not plugged in. Not for the charging a departure needs (Car not ready / plug in covers that).",
+          "notify_manual_expensive": "Notify at most once a day when manual charging is on and the car charges in one of the day's 4 most expensive hours.",
+          "notify_monthly_summary": "Notify once a month with last month's charged kWh, cost, average price and the saving compared with daily charging. Not for a month CJP did not see from its start or without a known cost.",
+          "notify_site_limit": "Notify when load balancing (the main fuse or the site limit) has stopped or lowered the charging of the plugged-in car for two check intervals and at least 10 minutes, each at most once a day. Not during the charger test.",
+          "notify_battery_full": "Notify when the car's own battery level has stood at 99 % or more for 12 hours (24 hours when a full charge every X days is set or not known), once per time it is full. Again after 30 days if it is still full. Needs the car integration.",
+          "notify_charging_loss": "Notify at most once a month when the kWh per 1 % at 4 kW or more over the last 30 days is at least 15 % above 3–6 months ago, with enough measurements in both, and also above the same months a year earlier when they have enough measurements. Cold weather raises it too."
         }
       },
       "advanced": {
@@ -464,10 +484,10 @@
           "fuse_l2": "The main fuse (or the limit the cars may use together) per phase.",
           "fuse_l3": "The main fuse (or the limit the cars may use together) per phase.",
           "margin": "Subtracted from the fuse to leave room for short peaks.",
-          "voltage": "Used when the phase sensors measure power (W) instead of current (A).",
-          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
+          "voltage": "Used when the phase sensors measure power (W, kW …) instead of current (A).",
+          "phase_l1_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l2_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l3_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
           "urgent_trip_hours": "A planned trip within this many hours gives the car precedence."
         }
       },
@@ -506,7 +526,7 @@
       "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well.",
-      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
+      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh, and for Energy Price Forecast per Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
       "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
@@ -592,11 +612,13 @@
         "data": {
           "site_priority": "Priority",
           "site_phase_order": "Charger phase order",
+          "charger_in_phase_meter": "Phase sensors include this car's charger",
           "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
           "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "charger_in_phase_meter": "On (default): the phase current sensors of the shared grid connection also measure this car's charger. Turn off if the charger is on its own meter that the phase sensors do not include (but behind the same main fuse): its draw is then added to the measured phase current in the overload check and the main fuse check, and is not taken off the measured current to get the house, so the protection is never lower. If you are unsure, let the car charge and watch the phase sensors: if they rise by what it draws, they include it. Turning it off is the safe side for the fuse, but for a charger that the sensors do measure it counts twice: the car then gets less current, and the main fuse repair may appear. Without phase sensors the setting has no effect. Without a reading from the charger's power sensor the car counts with the current it was given.",
           "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
@@ -645,11 +667,13 @@
         "data": {
           "power_consumption_entity_id": "House consumption",
           "ignore_consumption_from_entity_ids": "Ignore consumption from",
+          "charger_in_house_meter": "House consumption includes this car's charger",
           "ignore_cjp_chargers": "Ignore chargers of cars with lower priority"
         },
         "data_description": {
           "power_consumption_entity_id": "Home load (watts), not grid consumption",
           "ignore_consumption_from_entity_ids": "List of sensors to ignore",
+          "charger_in_house_meter": "On (default): the house consumption sensor also measures this car's charger, so Cable Juice Planner subtracts the charger from it. Turn off if the charger has its own meter that the house consumption sensor does not include, behind the same grid connection as the solar (not a separate connection): the charger is then not subtracted, neither here nor by the cars behind or by BattMind, and the cars behind this one (or with the same priority) add its charging to their house consumption instead, as one meter would. Without a number from the charger power sensor the charger counts with its most. If unsure, leave it on: a repair tells you when the history shows a house consumption under half of what the charger draws.",
           "ignore_cjp_chargers": "Subtracts the charging power of the chargers of your Cable Juice Planner cars with a lower priority (a higher number) from the house consumption, also for cars added later. The car with priority 1 has the first right to the solar surplus, then 2, and so on: this car counts the charging of the cars ahead of it as consumption, but not of the cars behind it. This car's own charger is not included, and a charger that is also in the list above is only subtracted once. Cars with the same priority do not leave each other out. Turn off if your house consumption sensor does not include the chargers."
         }
       },
@@ -848,17 +872,17 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast (Solcast)",
+          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solar forecast (watts) (Supported: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
@@ -886,7 +910,7 @@
       },
       "weather": {
         "title": "Weather",
-        "description": "The weather forecast is used to predict the solar surplus and for preheating.",
+        "description": "The weather forecast is used to predict the solar surplus (with solar), for preheating and for the “Adjust driving efficiency to temperature” switch. The page can be filled in without solar too.",
         "data": {
           "hourly_service_entity_id": "Hourly forecast",
           "daily_service_entity_id": "Daily forecast",
@@ -895,7 +919,7 @@
         "data_description": {
           "hourly_service_entity_id": "Hourly forecast entity",
           "daily_service_entity_id": "Daily forecast entity",
-          "outdoor_temp_entity_id": "Used for preheat/defrost with more accurate temp than forecast"
+          "outdoor_temp_entity_id": "Used for preheat/defrost with more accurate temp than forecast, and gives the drives under Analysis their outdoor temperature"
         }
       },
       "notifications": {
@@ -904,12 +928,28 @@
         "data": {
           "notify_list": "Notify",
           "efficiency_on_cable_plug_in": "Drive efficiency when plugged in",
-          "preheating": "Preheating start/stop"
+          "preheating": "Preheating start/stop",
+          "departure_readiness": "Car not ready / plug in",
+          "notify_charger_offline": "Charger not responding before a departure",
+          "notify_cheap_power": "Cheap power, car not plugged in",
+          "notify_manual_expensive": "Manual charging in an expensive hour",
+          "notify_monthly_summary": "Monthly summary",
+          "notify_site_limit": "Load balancing limited the charging",
+          "notify_battery_full": "Battery full for a long time",
+          "notify_charging_loss": "Charging loss has risen"
         },
         "data_description": {
           "notify_list": "notify services that get the CJP notifications (e.g. notify.mobile_app_phone). Empty = notify.notify. Use mobile_app for actionable notifications.",
           "efficiency_on_cable_plug_in": "Notify last drive efficiency on cable plug-in",
-          "preheating": "Notify on preheating start/stop"
+          "preheating": "Notify on preheating start/stop",
+          "departure_readiness": "Notify once per departure when the car will not be ready for the next departure (within 24 hours): too few charging hours, a need above the charge limit, the car's own charge limit too low (already at plug-in when the charger automation does not set it), the car stopping charging early, or charging much slower than planned. Also when charging planned for it starts within an hour while the car is home but not plugged in.",
+          "notify_charger_offline": "Notify once per departure when the charger's status has been unavailable or unknown for 30 minutes while charging for a departure within 24 hours is planned.",
+          "notify_cheap_power": "Notify at most once a day when charging at a very cheap price or a price below 0 is planned within the hour, and the car is home but not plugged in. Not for the charging a departure needs (Car not ready / plug in covers that).",
+          "notify_manual_expensive": "Notify at most once a day when manual charging is on and the car charges in one of the day's 4 most expensive hours.",
+          "notify_monthly_summary": "Notify once a month with last month's charged kWh, cost, average price and the saving compared with daily charging. Not for a month CJP did not see from its start or without a known cost.",
+          "notify_site_limit": "Notify when load balancing (the main fuse or the site limit) has stopped or lowered the charging of the plugged-in car for two check intervals and at least 10 minutes, each at most once a day. Not during the charger test.",
+          "notify_battery_full": "Notify when the car's own battery level has stood at 99 % or more for 12 hours (24 hours when a full charge every X days is set or not known), once per time it is full. Again after 30 days if it is still full. Needs the car integration.",
+          "notify_charging_loss": "Notify at most once a month when the kWh per 1 % at 4 kW or more over the last 30 days is at least 15 % above 3–6 months ago, with enough measurements in both, and also above the same months a year earlier when they have enough measurements. Cold weather raises it too."
         }
       },
       "advanced": {
@@ -976,10 +1016,10 @@
           "fuse_l2": "The main fuse (or the limit the cars may use together) per phase.",
           "fuse_l3": "The main fuse (or the limit the cars may use together) per phase.",
           "margin": "Subtracted from the fuse to leave room for short peaks.",
-          "voltage": "Used when the phase sensors measure power (W) instead of current (A).",
-          "phase_l1_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l2_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
-          "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
+          "voltage": "Used when the phase sensors measure power (W, kW …) instead of current (A).",
+          "phase_l1_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l2_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
+          "phase_l3_entity_id": "Optional: measured current (A or mA) or power (W, kW, mW, MW or GW) per phase of the whole house (e.g. a HAN/P1 meter). A sensor in an energy unit (Wh, kWh) can't be used: it doesn't show the current right now. With all three the house consumption is subtracted. Without them the fuse is a fixed budget for the cars, and each car's charging power sensor shows what it really draws. Either way an overloaded phase limits the last car at once.",
           "urgent_trip_hours": "A planned trip within this many hours gives the car precedence."
         }
       },
@@ -1015,7 +1055,7 @@
       "invalid_icon": "Use an icon name like mdi:ev-station.",
       "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
       "circuit_own_charger_missing": "Select this car's charger as well.",
-      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
+      "price_unit_subunit": "This sensor gives the price in cents or pence (or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh, and for Energy Price Forecast per Wh). Choose a sensor with the price per kWh in the currency (for example EUR/kWh). Wattcast’s price sensor must give ct/kWh; any other unit is wrong for it.",
       "price_sensor_not_retail": "This is not the retail price sensor. Choose the retail price sensor of Energy Price Forecast as the buy price (the wholesale price is the sell price).",
       "price_sensor_not_wholesale": "This is the retail price sensor. Choose the wholesale price sensor of Energy Price Forecast as the sell price (the retail price is higher than what a sale pays).",
       "price_sensor_forecast_only": "This sensor has no published prices for today right now, only a forecast. If Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source) and choose the sensor again. Otherwise try again once the prices are published.",
@@ -1065,6 +1105,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Test my charger automation"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Forced charging below daily target"
       },
@@ -1139,6 +1182,12 @@
       },
       "learn_driving_distance": {
         "name": "Learn driving distance"
+      },
+      "learn_departure_time": {
+        "name": "Learn departure and homecoming"
+      },
+      "temperature_efficiency": {
+        "name": "Adjust driving efficiency to temperature"
       },
       "learn_soc_charge_power": {
         "name": "Learn charge power by battery level"
@@ -1360,6 +1409,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Charger automation test",
+        "state": {
+          "idle": "Idle",
+          "running": "Running",
+          "done": "Done",
+          "stopped": "Stopped",
+          "failed": "Failed"
+        }
+      },
       "current_charging_rule": {
         "name": "Current charging rule"
       },
@@ -1641,9 +1700,16 @@
       "title": "Energy Price Forecast sensors that Cable Juice Planner uses have no published prices ({prefix})",
       "description": "Cable Juice Planner ({prefix}) uses Energy Price Forecast sensors that have had no published prices for today or tomorrow for at least an hour, only a forecast:\n{entities}\n\nWithout a price for today the hours that have passed have no price, so they are missing from the charging history and the price history.\n\nIf Energy Price Forecast publishes no prices for your market (for example Finland or Great Britain), set a Nord Pool or ENTSO-e sensor as “Own price source” in Energy Price Forecast (for the buy price, also choose “Own formula” under “Retail price” there: the estimate does not use the own price source). Otherwise the prices are only late.\n\nThis repair disappears by itself when the sensors have published prices again."
     },
-    "price_sensor_unit": {
-      "title": "Price sensors that Cable Juice Planner uses give the price in the wrong unit ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) uses price sensors that give the price in a subunit of the currency (for example ct/kWh or p/kWh) or, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool, per MWh or Wh:\n{entities}\n\nTheir prices are 100 or 1000 times off, so Cable Juice Planner does not use them: it plans on the stored prices instead. Choose a sensor with the price per kWh in the currency (for example EUR/kWh) in the price settings, or set the unit of the sensor back.\n\nThis repair disappears by itself when the sensors give the price per kWh again.\n\nWattcast’s price sensor must give ct/kWh; any other unit is wrong for it."
+    "voltage_old_default": {
+      "title": "The grid voltage of {name} is the old default {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Set the grid voltage of {name} to {default} V",
+            "description": "The grid voltage of **{name}** (under *Charger - specifications* in the options) is {voltage} V, the default of earlier versions of Cable Juice Planner. The default is now {default} V, the nominal voltage in most of Europe. CJP counts the charging power of the plan and of the solar steps with it, and turns the charger's measured power into amps for the load balancing: a voltage set too high counts a car's current too low.\n\nSelect **Submit** to set it to {default} V (the entry is reloaded). If your grid really has {voltage} V, ignore this repair. You can change the voltage at any time in the options."
+          }
+        }
+      }
     },
     "stromligning_entities": {
       "title": "Strømligning sensors that Cable Juice Planner needs are not available ({prefix})",
@@ -1652,6 +1718,54 @@
     "solcast_entities": {
       "title": "Solcast forecast sensors that Cable Juice Planner needs are not available ({prefix})",
       "description": "Cable Juice Planner ({prefix}) can't use all the Solcast forecast sensors it needs, so the days without one are planned from the weather forecast and the stored solar history instead. Solcast disables the forecast sensors of day 3 and on by default.\n\nDisabled in Home Assistant (enable them under **Settings → Devices & services → Entities**, with *Show disabled entities*):\n{disabled}\n\nNot named the way Cable Juice Planner expects (the entity id must end in _today, _tomorrow or _day_3 …):\n{renamed}\n\nWithout hourly detail (turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options):\n{no_detail}\n\nThis repair disappears by itself when the sensors are fixed."
+    },
+    "entities_missing": {
+      "title": "Entities of Cable Juice Planner ({prefix}) are disabled or missing",
+      "description": "Cable Juice Planner ({prefix}) reads these entities, but they are disabled in Home Assistant, or they are neither in the entity registry nor in the states (renamed or deleted). The plan can't use them.\n\nDisabled (enable them under **Settings → Devices & services → Entities**, with *Show disabled entities*):\n{disabled}\n\nMissing (check the entity id in the Cable Juice Planner settings, or the integration that provides it):\n{missing}\n\nAfter the fix, run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when the entities are enabled or found again."
+    },
+    "entity_units": {
+      "title": "Sensors with a unit Cable Juice Planner can't read ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these sensors in a fixed unit. Their unit is another one, so the code reads their values as if they were in an accepted unit, and the values are wrong:\n{entities}\n\nAccepted units: power sensors {power_units} (a unit with an h, such as Wh or kWh, is read as the unit without it; a power sensor without a unit is read as W); battery level sensors %; kWh meters only in {energy_units}. While the repair to update the charger blueprint is open, the charger power sensor is only read right in W or kW.\n\nChange the unit in the integration that provides the sensor, or pick another sensor. Then run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when every sensor has an accepted unit again."
+    },
+    "site_phase_units": {
+      "title": "Phase sensors in an energy unit (load balancing)",
+      "description": "These phase sensors report an energy (such as Wh or kWh), not a current or a power:\n{entities}\n\nAn energy meter can't tell how much current flows on the phase right now, so load balancing doesn't read these sensors. Until they are fixed, the house's consumption is counted as its last measurement or the forecast, or as the whole budget without either: then the cars get no current until the sensors are fixed. The last measurement and the forecast are only an estimate: if the house uses more than that, the main fuse is not protected by a measurement, and otherwise the cars may get less current than they could. The house forecast isn't updated either.\n\nPick a sensor in A, W or kW for each phase in the settings of the shared grid connection. The repair disappears by itself when no phase sensor reports an energy any more."
+    },
+    "blueprint_automation_lost": {
+      "title": "The charger automation of Cable Juice Planner ({prefix}) is disabled or gone",
+      "description": "The automation made from the Cable Juice Planner charger blueprint was running before, but now it is disabled or no longer in automations.yaml. Without it the charger does not get the actions of the plan.\n\nDisabled:\n{automations}\n\nWhen the list shows –, the automation was deleted.\n\nTurn the automation on again under **Settings → Automations & scenes**, or make it again from the blueprint. Then run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when the automation runs again."
+    },
+    "charger_status_unknown": {
+      "title": "The charger status is a value Cable Juice Planner does not know ({prefix})",
+      "description": "The status of the charger has been one of these values for at least {minutes} minutes. Cable Juice Planner does not know them: they are neither a ready, not ready, charging, completed nor error status. The last time each was seen is shown:\n{values}\n\nWhile the status has such a value, the plan goes on as if the charger were ready. Cable Juice Planner does not restart a charger that does not charge, does not see a car being plugged in (so manual and forced charging are not reset and the car is not woken up), does not count the charger's kWh meter for the battery level simulation, and counts the charger as charging in the load balancing.\n\nIf the value is a normal status of your charger, report it with **Export debug info** on the device. Otherwise check the charger integration. Then run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when no such value has been seen for {days} days."
+    },
+    "power_without_unit": {
+      "title": "Power sensors without a unit are read as W ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these power sensors in watts (W), because they have no unit:\n{entities}\n\nThe number after ≤ is the highest value seen (without sign).\n\nOver the last {days} days their values never went above {max}, and some of them are decimal numbers, so they look like kilowatts (kW). Read as W they are 1000 times too small, and the plan uses far too little power.\n\nFix it at the sensor: give it its unit, for example `unit_of_measurement: kW` on a template sensor, or the unit that its integration provides. If the values really are watts, choose **Ignore** on this repair. This repair disappears by itself once the sensors have a unit, or their values show that they are watts."
+    },
+    "battery_level_fraction": {
+      "title": "Battery levels that look like a share, not a percentage ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these battery levels as percent:\n{entities}\n\nThe number after ≤ is the highest value seen (without sign).\n\nOver the last {days} days every value of these sensors was between 0 and 1, so they look like a share (0.85 means 85 %). Read as percent, 0.85 is 0.85 %, so the plan works with a battery level that is 100 times too low.\n\nFix it at the sensor: make it report 0 to 100, for example by multiplying by 100 in a template sensor, and select that sensor in the settings. If the values really are percent and only happen to be below 1, choose **Ignore** on this repair. This repair disappears by itself once the sensors report 0 to 100, or their values show percent."
+    },
+    "price_unit_scale": {
+      "title": "Price sensors in a subunit, per MWh or per Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) reads these price sensors as prices per kWh in the currency, but their unit is a subunit of the currency (øre or cent), per MWh or per Wh:\n{entities}\n\nThe prices are 100 times too large (subunit), 1000 times too large (per MWh) or 1000 times too small (per Wh). Cable Juice Planner does not use the prices of such a sensor from Energi Data Service, Energy Price Forecast, Spot Forecast, Elprisprognos, Wattcast, EPEX Spot, GE-Spot or Nord Pool: the next provider’s prices or the stored prices are used instead (Energy Price Forecast converts a price per MWh itself). A Strømligning sensor, an Octopus Energy sensor or a tariff sensor is read as it is, so for those the plan and the savings calculation are wrong. Only the unit is judged, not the size of the prices.\n\nFix it at the source: in Energi Data Service turn off **Show prices in cent** and set **Price calculated in** to kWh in the options of the integration, or select a sensor whose unit is the currency per kWh (e.g. kr/kWh). If the unit really is correct, choose **Ignore** on this repair. This repair disappears by itself once every price sensor is in the currency per kWh (e.g. kr/kWh).\n\nWattcast’s price sensor must give ct/kWh; any other unit is wrong for it."
+    },
+    "consumption_frozen": {
+      "title": "House consumption sensor shows the same value for 6 hours ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) uses the house consumption sensor {entity} for the house consumption in the plan. It has shown {value} since {since}: at least 6 hours without a change.\n\nThe plan uses this sensor for the house, so a sensor that stays the same gives it a wrong house consumption. Check the integration or the device that delivers the sensor: it may have stopped sending values. If the value really is constant, choose **Ignore** on this repair.\n\nThis repair disappears by itself once the sensor reports a different value. An unavailable sensor keeps the repair as it is. The planner's notification about an unavailable sensor only covers a sensor with an entity registry entry (for example from an integration, made in the UI, or YAML with a unique ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "The house consumption does not seem to include the charger ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) subtracts this car's charger from the house consumption sensor {entity}, because the setting **House consumption includes this car's charger** is on. But in {hours} hours of the last {days} days the house consumption was under {share} % of what the charger alone drew, without solar and without the home battery charging or discharging. A sensor that includes the charger can never be lower than the charger, so the charger is probably on its own meter. The charger is then subtracted from a house that never had it: the house consumption becomes too low, and the plan sees solar surplus and cheap hours that are not there.\n\nIf the charger is on its own meter, turn off **House consumption includes this car's charger** in the options of this car (the House consumption page). If the house consumption sensor should include the charger, check the sensor. If the values are right as they are, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the setting is turned off, when the house consumption sensor or the charger power sensor is removed, or when the hours of the last {days} days show that the house consumption includes the charger."
+    },
+    "site_fuse_exceeded": {
+      "title": "The house and the cars draw more than the main fuse (load balancing)",
+      "description": "In the last {days} days the hourly mean current on these phases was above {factor} times the main fuse for {hours} hours or more. Each line shows the phase, its main fuse → the highest hourly mean current (hours above the limit > the limit, which is the main fuse times {factor}):\n{phases}\n\nA fuse of that size is unlikely to carry such a current for an hour. So either the main fuse on the shared grid connection page is set too low (the cars then get less current than they could), or a charger that the phase sensors do measure is set as outside them (*Phase sensors include this car's charger* turned off), so its draw is counted twice, or a phase sensor measures something else: phases in the wrong order, a sensor that is not the grid phase, or a wrong unit. Check the fuse size and the phase sensors. If the fuse really is that large and the values are correct, choose **Ignore** on this repair.\n\nThis repair disappears by itself when the next forecast no longer finds it: after the fuse is corrected, at the latest when these hours are out of the last {days} days."
+    },
+    "charger_not_following": {
+      "title": "The charger did not follow the plan {count} times in {days} days ({prefix})",
+      "description": "In the last {days} days the charger did not follow the plan {count} times. This repair appears at {limit} times or more. The restarts of the charger gave up {gave_up} times, and the charger charged without a rule {no_rule} times. Each of these had its own notification.\n\nLatest events (local time):\n{latest}\n\nCheck the integration of the charger and the car (does the charger report its status and power?), and any other app or automation that controls the charger or the car: it may stop or start it. Then run the charger test: turn on **Test my charger automation** under *Settings* on the dashboard. This repair disappears by itself when fewer than {limit} of these events are left within {days} days."
     }
   }
 }

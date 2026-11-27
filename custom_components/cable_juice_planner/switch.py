@@ -5,13 +5,13 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, SWITCH_SETTINGS
+from .const import CHARGER_TEST_RUN_SWITCH, DOMAIN, SWITCH_SETTINGS
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 
@@ -33,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     async_add_entities(
         CJPSwitch(coordinator, key, info) for key, info in SWITCH_SETTINGS.items() if requirement_met(coordinator, info.get("requires"))
     )
+    async_add_entities([CJPChargerTestSwitch(coordinator, "switch", CHARGER_TEST_RUN_SWITCH)])
 
 
 class CJPSwitch(CJPUpdatingEntity, SwitchEntity, RestoreEntity):
@@ -64,3 +65,28 @@ class CJPSwitch(CJPUpdatingEntity, SwitchEntity, RestoreEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         self.coordinator.async_set_setting(self._key, False)
         self.async_write_ha_state()
+
+
+class CJPChargerTestSwitch(CJPUpdatingEntity, SwitchEntity):
+    """On while the test of the user's charger automation runs. Turn it on to run it, off to stop it.
+
+    The test publishes one charging current after the other (also the maximum, and a stop) and reads the charger's power. A
+    stop puts the plan's own action and amps back. The result is on the charger_test sensor. A configuration entity, so a
+    voice assistant does not get it by default."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    @callback
+    def _handle_update(self, key: Any) -> None:
+        if key == "charger_test":
+            self.async_write_ha_state()
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.charger_test_state["status"] == "running"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self.coordinator.async_run_charger_test()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self.coordinator.async_stop_charger_test()

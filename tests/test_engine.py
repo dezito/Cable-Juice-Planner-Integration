@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import json
 import math
+import re
 import zoneinfo
 from copy import deepcopy
 from pathlib import Path
@@ -293,6 +294,48 @@ def test_stop_before_the_clock_went_back_does_not_hide_charging(monkeypatch: pyt
     engine.charging_no_rule_count = 0
     assert _check_no_rule(engine, datetime.datetime.combine(DAY, datetime.time(2, 10)), kwargs) is False
     assert engine.charging_no_rule_count == 1
+
+
+def test_a_charging_without_rule_is_noted_once_per_run_of_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The alarm runs on every cron of one run of charging without a rule: the health checks count the run once."""
+    start = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine, kwargs = _no_rule_engine(monkeypatch, start)
+    engine.charging_no_rule_count = 0
+    noted: list[str] = []
+
+    def crons(first: int, count: int, **power) -> None:
+        for step in range(count):
+            at = start + datetime.timedelta(minutes=first + 5 * step)
+            result = engine.run_job(snapshot(at, **{**kwargs, **power}), engine.charging_without_rule)
+            assert result.error is None, result.error
+            noted.extend(result.charger_problems)
+
+    crons(0, 8)  # the alarm from the fifth cron on, every cron after it too
+    assert engine.charging_no_rule_count == 4 and noted == ["no_rule"]
+
+    crons(40, 2, power=0)  # the charger stops using power: the run is over
+    assert engine.charging_no_rule_count == 0
+    crons(50, 8)  # a new run is one event again
+    assert noted == ["no_rule", "no_rule"]
+
+
+def test_a_charger_problem_is_not_noted_during_a_test_or_the_hour_after_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine, kwargs = _no_rule_engine(monkeypatch, now)
+
+    def problems() -> list[str]:
+        return engine.run_job(snapshot(now, **kwargs), lambda: engine._note_charger_problem("gave_up")).charger_problems
+
+    assert problems() == ["gave_up"]
+    engine._charger_test_released_at = now - datetime.timedelta(minutes=59)
+    assert problems() == [], "the charger may still charge from the test"
+    engine._charger_test_released_at = now - datetime.timedelta(minutes=60)
+    assert problems() == ["gave_up"]
+    engine._charger_hold = {"entity_id": "sensor.charger_action"}
+    assert problems() == [], "a test holds the charger"
+    engine._charger_hold = None
+    engine._note_charger_problem("gave_up")  # outside a job there is nothing to publish to: no error
+    assert engine.run_job(snapshot(now, **kwargs), engine.stop_charging).charger_problems == []
 
 
 def test_charger_decision_without_stop_request_is_unchanged() -> None:
@@ -2201,8 +2244,191 @@ def test_wake_up_reads_the_cars_last_update_in_the_home_assistant_time_zone(minu
 
 def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home", location_history: list | None = None):
     now = datetime.datetime.combine(DAY, datetime.time(12, minute))
+# ---------------------------------------------------------------------------------------------------------------- #
+# The solar forecast sources: Solcast's detailedHourly, and Forecast.Solar / Helios Forecast normalised to the same rows
+# by utils/solar_forecast.py (the coordinator puts them under the configured sensor)
+# ---------------------------------------------------------------------------------------------------------------- #
+
+# a Saturday: no work day takes hours out of the solar prediction, and a week before the clocks go back (25 October)
+SAT = DAY - datetime.timedelta(days=5)
+SOLAR_OPTIONS = {**OPTIONS, "production_entity_id": "sensor.solar", "enable_selling_during_expensive_hours": False}
+HELIOS_SENSOR = "sensor.helios_forecast_power_now"
+FORECAST_SOLAR_SENSOR = "sensor.energy_production_today"
+
+
+def _sun_kw(day: int, hour: int) -> float:
+    """A sunny day: 0 at night, up to 4 kW at noon, a little less every day."""
+    return round(max(0.0, 4.0 - abs(hour - 12) * 0.9) * (1 - 0.1 * day), 3) if 9 <= hour <= 16 else 0.0
+
+
+def _solcast_rows(days: int = 3) -> dict[str, list]:
+    """The detailedHourly rows of Solcast's day sensors (period_start: a datetime with the local offset)."""
+    rows = {}
+    for day, ending in enumerate(("today", "tomorrow", "day_3", "day_4")[:days]):
+        date = SAT + datetime.timedelta(days=day)
+        rows[f"sensor.solcast_{ending}"] = [
+            {
+                "period_start": datetime.datetime.combine(date, datetime.time(hour), tzinfo=TZ),
+                "pv_estimate": _sun_kw(day, hour),
+                "pv_estimate10": round(_sun_kw(day, hour) * 0.7, 3),
+            }
+            for hour in range(24)
+        ]
+    return rows
+
+
+def _helios_wh_hours(days: int = 3) -> dict[str, float]:
+    """The same forecast as Helios Forecast gives the Energy dashboard: Wh per UTC hour, keyed by its start."""
+    return {
+        datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(hour), tzinfo=TZ).astimezone(datetime.UTC).isoformat(): _sun_kw(day, hour) * 1000
+        for day in range(days)
+        for hour in range(24)
+    }
+
+
+def _forecast_solar_wh_hours(first_key: int = 11, days: int = 2) -> dict[str, float]:
+    """Forecast.Solar's Energy dashboard forecast: the key is the END of its period, so the value at <hour> is the
+    energy of the hour before it. Today starts at first_key (no row for the hours before it), the forecast ends after
+    the sunset of the last day (the free plan: today and tomorrow)."""
+    keys = {}
+    for day in range(days):
+        date = SAT + datetime.timedelta(days=day)
+        for hour in range(first_key if day == 0 else 8, 19):
+            keys[datetime.datetime.combine(date, datetime.time(hour), tzinfo=TZ).isoformat()] = _sun_kw(day, hour - 1) * 1000
+    return keys
+
+
+def _solar_engine(forecast_entity: str, platform: str | None, rows: dict[str, list], weather: bool = True, now: datetime.datetime | None = None):
+    """A started engine and a snapshot with the given solar forecast rows (snapshot.solcast) and platform."""
+    now = now or datetime.datetime.combine(SAT, datetime.time(3, 30))
+    engine = CJPEngine(const.build_config({**SOLAR_OPTIONS, "forecast_entity_id": forecast_entity}), "cjp_test", TEXTS)
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    snap.platforms = {forecast_entity: platform}
+    daily = [{"datetime": datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(0)).isoformat(), "condition": "sunny"} for day in range(8)]
+    # without weather the coordinator still gives the dict (with no forecasts in it)
+    snap.forecast_dict = {"hourly": [], "daily": daily if weather else []}
+    snap.solcast = rows
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    return engine, snap
+
+
+def _prediction(engine: CJPEngine, snap: Snapshot) -> tuple:
+    result = engine.run_job(snap, engine.local_energy_prediction)
+    assert result.error is None, result.error
+    return result.value, deepcopy(engine.local_energy_prediction_db)
+
+
+def _rows_from(wh_hours: dict[str, float], semantics: str) -> list[dict]:
+    from custom_components.cable_juice_planner.utils.solar_forecast import rows_from_wh_hours
+
+    return rows_from_wh_hours([wh_hours], semantics, TZ)
+
+
+def test_solcast_rows_are_read_as_before() -> None:
+    """Regression: the Solcast surplus per hour from detailedHourly of every day sensor is pv_estimate (kW over the
+    hour) minus the consumption history (none here), keyed by the local hour, for every hour with a price."""
+    engine, snap = _solar_engine("sensor.solcast_today", "solcast_solar", _solcast_rows())
+    forecast = engine.run_job(snap, engine.get_solar_kwh_forecast)
+    assert forecast.error is None
+    expected = {datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(hour)): _sun_kw(day, hour) for day in range(3) for hour in range(24)}
+    # the prices cover today, tomorrow and two forecast days: every Solcast hour has one
+    assert {key: value[0] for key, value in forecast.value.items()} == expected
+    # rows under the selected sensor alone are not Solcast's day sensors: a Solcast sensor reads only <base>_<day>
+    engine, snap = _solar_engine("sensor.solcast_today", "solcast_solar", {"sensor.solcast_today_x": _solcast_rows()["sensor.solcast_today"]})
+    assert engine.run_job(snap, engine.get_solar_kwh_forecast).value == {}
+
+
+def test_energy_platform_rows_plan_like_the_same_solcast_rows() -> None:
+    """Helios Forecast's wh_hours, normalised by utils/solar_forecast.py, give exactly the prediction and the plan of the
+    same numbers from Solcast: the engine reads both the same way."""
+    helios_rows = _rows_from(_helios_wh_hours(), "start")
+    assert len(helios_rows) == 72
+    results = []
+    for entity_id, platform, rows in (
+        ("sensor.solcast_today", "solcast_solar", _solcast_rows()),
+        (HELIOS_SENSOR, "helios_forecast", {HELIOS_SENSOR: helios_rows}),
+    ):
+        engine, snap = _solar_engine(entity_id, platform, rows)
+        prediction = _prediction(engine, snap)
+        plan = engine.run_job(snap, engine.charge_if_needed, True)
+        assert plan.error is None, plan.error
+        results.append((prediction, plan.states, plan.attributes))
+    assert results[1] == results[0]
+    # the forecast is really used: the noon hour of tomorrow is the forecast alone (no solar history yet)
+    timestamps = results[0][0][1]["solar_prediction_timestamps"]
+    assert timestamps[datetime.datetime.combine(SAT + datetime.timedelta(days=1), datetime.time(12))] == pytest.approx(_sun_kw(1, 12))
+
+
+def test_a_sensor_of_another_integration_without_rows_has_no_forecast() -> None:
+    engine, snap = _solar_engine("sensor.other_forecast", "open_meteo_solar_forecast", {})
+    assert engine.run_job(snap, engine.get_solar_kwh_forecast).value == {}
+
+
+def test_forecast_solar_rows_from_after_sunrise_keep_every_hour_in_its_place() -> None:
+    """Regression check for the positional-list hazard BattMind had: no weather and a Forecast.Solar forecast whose
+    first row is 11:00. The hours before it have no value (no known sun) and every later hour keeps its own time:
+    the planner reads them by time (solar_prediction_timestamps), the day is their sum."""
+    rows = _rows_from(_forecast_solar_wh_hours(first_key=11), "end")
+    # the key at 11:00 has no start: the first row is 11:00-12:00
+    assert rows[0]["period_start"] == datetime.datetime.combine(SAT, datetime.time(11), tzinfo=TZ)
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", {FORECAST_SOLAR_SENSOR: rows}, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    timestamps = db["solar_prediction_timestamps"]
+    today = [key for key in timestamps if key.date() == SAT]
+    assert sorted(key.hour for key in today) == [11, 12, 13, 14, 15, 16]
+    for key in today:
+        assert timestamps[key] == pytest.approx(_sun_kw(0, key.hour))
+    assert timestamps[datetime.datetime.combine(SAT, datetime.time(12))] == pytest.approx(4.0)
+    assert output[datetime.datetime.combine(SAT, datetime.time(0))] == pytest.approx(sum(_sun_kw(0, hour) for hour in range(11, 17)), abs=0.001)
+    # tomorrow is complete (the night period covers the morning), every sun hour at its own time
+    tomorrow = SAT + datetime.timedelta(days=1)
+    assert {key.hour: value for key, value in timestamps.items() if key.date() == tomorrow} == pytest.approx(
+        {hour: _sun_kw(1, hour) for hour in range(9, 17)}
+    )
+
+
+def test_a_missing_forecast_solar_hour_mid_day_is_no_sun_and_moves_no_other_hour() -> None:
+    wh_hours = _forecast_solar_wh_hours()
+    tomorrow = SAT + datetime.timedelta(days=1)
+    wh_hours[datetime.datetime.combine(tomorrow, datetime.time(13), tzinfo=TZ).isoformat()] = math.nan  # the energy of 12:00-13:00
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", {FORECAST_SOLAR_SENSOR: _rows_from(wh_hours, "end")}, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    found = {key.hour: value for key, value in db["solar_prediction_timestamps"].items() if key.date() == tomorrow}
+    assert found == pytest.approx({hour: _sun_kw(1, hour) for hour in range(9, 17) if hour != 12})
+    assert output[datetime.datetime.combine(tomorrow, datetime.time(0))] == pytest.approx(sum(_sun_kw(1, hour) for hour in range(9, 17) if hour != 12), abs=0.001)
+
+
+def test_the_days_after_the_forecast_without_weather_have_no_known_sun() -> None:
+    """Forecast.Solar's free plan covers today and tomorrow: without weather the later days are 0 kWh (no known sun),
+    never another day's sun; with weather they are planned from the stored solar history as without a forecast."""
+    rows = {FORECAST_SOLAR_SENSOR: _rows_from(_forecast_solar_wh_hours(first_key=8), "end")}
+    engine, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", rows, weather=False)
+    (output, _), db = _prediction(engine, snap)
+    for day in range(2, 8):
+        date = SAT + datetime.timedelta(days=day)
+        assert output[datetime.datetime.combine(date, datetime.time(0))] == 0.0
+        assert not [key for key in db["solar_prediction_timestamps"] if key.date() == date]
+    # the same days with weather and no forecast integration at all are predicted the same way
+    with_weather, snap = _solar_engine(FORECAST_SOLAR_SENSOR, "forecast_solar", rows)
+    without_forecast, plain = _solar_engine("", None, {})
+    (forecast_days, _), _ = _prediction(with_weather, snap)
+    (plain_days, _), _ = _prediction(without_forecast, plain)
+    for day in range(2, 8):
+        date = datetime.datetime.combine(SAT + datetime.timedelta(days=day), datetime.time(0))
+        assert forecast_days[date] == plain_days[date]
+
+
+def _public_job(engine: CJPEngine, minute: int, func, *args, level: float, port: str, cost: float = 0.0, location: str = "not_home",
+                location_history: list | None = None, odometer: float | str | None = None, when: datetime.datetime | None = None,
+                charger_meter: float | None = None):
+    now = when or datetime.datetime.combine(DAY, datetime.time(12, minute))
     snap = snapshot(now, level=level, port=port, settings={"public_charging_session_cost": cost})
     snap.states["device_tracker.ev"] = location
+    if odometer is not None:
+        snap.states["sensor.ev_odometer"] = str(odometer)
+    if charger_meter is not None:
+        snap.states["sensor.charger_kwh"] = str(charger_meter)
     if location_history is not None:
         # (minutes before now, state)
         snap.buffers = {"device_tracker.ev": [(now.replace(tzinfo=TZ).timestamp() - ago * 60, value) for ago, value in location_history]}
@@ -2231,7 +2457,7 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     # entering the first cost adds it and keeps the charge in progress
     _public_job(engine, 45, engine.add_public_charging_session, level=65, port="on", cost=120.0)
     assert engine.sensor_states["public_charging_session_done"] == "off"
-    assert engine.public_charging_sessions == [{"start_battery_level": 65.0}]
+    assert engine.public_charging_sessions == [{"start_battery_level": 65.0, "start_odometer": 25000.0}]
     assert queue() is None
     public = [row for row in engine.charging_history_db.values() if row.get("public_cost")]
     assert [(row["percentage"], row["public_cost"]) for row in public] == [(40.0, 120.0)]
@@ -2239,6 +2465,223 @@ def test_public_charging_session_still_charging_is_not_in_the_queue() -> None:
     _public_job(engine, 50, engine.public_charging_session, "off", level=90, port="off")
     assert engine.sensor_states["public_charging_session_done"] == "on"
     assert [s["added_percentage"] for s in queue()] == [25]
+
+
+def _public_queue(engine: CJPEngine) -> list | None:
+    return engine.sensor_attrs.get("public_charging_session_done", {}).get("public_charging_session")
+
+
+def test_a_public_charging_session_left_open_at_home_is_not_reused_later() -> None:
+    """The car integration reported the port before the location turned home (one update, 3 ms apart): a session
+    started at home. Its end at home must drop it, so a port opened by mistake away from home days later doesn't
+    measure from that old level (59 % -> 76 % without any charging)."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on", odometer=25000)  # still not_home
+    assert len(engine.public_charging_sessions) == 1
+    _public_job(engine, 5, engine.public_charging_session, "off", level=59, port="off", location="home", odometer=25000)
+    assert engine.public_charging_sessions == []
+    # two days later: charged at home, driven 200 km, the port opened and closed by mistake at someone else's home
+    later = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(10, 37, 16))
+    _public_job(engine, 0, engine.public_charging_session, "on", level=76, port="on", odometer=25200, when=later)
+    result = _public_job(engine, 0, engine.public_charging_session, "off", level=76, port="off", odometer=25200, when=later + datetime.timedelta(seconds=10))
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+    assert not result.mobile_notifications
+
+
+def test_a_session_still_open_when_plugged_in_at_home_is_dropped() -> None:
+    """Plugged in at home while a session away from home is still open: the car charges at home, not away."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "on", level=59, port="on", location="home")
+    assert engine.public_charging_sessions == []
+
+
+@pytest.mark.parametrize(
+    ("location", "location_history", "dropped"),
+    [
+        ("unknown", [], False),
+        ("unavailable", [], False),
+        ("unavailable", [(60, "not_home")], False),  # the last known location is away: the charge ends there
+        ("unavailable", [(60, "home")], True),  # the last known location of the past day is home, like _is_not_home
+    ],
+)
+def test_a_session_still_open_is_only_dropped_when_the_car_is_known_to_be_home(location: str, location_history: list, dropped: bool) -> None:
+    """Only a car known to be home drops an open session; an unknown location changes nothing."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", location=location, location_history=location_history)
+    if dropped:
+        assert engine.public_charging_sessions == []
+    elif location_history:
+        assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+    else:
+        assert engine.public_charging_sessions == [{"start_battery_level": 30.0, "start_odometer": 25000.0}]
+
+
+def test_only_the_open_session_is_dropped_at_home() -> None:
+    """A charge waiting for its cost and a newer one still open: a port change at home drops only the open one."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off")
+    waiting = deepcopy(_public_queue(engine))
+    _public_job(engine, 40, engine.public_charging_session, "on", level=65, port="on")  # started away, location late
+    result = _public_job(engine, 45, engine.public_charging_session, "off", level=65, port="off", location="home")
+    assert engine.public_charging_sessions == waiting
+    assert _public_queue(engine) == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    assert "runtime" in result.db_saves
+
+
+def test_a_session_dropped_after_a_drive_is_saved_while_another_waits() -> None:
+    """Dropping the open session after a drive is saved, also when a finished charge still waits for its cost."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25000)
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000)
+    waiting = deepcopy(_public_queue(engine))
+    _public_job(engine, 40, engine.public_charging_session, "on", level=65, port="on", odometer=25010)
+    result = _public_job(engine, 50, engine.public_charging_session, "off", level=80, port="off", odometer=25200)
+    assert engine.public_charging_sessions == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    assert "runtime" in result.db_saves
+
+
+def test_an_unavailable_odometer_at_the_end_is_not_its_last_known_value() -> None:
+    """The odometer must be read live at both ends: a last known value from before the drive is not a drive."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25200)
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, level=70, port="off")
+    snap.states["device_tracker.ev"] = "not_home"
+    snap.states["sensor.ev_odometer"] = "unavailable"
+    snap.buffers = {"sensor.ev_odometer": [(now.replace(tzinfo=TZ).timestamp() - 3600, "25000")]}
+    assert engine.run_job(snap, engine.public_charging_session, "off").error is None
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+
+
+def test_a_public_charging_session_is_not_measured_across_a_drive() -> None:
+    """A car can't drive while it charges: a moved odometer means the session's end was missed."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=59, port="on", odometer=25000)
+    # the end was never seen (the car was offline); later it ends away from home after a drive
+    result = _public_job(engine, 30, engine.public_charging_session, "off", level=76, port="off", odometer=25200)
+    assert engine.public_charging_sessions == []
+    assert engine.sensor_states.get("public_charging_session_done") != "on"
+    assert not result.mobile_notifications
+    # plugged in away while an old session is still open: the drive since starts a new session from the level now
+    _public_job(engine, 35, engine.public_charging_session, "on", level=59, port="on", odometer=25200)
+    _public_job(engine, 40, engine.public_charging_session, "on", level=50, port="on", odometer=25300)
+    assert engine.public_charging_sessions == [{"start_battery_level": 50.0, "start_odometer": 25300.0}]
+    _public_job(engine, 50, engine.public_charging_session, "off", level=80, port="off", odometer=25300.4)  # within the tolerance
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [30]
+
+
+@pytest.mark.parametrize("odometer", ["unavailable", "not a number"])
+def test_a_public_charging_session_without_an_odometer_is_measured(odometer: str) -> None:
+    """No odometer reading is not a drive: the session counts like before."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=odometer)
+    assert engine.public_charging_sessions == [{"start_battery_level": 30.0}]
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000)
+    assert [s["added_percentage"] for s in _public_queue(engine)] == [40]
+
+
+def test_a_finished_public_charge_waits_for_its_cost_at_home_and_days_later() -> None:
+    """A charge that ended away from home keeps waiting for its cost: driving home, port changes at home and an
+    end away from home without an open session don't change it, and its cost can be entered days later."""
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on", odometer=25000)
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off", odometer=25000, charger_meter=500)
+    waiting = deepcopy(_public_queue(engine))
+    assert [s["added_percentage"] for s in waiting] == [40]
+    # driven home: plugged in and unplugged at home
+    _public_job(engine, 50, engine.public_charging_session, "on", level=65, port="on", location="home", odometer=25040)
+    _public_job(engine, 55, engine.public_charging_session, "off", level=80, port="off", location="home", odometer=25040)
+    # a port closing away from home that never opened there (its opening came with an unknown location)
+    _public_job(engine, 59, engine.public_charging_session, "off", level=75, port="off", odometer=25060)
+    assert _public_queue(engine) == waiting
+    assert engine.sensor_states["public_charging_session_done"] == "on"
+    # the cost entered at home two days later
+    later = datetime.datetime.combine(DAY + datetime.timedelta(days=2), datetime.time(19, 0))
+    _public_job(engine, 0, engine.add_public_charging_session, level=60, port="on", location="home", odometer=25100, cost=120.0, when=later,
+                charger_meter=530)
+    assert engine.sensor_states["public_charging_session_done"] == "off"
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert [(row["percentage"], row["public_cost"]) for row in public.values()] == [(40.0, 120.0)]
+    # booked when the charge ended, with its own odometer and charger meter, not those of two days later
+    ended = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    assert list(public) == [ended]
+    assert public[ended]["ended"] == "12:30"
+    assert public[ended]["odometer"] == 25000
+    assert (public[ended]["start_charger_meter"], public[ended]["end_charger_meter"]) == (500.0, 500.0)
+
+
+def test_a_waiting_public_charge_stored_without_odometer_is_booked_at_its_own_time() -> None:
+    """A charge waiting from before its odometer and charger meter were stored (or restored from PyScript with an
+    ISO time): booked at its own end time without the odometer of today, which the history fills in on start."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    waiting = [{"start_battery_level": 30.0, "end_battery_level": 70.0, "added_percentage": 40.0, "timestamp": "2026-10-20T18:15:00"}]
+    runtime = {"public_charging_session_done": "on", "public_charging_session": waiting}
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {"runtime": runtime}).error is None
+    _public_job(engine, 0, engine.add_public_charging_session, level=60, port="on", location="home", odometer=25100, cost=90.0)
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert list(public) == [datetime.datetime(2026, 10, 20, 18, 15)]
+    assert "odometer" not in public[datetime.datetime(2026, 10, 20, 18, 15)]
+
+
+@pytest.mark.parametrize(
+    ("ended", "expected"),
+    [
+        ("2026-10-22T08:15:00+00:00", datetime.datetime(2026, 10, 22, 10, 15)),  # aware: converted to local time (CEST)
+        ("2026-10-23T09:00:00", None),  # in the future: booked now
+        ("not a time", None),
+        (None, None),
+    ],
+)
+def test_the_booking_time_of_a_waiting_public_charge(ended: str | None, expected: datetime.datetime | None) -> None:
+    """Without a usable end time the charge is booked when its cost is entered, like before; the charger meter then
+    comes from now too."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    waiting = [{"start_battery_level": 30.0, "end_battery_level": 70.0, "added_percentage": 40.0, "timestamp": ended}]
+    runtime = {"public_charging_session_done": "on", "public_charging_session": waiting}
+    assert engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(1, 0))), engine.startup, {"runtime": runtime}).error is None
+    _public_job(engine, 40, engine.add_public_charging_session, level=60, port="on", location="home", cost=90.0, charger_meter=777)
+    public = {key: row for key, row in engine.charging_history_db.items() if row.get("public_cost")}
+    assert list(public) == [expected or datetime.datetime.combine(DAY, datetime.time(12, 40))]
+    assert next(iter(public.values()))["start_charger_meter"] == 777.0
+
+
+def test_the_recalculation_of_this_hour_leaves_a_public_charge_alone() -> None:
+    """A public charge that ended earlier in the hour of a charge at home is not merged into it."""
+    engine = _loss_engine()
+    public_key = datetime.datetime.combine(DAY, datetime.time(12, 5))
+    home_key = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    public_row = {
+        "percentage": 40.0, "kWh": 30.0, "kWh_from_public": 30.0, "kWh_from_local_energy": 0.0, "solar_kwh_of_local_energy": 0.0,
+        "powerwall_kwh_of_local_energy": 0.0, "cost": 120.0, "public_cost": 120.0, "unit": 4.0, "emoji": "🧾",
+        "start_charger_meter": 500.0, "end_charger_meter": 500.0, "ended": "12:05", "charging_type": "public_charging",
+    }
+    engine.charging_history_db[public_key] = deepcopy(public_row)
+    engine.charging_history_db[home_key] = {
+        "percentage": 5.0, "kWh": 4.0, "cost": 8.0, "unit": 2.0, "emoji": "", "ended": "12:50",
+        "start_charger_meter": 500.0, "end_charger_meter": 504.0, "charging_type": ["planned"],
+    }
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 59)))
+    snap.states["sensor.charger_kwh"] = "504"
+    assert engine.run_job(snap, engine.charging_history_recalc_price).error is None
+    assert engine.charging_history_db[public_key] == public_row
+    assert engine.charging_history_db[home_key]["start_charger_meter"] == 500.0
+
+
+def test_a_public_charge_never_overwrites_a_history_entry_at_the_same_time() -> None:
+    engine = _loss_engine()
+    _public_job(engine, 0, engine.public_charging_session, "on", level=30, port="on")
+    _public_job(engine, 30, engine.public_charging_session, "off", level=70, port="off")
+    ended = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine.charging_history_db[ended] = {"percentage": 5.0, "kWh": 4.0, "cost": 8.0, "unit": 2.0, "emoji": "", "ended": "12:45"}
+    _public_job(engine, 40, engine.add_public_charging_session, level=70, port="off", cost=120.0)
+    assert engine.charging_history_db[ended]["cost"] == 8.0
+    assert engine.charging_history_db[ended + datetime.timedelta(seconds=1)]["public_cost"] == 120.0
 
 
 def test_an_autumn_night_with_25_price_rows_is_planned_with_one_price_for_the_repeated_hour() -> None:
@@ -2526,3 +2969,92 @@ def test_a_failed_price_update_publishes_what_the_plan_has_never_the_rows_of_an_
     assert [row["buy"] for row in without_sell] == [row["buy"] for row in rows] and all(row["sell"] is None for row in without_sell)
     monkeypatch.setattr(engine, "get_grid_prices", fail)
     assert published() == []
+# --- providers with different price intervals are planned on one common interval ---
+
+
+def _quarters(rows: list[dict], key: str = "hour") -> list[dict]:
+    """Every hourly row as four 15 minute rows with the same price."""
+    result = []
+    for row in rows:
+        start = datetime.datetime.fromisoformat(row[key])
+        result.extend({**row, key: (start + datetime.timedelta(minutes=minute)).isoformat()} for minute in (0, 15, 30, 45))
+    return result
+
+
+def _mixed_provider_engine(hourly: dict[int, float], quarter_price: float, *, level: float = 25.0, km: float = 150.0) -> tuple[CJPEngine, object]:
+    """Work plan at 01:30 on DAY: Strømligning has hourly prices for `hourly`, Energi Data Service every
+    15 minutes (at quarter_price) for the whole day."""
+    now = datetime.datetime.combine(DAY, datetime.time(1, 30))
+    settings = {
+        "workplan_charging": True,
+        "workday_thursday": True,
+        "workday_departure_thursday": datetime.time(7),
+        "workday_distance_needed_thursday": km,
+    }
+    snap = snapshot(now, level=level, settings=settings, **PLUGGED_IN)
+    eds = snap.price_data["attributes"]["sensor.price"]
+    eds["raw_today"] = _quarters([{**row, "price": quarter_price} for row in eds["raw_today"]])
+    snap.price_data["attributes"]["sensor.sl"] = {
+        "prices": [
+            {"start": datetime.datetime.combine(DAY, datetime.time(hour), tzinfo=TZ).isoformat(), "price": price}
+            for hour, price in hourly.items()
+        ]
+    }
+    engine = CJPEngine(const.build_config({**OPTIONS, "stromligning_buy_current_price": "sensor.sl"}), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None
+    return engine, result
+
+
+def test_an_hourly_provider_is_planned_for_whole_hours_next_to_a_quarter_hour_provider() -> None:
+    """The reported case: Strømligning has hourly prices (02-05 cheap), Energi Data Service 15 minute prices that are
+    dearer. The cheap hours are charged for the whole hour, not for the first quarter of each hour."""
+    engine, result = _mixed_provider_engine({2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5}, 3.0, level=40, km=90.0)
+    prices = engine.get_grid_prices()
+    assert prices[datetime.datetime.combine(DAY, datetime.time(3, 45))] == pytest.approx(0.5)
+    planned = {timestamp: engine.charge_hours[timestamp] for timestamp in charge_hours(engine) if timestamp.date() == DAY}
+    assert planned
+    assert all(data["Price"] == pytest.approx(0.5) for data in planned.values()), {t: d["Price"] for t, d in planned.items()}
+    per_hour: dict[int, float] = {}
+    for timestamp, data in planned.items():
+        per_hour[timestamp.hour] = per_hour.get(timestamp.hour, 0.0) + data["kWh"]
+    # the first hours of the plan are full hours at the charge power
+    assert [round(kwh, 2) for kwh in sorted(per_hour.values(), reverse=True)[:2]] == [pytest.approx(MAX_WATT / 1000, abs=0.05)] * 2
+    # the overview shows the quarters that follow each other as one window, never as 02:00-02:15
+    overview = result.attributes["overview"]["overview"]
+    assert re.search(r"02:00-0[3-5]:\d\d", overview), overview
+    assert "02:00-02:15" not in overview and "02:15-02:30" not in overview
+
+
+def _trip_plan(quarter: bool, target: float = 100.0) -> dict[datetime.datetime, float]:
+    """The kWh per hour the planner books for a trip above the max level, on hourly or on 15 minute prices."""
+    now = datetime.datetime.combine(DAY, datetime.time(6, 30))
+    settings = {
+        "trip_date_time": datetime.datetime.combine(DAY, datetime.time(9)),
+        "trip_homecoming_date_time": datetime.datetime.combine(DAY, datetime.time(18)),
+        "trip_charge_procent": target,
+        "max_recommended_charge_limit_battery_level": 60.0,
+    }
+    snap = snapshot(now, level=40, settings=settings, **PLUGGED_IN)
+    if quarter:
+        eds = snap.price_data["attributes"]["sensor.price"]
+        eds["raw_today"] = _quarters(eds["raw_today"])
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+    per_hour: dict[datetime.datetime, float] = {}
+    for timestamp in charge_hours(engine):
+        if engine.charge_hours[timestamp].get("trip"):
+            hour = timestamp.replace(minute=0)
+            per_hour[hour] = per_hour.get(hour, 0.0) + engine.charge_hours[timestamp]["kWh"]
+    return per_hour
+
+
+@pytest.mark.parametrize("target", [100.0, 70.0], ids=["more than the hours before departure hold", "less than one hour holds"])
+def test_a_trip_is_planned_the_same_on_15_minute_prices_as_on_hourly_prices(target: float) -> None:
+    hourly = _trip_plan(quarter=False, target=target)
+    quarters = _trip_plan(quarter=True, target=target)
+    assert hourly
+    assert sum(quarters.values()) == pytest.approx(sum(hourly.values()), abs=0.1)
+    assert quarters == pytest.approx(hourly, abs=0.1)

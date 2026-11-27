@@ -5,6 +5,9 @@ days of watching the plan before you trust it.
 
 ## 1. Check what you need
 
+You need Home Assistant **2025.12** or newer with the recorder (default). The [analysis](dashboard-analysis.md#analysis) and
+the charging loss read its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
+
 | You need | Why |
 |---|---|
 | A charger with **status**, **power** (W) and **kWh** sensors | whether the car is connected and charging, and how much went in |
@@ -15,9 +18,17 @@ Optional:
 
 - an **EV integration** with battery level, range and odometer (and preferably charge port, charge limit
   and location). Without one, you enter the battery level yourself when you plug in (virtual EV).
-- **solar production** (W), [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and a weather
-  integration with `weather.get_forecasts`
+- **solar production** (W), a solar forecast
+  ([Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
+  [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/), built into Home Assistant, or
+  [Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast)) and a weather
+  integration with `weather.get_forecasts`, e.g.
+  [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
+  [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
+  [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
 - a **home battery** (level and power)
+- for preheating, the driving temperature analysis and [Adjust driving efficiency to temperature](temperature-efficiency.md)
+  also without solar: a weather integration with `weather.get_forecasts` and an outdoor temperature sensor
 
 For the dashboard you need the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template-card`
 and `card-mod`. If Home Assistant can't find some of them, a notification lists the missing ones with links to
@@ -38,7 +49,10 @@ Not in the HACS search? Add it as a custom repository first: **HACS** → ⋮ �
 
 ## 3. Go through the setup
 
-The setup is split into pages. Every field has a help text – here are the ones that matter most.
+The setup is split into pages. Every field has a help text – here are the ones that matter most. The entity
+selectors only show relevant entities: battery level only `battery` sensors, power only `power` sensors, kWh only
+`energy` sensors, prices only entities from the price integrations and the solar forecast only Solcast,
+Forecast.Solar and Helios Forecast.
 
 ### Car
 
@@ -56,11 +70,12 @@ The setup is split into pages. Every field has a help text – here are the ones
 
 | Field | How to set it |
 |---|---|
-| Status | the charger's status sensor (`charging`, `completed`, `awaiting_start`, `disconnected` …) |
+| Status | the charger's status sensor (`charging`, `completed`, `awaiting_start`, `disconnected` …; case does not matter). Other states for charging or done can be added in the [charger blueprint](charger-control.md#charging-state) |
 | Power | the charging power in W |
 | kWh meter | if the charger's kWh meter updates slowly (e.g. Easee), make a *Riemann sum integral* (left) of the power sensor and use it |
-| Voltage, phases, max. amps | e.g. 230 V, 3 phases, 16 A: limits how many kWh fit in an hour |
+| Voltage, phases, max. amps | e.g. 230 V (the default), 3 phases, 16 A: limits how many kWh fit in an hour. The voltage also turns the charger's power into amps for the [load balancing](load-balancing.md), and the [charger test](charger-control.md#test-your-charger-automation) tells you when the power shows another one. An entry still at 240 V, the default of earlier versions, gets a repair that sets 230 V when you submit it; ignore it if your grid really has 240 V |
 | Charging loss | in percent, 0 or negative: −5 means 5 % is lost. CJP can [measure it](charging-loss.md) |
+| Charger enabled, cable connected, CO₂ | optional. *Charger enabled* is a switch or sensor showing whether the charger is on, and the action sensor asks you to turn it on when it is off. *Cable connected* is only used when the charger has no status sensor. *CO₂* is an optional sensor for the CO₂ figures |
 
 ### EV (optional)
 
@@ -78,18 +93,45 @@ integration (virtual EV).
 
 ### House and home battery
 
+The solar production and home battery power fields are pre-filled from the Energy dashboard of Home Assistant 2025.12
+or newer. Each field is filled only when the dashboard has exactly one source of that kind (solar or battery) and that source has a power sensor. Cars in one
+house normally share the house's solar and battery sensors, so every car gets the suggestion, also when another car
+already uses that sensor. For an inverted or two-sensor battery, the battery field gets the sensor that the Energy
+dashboard generates for it; that sensor disappears if the Energy configuration is changed. They are
+only suggestions: you can pick another sensor or clear the field. The battery sign is still checked against the
+recorder, as described below.
+
 - **House consumption:** the house's consumption, not the grid import. Used for the solar surplus.
 - **Ignored consumers:** power sensors subtracted from the house – e.g. a heat pump you don't want in the
   forecast. The charger itself is subtracted automatically. The house consumption used for the solar surplus is never below 0 W.
+- **House consumption includes this car's charger** (on by default): the house consumption sensor also measures this
+  car's charger, so the charger is subtracted from it. Turn it off when the charger has its own meter that the house
+  consumption sensor does not include: the charger is then not subtracted, neither by this car nor by the cars behind
+  it (the switch below) nor by BattMind, and this car's plan works with the same house as with one meter. The cars
+  behind this one, and those with the same priority, add its charging to their house consumption instead (with one
+  meter the sensor would include it), so they don't count the solar it uses as theirs; they reload once when the
+  setting changes. Without a number from a charger power sensor that is set (none in the window and none now), the
+  charger counts with its most (phases × max. current × voltage of that car): less solar, never more than with one
+  meter. Such an hour is not stored for the consumption and solar forecasts. A charger power sensor that has stopped
+  reporting counts with its last number, so a charger that hangs at 0 W while it charges gives the cars behind solar that
+  the car ahead uses, and a car on its own meter without a charger power sensor is not seen by the others at all. The
+  setting assumes the charger is behind the same grid connection as the solar (not a separate connection), and that
+  every car sharing one charger has the same setting. Hours stored
+  while the setting was wrong stay in the forecast until they are replaced (as many days as the power values are kept,
+  15 by default). If unsure, leave it on: the repair *The house consumption does not seem to include the charger*
+  appears when the stored hours show a house consumption under half of what the charger alone drew (see
+  [Repairs](faq-troubleshooting.md)).
 - **Ignore chargers of cars with lower priority** (on by default): with several cars in Cable Juice Planner, the car
   with [priority](load-balancing.md#solar-surplus-between-cars) 1 has the first right to the solar surplus, then 2,
   and so on. A car therefore counts the charging of the cars ahead of it as consumption of the house, but subtracts
   the chargers of the cars behind it, so you don't add them to the list yourself. Cars with the same priority (the
   default is 1 for everyone) don't leave each other out. The page shows the chargers it found. A car added later, or
   one with another priority, is picked up automatically (the cars concerned reload once), this car's own charger is
-  never counted twice, and a charger that is also in your list is subtracted once. Turn it off if the house
-  consumption sensor does not include the chargers, e.g. a separate meter: subtracting them would then take
-  consumption that was never there out of the forecast.
+  never counted twice, and a charger that is also in your list is subtracted once. A car whose charger is set to its
+  own meter (the setting above, on that car) is never subtracted; one ahead of this car is added instead, also with
+  this switch off. Turn it off if the house consumption sensor includes
+  none of the chargers, e.g. a separate meter: subtracting them would then take consumption that was never there out
+  of the forecast.
 - **A charger that hangs:** The charger of another car that has not reported for over 30 minutes while it still reads a number other
   than 0 (a hung integration is not *unavailable*) is taken to be stuck: it is not subtracted, in the current hour and in the
   hours since it got stuck, until it reports again, and a warning is logged. The higher consumption is the safe side. It is the
@@ -126,7 +168,7 @@ continue. The suggestions are only made when you have chosen or changed one of t
 restored backup, an import from PyScript and the stored settings keep their values; tick *Detect again* to look again
 (the page is the last one of *Home* under *Configure*). The numbers are only suggestions – check that they fit before you continue.
 
-The consumption numbers are read after the consumers that the planner itself leaves out are subtracted (the ignored ones, this car's charger and, when the switch above is on, the chargers of the cars behind it), so
+The consumption numbers are read after the consumers that the planner itself leaves out are subtracted (the ignored ones, this car's charger unless it is on its own meter and, when the switch above is on, the chargers of the cars behind it), so
 the page compares what the planner works with. If the page shows a message instead of numbers (no recorder, the reading took
 too long, a power sensor with an unknown unit, no usable history), the current values are kept; tick *Detect again* to try
 again.
@@ -138,6 +180,7 @@ Energi Data Service, then Octopus Energy, Nord Pool, EPEX Spot and GE-Spot, then
 and the next fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
+The page also sets the electricity tax refund and the selling fee, which are explained under [Prices](how-it-works.md#prices).
 
 **Energy Price Forecast** (for prices outside Denmark): choose its retail price sensor (*Current retail price*) as the
 buy price – it gives the published prices of today and tomorrow and the forecast after them. It only exists when
@@ -196,8 +239,13 @@ missing tariff counts as 0, which makes the sell price too high.
 
 ### Solar panels, solar charging and weather (optional)
 
-Only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
+Solar charging only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
 details, and [Fixed solar sell price](rules/solar.md#fixed-solar-sell-price) if your agreement pays a fixed price.
+
+The **Weather** page is also shown without solar: the weather forecast and the outdoor temperature are used for
+preheating, the outdoor temperature of the drives under Analysis and
+[Adjust driving efficiency to temperature](temperature-efficiency.md). Without solar, set them under
+**Configure → Solar panels and weather**.
 
 With Solcast, select e.g. `sensor.solcast_pv_forecast_forecast_today`; the other days are found automatically.
 Solcast switches the forecast sensors of day 3 and on off by default: enable `…_forecast_day_3` and on
@@ -205,11 +253,122 @@ Solcast switches the forecast sensors of day 3 and on off by default: enable `�
 Solcast options. A **repair** lists the sensors that are disabled, named differently or without hourly detail;
 the days without Solcast use the weather forecast and the stored solar history.
 
+#### Forecast.Solar or Helios Forecast
+
+Instead of Solcast the **Solar forecast** field also takes a sensor of
+[Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+[Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast). CJP reads the hourly forecast these integrations
+give the Energy dashboard of Home Assistant, not the state of the sensor, so any sensor of the integration works. The
+sensor must still exist and be available: like every configured sensor, a missing or unavailable one makes CJP wait
+for it at startup and notify you.
+
+- **Helios Forecast:** e.g. `sensor.helios_forecast_power_now`. Helios learns your roof from your production, so give
+  it your solar production sensor in its own setup.
+- **Forecast.Solar:** any sensor of it, e.g. `sensor.energy_production_today`. Forecast.Solar has one entry per roof
+  plane. If you added the planes as the forecast of a solar source in the Energy dashboard
+  (**Settings → Dashboards → Energy**, the solar panels), every plane of that source is added up; otherwise only the
+  plane of the selected sensor is used. An hour that one of the planes does not cover gets no forecast at all (never
+  half of one), and while a plane is not loaded the whole forecast waits for it. A plane you disabled is left out.
+- The free plan of Forecast.Solar covers today and tomorrow (about 2 days). CJP plans the hours a forecast does not
+  cover (and every hour while the integration has no forecast) from the weather forecast and the stored solar history,
+  the same as without a forecast integration. An hour with neither counts as no sun, so without a weather integration
+  the days after the forecast have no solar surplus in the plan.
+- Only whole hours are used: the hour of the first sunrise in the forecast and an hour at the end of the forecast that
+  is only covered in part are planned the same way.
+- Helios Forecast sums its own forecast points per hour. If it had to drop some of them, the hour looks complete to
+  CJP and is too low.
+- The forecast counts 75 % and the stored solar history 25 %, as with Solcast (see
+  [How it works](how-it-works.md#solar-surplus)). Forecast.Solar does not learn from your production; Helios does, so
+  with Helios your own production counts in both parts.
+- CJP does not check how old the forecast is: if the integration stops updating but still answers, its last forecast
+  is used for the hours ahead it covers (as with Solcast); values more than a day old are ignored.
+- The Solcast repair does not apply to these integrations, and the solar forecast in the price charts of the
+  dashboard is drawn only for Solcast.
+
 ### Notifications and advanced
 
 - **Notify services:** e.g. `notify.mobile_app_phone`. Use the mobile app for actionable notifications
   (public charging asks for the price).
+- **Car not ready / plug in** (default on): a push notification once per departure (work plan or trip, at most 24 hours
+  ahead) when even every hour up to the departure is not enough (about 2 % or more short), with the reason: too few
+  hours, or a need above the charge limit. Nothing is sent while an hour before the departure has no price yet.
+  And a reminder when the charging planned for the next departure starts within an hour (or has started) while the
+  car is home and has been unplugged for at least 15 minutes. Nothing is sent while the battery level is unknown, or
+  for a car without its integration while its level is 0 % or only what was charged since it was plugged in without
+  entering a level. The reminder needs a location entity: without one
+  the car only counts as home in the 15 minutes after it was unplugged.
+
+  It also checks what the car does while a planned hour before the next departure charges, so you hear in time when
+  a plan that looks fine will not be met. Each check must hold for two intervals (at least 10 minutes) within planned
+  hours in a row:
+  - the car's own charge limit (the *Car charge limit* entity) is more than 2 % below the need and the car did not
+    take the limit the plan asks for: the charger automation does not set it. A cloud integration shows the car's
+    limit late, so the car must have reported (the *Last update* entity, the car's own time) after the check first
+    saw the low limit; without that entity the low limit must hold for an hour. The button opens the car's limit;
+  - with a car integration: the charger says the car is done below the need and below the limit asked for now (e.g.
+    its own limit or a schedule in the car). The car's level must be newer than the stop: the car's own time of its
+    last report, or without the *Last update* entity a level that changed after the stop (a cloud integration writes
+    its old level again on every poll);
+  - the car charges at less than 80 % of the planned power, at most what load balancing allows now (the power now and
+    over the last 15 minutes, with the status charging all that time), so slowly that even every hour up to the
+    departure at that power is not enough. A level from a while ago is counted up for that time at the planned power.
+    Slower but in time is no notification: the plan adds hours itself. Also for a car without its integration: its
+    level is counted up from the charger's kWh meter.
+
+  When the charger automation has no step that sets the car's limit (*Set charge limit in the car* in the blueprint),
+  the car's low limit is reported already when the car is plugged in (the charger is ready, charging or done and the
+  car is home) and charging for the next departure is planned, not first when the planned hour starts in the night.
+  The same rules apply: below the need (at most the level the plan charges to, the max recommended charge limit) by
+  more than 2 %, the car's level too, and a limit the car reported after it was seen (or for an hour). The notification then says that the automation has no such step. CJP reads this from
+  the automations in `automations.yaml`; with the automation elsewhere (packages, YAML mode) it is not known and
+  this notification is not sent at plug-in.
+
+  These checks do not run while the charger is being restarted (that has its own notification), during the charger
+  test and the hour after it, the charging loss measurement, manual charging, without any charging mode, with another
+  car on the charger, or while a departure is moved later for a car still plugged in. A limit, level, age of the
+  level, status or power that is not known gives no notification.
+- **More push notifications** (each default on, each with its own switch). Each event is sent once, also across a
+  restart, and missing, unknown or stale data never sends one (except load balancing: it reports what it did, also
+  when missing measurements made it limit the charging):
+  - **Charger not responding before a departure:** the charger's status has been unavailable or unknown for 30
+    minutes while charging for a departure within 24 hours is planned and not over. Once per departure.
+  - **Cheap power, car not plugged in:** charging at the planner's very cheap price levels, or at a price below 0,
+    is planned within the hour (or has started) while the car is home and has been unplugged for at least 15
+    minutes. Not for the charging a departure needs (*Car not ready / plug in* reminds you of that), not while a
+    price of the window is unknown, and not for a car without its integration at 0 %. At most once a day.
+  - **Manual charging in an expensive hour:** manual charging is on and the car charges in one of the day's 4 most
+    expensive hours. At most once a day.
+  - **Monthly summary:** after the daily economy update in a new month: last month's kWh, cost, average price and
+    the saving (or extra cost) compared with daily charging, the same figures as the economy (the saving covers the
+    compared home connections, the kWh and cost all charging). It waits up to 3 days for a connection of last month
+    that is not compared yet (still open, just closed, or its prices are not in the statistics yet), and is not sent
+    when CJP's data (charging history or connections) does not begin before the month, for a month without charging
+    or with a cost that is not known.
+  - **Load balancing limited the charging:** load balancing (the main fuse or the site limit) has stopped or lowered
+    the charging of the plugged-in car for two check intervals and at least 10 minutes, each by itself (a kettle, or
+    a short stop during a longer reduction, is no notice), with
+    the time it began and the power before and after. At most once a day each. Not during the charger test.
+  - **Battery full for a long time:** with a car integration, the car's own level has stood at 99 % or more for 12
+    hours, or 24 hours when *Full charge every X days* is set or not known (a full charge on purpose, often an LFP
+    battery that stands it well). Once per time it is full, and again after 30 days if it is still full. Not when the
+    car's *Last update* entity is more than 24 hours old, or when its level is not known (an asleep car keeps its last
+    level for a day).
+  - **Charging loss has risen:** the kWh from the charger per 1 % at 4 kW or more over the last 30 days (at least 3
+    measurements and 20 %) is at least 15 % above the months 3 to 6 back (at least 5 measurements and 40 %). Cold
+    weather raises it too. When the same months a year earlier (12 and 13 months back) have as many measurements, the
+    rise must also be at least 15 % against them, and the message shows that value, so a cold winter alone sends
+    nothing. Without that year of data, a rise in winter against the summer may still be the season. These months come
+    from the charging loss measurement. At the first start it reads the long-term statistics up to about two years
+    back, but stops after 180 days once every power group has 10 measurements, and reads nothing older when the power
+    sensor has no statistics: then the year comparison only begins after CJP has run for a year. At most once a month.
+- **Interval:** the minutes between each check of the plan and the charging.
 - **Dashboard** in the sidebar (default on).
+- **Diagnostic file log:** writes a detailed log to `cable_juice_planner_<prefix>.log` in the config folder (2 MB per file, 3 rotations). See [Report a problem](faq-troubleshooting.md#report-a-problem).
+
+### Databases
+
+How much history is stored: days of power values, solar production per cloud cover category, price history,
+drive efficiency, km/kWh and months of charging history. The defaults suit most.
 
 Everything can be changed later under **Configure** on the integration.
 

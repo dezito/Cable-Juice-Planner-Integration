@@ -133,13 +133,78 @@ HISTORY_BUFFER_HOURS = 50
 HISTORY_LONG_BUFFER_HOURS = 7 * 24 + 1
 HISTORY_SHORT_BUFFER_HOURS = 25
 
+def normalize_state(value):
+    """A state to compare: text without surrounding blanks and in lower case (Complete, COMPLETE and complete are one
+    state); anything else (None, a number) is returned as it is."""
+    return value.strip().lower() if isinstance(value, str) else value
+
+
+class StateSet(tuple):
+    """The states that mean something (charging, done, plugged in ...): a tuple of lower case states where `in` ignores
+    the case and surrounding blanks of what is looked up, and `+` gives a StateSet again. Charger and car integrations
+    spell the same state differently (Complete, complete, completed), and a state that is not found has made the planner
+    act on a car that was away from home. A plain tuple made from one (`(*A, *B)`) loses this: use `StateSet(*A, *B)`."""
+
+    __slots__ = ()
+
+    def __new__(cls, *states: str):
+        return super().__new__(cls, (normalize_state(state) for state in states))
+
+    def __getnewargs__(self):
+        return tuple(self)  # copy and pickle give __new__ the states, not one tuple of them
+
+    def __contains__(self, item) -> bool:
+        return super().__contains__(normalize_state(item))
+
+    def __add__(self, other):
+        return StateSet(*self, *other)
+
+    def __radd__(self, other):
+        return StateSet(*other, *self)
+
+
 ENTITY_UNAVAILABLE_STATES = (None, "unavailable", "unknown")
-CHARGER_READY_STATUS = ("on", "connect", "connected", "ready", "ready_to_charge", "awaiting_authorization", "awaiting_start")
-CHARGER_NOT_READY_STATUS = ("off", "disconnect", "disconnected")
-CHARGER_COMPLETED_STATUS = ("completed", "finished")
-CHARGER_CHARGING_STATUS = ("charging",)
-EV_PLUGGED_STATES = ("on", "open", "plugged", "connect", "connected", "plugged_waiting_for_charge", "manual")
-EV_UNPLUGGED_STATES = ("off", "closed", "unplugged", "disconnect", "disconnected")
+# The states of the charger integrations, read from their sources (strings.json / const.py / README): Easee, Zaptec, Ohme, Wallbox,
+# myenergi, OpenEVSE, Peblar, Tesla Wall Connector, Tesla BLE. Only states that surely mean the one thing are listed; a state that
+# can mean either (paused, suspended, sleeping, idle, occupied) or is a fault (error, faulted, unknown) is deliberately not: a
+# status CJP does not know raises the repair, and a paused charger read as "ready" would be restarted. OCPP (Available, Preparing,
+# SuspendedEV, Finishing ...) is not listed: Preparing is also shown while charging on OCPP 2.0.1.
+CHARGER_READY_STATUS = StateSet(
+    "on", "connect", "connected", "ready", "ready_to_charge", "awaiting_authorization", "awaiting_start",
+    "awaiting_load_balancing", "awaiting_smart_start", "awaiting_scheduled_start",  # Easee
+    "plugged_in", "pending_approval",  # Ohme
+    "connected_requesting",  # Zaptec
+    "waiting_car",  # Tesla Wall Connector
+    "waiting for car demand",  # Wallbox
+    "ev connected", "waiting for ev",  # myenergi
+)
+# Plugged in, and the charger itself holds the charging back (its load balancing, a smart or scheduled start, an approval in
+# its app). They are READY (the car is connected), but a restart of the charger (is_charging) can not release them, so it is
+# not tried and the charger is not reported as not following the plan.
+CHARGER_HELD_STATUS = StateSet(
+    "awaiting_load_balancing", "awaiting_smart_start", "awaiting_scheduled_start",  # Easee
+    "pending_approval",  # Ohme
+)
+CHARGER_NOT_READY_STATUS = StateSet(
+    "off", "disconnect", "disconnected",
+    "unplugged",  # Ohme
+    "not_connected",  # OpenEVSE, Tesla Wall Connector
+    "no_ev_connected",  # Peblar
+    "ev disconnected",  # myenergi
+)
+CHARGER_COMPLETED_STATUS = StateSet(
+    "completed", "complete", "charge_complete", "finished",  # complete: Tesla (Teslemetry, Tesla BLE), go-e
+    "charging_finished",  # Tesla Wall Connector
+    # not Zaptec connected_finished: it is also shown after a stop or pause command, not only for a full car (unverified)
+)
+CHARGER_CHARGING_STATUS = StateSet(
+    "charging",
+    "connected_charging",  # Zaptec
+    "charging_reduced",  # Tesla Wall Connector
+    "boosting",  # myenergi
+)
+EV_PLUGGED_STATES = StateSet("on", "open", "plugged", "connect", "connected", "plugged_waiting_for_charge", "manual")
+EV_UNPLUGGED_STATES = StateSet("off", "closed", "unplugged", "disconnect", "disconnected")
 
 CHARGER_ACTION_STATES = ("charge", "stop")
 EV_REQUEST_TYPES = ("wake_up", "preheat_start", "preheat_stop")

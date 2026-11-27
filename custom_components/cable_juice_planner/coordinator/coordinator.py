@@ -43,9 +43,10 @@ from ..const import (
     object_prefix,
 )
 from ..management.debug_export import DebugRecorder
+from ..management.health_checks import HealthWatcher
 from ..engine import CJPEngine, JobResult
 from ..prices import CombinedPriceProvider
-from ..utils.chargers import lower_priority_charger_power_entities
+from ..utils.chargers import lower_priority_charger_power_entities, own_meter_chargers_ahead
 from ..utils.formatting import translate
 from ..utils.helpers import unique_entity_ids
 from ..management.storage import CJPStorage
@@ -53,12 +54,14 @@ from .data import CoordinatorData
 from .events import CoordinatorEvents
 from .lifecycle import CoordinatorLifecycle
 from .refresh import CoordinatorRefresh
+from .status_states import CoordinatorStatusStates
+from .charger_test import CoordinatorChargerTest
 from .what_if import CoordinatorWhatIf
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh, CoordinatorWhatIf):
+class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, CoordinatorRefresh, CoordinatorWhatIf, CoordinatorChargerTest, CoordinatorStatusStates):
     """Owns the engine, the worker thread and all scheduling for one config entry."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -83,6 +86,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self.setting_limits: dict[str, dict[str, float]] = {}
         self.started = False
         self.ignore_next_update = False
+        # the repairs of the health checks (management/health_checks.py), set up in async_setup (lifecycle)
+        self.health_watcher: HealthWatcher | None = None
 
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{self.object_prefix}_worker")
         # the What-if replay (Smart and charging at once over a period) runs on a thread of its own, so the worker above,
@@ -99,6 +104,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self._charging_loss_lock = asyncio.Lock()  # the history is read by one task at a time
         self._public_cost_task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
+        self._init_charger_test()
+        self._init_status_states()
 
         self._buffers: dict[str, list[tuple[float, str]]] = {}
         self._retention: dict[str, float] = {}
@@ -106,6 +113,8 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self._statistics_refreshed = 0.0
         self._statistics_hour: datetime.datetime | None = None
         self._platforms: dict[str, str | None] = {}
+        # why the last read of a Forecast.Solar / Helios Forecast forecast gave no rows (None: it gave rows), logged once
+        self._solar_forecast_problem: str | None = None
         self._price_snapshot_time = 0.0
         self._log_listener: QueueListener | None = None
         self._log_handler: QueueHandler | None = None
@@ -121,10 +130,14 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # not required to exist or be available at start: a car that is not set up yet must not hold this one up
         self.auto_ignored_entities = [entity_id for entity_id in self.lower_priority_chargers if entity_id not in listed]
         self.config["home"]["entity_ids"]["ignore_consumption_from_entity_ids"] = [*listed, *self.auto_ignored_entities]
-        # every other car's charger, whatever its priority and whether it was added or listed: these are checked for a hung reading
-        self.config["home"]["charger_entity_ids"] = lower_priority_charger_power_entities(
-            hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, float("-inf")
-        )
+        # every other car's charger, whatever its priority, whether it was added or listed and whether it is on its own
+        # meter: these are checked for a hung reading
+        self.config["home"]["charger_entity_ids"] = self._all_other_chargers()
+        # the chargers on their own meter of the cars ahead of this one (or with the same priority): the house sensor does
+        # not include them, so they are added to it (power sensor -> its most in W, counted while it has no number). Always,
+        # also with ignore_cjp_chargers off: that switch only decides about the cars behind. Not required at start either.
+        self.added_chargers: dict[str, float] = self._own_meter_chargers_ahead()
+        self.config["home"]["added_consumption"] = dict(self.added_chargers)
         self._chargers_reload_scheduled = False
 
         charger = self.config["charger"]["entity_ids"]
@@ -139,6 +152,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 solar["production_entity_id"],
                 charger["charger_power_entity_id"],
                 *(home["ignore_consumption_from_entity_ids"] or []),
+                *self.added_chargers,
             ) if e
         })
         own_battery_level = f"number.{self.object_prefix}_battery_level"
@@ -151,7 +165,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         # what the user configured: it must exist and be available before the planner starts
         self.configured_entities = sorted((entities - set(self.price_entities)) - {""} - set(self.auto_ignored_entities))
         # the states and units of the snapshot also cover the chargers of the other cars (read in the right unit)
-        self.snapshot_entities = sorted({*self.configured_entities, *self.auto_ignored_entities})
+        self.snapshot_entities = sorted({*self.configured_entities, *self.auto_ignored_entities, *self.added_chargers})
         self.buffered_entities = sorted(set(self.snapshot_entities) | set(self.long_entities))
         for entity_id in self.buffered_entities:
             if entity_id in self.long_entities:
@@ -205,6 +219,19 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
             self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, self.site_priority
         )
 
+    def _own_meter_chargers_ahead(self) -> dict[str, float]:
+        """The chargers on their own meter of the cars ahead of this one or with the same priority (utils/chargers.py)."""
+        return own_meter_chargers_ahead(
+            self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None, self.site_priority
+        )
+
+    def _all_other_chargers(self) -> list[str]:
+        """Every other car's charger, whatever its priority and also on its own meter (checked for a hung reading)."""
+        return lower_priority_charger_power_entities(
+            self.hass, self.entry.entry_id, self.config["charger"]["entity_ids"]["charger_power_entity_id"] or None,
+            float("-inf"), include_own_meter=True,
+        )
+
     @property
     def site_priority(self) -> int:
         return int(self.config["site"]["priority"])
@@ -212,6 +239,11 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
     @property
     def site_phase_order(self) -> str:
         return str(self.config["site"]["phase_order"])
+
+    @property
+    def site_in_phase_meter(self) -> bool:
+        """Whether the site's phase sensors measure this car's charger (only an explicit False says they do not)."""
+        return self.config["site"].get("charger_in_phase_meter", True) is not False
 
     @callback
     def async_site_recalculate(self) -> None:
@@ -284,6 +316,14 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
             self.async_set_setting(key, value, source="engine")
         for event_type, data in result.events:
             async_dispatcher_send(self.hass, self.signal, ("event", event_type, data))
+        if self.health_watcher is not None:
+            try:
+                for kind in result.charger_problems:
+                    self.health_watcher.record_charger_problem(kind)
+                if result.charger_meter is not None:
+                    self.health_watcher.record_charger_meter(result.charger_meter)
+            except Exception:  # noqa: BLE001 - a repair must never stop the notifications of the job below
+                _LOGGER.exception("Could not record the charger events of %s", self.object_prefix)
 
         for message, title, notification_id in result.notifications:
             persistent_notification.async_create(self.hass, message, title=title, notification_id=notification_id)
@@ -298,8 +338,14 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 _LOGGER.error("Could not save database %s: %s", name, err)
 
         if "charging_loss" in result.config_updates:
+            # set before the update (the listener may run inside it), and cleared when the options did not change: an
+            # unchanged update calls no listener, and a flag left set would swallow the next real change (the voltage
+            # repair, the settings) without the reload it needs
             self.ignore_next_update = True
-            self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, "charging_loss": result.config_updates["charging_loss"]})
+            if not self.hass.config_entries.async_update_entry(
+                self.entry, options={**self.entry.options, "charging_loss": result.config_updates["charging_loss"]}
+            ):
+                self.ignore_next_update = False
         if result.request_reload:
             self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 

@@ -101,10 +101,19 @@ class ControlActions:
             self.set_attr("charger_action", f"phase_{i}_amps", int(value))
 
     def set_charger_phase_limits(self, circuit_amps=None, charger_amps=None) -> None:
+        if (held := self.charger_hold_amps()) is not None:
+            # the test of the automation holds a current: the plan's amps wait (the load balancing below still limits it).
+            # A held stop leaves the circuit open, like the plan's stop: only the charger's own stop steps can pass it
+            charger_amps = held
+            circuit_amps = held if sum(held) > 0 else self._max_amps()
         circuit_amps = self._max_amps() if circuit_amps is None else circuit_amps
         charger_amps = self._max_amps() if charger_amps is None else charger_amps
         if self.site_active():
             circuit_amps, charger_amps = self._apply_site_limit(list(circuit_amps), list(charger_amps))
+        elif held is not None and self._charger_hold.get("site_stop"):
+            # the site is gone (unloaded or reloaded) during a hold: its stop no longer applies to the held amps
+            self._charger_hold["site_stop"] = False
+            self._publish_charger_action()
         for entity_id in self.config["charger"]["entity_ids"].values():
             if isinstance(entity_id, str) and self.is_entity_configured(entity_id):
                 self.is_entity_available(entity_id)
@@ -119,11 +128,21 @@ class ControlActions:
         self.requested_charger_amps = list(charger_amps)
         limited = self.site_clamp(charger_amps)
         text = self.site_text(charger_amps, limited)
+        stopped = sum(charger_amps) > 0 and sum(limited) <= 0
+        held = self._charger_hold if self.charger_hold_active() else None
+        if held is None:  # the charger test holds its own current
+            self.notify_site_limit([int(a) for a in charger_amps], list(limited), stopped)
         if limited != [int(a) for a in charger_amps]:
             _LOGGER.info("Site limit: %s A -> %s A per phase", [int(a) for a in charger_amps], limited)
             circuit_amps = [min(int(c), a) if a > 0 else 0 for c, a in zip(circuit_amps, limited)]
-            if sum(charger_amps) > 0 and sum(limited) <= 0 and self.charger_action == "charge":
+            if stopped and held is None and self.charger_action == "charge":
                 self.stop_charging()
+        if held is not None and bool(held.get("site_stop")) != stopped:
+            # a held charge the site has no current for is published as stop, like the plan's (a blueprint starts the charger
+            # on "charge" also with 0 A), and as charge again when the site has current. Decided on every limit, also by the
+            # site's own job, which publishes nothing else
+            held["site_stop"] = stopped
+            self._publish_charger_action()
         self.set_attr("charger_action", "site_limited", bool(text))
         self.set_attr("charger_action", "site_available", [int(a) for a in self._site().get("live", [0, 0, 0])])
         if text != self.site_charging_text:
@@ -150,12 +169,18 @@ class ControlActions:
         self.current_charging_amps = phases
 
     def _publish_charger_action(self) -> None:
-        self.set_state("charger_action", self.charger_action)
-        self.set_attr("charger_action", "charger_enabled", self.charger_enabled)
+        held = self.charger_hold_action()
+        self.set_state("charger_action", held or self.charger_action)
+        self.set_attr("charger_action", "charger_enabled", True if held else self.charger_enabled)
         self.set_attr("charger_action", "stop_request", self.charger_stop_request)
+        if held:
+            # the rule says what the test publishes, also when the load balancing turns the held charge into a stop
+            self._charger_test_rule()
 
     def start_charging(self, entities=None, force=False) -> None:
         """Charge (or with entities=['enabled']: only enable the charger)."""
+        if self.charger_hold_active():
+            return  # the test of the automation decides what is published; the plan runs again when it ends
         if entities == ["enabled"]:
             self.charger_enabled = True
         else:
@@ -173,6 +198,8 @@ class ControlActions:
         for the charger automation: stop_request is counted up, and the blueprint sends
         stop (or disable) once more.
         """
+        if self.charger_hold_active():
+            return  # the test of the automation decides what is published; the plan runs again when it ends
         if force:
             self.charger_stop_request += 1
             _LOGGER.info("Charger action: stop again (request %s)", self.charger_stop_request)

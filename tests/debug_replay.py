@@ -1,4 +1,4 @@
-"""Replay a debug export (custom_components/cable_juice_planner/management/debug_export.py) in the engine.
+r"""Replay a debug export (custom_components/cable_juice_planner/management/debug_export.py) in the engine.
 
     <venv python> tests/debug_replay.py cjp_debug_20261025_120000.json.gz [failed | planning | <index>]
 

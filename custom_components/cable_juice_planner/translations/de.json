@@ -56,11 +56,13 @@
         "data": {
           "site_priority": "Priorität",
           "site_phase_order": "Phasenfolge des Ladegeräts",
+          "charger_in_phase_meter": "Phasensensoren enthalten das Ladegerät dieses Autos",
           "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
           "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "charger_in_phase_meter": "Ein (Standard): Die Phasenstromsensoren des gemeinsamen Netzanschlusses messen auch das Ladegerät dieses Autos. Ausschalten, wenn das Ladegerät an einem eigenen Zähler hängt, den die Phasensensoren nicht enthalten (aber hinter derselben Hauptsicherung): Sein Bezug wird dann im Überlastungstest und in der Hauptsicherungsprüfung zum gemessenen Phasenstrom addiert und nicht vom gemessenen Strom abgezogen, um das Haus zu erhalten, sodass der Schutz nie geringer wird. Wenn Sie unsicher sind, lassen Sie das Auto laden und beobachten Sie die Phasensensoren: Steigen sie um das, was es bezieht, enthalten sie es. Ausschalten ist für die Sicherung die sichere Seite, aber ein Ladegerät, das die Sensoren messen, zählt dann doppelt: Das Auto bekommt weniger Strom, und die Reparatur zur Hauptsicherung kann erscheinen. Ohne Phasensensoren hat die Einstellung keine Wirkung. Ohne Messwert vom Leistungssensor des Ladegeräts zählt das Auto mit dem Strom, den es erhalten hat.",
           "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
@@ -109,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "charger_in_house_meter": "Hausverbrauch enthält das Ladegerät dieses Autos",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "charger_in_house_meter": "Ein (Standard): Der Hausverbrauchssensor misst auch das Ladegerät dieses Autos, daher zieht Cable Juice Planner das Ladegerät davon ab. Ausschalten, wenn das Ladegerät einen eigenen Zähler hat, den der Hausverbrauchssensor nicht enthält, hinter demselben Netzanschluss wie die Solaranlage (kein separater Anschluss): Dann wird das Ladegerät nicht abgezogen, weder hier noch von den Autos dahinter oder von BattMind, und die Autos hinter diesem (oder mit derselben Priorität) zählen sein Laden stattdessen zu ihrem Hausverbrauch, wie es ein Zähler täte. Ohne eine Zahl vom Leistungssensor des Ladegeräts zählt das Ladegerät mit seiner höchsten Leistung. Im Zweifel eingeschaltet lassen: Eine Reparatur meldet sich, wenn der Verlauf einen Hausverbrauch zeigt, der unter der Hälfte dessen liegt, was das Ladegerät bezieht.",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
@@ -312,17 +316,17 @@
       },
       "solar": {
         "title": "Solaranlage (optional)",
-        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
+        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nForecast.Solar und Helios Forecast werden aus ihrer Solarprognose für das Energie-Dashboard gelesen; Stunden, die sie nicht abdecken, werden aus der Wettervorhersage und dem gespeicherten Solarverlauf geplant; eine Stunde ohne beides zählt als keine Sonne.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solarproduktion",
-          "forecast_entity_id": "Solarprognose (Solcast)",
+          "forecast_entity_id": "Solarprognose",
           "inverter_discharging_power_limit": "Max. Leistung des Wechselrichters",
           "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen",
           "solar_sell_fixed_price": "Solar-Festverkaufspreis"
         },
         "data_description": {
           "production_entity_id": "Solarproduktion (Watt)",
-          "forecast_entity_id": "Solarprognose (Watt) (Unterstützt: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar oder Helios Forecast. Solcast: z. B. sensor.solcast_pv_forecast_forecast_today, die folgenden Tage werden automatisch gefunden. Forecast.Solar: ein beliebiger seiner Sensoren; die Dachflächen derselben Solarquelle im Energie-Dashboard werden addiert. Helios Forecast: z. B. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "WR-Entladeleistungsgrenze (Watt)",
           "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. “Solar-Festverkaufspreis” muss −1,0 sein, um Spotpreis zu nutzen",
           "solar_sell_fixed_price": "Festpreis für Solarverkauf; −1,0 = Spotpreis nutzen"
@@ -350,7 +354,7 @@
       },
       "weather": {
         "title": "Wetter",
-        "description": "Die Wetterprognose wird für den Solarüberschuss und das Vorheizen verwendet.",
+        "description": "Die Wetterprognose wird für den Solarüberschuss (mit Solaranlage), das Vorheizen und die Funktion „Fahreffizienz an die Temperatur anpassen“ verwendet. Die Seite kann auch ohne Solaranlage ausgefüllt werden.",
         "data": {
           "hourly_service_entity_id": "Stündliche Prognose",
           "daily_service_entity_id": "Tägliche Prognose",
@@ -359,7 +363,7 @@
         "data_description": {
           "hourly_service_entity_id": "Stundenprognose-Entity",
           "daily_service_entity_id": "Tagesprognose-Entity",
-          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast"
+          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast und für die Außentemperatur der Fahrten in der Analyse"
         }
       },
       "notifications": {
@@ -368,12 +372,28 @@
         "data": {
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
-          "preheating": "Vorheizen Start/Stopp"
+          "preheating": "Vorheizen Start/Stopp",
+          "departure_readiness": "Auto nicht bereit / anschließen",
+          "notify_charger_offline": "Ladegerät antwortet nicht vor einer Abfahrt",
+          "notify_cheap_power": "Günstiger Strom, Auto nicht angeschlossen",
+          "notify_manual_expensive": "Manuelles Laden in einer teuren Stunde",
+          "notify_monthly_summary": "Monatsübersicht",
+          "notify_site_limit": "Lastverteilung hat das Laden begrenzt",
+          "notify_battery_full": "Akku seit Langem voll",
+          "notify_charging_loss": "Ladeverlust ist gestiegen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
-          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen"
+          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist.",
+          "notify_charger_offline": "Benachrichtigt einmal pro Abfahrt, wenn der Status des Ladegeräts 30 Minuten lang nicht verfügbar oder unbekannt war, während Laden für eine Abfahrt innerhalb von 24 Stunden geplant ist.",
+          "notify_cheap_power": "Benachrichtigt höchstens einmal am Tag, wenn Laden zu einem sehr günstigen Preis oder einem Preis unter 0 innerhalb der nächsten Stunde geplant ist und das Auto zu Hause, aber nicht angeschlossen ist. Nicht für das Laden, das eine Abfahrt braucht (das deckt Auto nicht bereit / anschließen ab).",
+          "notify_manual_expensive": "Benachrichtigt höchstens einmal am Tag, wenn manuelles Laden an ist und das Auto in einer der 4 teuersten Stunden des Tages lädt.",
+          "notify_monthly_summary": "Benachrichtigt einmal im Monat mit den geladenen kWh, den Kosten, dem Durchschnittspreis und der Ersparnis im Vergleich zum täglichen Laden des letzten Monats. Nicht für einen Monat, den CJP nicht von Anfang an gesehen hat, oder ohne bekannte Kosten.",
+          "notify_site_limit": "Benachrichtigt, wenn die Lastverteilung (die Hauptsicherung oder das Limit der Anlage) das Laden des angeschlossenen Autos zwei Prüfintervalle und mindestens 10 Minuten lang gestoppt oder gesenkt hat, jeweils höchstens einmal am Tag. Nicht während des Tests des Ladegeräts.",
+          "notify_battery_full": "Benachrichtigt, wenn der eigene Akkustand des Autos 12 Stunden lang bei 99 % oder mehr stand (24 Stunden, wenn eine Vollladung alle X Tage eingestellt oder unbekannt ist), einmal pro Vollstand. Erneut nach 30 Tagen, wenn er noch voll ist. Braucht die Integration des Autos.",
+          "notify_charging_loss": "Benachrichtigt höchstens einmal im Monat, wenn die kWh pro 1 % bei 4 kW oder mehr in den letzten 30 Tagen mindestens 15 % über denen vor 3–6 Monaten liegen, mit genug Messungen in beiden, und auch über denselben Monaten im Vorjahr, wenn es dort genug Messungen gibt. Kälte erhöht ihn auch."
         }
       },
       "advanced": {
@@ -464,10 +484,10 @@
           "fuse_l2": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "fuse_l3": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "margin": "Wird von der Sicherung abgezogen.",
-          "voltage": "Wenn die Phasensensoren Leistung (W) statt Strom (A) messen.",
-          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
+          "voltage": "Wenn die Phasensensoren Leistung (W, kW …) statt Strom (A) messen.",
+          "phase_l1_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l2_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l3_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
           "urgent_trip_hours": "Eine geplante Fahrt innerhalb dieser Stunden gibt dem Auto Vorrang."
         }
       },
@@ -506,7 +526,7 @@
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
-      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot und Nord Pool, pro MWh oder Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh). Der Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch.",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot und Nord Pool, pro MWh oder Wh, und für Energy Price Forecast pro Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh). Der Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch.",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
       "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
@@ -592,11 +612,13 @@
         "data": {
           "site_priority": "Priorität",
           "site_phase_order": "Phasenfolge des Ladegeräts",
+          "charger_in_phase_meter": "Phasensensoren enthalten das Ladegerät dieses Autos",
           "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
           "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "charger_in_phase_meter": "Ein (Standard): Die Phasenstromsensoren des gemeinsamen Netzanschlusses messen auch das Ladegerät dieses Autos. Ausschalten, wenn das Ladegerät an einem eigenen Zähler hängt, den die Phasensensoren nicht enthalten (aber hinter derselben Hauptsicherung): Sein Bezug wird dann im Überlastungstest und in der Hauptsicherungsprüfung zum gemessenen Phasenstrom addiert und nicht vom gemessenen Strom abgezogen, um das Haus zu erhalten, sodass der Schutz nie geringer wird. Wenn Sie unsicher sind, lassen Sie das Auto laden und beobachten Sie die Phasensensoren: Steigen sie um das, was es bezieht, enthalten sie es. Ausschalten ist für die Sicherung die sichere Seite, aber ein Ladegerät, das die Sensoren messen, zählt dann doppelt: Das Auto bekommt weniger Strom, und die Reparatur zur Hauptsicherung kann erscheinen. Ohne Phasensensoren hat die Einstellung keine Wirkung. Ohne Messwert vom Leistungssensor des Ladegeräts zählt das Auto mit dem Strom, den es erhalten hat.",
           "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
@@ -645,11 +667,13 @@
         "data": {
           "power_consumption_entity_id": "Hausverbrauch",
           "ignore_consumption_from_entity_ids": "Verbrauch ignorieren von",
+          "charger_in_house_meter": "Hausverbrauch enthält das Ladegerät dieses Autos",
           "ignore_cjp_chargers": "Ladegeräte von Autos mit niedrigerer Priorität ignorieren"
         },
         "data_description": {
           "power_consumption_entity_id": "Hauslast (Watt-Entität), nicht Netzbezug",
           "ignore_consumption_from_entity_ids": "Liste von Leistungs-Sensoren, die ignoriert werden",
+          "charger_in_house_meter": "Ein (Standard): Der Hausverbrauchssensor misst auch das Ladegerät dieses Autos, daher zieht Cable Juice Planner das Ladegerät davon ab. Ausschalten, wenn das Ladegerät einen eigenen Zähler hat, den der Hausverbrauchssensor nicht enthält, hinter demselben Netzanschluss wie die Solaranlage (kein separater Anschluss): Dann wird das Ladegerät nicht abgezogen, weder hier noch von den Autos dahinter oder von BattMind, und die Autos hinter diesem (oder mit derselben Priorität) zählen sein Laden stattdessen zu ihrem Hausverbrauch, wie es ein Zähler täte. Ohne eine Zahl vom Leistungssensor des Ladegeräts zählt das Ladegerät mit seiner höchsten Leistung. Im Zweifel eingeschaltet lassen: Eine Reparatur meldet sich, wenn der Verlauf einen Hausverbrauch zeigt, der unter der Hälfte dessen liegt, was das Ladegerät bezieht.",
           "ignore_cjp_chargers": "Zieht die Ladeleistung der Ladegeräte Ihrer Cable-Juice-Planner-Autos mit niedrigerer Priorität (höhere Zahl) vom Hausverbrauch ab, auch für später hinzugefügte Autos. Das Auto mit Priorität 1 hat das erste Recht auf den Solarüberschuss, dann 2 usw.: dieses Auto zählt das Laden der Autos vor ihm als Verbrauch, nicht aber das der Autos hinter ihm. Das eigene Ladegerät dieses Autos zählt nicht dazu, und ein Ladegerät, das auch in der Liste oben steht, wird nur einmal abgezogen. Autos mit gleicher Priorität ignorieren sich nicht gegenseitig. Ausschalten, wenn Ihr Hausverbrauchssensor die Ladegeräte nicht enthält."
         }
       },
@@ -848,17 +872,17 @@
       },
       "solar": {
         "title": "Solaranlage (optional)",
-        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
+        "description": "Ausfüllen, wenn du eine Solaranlage hast.\n\nForecast.Solar und Helios Forecast werden aus ihrer Solarprognose für das Energie-Dashboard gelesen; Stunden, die sie nicht abdecken, werden aus der Wettervorhersage und dem gespeicherten Solarverlauf geplant; eine Stunde ohne beides zählt als keine Sonne.\n\nSolcast schaltet die Prognosesensoren ab Tag 3 standardmäßig aus: aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** (*Deaktivierte Entitäten anzeigen*) und schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein, sonst werden diese Tage ohne Solcast geplant.\nJetzt deaktivierte Solcast-Sensoren: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solarproduktion",
-          "forecast_entity_id": "Solarprognose (Solcast)",
+          "forecast_entity_id": "Solarprognose",
           "inverter_discharging_power_limit": "Max. Leistung des Wechselrichters",
           "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen",
           "solar_sell_fixed_price": "Solar-Festverkaufspreis"
         },
         "data_description": {
           "production_entity_id": "Solarproduktion (Watt)",
-          "forecast_entity_id": "Solarprognose (Watt) (Unterstützt: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar oder Helios Forecast. Solcast: z. B. sensor.solcast_pv_forecast_forecast_today, die folgenden Tage werden automatisch gefunden. Forecast.Solar: ein beliebiger seiner Sensoren; die Dachflächen derselben Solarquelle im Energie-Dashboard werden addiert. Helios Forecast: z. B. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "WR-Entladeleistungsgrenze (Watt)",
           "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. “Solar-Festverkaufspreis” muss −1,0 sein, um Spotpreis zu nutzen",
           "solar_sell_fixed_price": "Festpreis für Solarverkauf; −1,0 = Spotpreis nutzen"
@@ -886,7 +910,7 @@
       },
       "weather": {
         "title": "Wetter",
-        "description": "Die Wetterprognose wird für den Solarüberschuss und das Vorheizen verwendet.",
+        "description": "Die Wetterprognose wird für den Solarüberschuss (mit Solaranlage), das Vorheizen und die Funktion „Fahreffizienz an die Temperatur anpassen“ verwendet. Die Seite kann auch ohne Solaranlage ausgefüllt werden.",
         "data": {
           "hourly_service_entity_id": "Stündliche Prognose",
           "daily_service_entity_id": "Tägliche Prognose",
@@ -895,7 +919,7 @@
         "data_description": {
           "hourly_service_entity_id": "Stundenprognose-Entity",
           "daily_service_entity_id": "Tagesprognose-Entity",
-          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast"
+          "outdoor_temp_entity_id": "Für Vorheizen/Enteisen mit genauerer Temperatur als Forecast und für die Außentemperatur der Fahrten in der Analyse"
         }
       },
       "notifications": {
@@ -904,12 +928,28 @@
         "data": {
           "notify_list": "Benachrichtigen",
           "efficiency_on_cable_plug_in": "Fahreffizienz beim Einstecken",
-          "preheating": "Vorheizen Start/Stopp"
+          "preheating": "Vorheizen Start/Stopp",
+          "departure_readiness": "Auto nicht bereit / anschließen",
+          "notify_charger_offline": "Ladegerät antwortet nicht vor einer Abfahrt",
+          "notify_cheap_power": "Günstiger Strom, Auto nicht angeschlossen",
+          "notify_manual_expensive": "Manuelles Laden in einer teuren Stunde",
+          "notify_monthly_summary": "Monatsübersicht",
+          "notify_site_limit": "Lastverteilung hat das Laden begrenzt",
+          "notify_battery_full": "Akku seit Langem voll",
+          "notify_charging_loss": "Ladeverlust ist gestiegen"
         },
         "data_description": {
           "notify_list": "notify-Dienste, die die CJP-Benachrichtigungen erhalten (z. B. notify.mobile_app_telefon). Leer = notify.notify.",
           "efficiency_on_cable_plug_in": "Benachrichtigung: Effizienz der letzten Fahrt beim Einstecken des Kabels",
-          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen"
+          "preheating": "Benachrichtigung bei Start/Stopp Vorheizen",
+          "departure_readiness": "Benachrichtigt einmal pro Abfahrt, wenn das Auto zur nächsten Abfahrt (innerhalb von 24 Stunden) nicht bereit sein wird: zu wenige Ladestunden, ein Bedarf über dem Ladelimit, ein zu niedriges eigenes Ladelimit des Autos (schon beim Anschließen, wenn die Laderautomation es nicht setzt), ein Auto, das das Laden zu früh beendet, oder Laden deutlich langsamer als geplant. Auch wenn dafür geplantes Laden innerhalb einer Stunde beginnt, während das Auto zu Hause, aber nicht angeschlossen ist.",
+          "notify_charger_offline": "Benachrichtigt einmal pro Abfahrt, wenn der Status des Ladegeräts 30 Minuten lang nicht verfügbar oder unbekannt war, während Laden für eine Abfahrt innerhalb von 24 Stunden geplant ist.",
+          "notify_cheap_power": "Benachrichtigt höchstens einmal am Tag, wenn Laden zu einem sehr günstigen Preis oder einem Preis unter 0 innerhalb der nächsten Stunde geplant ist und das Auto zu Hause, aber nicht angeschlossen ist. Nicht für das Laden, das eine Abfahrt braucht (das deckt Auto nicht bereit / anschließen ab).",
+          "notify_manual_expensive": "Benachrichtigt höchstens einmal am Tag, wenn manuelles Laden an ist und das Auto in einer der 4 teuersten Stunden des Tages lädt.",
+          "notify_monthly_summary": "Benachrichtigt einmal im Monat mit den geladenen kWh, den Kosten, dem Durchschnittspreis und der Ersparnis im Vergleich zum täglichen Laden des letzten Monats. Nicht für einen Monat, den CJP nicht von Anfang an gesehen hat, oder ohne bekannte Kosten.",
+          "notify_site_limit": "Benachrichtigt, wenn die Lastverteilung (die Hauptsicherung oder das Limit der Anlage) das Laden des angeschlossenen Autos zwei Prüfintervalle und mindestens 10 Minuten lang gestoppt oder gesenkt hat, jeweils höchstens einmal am Tag. Nicht während des Tests des Ladegeräts.",
+          "notify_battery_full": "Benachrichtigt, wenn der eigene Akkustand des Autos 12 Stunden lang bei 99 % oder mehr stand (24 Stunden, wenn eine Vollladung alle X Tage eingestellt oder unbekannt ist), einmal pro Vollstand. Erneut nach 30 Tagen, wenn er noch voll ist. Braucht die Integration des Autos.",
+          "notify_charging_loss": "Benachrichtigt höchstens einmal im Monat, wenn die kWh pro 1 % bei 4 kW oder mehr in den letzten 30 Tagen mindestens 15 % über denen vor 3–6 Monaten liegen, mit genug Messungen in beiden, und auch über denselben Monaten im Vorjahr, wenn es dort genug Messungen gibt. Kälte erhöht ihn auch."
         }
       },
       "advanced": {
@@ -976,10 +1016,10 @@
           "fuse_l2": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "fuse_l3": "Die Hauptsicherung (oder das gemeinsame Limit der Autos) pro Phase.",
           "margin": "Wird von der Sicherung abgezogen.",
-          "voltage": "Wenn die Phasensensoren Leistung (W) statt Strom (A) messen.",
-          "phase_l1_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l2_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
-          "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
+          "voltage": "Wenn die Phasensensoren Leistung (W, kW …) statt Strom (A) messen.",
+          "phase_l1_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l2_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
+          "phase_l3_entity_id": "Optional: gemessener Strom (A oder mA) oder Leistung (W, kW, mW, MW oder GW) pro Phase des ganzen Hauses (z. B. HAN/P1-Zähler). Ein Sensor in einer Energieeinheit (Wh, kWh) kann nicht verwendet werden: Er zeigt nicht den aktuellen Strom. Mit allen drei wird der Hausverbrauch abgezogen. Ohne sie ist die Sicherung ein festes Budget für die Autos, und der Ladeleistungssensor jedes Autos zeigt, was es wirklich zieht. In beiden Fällen begrenzt eine überlastete Phase sofort das letzte Auto.",
           "urgent_trip_hours": "Eine geplante Fahrt innerhalb dieser Stunden gibt dem Auto Vorrang."
         }
       },
@@ -1015,7 +1055,7 @@
       "invalid_icon": "Verwende einen Symbolnamen wie mdi:ev-station.",
       "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
       "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos.",
-      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot und Nord Pool, pro MWh oder Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh). Der Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch.",
+      "price_unit_subunit": "Dieser Sensor gibt den Preis in Cent oder Pence an (oder, bei Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot und Nord Pool, pro MWh oder Wh, und für Energy Price Forecast pro Wh). Wähle einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh). Der Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch.",
       "price_sensor_not_retail": "Das ist nicht der Sensor mit dem Endkundenpreis. Wähle den Endkundenpreis-Sensor von Energy Price Forecast als Kaufpreis (der Großhandelspreis ist der Verkaufspreis).",
       "price_sensor_not_wholesale": "Das ist der Sensor mit dem Endkundenpreis. Wähle den Großhandelspreis-Sensor von Energy Price Forecast als Verkaufspreis (der Endkundenpreis liegt über dem, was ein Verkauf einbringt).",
       "price_sensor_forecast_only": "Dieser Sensor hat gerade keine veröffentlichten Preise für heute, nur eine Prognose. Wenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht) und wähle den Sensor erneut. Andernfalls versuche es erneut, sobald die Preise veröffentlicht sind.",
@@ -1065,6 +1105,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Meine Ladeautomation testen"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Erzwungenes Laden unter täglichem Ziel"
       },
@@ -1139,6 +1182,12 @@
       },
       "learn_driving_distance": {
         "name": "Fahrstrecke lernen"
+      },
+      "learn_departure_time": {
+        "name": "Abfahrt und Rückkehr lernen"
+      },
+      "temperature_efficiency": {
+        "name": "Fahreffizienz an die Temperatur anpassen"
       },
       "learn_soc_charge_power": {
         "name": "Ladeleistung nach Akkustand lernen"
@@ -1360,6 +1409,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Ladeautomationstest",
+        "state": {
+          "idle": "Inaktiv",
+          "running": "Läuft",
+          "done": "Fertig",
+          "stopped": "Gestoppt",
+          "failed": "Fehlgeschlagen"
+        }
+      },
       "current_charging_rule": {
         "name": "Aktuelle Lade­regel"
       },
@@ -1641,9 +1700,16 @@
       "title": "Energy-Price-Forecast-Sensoren, die Cable Juice Planner nutzt, haben keine veröffentlichten Preise ({prefix})",
       "description": "Cable Juice Planner ({prefix}) nutzt Energy-Price-Forecast-Sensoren, die seit mindestens einer Stunde keine veröffentlichten Preise für heute oder morgen haben, nur eine Prognose:\n{entities}\n\nOhne einen Preis für heute haben die vergangenen Stunden keinen Preis, daher fehlen sie im Ladeverlauf und im Preisverlauf.\n\nWenn Energy Price Forecast für deinen Markt keine Preise veröffentlicht (z. B. Finnland oder Großbritannien), wähle dort einen Nord-Pool- oder ENTSO-e-Sensor als „Eigene Preisquelle“ (für den Kaufpreis wähle dort auch „Eigene Formel“ unter „Endkundenpreis“: die Schätzung nutzt diese Preisquelle nicht). Andernfalls sind die Preise nur verspätet.\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren wieder veröffentlichte Preise haben."
     },
-    "price_sensor_unit": {
-      "title": "Preissensoren, die Cable Juice Planner nutzt, geben den Preis in der falschen Einheit an ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) nutzt Preissensoren, die den Preis in einer Untereinheit der Währung (z. B. ct/kWh oder p/kWh) oder, bei Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot und Nord Pool, pro MWh oder Wh angeben:\n{entities}\n\nIhre Preise sind um den Faktor 100 oder 1000 falsch, daher nutzt Cable Juice Planner sie nicht: Es plant stattdessen mit den gespeicherten Preisen. Wähle in den Preiseinstellungen einen Sensor mit dem Preis pro kWh in der Währung (z. B. EUR/kWh) oder stelle die Einheit des Sensors zurück.\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren den Preis wieder pro kWh angeben.\n\nDer Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch."
+    "voltage_old_default": {
+      "title": "Die Netzspannung von {name} ist der alte Standardwert {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Netzspannung von {name} auf {default} V setzen",
+            "description": "Die Netzspannung von **{name}** (unter *Ladegerät - Daten* in den Optionen) ist {voltage} V, der Standardwert früherer Versionen von Cable Juice Planner. Der Standard ist jetzt {default} V, die Nennspannung in den meisten Teilen Europas. CJP berechnet damit die Ladeleistung des Plans und der Solarstufen und rechnet die gemessene Leistung der Wallbox für die Lastverteilung in Ampere um: Eine zu hoch eingestellte Spannung zählt den Strom eines Autos zu niedrig.\n\nWähle **Absenden**, um sie auf {default} V zu setzen (der Eintrag wird neu geladen). Hat dein Netz wirklich {voltage} V, ignoriere diese Reparatur. Du kannst die Spannung jederzeit in den Optionen ändern."
+          }
+        }
+      }
     },
     "stromligning_entities": {
       "title": "Strømligning-Sensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",
@@ -1652,6 +1718,54 @@
     "solcast_entities": {
       "title": "Solcast-Prognosesensoren, die Cable Juice Planner braucht, sind nicht verfügbar ({prefix})",
       "description": "Cable Juice Planner ({prefix}) kann nicht alle benötigten Solcast-Prognosesensoren nutzen; die Tage ohne Sensor werden stattdessen aus der Wettervorhersage und dem gespeicherten Solarverlauf geplant. Solcast deaktiviert die Prognosesensoren ab Tag 3 standardmäßig.\n\nIn Home Assistant deaktiviert (aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** mit *Deaktivierte Entitäten anzeigen*):\n{disabled}\n\nNicht so benannt, wie Cable Juice Planner es erwartet (die Entity-ID muss auf _today, _tomorrow oder _day_3 … enden):\n{renamed}\n\nOhne Stundendetails (schalte *Stündliche Details* unter *Aufschlüsselung der Prognoseattribute* in den Solcast-Optionen ein):\n{no_detail}\n\nDiese Reparatur verschwindet von selbst, wenn die Sensoren korrigiert sind."
+    },
+    "entities_missing": {
+      "title": "Entitäten von Cable Juice Planner ({prefix}) sind deaktiviert oder fehlen",
+      "description": "Cable Juice Planner ({prefix}) liest diese Entitäten, doch sie sind in Home Assistant deaktiviert oder weder im Entitätsregister noch in den Zuständen vorhanden (umbenannt oder gelöscht). Der Plan kann sie nicht verwenden.\n\nDeaktiviert (aktiviere sie unter **Einstellungen → Geräte & Dienste → Entitäten** mit *Deaktivierte Entitäten anzeigen*):\n{disabled}\n\nFehlt (prüfe die Entität in den Einstellungen von Cable Juice Planner oder die Integration, die sie bereitstellt):\n{missing}\n\nFühre nach der Korrektur den Ladertest aus: schalte **Meine Ladeautomation testen** unter *Einstellungen* auf dem Dashboard ein. Die Reparatur verschwindet von selbst, wenn die Entitäten aktiviert oder wieder gefunden sind."
+    },
+    "entity_units": {
+      "title": "Sensoren mit einer Einheit, die Cable Juice Planner nicht lesen kann ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) liest diese Sensoren in einer festen Einheit. Sie haben eine andere Einheit, daher liest der Code ihre Werte so, als wären sie in einer erlaubten Einheit, und die Werte sind falsch:\n{entities}\n\nErlaubte Einheiten: Leistungssensoren {power_units} (eine Einheit mit h, etwa Wh oder kWh, wird wie die Einheit ohne h gelesen; ein Leistungssensor ohne Einheit wird als W gelesen); Batteriestand-Sensoren %; kWh-Zähler nur in {energy_units}. Solange die Reparatur zum Aktualisieren des Lader-Blueprints offen ist, wird der Ladeleistungssensor nur in W oder kW richtig gelesen.\n\nÄndere die Einheit in der Integration, die den Sensor bereitstellt, oder wähle einen anderen Sensor. Führe dann den Ladertest aus: schalte **Meine Ladeautomation testen** unter *Einstellungen* auf dem Dashboard ein. Die Reparatur verschwindet von selbst, wenn alle Sensoren wieder eine erlaubte Einheit haben."
+    },
+    "site_phase_units": {
+      "title": "Phasensensoren in einer Energieeinheit (Lastverteilung)",
+      "description": "Diese Phasensensoren melden eine Energie (z. B. Wh oder kWh), keinen Strom und keine Leistung:\n{entities}\n\nEin Energiezähler kann nicht zeigen, wie viel Strom gerade auf der Phase fließt, deshalb liest die Lastverteilung diese Sensoren nicht. Bis sie korrigiert sind, wird der Verbrauch des Hauses als seine letzte Messung oder die Prognose angesetzt, ohne beides als das ganze Budget: dann bekommen die Autos keinen Strom, bis die Sensoren korrigiert sind. Die letzte Messung und die Prognose sind nur eine Schätzung: Verbraucht das Haus mehr, ist die Hauptsicherung nicht durch eine Messung geschützt, sonst bekommen die Autos womöglich weniger Strom, als sie könnten. Auch die Hausprognose wird nicht aktualisiert.\n\nWähle in den Einstellungen des gemeinsamen Netzanschlusses für jede Phase einen Sensor in A, W oder kW. Die Reparatur verschwindet von selbst, wenn kein Phasensensor mehr eine Energie meldet."
+    },
+    "blueprint_automation_lost": {
+      "title": "Die Ladeautomation von Cable Juice Planner ({prefix}) ist deaktiviert oder weg",
+      "description": "Die Automatisierung aus dem Ladeblueprint von Cable Juice Planner lief schon, ist jetzt aber deaktiviert oder nicht mehr in automations.yaml. Ohne sie bekommt der Lader keine Aktionen des Plans.\n\nDeaktiviert:\n{automations}\n\nZeigt die Liste –, wurde die Automatisierung gelöscht.\n\nSchalte die Automatisierung wieder ein unter **Einstellungen → Automatisierungen & Szenen**, oder erstelle sie neu aus dem Blueprint. Führe dann den Ladertest aus: schalte **Meine Ladeautomation testen** unter *Einstellungen* auf dem Dashboard ein. Die Reparatur verschwindet von selbst, wenn die Automatisierung wieder läuft."
+    },
+    "charger_status_unknown": {
+      "title": "Der Ladestatus ist ein Wert, den Cable Juice Planner nicht kennt ({prefix})",
+      "description": "Der Status des Laders war mindestens {minutes} Minuten lang einer dieser Werte, die Cable Juice Planner nicht kennt. Sie sind weder bereit, nicht bereit, ladend, abgeschlossen noch Fehler. Gezeigt wird, wann jeder zuletzt gesehen wurde:\n{values}\n\nSolange der Status einen solchen Wert hat, folgt der Plan, als wäre der Lader bereit. Cable Juice Planner startet einen Lader, der nicht lädt, nicht neu, erkennt ein eingestecktes Auto nicht (manuelles und erzwungenes Laden werden nicht zurückgesetzt, das Auto wird nicht geweckt), zählt den kWh-Zähler des Laders nicht für die Simulation des Batteriestands und zählt den Lader in der Lastverteilung als ladend.\n\nIst der Wert ein normaler Status deines Laders, melde ihn mit **Debug-Info exportieren** am Gerät. Sonst prüfe die Integration des Laders. Führe dann den Ladertest aus: schalte **Meine Ladeautomation testen** unter *Einstellungen* auf dem Dashboard ein. Die Reparatur verschwindet von selbst, wenn seit {days} Tagen kein solcher Wert mehr gesehen wurde."
+    },
+    "power_without_unit": {
+      "title": "Leistungssensoren ohne Einheit werden als W gelesen ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) liest diese Leistungssensoren in Watt (W), weil sie keine Einheit haben:\n{entities}\n\nDie Zahl nach ≤ ist der höchste gemessene Wert (ohne Vorzeichen).\n\nIn den letzten {days} Tagen lagen ihre Werte nie über {max}, und einige sind Dezimalzahlen. Sie sehen daher aus wie Kilowatt (kW). Als W gelesen sind sie 1000-mal zu klein, und der Plan rechnet mit viel zu wenig Leistung.\n\nBehebe es am Sensor: gib ihm seine Einheit, z. B. `unit_of_measurement: kW` bei einem Template-Sensor, oder die Einheit, die seine Integration liefert. Sind die Werte wirklich Watt, wähle bei dieser Reparatur **Ignorieren**. Die Reparatur verschwindet von selbst, wenn die Sensoren eine Einheit haben oder ihre Werte zeigen, dass es Watt sind."
+    },
+    "battery_level_fraction": {
+      "title": "Batteriestände, die wie ein Anteil aussehen, nicht wie Prozent ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) liest diese Batteriestände als Prozent:\n{entities}\n\nDie Zahl nach ≤ ist der höchste gemessene Wert (ohne Vorzeichen).\n\nIn den letzten {days} Tagen lagen alle Werte dieser Sensoren zwischen 0 und 1, sie sehen also aus wie ein Anteil (0,85 bedeutet 85 %). Als Prozent gelesen ist 0,85 nur 0,85 %, der Plan rechnet also mit einem Batteriestand, der 100-mal zu niedrig ist.\n\nBehebe es am Sensor: lass ihn 0 bis 100 melden, z. B. durch Multiplizieren mit 100 in einem Template-Sensor, und wähle diesen Sensor in den Einstellungen. Sind die Werte wirklich Prozent und liegen nur unter 1, wähle bei dieser Reparatur **Ignorieren**. Die Reparatur verschwindet von selbst, wenn die Sensoren 0 bis 100 melden oder ihre Werte Prozent zeigen."
+    },
+    "price_unit_scale": {
+      "title": "Preissensoren in einer Untereinheit, pro MWh oder pro Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) liest diese Preissensoren als Preise pro kWh in der Währung, ihre Einheit ist aber eine Untereinheit der Währung (Øre oder Cent), pro MWh oder pro Wh:\n{entities}\n\nDie Preise sind 100-mal zu groß (Untereinheit), 1000-mal zu groß (pro MWh) oder 1000-mal zu klein (pro Wh). Cable Juice Planner nutzt die Preise eines solchen Sensors von Energi Data Service, Energy Price Forecast, Spot Forecast, Elprisprognos, Wattcast, EPEX Spot, GE-Spot und Nord Pool nicht: Stattdessen werden die Preise des nächsten Anbieters oder die gespeicherten Preise verwendet (Energy Price Forecast rechnet einen Preis pro MWh selbst um). Ein Strømligning-Sensor, ein Octopus-Energy-Sensor oder ein Tarifsensor wird so gelesen, wie er ist; für diese sind Plan und Ersparnisberechnung falsch. Beurteilt wird nur die Einheit, nicht die Größe der Preise.\n\nBehebe es an der Quelle: schalte in Energi Data Service die Option **Preise in Cent anzeigen** aus und stelle **Preis wird berechnet in** auf kWh, in den Optionen der Integration, oder wähle einen Sensor, dessen Einheit die Währung pro kWh ist (z. B. kr/kWh). Ist die Einheit wirklich richtig, wähle bei dieser Reparatur **Ignorieren**. Die Reparatur verschwindet von selbst, wenn alle Preissensoren in der Währung pro kWh sind (z. B. kr/kWh).\n\nDer Preissensor von Wattcast muss ct/kWh liefern; jede andere Einheit ist dafür falsch."
+    },
+    "consumption_frozen": {
+      "title": "Hausverbrauchssensor zeigt 6 Stunden lang denselben Wert ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) verwendet den Hausverbrauchssensor {entity} für den Hausverbrauch im Plan. Er zeigt seit {since} den Wert {value}, also mindestens 6 Stunden ohne Änderung.\n\nDer Plan verwendet diesen Sensor für das Haus; ein Sensor, der stehen bleibt, liefert einen falschen Hausverbrauch. Prüfe die Integration oder das Gerät, das den Sensor liefert: Es sendet vielleicht keine Werte mehr. Wenn der Wert wirklich konstant ist, wähle bei dieser Reparatur **Ignorieren**.\n\nDiese Reparatur verschwindet von selbst, sobald der Sensor einen anderen Wert meldet. Ein nicht verfügbarer Sensor lässt die Reparatur, wie sie ist. Die Benachrichtigung des Plans über einen nicht verfügbaren Sensor gilt nur für einen Sensor mit Eintrag im Entitätsregister (zum Beispiel aus einer Integration, in der Oberfläche angelegt oder per YAML mit einer eindeutigen ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Der Hausverbrauch scheint das Ladegerät nicht zu enthalten ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) zieht das Ladegerät dieses Autos vom Hausverbrauchssensor {entity} ab, weil die Einstellung **Hausverbrauch enthält das Ladegerät dieses Autos** eingeschaltet ist. In {hours} Stunden der letzten {days} Tage lag der Hausverbrauch aber unter {share} % dessen, was das Ladegerät allein bezog, ohne Solarstrom und ohne Laden oder Entladen der Hausbatterie. Ein Sensor, der das Ladegerät enthält, kann nie niedriger sein als das Ladegerät, daher hat das Ladegerät wahrscheinlich einen eigenen Zähler. Dann wird das Ladegerät von einem Haus abgezogen, das es nie enthielt: Der Hausverbrauch wird zu niedrig, und der Plan sieht Solarüberschuss und günstige Stunden, die es nicht gibt.\n\nWenn das Ladegerät einen eigenen Zähler hat, schalte **Hausverbrauch enthält das Ladegerät dieses Autos** in den Optionen dieses Autos aus (Seite Hausverbrauch). Wenn der Hausverbrauchssensor das Ladegerät enthalten sollte, prüfe den Sensor. Wenn die Werte so richtig sind, wähle bei dieser Reparatur **Ignorieren**.\n\nDiese Reparatur verschwindet von selbst, wenn die Einstellung ausgeschaltet wird, wenn der Hausverbrauchssensor oder der Leistungssensor des Ladegeräts entfernt wird oder wenn die Stunden der letzten {days} Tage zeigen, dass der Hausverbrauch das Ladegerät enthält."
+    },
+    "site_fuse_exceeded": {
+      "title": "Haus und Autos ziehen mehr als die Hauptsicherung (Lastverteilung)",
+      "description": "In den letzten {days} Tagen lag der stündliche Mittelwert des Stroms auf diesen Phasen mindestens {hours} Stunden lang über dem {factor}-Fachen der Hauptsicherung. Jede Zeile zeigt die Phase, ihre Hauptsicherung → den höchsten stündlichen Mittelwert (Stunden über der Grenze > die Grenze, also die Hauptsicherung mal {factor}):\n{phases}\n\nEine Sicherung dieser Größe kann einen solchen Strom kaum eine Stunde lang tragen. Entweder ist die Hauptsicherung auf der Seite des gemeinsamen Netzanschlusses zu niedrig eingestellt (die Autos bekommen dann weniger Strom, als sie könnten), oder ein Ladegerät, das die Phasensensoren messen, ist als außerhalb eingestellt (*Phasensensoren enthalten das Ladegerät dieses Autos* ausgeschaltet), sodass sein Bezug doppelt gezählt wird, oder ein Phasensensor misst etwas anderes: falsche Phasenreihenfolge, ein Sensor, der nicht die Netzphase ist, oder eine falsche Einheit. Prüfe die Größe der Sicherung und die Phasensensoren. Ist die Sicherung wirklich so groß und stimmen die Werte, wähle bei dieser Reparatur **Ignorieren**.\n\nDie Reparatur verschwindet von selbst, wenn die nächste Prognose sie nicht mehr findet: nach der Korrektur der Sicherung, spätestens wenn diese Stunden aus den letzten {days} Tagen heraus sind."
+    },
+    "charger_not_following": {
+      "title": "Der Lader folgte dem Plan {count} Mal in {days} Tagen nicht ({prefix})",
+      "description": "In den letzten {days} Tagen folgte der Lader dem Plan {count} Mal nicht. Die Reparatur erscheint ab {limit} Mal. Die Neustarts des Laders haben {gave_up} Mal aufgegeben, und der Lader hat {no_rule} Mal ohne Regel geladen. Jedes davon hatte eine eigene Benachrichtigung.\n\nLetzte Ereignisse (Ortszeit):\n{latest}\n\nPrüfe die Integration von Lader und Auto (meldet der Lader Status und Leistung?) sowie andere Apps oder Automatisierungen, die Lader oder Auto steuern: sie können ihn stoppen oder starten. Führe dann den Ladertest aus: schalte **Meine Ladeautomation testen** unter *Einstellungen* auf dem Dashboard ein. Die Reparatur verschwindet von selbst, wenn innerhalb von {days} Tagen weniger als {limit} solche Ereignisse übrig sind."
     }
   }
 }

@@ -56,11 +56,13 @@
         "data": {
           "site_priority": "Priorytet",
           "site_phase_order": "Kolejność faz ładowarki",
+          "charger_in_phase_meter": "Czujniki faz obejmują ładowarkę tego samochodu",
           "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
           "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "charger_in_phase_meter": "Włączone (domyślnie): czujniki prądu faz wspólnego przyłącza sieciowego mierzą też ładowarkę tego samochodu. Wyłącz, jeśli ładowarka ma własny licznik, którego czujniki faz nie obejmują (ale jest za tym samym bezpiecznikiem głównym): jej pobór jest wtedy dodawany do zmierzonego prądu fazy w kontroli przeciążenia i kontroli bezpiecznika głównego, a nie jest odejmowany od zmierzonego prądu przy obliczaniu domu, więc ochrona nigdy nie jest słabsza. Jeśli nie masz pewności, pozwól samochodowi się ładować i obserwuj czujniki faz: jeśli rosną o tyle, ile pobiera, obejmują ją. Wyłączenie jest bezpieczne dla bezpiecznika, ale ładowarka, którą czujniki mierzą, jest wtedy liczona dwa razy: samochód dostaje mniej prądu i może pojawić się naprawa dotycząca bezpiecznika głównego. Bez czujników faz ustawienie nie ma wpływu. Bez odczytu z czujnika mocy ładowarki samochód liczy się z prądem, który otrzymał.",
           "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
@@ -109,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "charger_in_house_meter": "Zużycie domu obejmuje ładowarkę tego samochodu",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "charger_in_house_meter": "Włączone (domyślnie): czujnik zużycia domu mierzy też ładowarkę tego samochodu, więc Cable Juice Planner odejmuje od niego ładowarkę. Wyłącz, jeśli ładowarka ma własny licznik, którego czujnik zużycia domu nie obejmuje, za tym samym przyłączem sieciowym co instalacja słoneczna (nie osobne przyłącze): wtedy ładowarka nie jest odejmowana ani tutaj, ani przez samochody za nim, ani przez BattMind, a samochody za tym (lub o tym samym priorytecie) zamiast tego doliczają jej ładowanie do zużycia domu, jak zrobiłby to jeden licznik. Bez liczby z czujnika mocy ładowarki ładowarka liczy się ze swoją największą mocą. W razie wątpliwości zostaw włączone: naprawa poinformuje, gdy historia pokaże zużycie domu poniżej połowy tego, co pobiera ładowarka.",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
@@ -312,17 +316,17 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
@@ -350,7 +354,7 @@
       },
       "weather": {
         "title": "Pogoda",
-        "description": "Prognoza pogody służy do przewidywania nadwyżki i podgrzewania.",
+        "description": "Prognoza pogody służy do przewidywania nadwyżki (z fotowoltaiką), podgrzewania oraz funkcji Dostosuj efektywność jazdy do temperatury. Stronę można wypełnić także bez fotowoltaiki.",
         "data": {
           "hourly_service_entity_id": "Prognoza godzinowa",
           "daily_service_entity_id": "Prognoza dzienna",
@@ -359,7 +363,7 @@
         "data_description": {
           "hourly_service_entity_id": "Encja prognozy godzinowej",
           "daily_service_entity_id": "Encja prognozy dziennej",
-          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza"
+          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza oraz do temperatury zewnętrznej przejazdów w Analizie"
         }
       },
       "notifications": {
@@ -368,12 +372,28 @@
         "data": {
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
-          "preheating": "Podgrzewanie start/stop"
+          "preheating": "Podgrzewanie start/stop",
+          "departure_readiness": "Samochód niegotowy / podłącz",
+          "notify_charger_offline": "Ładowarka nie odpowiada przed wyjazdem",
+          "notify_cheap_power": "Tani prąd, samochód niepodłączony",
+          "notify_manual_expensive": "Ręczne ładowanie w drogiej godzinie",
+          "notify_monthly_summary": "Podsumowanie miesiąca",
+          "notify_site_limit": "Rozdział mocy ograniczył ładowanie",
+          "notify_battery_full": "Akumulator długo pełny",
+          "notify_charging_loss": "Straty ładowania wzrosły"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
-          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony.",
+          "notify_charger_offline": "Powiadamia raz na wyjazd, gdy stan ładowarki był niedostępny lub nieznany przez 30 minut, a zaplanowano ładowanie przed wyjazdem w ciągu 24 godzin.",
+          "notify_cheap_power": "Powiadamia najwyżej raz dziennie, gdy w ciągu godziny zaplanowano ładowanie po bardzo niskiej cenie lub cenie poniżej 0, a samochód jest w domu, ale nie jest podłączony. Nie dotyczy ładowania potrzebnego do wyjazdu (to obejmuje Samochód niegotowy / podłącz).",
+          "notify_manual_expensive": "Powiadamia najwyżej raz dziennie, gdy ręczne ładowanie jest włączone, a samochód ładuje się w jednej z 4 najdroższych godzin dnia.",
+          "notify_monthly_summary": "Powiadamia raz w miesiącu o naładowanych kWh, koszcie, średniej cenie i oszczędności w porównaniu z codziennym ładowaniem w poprzednim miesiącu. Nie dla miesiąca, którego CJP nie widział od początku, ani bez znanego kosztu.",
+          "notify_site_limit": "Powiadamia, gdy rozdział mocy (bezpiecznik główny lub limit instalacji) przez dwa interwały kontroli i co najmniej 10 minut zatrzymywał lub obniżał ładowanie podłączonego samochodu, każde najwyżej raz dziennie. Nie podczas testu ładowarki.",
+          "notify_battery_full": "Powiadamia, gdy własny poziom akumulatora samochodu wynosi 99 % lub więcej przez 12 godzin (24 godziny, gdy ustawiono pełne ładowanie co X dni lub nie jest to znane), raz na każde pełne naładowanie. Ponownie po 30 dniach, jeśli nadal jest pełny. Wymaga integracji samochodu.",
+          "notify_charging_loss": "Powiadamia najwyżej raz w miesiącu, gdy kWh na 1 % przy 4 kW lub więcej w ostatnich 30 dniach jest co najmniej o 15 % wyższe niż 3–6 miesięcy temu, przy wystarczającej liczbie pomiarów w obu okresach, a także wyższe niż w tych samych miesiącach rok wcześniej, jeśli jest tam wystarczająco pomiarów. Zimno też je zwiększa."
         }
       },
       "advanced": {
@@ -464,10 +484,10 @@
           "fuse_l2": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "margin": "Odejmowany od bezpiecznika.",
-          "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
-          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "voltage": "Gdy czujniki faz mierzą moc (W, kW …) zamiast prądu (A).",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
           "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
         }
       },
@@ -506,7 +526,7 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh, a dla Energy Price Forecast za Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
@@ -592,11 +612,13 @@
         "data": {
           "site_priority": "Priorytet",
           "site_phase_order": "Kolejność faz ładowarki",
+          "charger_in_phase_meter": "Czujniki faz obejmują ładowarkę tego samochodu",
           "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
           "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "charger_in_phase_meter": "Włączone (domyślnie): czujniki prądu faz wspólnego przyłącza sieciowego mierzą też ładowarkę tego samochodu. Wyłącz, jeśli ładowarka ma własny licznik, którego czujniki faz nie obejmują (ale jest za tym samym bezpiecznikiem głównym): jej pobór jest wtedy dodawany do zmierzonego prądu fazy w kontroli przeciążenia i kontroli bezpiecznika głównego, a nie jest odejmowany od zmierzonego prądu przy obliczaniu domu, więc ochrona nigdy nie jest słabsza. Jeśli nie masz pewności, pozwól samochodowi się ładować i obserwuj czujniki faz: jeśli rosną o tyle, ile pobiera, obejmują ją. Wyłączenie jest bezpieczne dla bezpiecznika, ale ładowarka, którą czujniki mierzą, jest wtedy liczona dwa razy: samochód dostaje mniej prądu i może pojawić się naprawa dotycząca bezpiecznika głównego. Bez czujników faz ustawienie nie ma wpływu. Bez odczytu z czujnika mocy ładowarki samochód liczy się z prądem, który otrzymał.",
           "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
@@ -645,11 +667,13 @@
         "data": {
           "power_consumption_entity_id": "Zużycie domu",
           "ignore_consumption_from_entity_ids": "Ignoruj zużycie z",
+          "charger_in_house_meter": "Zużycie domu obejmuje ładowarkę tego samochodu",
           "ignore_cjp_chargers": "Ignoruj ładowarki samochodów o niższym priorytecie"
         },
         "data_description": {
           "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
           "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania",
+          "charger_in_house_meter": "Włączone (domyślnie): czujnik zużycia domu mierzy też ładowarkę tego samochodu, więc Cable Juice Planner odejmuje od niego ładowarkę. Wyłącz, jeśli ładowarka ma własny licznik, którego czujnik zużycia domu nie obejmuje, za tym samym przyłączem sieciowym co instalacja słoneczna (nie osobne przyłącze): wtedy ładowarka nie jest odejmowana ani tutaj, ani przez samochody za nim, ani przez BattMind, a samochody za tym (lub o tym samym priorytecie) zamiast tego doliczają jej ładowanie do zużycia domu, jak zrobiłby to jeden licznik. Bez liczby z czujnika mocy ładowarki ładowarka liczy się ze swoją największą mocą. W razie wątpliwości zostaw włączone: naprawa poinformuje, gdy historia pokaże zużycie domu poniżej połowy tego, co pobiera ładowarka.",
           "ignore_cjp_chargers": "Odejmuje moc ładowania ładowarek Twoich samochodów Cable Juice Planner o niższym priorytecie (wyższy numer) od zużycia domu, także dla samochodów dodanych później. Samochód z priorytetem 1 ma pierwszeństwo do nadwyżki słonecznej, potem 2 itd.: ten samochód wlicza ładowanie samochodów przed sobą jako zużycie, ale nie tych za sobą. Własna ładowarka tego samochodu nie jest wliczana, a ładowarka, która jest też na liście powyżej, jest odejmowana tylko raz. Samochody o tym samym priorytecie nie pomijają się nawzajem. Wyłącz, jeśli czujnik zużycia domu nie obejmuje ładowarek."
         }
       },
@@ -848,17 +872,17 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
@@ -886,7 +910,7 @@
       },
       "weather": {
         "title": "Pogoda",
-        "description": "Prognoza pogody służy do przewidywania nadwyżki i podgrzewania.",
+        "description": "Prognoza pogody służy do przewidywania nadwyżki (z fotowoltaiką), podgrzewania oraz funkcji Dostosuj efektywność jazdy do temperatury. Stronę można wypełnić także bez fotowoltaiki.",
         "data": {
           "hourly_service_entity_id": "Prognoza godzinowa",
           "daily_service_entity_id": "Prognoza dzienna",
@@ -895,7 +919,7 @@
         "data_description": {
           "hourly_service_entity_id": "Encja prognozy godzinowej",
           "daily_service_entity_id": "Encja prognozy dziennej",
-          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza"
+          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza oraz do temperatury zewnętrznej przejazdów w Analizie"
         }
       },
       "notifications": {
@@ -904,12 +928,28 @@
         "data": {
           "notify_list": "Powiadamiaj",
           "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
-          "preheating": "Podgrzewanie start/stop"
+          "preheating": "Podgrzewanie start/stop",
+          "departure_readiness": "Samochód niegotowy / podłącz",
+          "notify_charger_offline": "Ładowarka nie odpowiada przed wyjazdem",
+          "notify_cheap_power": "Tani prąd, samochód niepodłączony",
+          "notify_manual_expensive": "Ręczne ładowanie w drogiej godzinie",
+          "notify_monthly_summary": "Podsumowanie miesiąca",
+          "notify_site_limit": "Rozdział mocy ograniczył ładowanie",
+          "notify_battery_full": "Akumulator długo pełny",
+          "notify_charging_loss": "Straty ładowania wzrosły"
         },
         "data_description": {
           "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
           "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
-          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania",
+          "departure_readiness": "Powiadamia raz na wyjazd, gdy samochód nie będzie gotowy do następnego wyjazdu (w ciągu 24 godzin): za mało godzin ładowania, zapotrzebowanie powyżej limitu ładowania, zbyt niski własny limit ładowania samochodu (już przy podłączeniu, gdy automatyzacja ładowarki go nie ustawia), samochód kończy ładowanie za wcześnie lub ładowanie jest znacznie wolniejsze niż planowano. Także gdy zaplanowane dla niego ładowanie zaczyna się w ciągu godziny, a samochód jest w domu, ale nie jest podłączony.",
+          "notify_charger_offline": "Powiadamia raz na wyjazd, gdy stan ładowarki był niedostępny lub nieznany przez 30 minut, a zaplanowano ładowanie przed wyjazdem w ciągu 24 godzin.",
+          "notify_cheap_power": "Powiadamia najwyżej raz dziennie, gdy w ciągu godziny zaplanowano ładowanie po bardzo niskiej cenie lub cenie poniżej 0, a samochód jest w domu, ale nie jest podłączony. Nie dotyczy ładowania potrzebnego do wyjazdu (to obejmuje Samochód niegotowy / podłącz).",
+          "notify_manual_expensive": "Powiadamia najwyżej raz dziennie, gdy ręczne ładowanie jest włączone, a samochód ładuje się w jednej z 4 najdroższych godzin dnia.",
+          "notify_monthly_summary": "Powiadamia raz w miesiącu o naładowanych kWh, koszcie, średniej cenie i oszczędności w porównaniu z codziennym ładowaniem w poprzednim miesiącu. Nie dla miesiąca, którego CJP nie widział od początku, ani bez znanego kosztu.",
+          "notify_site_limit": "Powiadamia, gdy rozdział mocy (bezpiecznik główny lub limit instalacji) przez dwa interwały kontroli i co najmniej 10 minut zatrzymywał lub obniżał ładowanie podłączonego samochodu, każde najwyżej raz dziennie. Nie podczas testu ładowarki.",
+          "notify_battery_full": "Powiadamia, gdy własny poziom akumulatora samochodu wynosi 99 % lub więcej przez 12 godzin (24 godziny, gdy ustawiono pełne ładowanie co X dni lub nie jest to znane), raz na każde pełne naładowanie. Ponownie po 30 dniach, jeśli nadal jest pełny. Wymaga integracji samochodu.",
+          "notify_charging_loss": "Powiadamia najwyżej raz w miesiącu, gdy kWh na 1 % przy 4 kW lub więcej w ostatnich 30 dniach jest co najmniej o 15 % wyższe niż 3–6 miesięcy temu, przy wystarczającej liczbie pomiarów w obu okresach, a także wyższe niż w tych samych miesiącach rok wcześniej, jeśli jest tam wystarczająco pomiarów. Zimno też je zwiększa."
         }
       },
       "advanced": {
@@ -976,10 +1016,10 @@
           "fuse_l2": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
           "margin": "Odejmowany od bezpiecznika.",
-          "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
-          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
-          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "voltage": "Gdy czujniki faz mierzą moc (W, kW …) zamiast prądu (A).",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A lub mA) lub moc (W, kW, mW, MW lub GW) na fazę całego domu (np. licznik HAN/P1). Czujnika w jednostce energii (Wh, kWh) nie można użyć: nie pokazuje bieżącego prądu. Z wszystkimi trzema zużycie domu jest odejmowane. Bez nich bezpiecznik jest stałym budżetem dla samochodów, a czujnik mocy ładowania każdego samochodu pokazuje, ile on naprawdę pobiera. W obu przypadkach przeciążona faza natychmiast ogranicza ostatni samochód.",
           "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
         }
       },
@@ -1015,7 +1055,7 @@
       "invalid_icon": "Użyj nazwy ikony, np. mdi:ev-station.",
       "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
       "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta.",
-      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
+      "price_unit_subunit": "Ten czujnik podaje cenę w centach lub pensach (albo, w przypadku Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh, a dla Energy Price Forecast za Wh). Wybierz czujnik z ceną za kWh w walucie (np. EUR/kWh). Czujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna.",
       "price_sensor_not_retail": "To nie jest czujnik z ceną detaliczną. Jako cenę zakupu wybierz czujnik Energy Price Forecast z ceną detaliczną (cena hurtowa jest ceną sprzedaży).",
       "price_sensor_not_wholesale": "To jest czujnik z ceną detaliczną. Jako cenę sprzedaży wybierz czujnik Energy Price Forecast z ceną hurtową (cena detaliczna jest wyższa niż to, co daje sprzedaż).",
       "price_sensor_forecast_only": "Ten czujnik nie ma teraz opublikowanych cen na dziś, tylko prognozę. Jeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen) i wybierz czujnik ponownie. W przeciwnym razie spróbuj ponownie, gdy ceny zostaną opublikowane.",
@@ -1065,6 +1105,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Przetestuj moją automatyzację ładowarki"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Wymuszone ładowanie poniżej dziennego poziomu"
       },
@@ -1139,6 +1182,12 @@
       },
       "learn_driving_distance": {
         "name": "Ucz się dystansu jazdy"
+      },
+      "learn_departure_time": {
+        "name": "Ucz się odjazdów i powrotów"
+      },
+      "temperature_efficiency": {
+        "name": "Dostosuj efektywność jazdy do temperatury"
       },
       "learn_soc_charge_power": {
         "name": "Ucz się mocy ładowania według poziomu baterii"
@@ -1360,6 +1409,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Test automatyzacji ładowarki",
+        "state": {
+          "idle": "Bezczynny",
+          "running": "Działa",
+          "done": "Zakończono",
+          "stopped": "Zatrzymano",
+          "failed": "Niepowodzenie"
+        }
+      },
       "current_charging_rule": {
         "name": "Aktywna reguła ładowania"
       },
@@ -1641,9 +1700,16 @@
       "title": "Czujniki Energy Price Forecast używane przez Cable Juice Planner nie mają opublikowanych cen ({prefix})",
       "description": "Cable Juice Planner ({prefix}) używa czujników Energy Price Forecast, które od co najmniej godziny nie mają opublikowanych cen na dziś ani na jutro, tylko prognozę:\n{entities}\n\nBez ceny na dziś minione godziny nie mają ceny, więc brakuje ich w historii ładowania i w historii cen.\n\nJeśli Energy Price Forecast nie publikuje cen dla Twojego rynku (np. Finlandia lub Wielka Brytania), ustaw w nim czujnik Nord Pool lub ENTSO-e jako „Own price source” (dla ceny zakupu wybierz tam też „Own formula” w „Retail price”: oszacowanie nie korzysta z tego źródła cen). W przeciwnym razie ceny są tylko opóźnione.\n\nTa naprawa zniknie sama, gdy czujniki znów będą miały opublikowane ceny."
     },
-    "price_sensor_unit": {
-      "title": "Czujniki cen używane przez Cable Juice Planner podają cenę w złej jednostce ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) używa czujników cen, które podają cenę w podjednostce waluty (np. ct/kWh lub p/kWh) lub, dla Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot i Nord Pool, za MWh lub Wh:\n{entities}\n\nIch ceny są błędne o czynnik 100 lub 1000, więc Cable Juice Planner ich nie używa: planuje na podstawie zapisanych cen. Wybierz w ustawieniach cen czujnik z ceną za kWh w walucie (np. EUR/kWh) albo przywróć jednostkę czujnika.\n\nTa naprawa zniknie sama, gdy czujniki znów będą podawać cenę za kWh.\n\nCzujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna."
+    "voltage_old_default": {
+      "title": "Napięcie sieci dla {name} to stara wartość domyślna {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Ustaw napięcie sieci dla {name} na {default} V",
+            "description": "Napięcie sieci dla **{name}** (w *Ładowarka - parametry* w opcjach) wynosi {voltage} V, czyli wartość domyślną wcześniejszych wersji Cable Juice Planner. Teraz domyślnie jest {default} V, napięcie znamionowe w większości Europy. CJP liczy z nim moc ładowania planu i stopni solarnych oraz przelicza zmierzoną moc ładowarki na ampery dla zarządzania obciążeniem: zbyt wysokie napięcie zaniża prąd samochodu.\n\nWybierz **Zatwierdź**, aby ustawić {default} V (wpis zostanie ponownie wczytany). Jeśli Twoja sieć naprawdę ma {voltage} V, zignoruj tę naprawę. Napięcie możesz zmienić w każdej chwili w opcjach."
+          }
+        }
+      }
     },
     "stromligning_entities": {
       "title": "Czujniki Strømligning potrzebne dla Cable Juice Planner są niedostępne ({prefix})",
@@ -1652,6 +1718,54 @@
     "solcast_entities": {
       "title": "Czujniki prognozy Solcast potrzebne dla Cable Juice Planner są niedostępne ({prefix})",
       "description": "Cable Juice Planner ({prefix}) nie może użyć wszystkich potrzebnych czujników prognozy Solcast, więc dni bez nich są planowane na podstawie prognozy pogody i zapisanej historii produkcji słonecznej. Solcast domyślnie wyłącza czujniki prognozy od dnia 3.\n\nWyłączone w Home Assistant (włącz je w **Ustawienia → Urządzenia i usługi → Encje** z opcją *Pokaż wyłączone encje*):\n{disabled}\n\nNazwane inaczej, niż oczekuje Cable Juice Planner (identyfikator encji musi kończyć się na _today, _tomorrow lub _day_3 …):\n{renamed}\n\nBez szczegółów godzinowych (włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast):\n{no_detail}\n\nTa naprawa zniknie sama po poprawieniu czujników."
+    },
+    "entities_missing": {
+      "title": "Encje Cable Juice Planner ({prefix}) są wyłączone albo ich brakuje",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te encje, ale są wyłączone w Home Assistant albo nie ma ich ani w rejestrze encji, ani wśród stanów (zmieniono nazwę lub usunięto). Plan nie może z nich korzystać.\n\nWyłączone (włącz je w **Ustawienia → Urządzenia i usługi → Encje**, z opcją *Pokaż wyłączone encje*):\n{disabled}\n\nBrakujące (sprawdź identyfikator encji w ustawieniach Cable Juice Planner albo integrację, która ją dostarcza):\n{missing}\n\nPo naprawie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy encje zostaną włączone lub znalezione ponownie."
+    },
+    "entity_units": {
+      "title": "Czujniki z jednostką, której Cable Juice Planner nie potrafi odczytać ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te czujniki w stałej jednostce. Mają inną jednostkę, więc kod odczytuje ich wartości tak, jakby były w dozwolonej jednostce, i wartości są błędne:\n{entities}\n\nDozwolone jednostki: czujniki mocy {power_units} (jednostka z h, np. Wh lub kWh, jest odczytywana jak jednostka bez h; czujnik mocy bez jednostki jest odczytywany jako W); czujniki poziomu baterii %; liczniki kWh tylko w {energy_units}. Dopóki naprawa aktualizacji blueprintu ładowarki jest otwarta, czujnik mocy ładowarki jest poprawnie odczytywany tylko w W lub kW.\n\nZmień jednostkę w integracji dostarczającej czujnik albo wybierz inny czujnik. Następnie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy wszystkie czujniki mają ponownie dozwoloną jednostkę."
+    },
+    "site_phase_units": {
+      "title": "Czujniki faz w jednostce energii (rozdział mocy)",
+      "description": "Te czujniki faz podają energię (np. Wh lub kWh), a nie prąd ani moc:\n{entities}\n\nLicznik energii nie pokazuje, ile prądu płynie w danej chwili przez fazę, więc rozdział mocy nie odczytuje tych czujników. Dopóki nie zostaną poprawione, zużycie domu jest przyjmowane jako ostatni pomiar lub prognoza, a bez obu – jako cały budżet: wtedy samochody nie dostają prądu, dopóki czujniki nie zostaną poprawione. Ostatni pomiar i prognoza to tylko szacunek: jeśli dom zużywa więcej, bezpiecznik główny nie jest chroniony pomiarem, a w przeciwnym razie samochody mogą dostać mniej prądu, niż mogłyby. Prognoza domu również nie jest aktualizowana.\n\nWybierz w ustawieniach wspólnego przyłącza czujnik w A, W lub kW dla każdej fazy. Naprawa znika sama, gdy żaden czujnik fazy nie podaje już energii."
+    },
+    "blueprint_automation_lost": {
+      "title": "Automatyzacja ładowarki Cable Juice Planner ({prefix}) jest wyłączona albo zniknęła",
+      "description": "Automatyzacja utworzona z blueprintu ładowarki Cable Juice Planner działała wcześniej, ale teraz jest wyłączona albo nie ma jej już w automations.yaml. Bez niej ładowarka nie dostaje działań planu.\n\nWyłączone:\n{automations}\n\nJeśli lista pokazuje –, automatyzacja została usunięta.\n\nWłącz automatyzację ponownie w **Ustawienia → Automatyzacje i sceny** albo utwórz ją od nowa z blueprintu. Następnie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy automatyzacja znów działa."
+    },
+    "charger_status_unknown": {
+      "title": "Stan ładowarki ma wartość, której Cable Juice Planner nie zna ({prefix})",
+      "description": "Stan ładowarki przez co najmniej {minutes} minut miał jedną z tych wartości, których Cable Juice Planner nie zna. Nie są ani gotowością, ani brakiem gotowości, ani ładowaniem, ani zakończeniem, ani błędem. Przy każdej podano, kiedy była ostatnio widziana:\n{values}\n\nDopóki stan ma taką wartość, plan działa tak, jakby ładowarka była gotowa. Cable Juice Planner nie uruchamia jednak ponownie ładowarki, która nie ładuje, nie widzi podłączenia samochodu (ładowanie ręczne i wymuszone nie są resetowane, samochód nie zostaje obudzony), nie liczy licznika kWh ładowarki przy symulacji poziomu baterii i traktuje ładowarkę jako ładującą w rozdziale mocy.\n\nJeśli wartość jest normalnym stanem twojej ładowarki, zgłoś ją przyciskiem **Eksportuj informacje debug** na urządzeniu. W przeciwnym razie sprawdź integrację ładowarki. Następnie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy przez {days} dni nie zauważono takiej wartości."
+    },
+    "power_without_unit": {
+      "title": "Czujniki mocy bez jednostki są odczytywane jako W ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te czujniki mocy w watach (W), bo nie mają jednostki:\n{entities}\n\nLiczba po ≤ to najwyższa zaobserwowana wartość (bez znaku).\n\nW ciągu ostatnich dni ({days}) ich wartości nigdy nie przekroczyły {max}, a niektóre są liczbami ułamkowymi, więc wyglądają na kilowaty (kW). Odczytane jako W są 1000 razy za małe, a plan używa zbyt małej mocy.\n\nNapraw to na czujniku: nadaj mu jednostkę, np. `unit_of_measurement: kW` w czujniku szablonowym, albo jednostkę, którą podaje jego integracja. Jeśli wartości są naprawdę w watach, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy czujniki mają jednostkę albo ich wartości pokazują, że są w watach."
+    },
+    "battery_level_fraction": {
+      "title": "Poziomy baterii wyglądające na udział, a nie na procenty ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te poziomy baterii jako procenty:\n{entities}\n\nLiczba po ≤ to najwyższa zaobserwowana wartość (bez znaku).\n\nW ciągu ostatnich dni ({days}) wszystkie wartości tych czujników mieściły się między 0 a 1, więc wyglądają na udział (0,85 oznacza 85 %). Odczytane jako procenty, 0,85 to tylko 0,85 %, więc plan liczy z poziomem baterii 100 razy za niskim.\n\nNapraw to na czujniku: niech podaje wartości od 0 do 100, np. mnożąc przez 100 w czujniku szablonowym, i wybierz ten czujnik w ustawieniach. Jeśli wartości są naprawdę w procentach i tylko leżą poniżej 1, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy czujniki podają wartości od 0 do 100 albo ich wartości pokazują procenty."
+    },
+    "price_unit_scale": {
+      "title": "Czujniki cen w podjednostce, za MWh lub za Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odczytuje te czujniki cen jako ceny za kWh w walucie, ale ich jednostka to podjednostka waluty (øre lub cent), cena za MWh albo cena za Wh:\n{entities}\n\nCeny są 100 razy za duże (podjednostka), 1000 razy za duże (za MWh) albo 1000 razy za małe (za Wh). Cable Juice Planner nie używa cen z takiego czujnika Energi Data Service, Energy Price Forecast, Spot Forecast, Elprisprognos, Wattcast, EPEX Spot, GE-Spot i Nord Pool: zamiast nich używa cen następnego dostawcy lub zapisanych cen (Energy Price Forecast sam przelicza cenę za MWh). Czujnik Strømligning, czujnik Octopus Energy lub czujnik taryfy jest czytany taki, jaki jest, więc dla nich plan i rachunek oszczędności są błędne. Oceniana jest tylko jednostka, nie wielkość cen.\n\nNapraw to u źródła: w Energi Data Service (opcje są tylko po angielsku) wyłącz **Show prices in cent** i ustaw **Price calculated in** na kWh w opcjach integracji, albo wybierz czujnik, którego jednostka to waluta za kWh (np. kr/kWh). Jeśli jednostka jest naprawdę poprawna, wybierz przy tej naprawie **Ignoruj**. Naprawa znika sama, gdy wszystkie czujniki cen są w walucie za kWh (np. kr/kWh).\n\nCzujnik ceny Wattcast musi podawać ct/kWh; każda inna jednostka jest dla niego błędna."
+    },
+    "consumption_frozen": {
+      "title": "Czujnik zużycia domu pokazuje przez 6 godzin tę samą wartość ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) używa czujnika zużycia domu {entity} do zużycia domu w planie. Od {since} pokazuje wartość {value}, czyli co najmniej 6 godzin bez zmiany.\n\nPlan używa tego czujnika dla domu, więc czujnik, który stoi w miejscu, daje błędne zużycie domu. Sprawdź integrację lub urządzenie, które dostarcza czujnik: może przestało wysyłać wartości. Jeśli wartość naprawdę jest stała, wybierz przy tej naprawie **Ignoruj**.\n\nTa naprawa znika sama, gdy czujnik pokaże inną wartość. Niedostępny czujnik zostawia naprawę bez zmian. Powiadomienie planu o niedostępnym czujniku dotyczy tylko czujnika z wpisem w rejestrze encji (na przykład z integracji, utworzonego w interfejsie albo z YAML z unikalnym ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Zużycie domu chyba nie obejmuje ładowarki ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) odejmuje ładowarkę tego samochodu od czujnika zużycia domu {entity}, ponieważ ustawienie **Zużycie domu obejmuje ładowarkę tego samochodu** jest włączone. Jednak przez {hours} godzin w ostatnich {days} dniach zużycie domu było poniżej {share} % tego, co pobierała sama ładowarka, bez energii słonecznej i bez ładowania ani rozładowywania baterii domowej. Czujnik, który obejmuje ładowarkę, nigdy nie może pokazywać mniej niż ładowarka, więc ładowarka ma prawdopodobnie własny licznik. Wtedy ładowarka jest odejmowana od domu, który nigdy jej nie zawierał: zużycie domu jest za niskie, a plan widzi nadwyżkę słoneczną i tanie godziny, których nie ma.\n\nJeśli ładowarka ma własny licznik, wyłącz **Zużycie domu obejmuje ładowarkę tego samochodu** w opcjach tego samochodu (strona Zużycie domu). Jeśli czujnik zużycia domu powinien obejmować ładowarkę, sprawdź czujnik. Jeśli wartości są prawidłowe, wybierz przy tej naprawie **Ignoruj**.\n\nTa naprawa znika sama, gdy ustawienie zostanie wyłączone, gdy czujnik zużycia domu lub czujnik mocy ładowarki zostanie usunięty, albo gdy godziny z ostatnich {days} dni pokażą, że zużycie domu obejmuje ładowarkę."
+    },
+    "site_fuse_exceeded": {
+      "title": "Dom i samochody pobierają więcej niż bezpiecznik główny (rozdział mocy)",
+      "description": "W ciągu ostatnich dni ({days}) godzinowa średnia prądu na tych fazach była przez co najmniej {hours} h powyżej bezpiecznika głównego pomnożonego przez {factor}. Każda linia pokazuje fazę, jej bezpiecznik główny → najwyższą godzinową średnią prądu (godziny powyżej limitu > limit, czyli bezpiecznik główny razy {factor}):\n{phases}\n\nBezpiecznik tej wielkości raczej nie wytrzymałby takiego prądu przez godzinę. Więc albo bezpiecznik główny we wspólnym przyłączu jest ustawiony za nisko (samochody dostają wtedy mniej prądu, niż mogłyby), albo ładowarka, którą czujniki faz mierzą, jest ustawiona jako poza nimi (*Czujniki faz obejmują ładowarkę tego samochodu* wyłączone), więc jej pobór jest liczony dwa razy, albo czujnik fazy mierzy coś innego: fazy w złej kolejności, czujnik, który nie jest fazą sieci, albo zła jednostka. Sprawdź wielkość bezpiecznika i czujniki faz. Jeśli bezpiecznik jest naprawdę tak duży, a wartości są poprawne, wybierz przy tej naprawie **Ignoruj**.\n\nNaprawa znika sama, gdy kolejna prognoza jej już nie znajduje: po poprawieniu bezpiecznika, najpóźniej gdy te godziny wypadną z ostatnich dni ({days})."
+    },
+    "charger_not_following": {
+      "title": "Ładowarka nie stosowała się do planu {count} razy w ciągu {days} dni ({prefix})",
+      "description": "W ciągu ostatnich {days} dni ładowarka nie stosowała się do planu {count} razy. Ta naprawa pojawia się od {limit} razy. Próby ponownego uruchomienia ładowarki zakończyły się rezygnacją {gave_up} razy, a ładowarka ładowała bez reguły {no_rule} razy. Każde z tych zdarzeń miało własne powiadomienie.\n\nOstatnie zdarzenia (czas lokalny):\n{latest}\n\nSprawdź integrację ładowarki i samochodu (czy ładowarka raportuje stan i moc?) oraz inne aplikacje lub automatyzacje sterujące ładowarką albo samochodem: mogą ją zatrzymywać lub uruchamiać. Następnie uruchom test ładowarki: włącz **Przetestuj moją automatyzację ładowarki** w *Ustawieniach* na pulpicie. Naprawa znika sama, gdy w ciągu {days} dni zostanie mniej niż {limit} takich zdarzeń."
     }
   }
 }

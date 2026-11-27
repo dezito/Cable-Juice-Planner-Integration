@@ -72,7 +72,8 @@ def test_the_rows_of_another_period_of_a_later_provider_are_not_mixed_into_an_ho
     }
     _combine(combined, attributes)
     for kind in (combined.get_buy_real_prices(), combined.get_sell_real_prices()):
-        assert {start for start in kind if start.date() == TODAY and start.hour == 12} == {_at(TODAY, 12)}  # the quarters are not Energy Price Forecast's
+        noon = {start: price for start, price in kind.items() if start.date() == TODAY and start.hour == 12}
+        assert set(noon) == {_at(TODAY, 12, minute) for minute in (0, 15, 30, 45)} and len(set(noon.values())) == 1  # Nord Pool's hourly price, repeated: not Energy Price Forecast's quarters
         assert all(price < 5 for start, price in kind.items() if start.date() in (TODAY, TOMORROW))  # nothing of the 9.0 and 8.0 of the other provider
     assert combined.price_source(_at(DAY_3, 12, 15)).startswith("energypriceforecast")  # the days after are its forecast, quarters and all
 

@@ -52,9 +52,12 @@ Charging-loss and battery-level power learning update hourly. The comparisons ne
 which the recorder has for its `purge_keep_days` – the longer, the more there is from the first day (e.g. 30
 days). After that CJP saves the prices every hour itself.
 
+The page is organised in groups, each with its own heading: **Results and plan**, **Driving and learning**,
+**Forecasts** and **Car battery**, and last the **History**.
+
 Without a car integration, *Driving and temperature*, *Ready at departure*, *Learned driving distance*,
-*Battery capacity*, *Charging loss per power* and *Charging power by battery level* are left out, and *Forecast
-accuracy* shows only the house consumption.
+*Battery capacity*, *Charging loss per power* and *Charging power by battery level* are left out (the **Car battery**
+group with them), and *Forecast accuracy* shows only the house consumption.
 
 ### Economy
 
@@ -82,15 +85,15 @@ attributes.
 
 </details>
 
-### Driving and temperature
+### Planned against actually charged
 
-km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
-temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C.
+The kWh planned the evening before against what was charged, and how much was charged outside the plan
+(manual, forced charging …). Saved every evening from the first start.
 
 <details>
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
+<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
 
 </details>
 
@@ -103,6 +106,20 @@ the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 depa
 <summary>Screenshot</summary>
 
 <p align="center"><img src="../images/ready-at-departure.png" alt="Battery level at each work plan departure" width="760"></p>
+
+</details>
+
+### Driving and temperature
+
+km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
+temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C. Below it: with
+[*Adjust driving efficiency to temperature*](temperature-efficiency.md) on, the km/kWh the plan uses for each planned
+drive at its forecast temperature next to the learned one, or why the learned one is used.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
 
 </details>
 
@@ -129,17 +146,22 @@ The first distance comes the evening after the first start.
 
 </details>
 
-### Planned against actually charged
+### Learned departure and homecoming
 
-The kWh planned the evening before against what was charged, and how much was charged outside the plan
-(manual, forced charging …). Saved every evening from the first start.
+Per weekday (Monday to Sunday): the departure and homecoming entered in the work plan against what CJP has
+[learned](learn-departure.md) from when the car is unplugged from and plugged in to the charger.
 
-<details>
-<summary>Screenshot</summary>
+| Column | Meaning |
+|---|---|
+| Workday | ✅ when the weekday is a workday in the work plan (only workdays are learned) |
+| Entered | departure–homecoming in the settings |
+| Learned | the suggestion: the 25th percentile of the departures rounded down and the 75th percentile of the homecomings rounded up, both to 15 minutes, from the last 8 weeks |
+| Used by the plan | with *Learn departure and homecoming* on and at least 3 days: the earlier departure and the later homecoming of *Entered* and *Learned*; otherwise *Entered* |
+| Days | days the times are learned from. ⏳ = fewer than 3, so the learned times are not used yet |
 
-<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
-
-</details>
+Above the table it says whether *Learn departure and homecoming* is on. The section is empty until the car has been
+unplugged between 04:00 and 12:00 and plugged in again the same day on a workday; CJP records the connections from the
+start and keeps them as far back as its charging history reaches. The switch is under *Settings → Advanced*.
 
 ### Price forecast
 
@@ -226,7 +248,8 @@ from the first start: the house consumption after the first whole day, km/kWh af
 ### Battery capacity
 
 kWh from the charger per 1 % per month and power group, from the [charging loss](charging-loss.md)
-measurements. Rising over the years = less capacity. Compare the same month year by year – winter is higher.
+measurements. Falling over the years = less capacity (fewer kWh fill 1 %) or a lower charging loss; rising = a higher
+charging loss. Compare the same month year by year – winter is higher.
 
 <details>
 <summary>Screenshot</summary>
@@ -257,6 +280,15 @@ appears only when at least 3 separate sessions show a drop of at least 10% from 
 session. This comparison helps separate vehicle taper from charger, solar, or site limits, but cannot rule out
 changes in those external limits. Unstable data, unconfirmed phases, and bands without enough evidence do not
 change the plan's existing capacity assumption.
+
+The line above the table says where the learning stands, *learning, no limit yet* or *at least one limit is learned*,
+followed by the most slower sessions found in one band so far, for example `2 / 3` (3 are needed; with a limit already
+learned the count can be 3 or more). Without any usable measurement the table says so instead. The table's *Typical
+power* column and the light points in the graph show what the car typically drew in each band (the median of its stable
+measurements, per phase count, so a long session with several measurements in one band weighs more), also where a limit is
+learned, so the section is not empty while it learns. For a band that takes its start value from the statistics (📊) these
+figures come from the hourly statistics. The points are for reading only: the plan uses a band's *Learned limit* and
+nothing else. A learned limit is a point in the graph as well as a line, so a single learned band is visible.
 
 With *Learn charge power by battery level* enabled, the planner applies the learned limit to price intervals that cross a
 trained band, while keeping the existing charger and site limits. The switch is off by default, and this
@@ -660,7 +692,9 @@ not stored, so they are not offered. The home battery is kept as recorded (its e
 replaced nor valued) and no whole-house result is claimed.
 
 **From the recorder's statistics, like the other what-ifs.** The daily economy update reads the long-term
-statistics of the solar production, the house consumption (the EV included), the charger power and, for providers
+statistics of the solar production, the house consumption (the EV included; a charger on its own meter, *House
+consumption includes this car's charger* off, is added when the hours are stored; an hour already stored keeps its
+value until it is read again; the chargers of other cars on their own meter are not added here), the charger power and, for providers
 that have one sensor for it (Energi Data Service), the sell price, and keeps as many days of them as the history is kept (months set in the setup plus one month, at least 400). With those the
 comparison is calculated **hour by hour for every hour with a known buy and sell price**, for the time no
 recorded session covers (the sell price of an hour comes from CJP's own stored prices or from the recorder's sell

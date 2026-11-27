@@ -1,0 +1,84 @@
+# Code map
+
+For contributors and coding agents. Linked from `AGENTS.md`.
+
+```text
+custom_components/cable_juice_planner/  The HA integration (HACS payload)
+├── __init__.py                          Integration setup and platform forwarding
+├── coordinator/                         Shared data, refresh, events, and lifecycle
+├── config_flow.py / flow/               Setup/options flow, pages, and schemas
+├── const/                               Configuration, settings, and site constants
+├── engine/                              Charging plans, calculations, and current actions
+│   ├── engine.py / planning.py          Calculation orchestration
+│   ├── planner/                         Charge plan and price-level decisions
+│   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
+│   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
+│   │   ├── readiness.py                 Departure notifications: not ready (the shortfall scheduled_planner records; while charging the car's limit, a car that stops, slow charging; the car's limit at plug-in when the automation has no limit step: `car_limit_steps` from `coordinator/status_states.py`), plug in; sent once per departure (runtime state)
+│   │   ├── notices.py                   More notifications: charger offline before a departure, cheap power unplugged, manual charging in an expensive hour, monthly summary (from `economy_update`), load balancing (from `_apply_site_limit`), battery full, charging loss rise; sent once per event (`sent_notices`, runtime state)
+│   │   └── charger_test.py              Test of the user's charger automation: steps, held current, markdown result
+│   │                                    (the runner is `coordinator/charger_test.py`; the seams are in `actions.py`, `schedule.py`, `events.py`)
+│   ├── energy/                          Prices, solar, forecasts, and power inputs (`meter_check.py`: does the house sensor include the charger?)
+│   ├── history/                         Charging sessions, consumption, cost, and efficiency
+│   ├── analysis/                        Economy/forecast analysis and published results
+│   ├── economy.py                       Monthly charging economy comparison
+│   ├── pricing.py / state.py            Price helpers (incl. `sell_value()`) and engine state
+│   ├── debug.py                         Engine debug information
+│   ├── site.py / battery.py / loss.py   Site, battery, and charging-loss models
+│   ├── workplan.py                      Learned departure and homecoming per weekday, and the times the plan uses
+│   ├── temperature_efficiency.py        km/kWh line against the outdoor temperature, moving the learned drives to the forecast
+│   │                                    (pure functions; the engine side and the planner's `*_for()` helpers are in `battery.py`)
+│   └── public_charging.py / distance.py Public sessions and driving-distance calculations
+├── prices/                              Price providers; CombinedPriceProvider is the only entry point
+│   ├── energypriceforecast.py           Energy Price Forecast: buy = its retail sensor, sell = its wholesale sensor
+│   ├── intervals.py                     The common price interval of the providers (hourly, 15 minutes) and the slots on it
+│   ├── spotprices.py                    Spot Forecast, Elprisprognos, Wattcast: wholesale prices, buy = spot × (1 + VAT) + surcharge
+│   ├── spot_rows.py                     Pure row parsers of the three (the same file in both repositories)
+│   ├── publishedprices.py               EPEX Spot, GE-Spot, Octopus Energy, Nord Pool: the user's own published prices, no forecast
+│   ├── published_rows.py                Pure row parsers of the first three (the same file in both repositories)
+│   └── chart_rows.py                    The prices of the plan per price period for the price chart of every provider (the same file in both repositories)
+├── management/                          Storage, backups, dashboard, and blueprint setup
+│   └── voltage_issue.py                 Fixable repair for a grid voltage still at the old 240 V default (sets 230 V)
+├── utils/                               Shared utilities and datetime/time platform implementations
+│   └── solar_forecast.py                Forecast.Solar / Helios Forecast energy platform -> hourly solar rows (shared with BattMind)
+├── sensor.py / number.py / switch.py    Main HA entity platforms
+├── select.py / button.py / binary_sensor.py  Other HA entity platforms
+├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base
+├── repairs.py / site.py                 Repairs and site-related entities
+├── translations/ texts/                 HA strings and user-facing descriptions
+├── dashboard/ blueprints/               Bundled dashboard and automation blueprint
+│   └── dashboard/prices/                One price chart per price integration (the key of PROVIDER_CLASSES)
+└── manifest.json                        HA integration metadata
+
+tests/                                   Pytest suite
+├── conftest.py                          Shared fixtures and simulated HA entities
+├── test_engine.py / test_economy.py     Engine and cost/economy behavior
+├── test_site.py / test_charging_loss_model.py  Site and charging-loss calculations
+├── test_analysis.py / test_config_flow.py      Analysis and setup/options
+├── test_init.py / test_backup.py / test_debug_export.py  Lifecycle and persistence
+├── test_health_checks.py / test_value_checks.py / test_value_checks_recorder.py / test_site_fuse_check.py  Repairs: health checks, scale of values, main fuse
+├── test_voltage_issue.py                The old-default voltage repair and its fix flow
+├── test_charger_meter.py                A charger on its own meter (house consumption) and the repair for a wrong setting
+├── test_workplan_learning.py            Learned departure and homecoming: samples, percentiles, the times the plan uses
+├── test_temperature_efficiency.py       The plan's km/kWh at the forecast temperature: the line, the forecast, the plan, the callers
+├── test_charger_test.py                 Charger automation test: judging, voltage, runner parts, charge limit step
+├── test_dashboard.py                    Dashboard generation and content
+├── test_solar_forecast.py               utils/solar_forecast.py (the same file as in BattMind)
+├── test_solar_forecast_sources.py       The solar forecast of the snapshot: Solcast, Forecast.Solar, Helios Forecast, debug replay
+├── test_weather_forecast_fetch.py       The weather forecast of the snapshot: also without solar with a weather entity, never without one
+├── test_forecast_timezone.py            Times with an offset in local time: the weather forecast in UTC, the car's last update
+├── test_departure_readiness.py          Departure notifications: the planner's shortfall, once per departure and across a restart, plug in, the checks while charging and at plug-in, the virtual EV's level from the charger meter
+├── test_notices.py                      More notifications: each fires once, not after a restart, not from missing or stale data, not with its switch off
+├── test_blueprint_control.py / test_blueprint_install.py  Charger actions and installation
+├── fixtures/                            Legacy PyScript config for the import tests
+└── debug_replay.py                      Debug/replay helper
+
+docs/                                    User documentation and behavior details
+docs/development/                        Contributor and agent reference (this folder)
+.github/workflows/validate.yml           CI: hassfest and HACS validation
+.github/workflows/release.yml            Attaches cable_juice_planner.zip to published releases
+.github/workflows/release-notes.yml      Draft release with notes written by Claude
+pytest.ini / requirements_test.txt       Pytest configuration and pinned test deps
+```
+
+Use this as a map, not an exhaustive inventory; check the current files before
+editing.

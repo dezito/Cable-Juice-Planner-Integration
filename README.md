@@ -2,83 +2,40 @@
 
 # 🚗Cable Juice Planner🔋🌞📅 for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
-[![GitHub Release](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-Integration)](https://github.com/dezito/Cable-Juice-Planner-Integration/releases)
-[![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-Integration)](LICENSE)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/dezito)
+[![Version](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-Integration?style=flat-square&label=version&color=00B894)](https://github.com/dezito/Cable-Juice-Planner-Integration/releases)
+[![Home Assistant 2025.12+](https://img.shields.io/badge/Home%20Assistant-2025.12%2B-18BCF2?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io)
+[![Validate](https://img.shields.io/github/actions/workflow/status/dezito/Cable-Juice-Planner-Integration/validate.yml?branch=main&style=flat-square&label=validate)](https://github.com/dezito/Cable-Juice-Planner-Integration/actions/workflows/validate.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/dezito/Cable-Juice-Planner-Integration/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/dezito/Cable-Juice-Planner-Integration/actions/workflows/tests.yml)
+[![Last commit](https://img.shields.io/github/last-commit/dezito/Cable-Juice-Planner-Integration?style=flat-square)](https://github.com/dezito/Cable-Juice-Planner-Integration/commits)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Default-41BDF5?style=flat-square)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
+[![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-Integration?style=flat-square)](LICENSE)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/dezito)
 
-Plans EV charging based on a work plan or the cheapest times over a week.
-The plan uses electricity prices, solar surplus, home battery and the car's actual consumption.
-
-## How Cable Juice Planner compares with other smart chargers
-
-Smart charging can mean different things: a Home Assistant integration, a charger app that schedules a session, or a bundled electricity tariff that automatically controls a compatible car or charger.
-
-CJP plans charging in Home Assistant. An automation, such as the included blueprint, applies the plan to your charger.
-
-The examples below compare published approaches, not prices or performance in a controlled test. Availability, supported hardware and tariffs vary by country and can change.
-
-Two key advantages of CJP are its potential to save more by planning across the whole week and its support for a lower average battery state of charge during everyday driving.
-
-For a typical driver on variable electricity prices, CJP offers substantial savings potential compared with charging to the maximum recommended level every day.<br><br>CJP can wait for cheaper hours across the week, account for forecast solar surplus and avoid buying energy before it is needed.
-
-This is not a guarantee.<br><br>Actual savings depend on prices, solar production and driving.
-
-Its configurable daily reserve can also avoid routinely keeping the battery at a high state of charge, which may be gentler on battery health. Battery-life effects depend on battery chemistry and the vehicle.<br><br>See the scenarios below and [Daily reserve, cheaper power and battery health](#daily-reserve-cheaper-power-and-battery-health).
-
-Compare the projects and provider offerings by scenario. The table describes features from CJP's documentation and the linked projects' or providers' published descriptions.
-
-**Charging-window assumption for the comparison:** For EV Smart Charging, ha-evcc and public/provider solutions, unless their documentation explicitly states otherwise, assume the available cheap-charging window is only from arriving home today until departure the next day. They are not assumed to shift charging into cheaper hours on earlier days.
-
-| Scenario | Cable Juice Planner | [EV Smart Charging](https://github.com/jonasbkarlsson/ev_smart_charging) | [ha-evcc](https://github.com/marq24/ha-evcc) | Public/provider options |
-| --- | --- | --- | --- | --- |
-| Potential to save on charging | Plans across the week and can use forecast solar surplus.<br>Actual savings depend on prices and usage. | Selects low-price intervals within the assumed window, ending at departure the next day.<br>Actual savings depend on prices and usage. | Solar modes can prioritize solar charging.<br>No direct price-savings comparison is implied. | Octopus schedules for cheaper energy within the assumed window, ending at departure the next day.<br>Other offers combine tariffs, apps or scheduled charging.<br>Actual savings depend on plan and usage. |
-| Maximizing battery longevity | Daily reserve supports a lower average SOC, which research links to slower battery aging. | Defaults to a 100% target if no target-SOC entity is set.<br><br>Prolonged high SOC can accelerate aging. | evcc plans can be set to a high target SOC.<br><br>Prolonged high SOC can accelerate aging. | If the service charges to a high target SOC.<br><br>Prolonged high SOC can accelerate aging. |
-| Cheapest hours across the week | Selects the week's cheapest eligible hours, not just the hours before the next departure. | No multi-day look-ahead documented. | No multi-day look-ahead documented. | No multi-day price look-ahead documented. |
-| Routine charging | Daily reserve, weekly cheap-hour top-up. | Cheap 15/60-minute slots before the next-day departure. | evcc modes: Solar, Min+Solar, Fast. | [Octopus](https://octopus.energy/smart/intelligent-octopus-go/): schedules compatible EV/charger.<br>[OVO](https://www.ovoenergy.com/electric-cars/charge-anytime): schedules within set times.<br>Comparison assumes departure the next day. |
-| Planned trip | Add departure date and time, departure SOC or required distance. | No trip-specific inputs documented.<br>Supports a charge-completion time and minimum SOC.<br>Comparison assumes departure the next day. | Can create or adjust charging plans via HA services.<br>No trip-specific inputs documented. | — |
-| Unexpected long trip | A low daily reserve may not cover it.<br>A higher reserve keeps more charge available. | A higher target SOC keeps more charge available.<br>Defaults to 100% if no target-SOC entity is provided. | A higher target can be set in the evcc charging plan. | A higher charge target, where configurable, keeps more charge available. |
-| Solar and home battery | Uses solar surplus and forecasts it when planning ahead.<br>Can account for a home battery. | Price-based interval selection. | evcc Solar/Min+Solar modes and battery settings. | Looad advertises Smart Charging in its [app](https://looad.dk/pages/vaelg-din-ladelosning). |
-| Convenience after setup | Once configured, plans routine charging and future trips automatically. | Automatic charging after price, vehicle/charger and schedule configuration. | Requires a separate evcc installation as well as the HA integration. | Provider apps/services offer managed charging, subject to device and tariff compatibility. |
-| Control and offering | You decide what charging actions to take and adapt the automation to your own setup. | Direct charger or EV-integration control. | Requires a separate evcc instance. | [OK](https://www.ok.dk/privat/produkter/appen/viden/hjemmeladning-med-ok-appen): choose session start/end.<br>[Clever](https://clever.dk/ladeloesninger/): home charging, subscriptions, electricity and public network.<br>[Looad](https://looad.dk/pages/vaelg-din-ladelosning): charger, electricity and app. |
-
-### “Daily charging estimate” section in the Home Assistant CJP dashboard overview
-
-The **Daily charging estimate** is a comparison, not the planner that controls CJP's charging actions. It estimates a daily-charging alternative by using forecast solar from the preceding day and then the cheapest eligible grid-price hours between the car coming home and its next charging deadline. The economy comparison also reports a conventional daily-charging baseline: the same energy in the cheapest hours before departure, without shifting the charge to an earlier, cheaper window or counting solar.
-
-### Daily reserve, cheaper power and battery health
-
-CJP does not assume that the car must always be fully charged, or that the amount needed is the same every day. The daily reserve is configurable with `number.cjp_<prefix>_min_daily_battery_level` (for example, `number.cjp_tesla_min_daily_battery_level`). It represents the battery level you want available when you get home. The plan adds the energy needed for your typical daily distance or the distances in your work plan and trips.
-
-This is a deliberate trade-off compared with charging to the max recommended level every day. CJP prioritizes the energy you expect to need, but can use sufficiently cheap hours to charge further toward the recommended limit. When prices are high, it can leave that extra capacity unfilled. When prices are very low, it can take the opportunity to save more.
-
-For battery health, regular smaller top-ups can keep the battery in a narrower state-of-charge (SOC) range and reduce depth of discharge, rather than repeatedly cycling through a wider range or leaving the car at a high SOC for long periods. For example, daily use around 30–60% SOC is generally a gentler pattern than repeatedly using 60–90%, though the exact effect depends on battery chemistry, temperature, the battery-management system and the vehicle. Laboratory findings support lower depth of discharge and avoiding prolonged high SOC, but their benefit does not translate identically to every EV ([Recurrent](https://www.recurrentauto.com/research/one-simple-trick), [Acterra](https://acterra.org/electric-vehicles-battery/), [WiTricity](https://www.witricity.com/blogs/how-you-charge.php)). CJP's configurable daily reserve supports this charging pattern while still letting you charge higher when needed or when power is very cheap. Follow the vehicle maker's guidance, especially for LFP batteries and trips requiring a higher charge.
-
-### CJP's trade-offs
-
-| ✅ Advantages | ⚠️ Disadvantages |
-| --- | --- |
-| Plans workdays, trips and preheating.<br>Automates routine charging and can find cheaper hours earlier in the week. | More settings and reliable price, charger and battery data are needed. |
-| Combines prices, solar, home battery, driving distance and measured charging loss. | Charger control needs your automation.<br>The included blueprint helps. |
-| Daily reserve avoids charging to a high level every day.<br>Very cheap hours can fill toward the recommended limit. | An unexpected long trip may require public charging if only the daily reserve remains. |
-| Lower average SOC may help battery longevity.<br>CJP also includes a dashboard, history and cost comparisons. | Built-in price providers are Energi Data Service, Strømligning, Energy Price Forecast and the spot forecast integrations Spot Forecast, Elprisprognos and Wattcast, and EPEX Spot, GE-Spot, Octopus Energy and Nord Pool for your own published prices (outside Denmark).<br>Other sources may need extra setup. |
-| Works with supported HA charger and car integrations through your own automation. | More rules and forecasts mean more setup and complexity than a simple price scheduler. |
-
----
-
-> [!NOTE]
-> This is the **integration version** of Cable Juice Planner, installed via HACS. It replaces the
-> [PyScript version](https://github.com/dezito/Cable-Juice-Planner) and can import its
-> configuration and databases. See [Switching from the PyScript version](docs/migration.md).
-
-> [!IMPORTANT]
-> The integration **sends no commands** to the charger or the car. The plan is exposed as
-> [action entities](docs/charger-control.md#the-action-entities), and you control the charger yourself with an
-> automation. A [blueprint](docs/charger-control.md#the-blueprint) with fail-safe is included for this.
+**Charge your EV in the cheapest hours of the whole week – and only as much as you need.**
+Cable Juice Planner (CJP) plans the charging from electricity prices, solar surplus, your home battery and the
+car's measured consumption.
 
 <p align="center">
   <a href="https://sloth.nu/cable-juice-planner.mp4" target="_blank"><img src="images/dashboard-demo.gif" alt="The Cable Juice Planner dashboard in use: battery and charging plan, electricity prices, settings and analysis" width="100%"></a>
 </p>
+
+- **Cheapest hours across the week, not just tonight.** CJP can wait for cheaper hours later in the week and avoid buying energy before it is needed.
+- **A daily reserve instead of a full battery every day.** You set the level you want when you get home, and CJP adds what your driving needs. See [Daily reserve, cheaper power and battery health](docs/comparison.md#daily-reserve-cheaper-power-and-battery-health).
+- **Work plan, trips and preheating.** Set km, departure and arrival per weekday, or a one-off trip, and the analysis shows whether the car was ready at each work plan departure.
+- **Fits any charger and car integration.** The blueprint lets you map start/stop, charging current and charge limit to the actions your own integrations provide, so you can set up the control yourself. See [Works with any charger and car](#works-with-any-charger-and-car).
+- **Solar, home battery and charging loss in one plan.** The plan uses the surplus now and the forecast ahead, and, if you turn it on, the loss CJP has measured on your charger.
+- **Shows the cost against daily charging.** The analysis compares what you paid with daily charging. Actual savings depend on prices, solar production and driving, so this is not a guarantee.
+
+Want to see how CJP compares with EV Smart Charging, ha-evcc and provider solutions? See [How CJP compares](docs/comparison.md).
+
+[![Open Cable Juice Planner in the Marketplace in your Home Assistant.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
+
+**How it works:** prices, solar and car → **plan** → [charger action entities](#how-to-control-the-charger-and-the-car) → the included **blueprint** → your charger and car.
+CJP does not send commands to the charger or the car itself: it publishes what should happen, and your automation
+applies it. The [blueprint](docs/charger-control.md#the-blueprint) with a fail-safe does that for you.
+
+> [!NOTE]
+> Coming from the [PyScript version](https://github.com/dezito/Cable-Juice-Planner)? Keep it running while the integration is added, so its helpers and sensors can be copied. See [Switching from the PyScript version](docs/migration.md).
 
 📖 **[Documentation](docs/README.md)** – [getting started](docs/getting-started.md), [how CJP plans](docs/how-it-works.md),
 every charging rule explained with examples, [charger control](docs/charger-control.md) and [FAQ](docs/faq-troubleshooting.md).
@@ -87,146 +44,74 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 
 ## Charging rules
 
-- **[☀️ Solar surplus charging](docs/rules/solar.md)**
-  - The car is charged with the solar panels' surplus production. It can use the whole hour's surplus, even if
-    charging only starts later in the hour.
-  - Can also be set to X minutes back. With e.g. 15 min the hour is split into four
-    (13:00, 13:15, 13:30 and 13:45), and the surplus is used in those intervals.
-- **[🏢 Work Plan charging](docs/rules/workplan.md)**
-  - Set the number of kilometres, departure, arrival and preheating per workday. The integration finds the
-    cheapest times to charge and preheats the car for departure, if selected.
-  - When the car is away on a workday and hasn't come home yet, only the way back (half the distance) is
-    left for that day.
-  - The km per weekday can be [learned](docs/learn-distance.md) from the odometer.
-- **[📅 Optimal weekly charging (no Work Plan)](docs/rules/weekly.md)**
-  - Set how many kilometres you typically drive per day. Every day, enough is always charged for that
-    distance plus the daily minimum, in the day's cheapest hours. The rest up to the **EV max
-    recommended charging limit** (e.g. 90 %) is only charged in the week's cheapest hours (the cheapest 30 %), and
-    only if the next 24 hours aren't clearly cheaper.
-- **[🧳 Trip](docs/rules/trip.md):** charge to a percentage or to a number of km before a departure, optionally with preheating
-- **[🔌 Manual charging](docs/rules/manual-forced.md)** (e.g. guests), optionally on solar surplus only
-- **[🪫 Forced charging below the daily battery level](docs/rules/manual-forced.md#-forced-charging-below-the-daily-battery-level)** (up to e.g. 30 %), but not in the most expensive hours
-- **[💸 Cheap and very cheap power](docs/rules/cheap-power.md):** charge higher (e.g. 70 % / 90 %) when the power is cheap or extra cheap –
-  together with Optimal weekly charging, or on its own with **Charge on cheap power**
-- **[💯 Full charge every X days](docs/rules/full-charge.md):** for LFP batteries that need a periodic 100% charge for battery-management-system calibration, following the car maker's guidance. CJP targets 100%. If charging stops at 99% and remains inactive for 30 minutes, CJP counts it as complete and stops retrying the final percentage.
+- **[☀️ Solar surplus charging](docs/rules/solar.md):** charge with the solar panels' surplus
+- **[🏢 Work Plan charging](docs/rules/workplan.md):** km, departure, arrival and preheating per workday, in the cheapest hours
+- **[📅 Optimal weekly charging (no Work Plan)](docs/rules/weekly.md):** the daily need in the day's cheapest hours, the rest in the week's cheapest
+- **[🧳 Trip](docs/rules/trip.md):** charge to a percentage or a number of km before a departure
+- **[🔌 Manual charging](docs/rules/manual-forced.md)** and **[🪫 forced charging below the daily battery level](docs/rules/manual-forced.md#-forced-charging-below-the-daily-battery-level)**
+- **[💸 Cheap and very cheap power](docs/rules/cheap-power.md):** charge higher when the power is cheap
+- **[💯 Full charge every X days](docs/rules/full-charge.md):** for LFP batteries that need a periodic 100 % charge
 
 > [!NOTE]
 > If all charging rules are turned off, Cable Juice Planner charges like a regular charger at max. current.
 
 ## Features
 
-- **EV integration or virtual EV:** without a car in Home Assistant you enter the
-  battery level yourself when the cable is plugged in. For a car integration that updates the battery level
-  slowly, it can be [simulated from the charger's meter](docs/cookbook.md#car-integration-that-updates-slowly)
-  while charging
-- **Solar and Solcast (optional):** surplus now and forecast ahead, from
-  [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and/or own history
-- **Home battery (optional):** charge the home battery to a certain level first, and charge the car from
-  the home battery above a minimum
-- **Multiple cars on the same main fuse:** [load balancing](docs/load-balancing.md) with priority and phase order,
-  and chargers sharing one circuit limit (e.g. an Easee master)
-- **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
-- **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
-  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund, and
-  [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) for prices and forecasts in most of Europe, and the
-  spot forecast integrations Spot Forecast, Elprisprognos and Wattcast (wholesale prices with your VAT and surcharge), and EPEX Spot, GE-Spot, Octopus Energy and Nord Pool (your own published prices, next to a provider with a forecast);
-  forecast prices are corrected with their measured bias
-- **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
-- **[Public charging](docs/public-charging.md)** (with EV integration and location)
-  - a charge away from home is detected automatically: time, battery level at start and end, and percentage added
-  - you get a notification, enter the total price, and the charge is added to the history and the economy
-  - waiting sessions are remembered across restarts, and charges can also be added with a service
-- **[Charging loss](docs/charging-loss.md)**
-  - **measured continuously** from the charger's kWh meter and the car's battery level, also back in Home
-    Assistant's history – no full charge needed
-  - per charging power (< 2,5 kW, 2,5-4 kW, 4-7 kW, > 7 kW), so the model can tell the car's fixed use from the
-    charger's loss – a low power (solar on 1 phase) loses the most
-  - **Use measured charging loss:** the plan uses the measured loss per hour at that hour's power instead of the
-    configured one
-  - a one-time measurement from low to full is still possible
-- **Learned charging power by battery level:** the plan can use stable measurements by battery level and phase to account for
-  lower charging power at higher battery levels; see [Analysis](docs/dashboard-analysis.md#charging-power-by-battery-level)
-- **[Learn driving distance](docs/learn-distance.md)**
-  - the odometer is read every evening (missed evenings come from Home Assistant's statistics or history),
-    and from the last 8 weeks CJP suggests the **km per workday** in the work plan
-    (the median per weekday) and the **typical daily distance** for optimal weekly charging (75th percentile)
-  - the suggestions are always shown, and with **Learn driving distance** on, the plan uses the higher of the
-    entered and the learned km – the entered numbers are not changed
-  - the analysis shows entered against learned distance per weekday
-- **[Analysis](docs/dashboard-analysis.md#analysis)**
-  - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km
-  - saved compared with daily charging, and a score for how close the price came to the lowest possible
-  - recorded charging cost compared with an optional fixed monthly all-inclusive charging price
-  - driving efficiency against the outdoor temperature (how much more the car uses at 0 °C)
-  - whether the car was ready at each work plan departure
-  - planned the evening before against actually charged
-  - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
-  - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate; optionally the most accurate type is chosen automatically
-  - battery capacity over time, charging loss by power and learned charging power by battery level
-- **kWh charged by solar**
-- **Very detailed charging history**
-  - each charge: time, charging reason, percentage, kWh, price and price/kWh
-  - per month: km, kWh, share from solar, price and price/kWh
-  - split between day and night
-  - public charging
-- **Overviews:** last drive's efficiency, costs for the current battery level,
-  charging overview, departure plan, estimate for daily charging and solar surplus forecast
-- **Fail-safe:** CJP stores the prices in its own [price database](docs/how-it-works.md#prices) and fills hours
-  without a price from it, and the blueprint charges at a fixed current if the integration stops. See
-  [When something goes wrong](docs/how-it-works.md#when-something-goes-wrong)
-- **[Ready-made dashboard](docs/dashboard-analysis.md)** in the sidebar, one per car, built from your setup
-  - **Overview:** battery level forecast, prices with solar and the charging plan, status, trip, manual charging and history
-  - **Settings:** all charging rules, work plan per weekday, battery levels, charging loss and the *Learn charge power by battery level* option, each with "Read more"
-  - **Analysis:** the analysis above plus the history of battery, charge limit, driving efficiency and solar
-- **Languages:** Danish, English, German, Polish and Ukrainian
-- **Does not run in Home Assistant's main thread:** all calculations run in the integration's own
-  worker thread, so Home Assistant isn't blocked while the plan is calculated
+- **Works with or without an EV integration** (a virtual EV needs only the battery level when you plug in)
+- **Solar, a solar forecast (Solcast, Forecast.Solar or Helios Forecast) and a home battery** (optional), and **[load balancing](docs/load-balancing.md)** for several cars on one main fuse
+- **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning), [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant), the spot forecast integrations (Spot Forecast, Elprisprognos, Wattcast) and your own published prices (EPEX Spot, GE-Spot, Octopus Energy, Nord Pool), with the forecast corrected for its measured bias
+- **[Charging loss](docs/charging-loss.md) measured continuously** and **[learned driving distance](docs/learn-distance.md)**
+- **[Public charging](docs/public-charging.md)** detected automatically and added to the history and the economy
+- **Departure notifications:** a push when the car will not be ready for the next departure (also at plug-in and while it charges: the car's own limit too low, the car stops early, or charging too slow), and a reminder to plug in when the charging planned for it starts
+- **[Analysis](docs/dashboard-analysis.md#analysis):** economy, saved against daily charging, driving against temperature, ready at departure, price forecast accuracy and more
+- **Very detailed charging history**, CO₂ emissions and kWh charged by solar
+- **Fail-safe:** prices in CJP's own database, and the blueprint charges at a fixed current if the integration stops
+- **[Ready-made dashboard](docs/dashboard-analysis.md)** per car, and the integration is available in Danish, English, German, Polish and Ukrainian
+
+The complete list is in [Features and charging rules](docs/features.md).
 
 | Battery level costs and charging overview | Departure plan | Charging history |
 | --- | --- | --- |
 | ![Battery level costs and charging overview](images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](images/departure-plan.png) | ![Charging history](images/charging-history.png) |
 
-| Economy | Driving and temperature |
-| --- | --- |
-| ![Economy per month compared with daily charging](images/economy.png) | ![km/kWh against the outdoor temperature](images/driving-and-temperature.png) |
-
----
-
 ## Requirements
 
-- Home Assistant **2025.1** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
+- Home Assistant **2025.12** or newer with recorder (default). The [analysis](docs/dashboard-analysis.md#analysis) and the charging loss read
   its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
 - A charger with **status**, **power** (W) and **kWh** sensors
 - Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice), [Strømligning](https://github.com/MTrab/stromligning), [Energy Price Forecast](https://github.com/BackupBaTTerY/energypriceforecast-home-assistant) and/or a spot forecast integration, EPEX Spot, GE-Spot, Octopus Energy or Nord Pool (HACS)
-- Optional:
-  - EV integration (battery level, range and odometer, and preferably charge port, charge limit and location)
-  - solar production (W) and [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar)
-  - a weather integration with `weather.get_forecasts`, e.g.
-    [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
-    [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
-    [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
+- Optional: an EV integration, solar production and a solar forecast
+  ([Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar),
+  [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
+  [Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast)), a weather
+  integration with `weather.get_forecasts` and a home battery. See [Getting started](docs/getting-started.md#1-check-what-you-need)
 - For the dashboard (install these HACS frontend cards): [Mushroom](https://github.com/piitaya/lovelace-mushroom),
   [ApexCharts Card](https://github.com/RomRider/apexcharts-card),
   [Config Template Card](https://github.com/iantrich/config-template-card) and
   [card-mod](https://github.com/thomasloven/lovelace-card-mod) (only styling). If Home Assistant can't find
   some of them, a persistent notification lists them with links
 
-### Tested with
+### Works with any charger and car
 
-| Charger | Car | Inverter |
-|---|---|---|
-| [Easee](https://github.com/nordicopen/easee_hass) | [Tesla](https://github.com/alandtse/tesla), [TeslaFi](https://github.com/jhansche/ha-teslafi), [Tessie](https://www.home-assistant.io/integrations/tessie/), [Polestar](https://github.com/pypolestar/polestar_api), [Cupra WeConnect](https://github.com/daernsinstantfortress/cupra_we_connect), [Kia UVO](https://github.com/Hyundai-Kia-Connect/kia_uvo) | [Huawei Solar](https://github.com/wlcrs/huawei_solar), [Fronius](https://www.home-assistant.io/integrations/fronius/), [Kostal](https://www.home-assistant.io/integrations/kostal_plenticore/), [Solarman](https://github.com/StephanJoubert/home_assistant_solarman/) |
+CJP does not depend on a specific charger or car integration. The [blueprint](docs/charger-control.md#the-blueprint)
+lets you pick the actions your own integrations offer for *start/stop*, *charging current*, *charge limit* and
+*enable/disable*, so you set up the control yourself in the automation editor – typically with a few
+actions:
 
-The charger is controlled by your own automation, so other chargers work too, as long as they can be started,
-stopped and have their amps set from Home Assistant.
+- **Charger with an integration** (e.g. Easee, Zaptec, Monta, Wallbox, OCPP, KEBA, Ohme, myenergi) – with or without a car integration
+- **Car with an integration** (e.g. Tesla, Kia/Hyundai, VW/Cupra/Skoda) on a charger without one, optionally measured with an energy meter
+- **Both** – each task is done where it can be done
 
----
+If neither can set the current, the blueprint only starts and stops charging, and solar surplus charging and
+load balancing can't regulate the current. See [Charger and car control](docs/charger-control.md#charger-and-car),
+[ready-made charger actions](docs/chargers.md) and the shared
+[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-Integration/discussions/categories/blueprint-setups).
 
 ## Installation
 
 ### HACS (recommended)
 
-[![Open Cable Juice Planner in HACS in your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
+[![Open Cable Juice Planner in the Marketplace in your Home Assistant.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
 
 1. Open **HACS**, search for **Cable Juice Planner**, install it, and restart Home Assistant.
 2. Add the integration:
@@ -244,36 +129,16 @@ If **Cable Juice Planner** does not show up in the HACS search, add it as a cust
 Download `cable_juice_planner.zip` from the [latest release](https://github.com/dezito/Cable-Juice-Planner-Integration/releases/latest),
 unpack it into `config/custom_components/cable_juice_planner` and restart Home Assistant.
 
----
-
 ## Setup
 
-Setup is done in the UI, split into pages with help texts:
+Setup is done in the UI, split into pages with help texts. [Getting started](docs/getting-started.md) goes through every page and how to set the values.
 
-1. **Car:** name (used as the device name and in notifications), prefix and language. All entity
-   ids start with `cjp_`. Without a prefix they are named `sensor.cjp_overview`, and with the prefix
-   `tesla` they are named `sensor.cjp_tesla_overview`. Use one prefix per car.
-2. **Charger:** status, power, kWh meters, on/off and cable, as well as voltage, phases,
-   max. amps and charging loss
-3. **Load balancing:** priority, phase order and the chargers on the same circuit (only with a
-   [shared grid connection](docs/load-balancing.md))
-4. **EV:** battery level, range, odometer, charge port/cable, charge limit,
-   location, update time and climate, as well as battery size. Skip the page if you don't have
-   an EV integration (virtual EV).
-5. **House and home battery:** consumption, ignored consumers, the home battery's level and power
-6. **Price providers:** Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast integration or one of the providers of published prices (EPEX Spot, GE-Spot, Octopus Energy, Nord Pool), the country, refund and selling fee (and the VAT and the surcharge of the spot forecast integrations)
-7. **Solar panels, solar charging and weather** (only with solar panels), incl. a
-   [fixed solar sell price](docs/rules/solar.md#fixed-solar-sell-price) (−1 = the hourly price)
-8. **Notifications, advanced** (interval, dashboard and diagnostic file log) **and databases**
-
-The entity selectors only show relevant entities: battery level only `battery` sensors, power
-only `power` sensors, kWh only `energy` sensors, prices only entities from the price integrations
-and the forecast only Solcast.
+1. **Car** (name, prefix, language), **charger** (status, power, kWh, phases, amps) and **load balancing** (only with a [shared grid connection](docs/load-balancing.md))
+2. **EV** (battery level, range, odometer, charge limit, location, climate), skipped without an EV integration
+3. **House and home battery**, **price providers** and **solar panels, solar charging and weather**
+4. **Notifications, advanced** (interval, dashboard and diagnostic file log) and **databases**
 
 Everything can be changed afterwards under **Configure** on the integration, via a menu.
-[Getting started](docs/getting-started.md) goes through every page and how to set the values.
-
----
 
 ## How to control the charger and the car
 
@@ -297,81 +162,25 @@ Find a ready-made setup for your charger and car, or share your own, under
 The blueprint file is never overwritten on its own. If a new version arrives with a HACS update (or you
 have edited the file yourself), a repair shows up after restart under *Settings → System → Repairs*.
 
----
-
 ## Multiple cars (load balancing)
 
-If several cars charge on the same grid connection, add one **Shared grid connection**
-(**Add integration → Cable Juice Planner → Shared grid connection**) with the main fuse per phase and
-optionally the house's phase sensors. Each car gets a priority and a phase order, and together they never
-use more current per phase than the fuse. Chargers sharing one circuit limit (e.g. Easee chargers behind a
-master) can be linked, so the master's automation sets the circuit for all of them. See
-[Multiple cars](docs/load-balancing.md).
-
----
-
-## Entities
-
-The settings from the dashboard are entities that are kept across restarts:
-
-| Type | Examples |
-|---|---|
-| `switch` | charging rules, workdays and preheating per day, the What-if Smart days, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast, choose the forecast type automatically |
-| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging (with location), virtual EV / simulated battery level, fixed monthly charging price and the What-if period, start level, alternative reserve and the maximum recommended level (also the level Smart and charging at once charge to) |
-| `time` | departure and arrival per workday |
-| `datetime` | the trip's departure and arrival |
-| `select` | forecast type, What-if Smart days |
-| `button` | force planning, reset trip, run what-if, run what-if settings, run what-if without solar, recalculate charging loss, export data, reset dashboard |
-| `binary_sensor` | public charging session done (waiting for the price; with location) |
-
-If you click a setting, a short explanation is shown under **Attributes** (`description`
-and `help`). The plan is recalculated 5 seconds after a change (not for the What-if settings, which never
-affect the plan).
-
-The results include `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
-`_emoji_description`, `_kwh_cost_price`, `_drive_efficiency`, `_km_per_kwh`, `_estimated_range`,
-`_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
-full), `_charging_loss_model`, `_economy`, `_what_if`, `_what_if_settings`, `_what_if_no_solar` and `_what_if_solar` (the What-if results) and `_analysis`. Large attributes (markdown, plans, measurements)
-are not stored in the recorder database.
-
----
+Several cars on the same grid connection are kept within the main fuse per phase with one **Shared grid connection**, a priority and a phase order per car.
+See [Multiple cars](docs/load-balancing.md).
 
 ## Dashboard
 
-With **Dashboard in the sidebar** enabled (default), each car gets its own dashboard,
-e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views. You choose its sidebar icon when adding the car, and can change it under **Configure → General**:
+Each car gets its own dashboard in the sidebar (default on), e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with four views:
 
-- **Overview:** battery level with forecast and planned charging hours, electricity prices with solar and the
-  charging plan, current charging rule, status, manual and forced charging, trip, public charging, the
-  charging history and the overview
-- **Settings:** all charging rules, the work plan per weekday, battery levels, cheap power, full charge,
-  solar/home battery, charging loss and virtual EV – with "Read more"
-- **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price
-  forecast, battery capacity and charging loss
-- **What-if:** simulated comparisons that never change the plan: what CJP actually charged against a Smart charger
-  and charging at once (with an estimate of the difference per year), the current daily reserve and maximum level against alternative
-  ones, the charging planned from the grid only (without solar), the EV's solar energy replaced by grid energy, and the cost recorded in the charging history against a fixed monthly charging price. The first three need a car integration (they replay recorded drives) and are left out with a virtual EV. Connections from before CJP began recording are estimated from the recorder's battery level and charger power statistics (only after they have been checked against the measured connections), cut to the work plan's homecoming and departure, and, for the time before any record, modelled from the work plan; all of it is labelled
+- **Overview:** battery level forecast, prices with solar and the charging plan, current rule, status, trip, history
+- **Settings:** all charging rules, the work plan, battery levels and charging loss, each with "Read more"
+- **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price forecast, battery capacity and charging loss
+- **What-if:** simulated comparisons that never change the plan, e.g. against a Smart charger and charging at once ([details](docs/dashboard-analysis.md#what-if))
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to
 go back to the generated dashboard.
 
----
-
-## Services
-
-| Service | Description |
-|---|---|
-| `cable_juice_planner.enforce_planning` | Recalculate the plan now |
-| `cable_juice_planner.manual_add_public_charging_session` | Calculate (and optionally save) a public charging session |
-| `cable_juice_planner.debug_info` | Returns internal state for troubleshooting |
-| `cable_juice_planner.export_debug` | Save an anonymised debug file for a GitHub issue |
-| `cable_juice_planner.export_data` | Save a backup of data and settings (see below) |
-| `cable_juice_planner.import_data` | Replace data and settings with a backup |
-
-All services optionally take `config_entry_id` so they only affect one car (`import_data` requires it).
-
----
+The settings, results and services are listed in [Entities and services](docs/reference.md).
 
 ## Backup: export and import of data
 
@@ -381,8 +190,6 @@ A backup is one JSON file in `/config/cable_juice_planner_backups/` with the dat
 - **Export** with the *Export data* button on the device, under **Configure → Backup** or with `cable_juice_planner.export_data`.
 - **Import into a new car**: when you create a new one, the setup offers to restore one of the backups. The configuration is pre-filled, and databases and settings are restored on first start.
 - **Import into an existing car** under **Configure → Backup** or with `cable_juice_planner.import_data` (`file: cjp_tesla_20261024_120000.json`). Databases and settings are replaced, and the integration is reloaded. The current data is first saved as `…_before_import.json`, so an import can be undone. With `restore_configuration` the configuration is also taken over. Leave it off when the backup comes from another Home Assistant.
-
----
 
 ## Switching from the PyScript version
 
@@ -395,8 +202,6 @@ configuration, the databases and the values of the old helpers. The PyScript fil
 changed, and the new entities start with `cjp_`, so both versions can run side by side.
 See [Switching from the PyScript version](docs/migration.md) for the steps and what became what.
 
----
-
 ## Troubleshooting
 
 See [FAQ and troubleshooting](docs/faq-troubleshooting.md). In short:
@@ -407,21 +212,17 @@ See [FAQ and troubleshooting](docs/faq-troubleshooting.md). In short:
 - **Settings → Devices & services → Cable Juice Planner → ⋮ → Download diagnostics** gives the same anonymised data without
   the databases.
 
----
-
 ## Removal
 
 1. **Settings → Devices & services → Cable Juice Planner**: delete each entry with **⋮ → Delete**. Cable Juice Planner first saves the
    entry's data to `cable_juice_planner_backups/<prefix>_<time>_deleted.json`, so it can be imported again in a new entry, and then
-   removes its databases and its dashboard.
+   removes its databases, the state of its repairs and its dashboard.
    The load balancing entry has no data of its own.
 2. Delete the automations that control the charger, or switch them to other entities: they stop working without
    Cable Juice Planner's entities.
 3. **HACS** → Cable Juice Planner → ⋮ → **Remove**, then restart Home Assistant.
 4. Optional: delete what is left in the config folder: `cable_juice_planner_backups/`, `cable_juice_planner_debug/`,
    `blueprints/automation/cable_juice_planner/` and `cable_juice_planner_<prefix>.log`.
-
----
 
 ## Support
 

@@ -14,9 +14,13 @@ from ..management.backup import BACKUP_DIR, async_load_backup, backup_dir, list_
 from ..const import CONF_ENTITY_PREFIX, CONF_SITE, SITE_DEFAULTS, SITE_TITLE, DEFAULT_ENTITY_PREFIX, DOMAIN, SENSOR_DEFS, dashboard_icon, default_options, CONF_CAR_NAME, instance_title, normalize_prefix, object_prefix, normalize_language, upgrade_options
 from ..management.storage import find_legacy_sources, load_legacy_config
 from ..prices import providers_from_options
+from .energy_prefs import async_energy_suggestions
 from .pages import CJPFlowPages
 from .options import CJPOptionsFlow, CJPSiteOptionsFlow
 from .schema import CONFIG_FLOW_STEPS, normalize_input, validate_step, IMPORT_NONE, PREFIX_RE, RESERVED_PREFIXES, SELECTORS, options_from_legacy, site_options, site_schema
+
+# the Energy dashboard's suggestions (flow/energy_prefs.py) and the option each one fills
+ENERGY_OPTION_KEYS = {"solar_power": "production_entity_id", "battery_power": "powerwall_watt_flow_entity_id"}
 
 
 class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
@@ -93,6 +97,13 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
                 self._car_name = (user_input.get(CONF_CAR_NAME) or "").strip()
                 self._options["language"] = user_input.get("language", self._options["language"])
                 self._options["dashboard_icon"] = icon["dashboard_icon"]
+                # pre-filled from the Energy dashboard where the field is still empty: a restored backup or an import replaces
+                # the options below, so their values win. Only the form shows the suggestion (suggested_value), the user decides.
+                # skip_used=False: the cars of one house share its solar and battery sensors, so every car gets the suggestion.
+                for key, entity_id in (await async_energy_suggestions(self.hass, DOMAIN, ENERGY_OPTION_KEYS, skip_used=False)).items():
+                    option_key = ENERGY_OPTION_KEYS[key]
+                    if not self._options.get(option_key):
+                        self._options[option_key] = entity_id
                 self._queue = list(CONFIG_FLOW_STEPS)
                 self._backups = await self.hass.async_add_executor_job(list_backups, backup_dir(self.hass))
                 if self._backups:

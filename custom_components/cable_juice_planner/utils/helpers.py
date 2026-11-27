@@ -115,12 +115,18 @@ def date_to_string(date, format: str = "%m/%d/%Y %H:%M:%S") -> str:  # noqa: A00
     return ", ".join(output)
 
 
-def to_datetime(date):
-    """ISO string -> naive datetime, anything else is returned unchanged."""
+def to_datetime(date, tz: datetime.tzinfo | None = None):
+    """ISO string -> naive datetime, anything else is returned unchanged.
+
+    With tz, a string with an offset (a weather forecast or a timestamp sensor in UTC) is converted to that local time
+    first; without tz the offset is dropped as it is (the wall clock of the string)."""
     try:
-        return dateutil_parser.isoparse(date).replace(tzinfo=None)
+        parsed = dateutil_parser.isoparse(date)
     except Exception:  # noqa: BLE001
         return date
+    if tz is not None and parsed.tzinfo is not None:
+        parsed = parsed.astimezone(tz)
+    return parsed.replace(tzinfo=None)
 
 
 def to_local_datetime(value, tz: datetime.tzinfo | None = None):

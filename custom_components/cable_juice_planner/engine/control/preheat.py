@@ -41,9 +41,13 @@ class ControlPreheat:
         now = self.now()
         trip_date_time = self.get_trip_date_time()
         next_work_time = reset_datetime()
+        learned_departure = None
         try:
             day_name = day_of_week_text(now)
-            work_time = self.setting(f"workday_departure_{day_name}")
+            # the departure the plan uses: the entered one, and with Learn departure and homecoming on the earlier of the entered and the
+            # learned (today, while the car is still plugged in after the learned departure, the entered one again)
+            work_time = self.effective_workday_times(day_name, now.date())[0]
+            learned_departure = self.learned_departure_in_use(day_name)
             if self.switch_state(f"workday_{day_name}") == "on" and work_time is not None:
                 next_work_time = now.replace(hour=work_time.hour, minute=work_time.minute, second=0, microsecond=0)
         except Exception as err:  # noqa: BLE001
@@ -51,6 +55,17 @@ class ControlPreheat:
         next_work_time_diff = abs(now - next_work_time)
         trip_date_time_diff = abs(now - trip_date_time)
         next_drive = next_work_time if min(next_work_time_diff, trip_date_time_diff) == next_work_time_diff else trip_date_time
+        is_trip = next_drive == trip_date_time
+        # The stop (the car did not move) is judged against the departure the plan uses, and also against the learned one the
+        # preheating was started for: the plan moves to the entered departure when the car did not leave at the learned one. After a
+        # restart that is not remembered, then today's learned departure stands in for it (never on a trip day). With learning off,
+        # fewer than 3 days, a night shift or a trip nothing is added: it is the departure alone, as it was.
+        stop_candidates = [next_drive]
+        if self._preheat_departure is not None:
+            stop_candidates.append(self._preheat_departure)
+        elif learned_departure is not None and not is_trip:
+            stop_candidates.append(now.replace(hour=learned_departure.hour, minute=learned_departure.minute, second=0, microsecond=0))
+        cancel_for = next((candidate for candidate in stop_candidates if stop_preheat_no_driving(candidate, now, preheat_min_before)), None)
 
         outdoor_temp = 0.0
         forecast_temp = 0.0
@@ -92,15 +107,19 @@ class ControlPreheat:
             heating_state = "heating" if integration == "cupra_we_connect" else "heat_cool"
             if preheat and climate_state == "off":
                 notify_type = "preheat_start"
-            elif climate_state == heating_state and stop_preheat_no_driving(next_drive, now, preheat_min_before):
+            elif climate_state == heating_state and cancel_for is not None:
                 notify_type = "preheat_cancel"
+            elif climate_state != heating_state:
+                self._preheat_departure = None
         elif domain in BUTTON_DOMAINS + SWITCH_DOMAINS or domain == "climate":
             # other cars: the PREHEATING flag decides (ev.py pressed a button or toggled a switch)
             if self.preheating:
-                if stop_preheat_no_driving(next_drive, now, preheat_min_before):
+                if cancel_for is not None:
                     notify_type = "preheat_cancel"
             elif preheat:
                 notify_type = "preheat_start"
+            else:
+                self._preheat_departure = None
         else:
             _LOGGER.warning("Integration %s not supported", integration)
             return
@@ -109,18 +128,21 @@ class ControlPreheat:
             if thawing:
                 heating_type = t("ui.preheat_ev.thawing")
             _LOGGER.info("Preheating ev car (%s)", heating_type)
+            # only a preheating for the learned departure is remembered (the plan's departure can move away from it)
+            self._preheat_departure = next_drive if learned_departure is not None and not is_trip and next_drive.time() == learned_departure else None
             self.fire_ev_request("preheat_start", departure=next_drive.strftime("%H:%M"), defrost=thawing)
             self.drive_efficiency("preheat_start")
         elif notify_type == "preheat_cancel":
             _LOGGER.info("Car not moved stopping preheating ev car")
-            self.fire_ev_request("preheat_stop", departure=next_drive.strftime("%H:%M"))
+            self.fire_ev_request("preheat_stop", departure=(cancel_for or next_drive).strftime("%H:%M"))
+            self._preheat_departure = None
             self.drive_efficiency("preheat_cancel")
 
         if self.config["notification"]["preheating"]:
             if notify_type == "preheat_start":
                 self.my_notify(t("ui.preheat_ev.preheat_start", heating_type=heating_type, time=next_drive.strftime("%H:%M")), title=self.title)
             elif notify_type == "preheat_cancel":
-                self.my_notify(t("ui.preheat_ev.preheat_cancel", time=next_drive.strftime("%H:%M")), title=self.title)
+                self.my_notify(t("ui.preheat_ev.preheat_cancel", time=(cancel_for or next_drive).strftime("%H:%M")), title=self.title)
 
     def preheat_cron(self) -> None:
         self.preheat_ev()

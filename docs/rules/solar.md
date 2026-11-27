@@ -33,24 +33,25 @@ The dashboard shows them under *Settings → Solar → Read more*: a table with 
 at, the current, the phases and the charging power. It follows your charger voltage, the current limits
 above, the allowed difference and the inverter limit (*Solar panels → Inverter max power*, default 5000 W:
 steps above it are never used, so they are left out). It is rebuilt when CJP starts. With the defaults
-(240 V, 3-phase 16 A charger, 1-phase 6–16 A, 3-phase from 5 A, −100 W):
+(230 V, 3-phase 16 A charger, 1-phase 6–16 A, 3-phase from 5 A, −100 W):
 
 | Surplus from | Current | Phases | Charging power |
 |---:|---:|---:|---:|
 | – | 0 A | – | 0 W |
-| 1515 W | 6 A | 1 | 1440 W |
-| 1660 W | 7 A | 1 | 1680 W |
-| 1900 W | 8 A | 1 | 1920 W |
+| 1455 W | 6 A | 1 | 1380 W |
+| 1595 W | 7 A | 1 | 1610 W |
+| 1825 W | 8 A | 1 | 1840 W |
 | … | … | … | … |
-| 3820 W | 16 A | 1 | 3840 W |
-| 4180 W | 6 A | 3 | 4320 W |
+| 3665 W | 16 A | 1 | 3680 W |
+| 4010 W | 6 A | 3 | 4140 W |
 
 The car charges at the step closest to the surplus, so a step starts halfway to the one below it. Below
 the first step it doesn't charge, and the last step is used for any surplus above it.
 
 ## In the plan
 
-The expected surplus of the week (Solcast and/or CJP's own history per weather type) is used by the
+The expected surplus of the week (the solar forecast integration – Solcast, Forecast.Solar or Helios Forecast –
+and/or CJP's own history per weather type) is used by the
 [work plan](workplan.md) and [optimal weekly charging](weekly.md): grid charging is only planned for what
 the sun won't cover before departure.
 

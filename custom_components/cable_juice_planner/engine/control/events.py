@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 
 from ...const import (
     CHARGER_CHARGING_STATUS,
@@ -12,6 +13,7 @@ from ...const import (
     ENTITY_UNAVAILABLE_STATES,
 )
 from ...utils.helpers import reset_datetime
+from ..energy.power import ESTIMATED_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ class ControlEvents:
     """Startup, triggers and state changes."""
 
     def trip_reset(self) -> None:
+        self.record_trip_days()  # the dates of a trip that has started outlive its settings
         self.set_setting("trip_charge_procent", 0.0)
         self.set_setting("trip_range_needed", 0.0)
         self.set_setting("trip_date_time", None)
@@ -52,6 +55,7 @@ class ControlEvents:
         elif key == "trip_reset":
             self.trip_reset()
         self.last_trip_change_datetime = self.now()
+        self.record_trip_days()
 
     def startup(self, databases: dict, odometer_history: dict | None = None) -> dict:
         """Load the databases and the runtime state and calculate the first plan."""
@@ -66,6 +70,17 @@ class ControlEvents:
         if isinstance(runtime.get("charging_loss"), (int, float)):
             self.config["charger"]["charging_loss"] = runtime["charging_loss"]
         self.daily_odometer = {str(date): float(value) for date, value in (runtime.get("daily_odometer") or {}).items()}
+        self.trip_days = {date for date in (runtime.get("trip_days") or []) if isinstance(date, str)}
+        self.restore_departure_notices(runtime.get("departure_notices"))
+        self.restore_sent_notices(runtime.get("sent_notices"))
+        anchor = runtime.get("virtual_charge_anchor")
+        # meter None: unplugged, the next charge counts from the meter then
+        valid = isinstance(anchor, dict) and all(
+            (key == "meter" and anchor.get(key, 0) is None)
+            or (isinstance(anchor.get(key), (int, float)) and not isinstance(anchor.get(key), bool) and math.isfinite(anchor[key]))
+            for key in ("meter", "level", "base")
+        )
+        self.virtual_charge_anchor = {key: None if anchor[key] is None else float(anchor[key]) for key in ("meter", "level", "base")} if valid else None
         if (measurement := runtime.get("charging_loss_measurement")) and self.is_calculating_charging_loss():
             # a measurement in progress survives a restart or reload
             self.charging_loss_car_begin_battery_level = measurement.get("car_begin_battery_level", 0.0)
@@ -97,6 +112,7 @@ class ControlEvents:
 
         self.set_charging_rule(f"📟{t('ui.startup.loading_db')}")
         self.load_power_values_db(databases.get("power_values"))
+        self.note_charger_meter()  # judged again from the stored hours: a restart does not wait an hour for the repair
         self.load_solar_available_db(databases.get("solar_available"))
         # ev.py loaded the price history before the price provider existed
         provider, self.price_provider = self.price_provider, None
@@ -112,6 +128,7 @@ class ControlEvents:
         self.update_learned_distances()
         self.load_charging_loss_db(databases.get("charging_loss"))
         self.load_economy_db(databases.get("economy"))
+        self.update_learned_workplan()
         self.publish_economy()
         self.load_what_if()
         self.load_what_if_settings()
@@ -168,15 +185,24 @@ class ControlEvents:
         self.calc_kwh_price(self.now().minute, update_entities=True)
         self.charge_trigger()
 
-    def charge_trigger(self, var_name: str | None = None) -> None:
-        """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities."""
+    def charge_trigger(self, var_name: str | None = None, force: bool = False) -> None:
+        """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities.
+
+        force: plan again although the plan hash did not change (the end of the charger test)."""
+        if self.charger_hold_active():
+            # the test of the automation holds the current: no restart of the charger, no "charging without a rule"
+            self._charger_test_publish()
+            return
         if self.is_charging() and not self.other_ev_connected():
             self.wake_up_ev()
             if not self.is_ev_configured():
                 self.charging_power_to_emulated_battery_level()
-        force = var_name == "enforce_planning"
+        force = force or var_name == "enforce_planning"
         self.charge_if_needed(force_recalculate=force)
         self.is_battery_fully_charged()
+        # from the stored plan, also when the plan hash skipped the calculation
+        self.notify_departure_readiness()
+        self.notify_notices()
         if self.is_ev_configured():
             self.analysis_check_departure()
         self.set_estimated_range()
@@ -195,12 +221,16 @@ class ControlEvents:
         """cron_hour_end (minute 59)."""
         local_energy = self.local_energy_available(period=60, without_all_exclusion=True, solar_only=True)
         power_values = self.power_values(period=60)
-        self.solar_available_append_to_db(local_energy)
+        if not power_values.get(ESTIMATED_KEY):
+            # a charger counted with its most is no measurement: the solar forecast must not learn it either
+            self.solar_available_append_to_db(local_energy)
         self.power_values_to_db(power_values)
+        self.note_charger_meter()
         self.stop_current_charging_session()
         self.kwh_charged_by_solar()
         self.solar_charged_percentage()
         self.record_daily_odometer()
+        self.update_learned_workplan()
         self.analysis_record_planned()
         self.analysis_record_prices()
         self.economy_store_prices()
@@ -247,8 +277,21 @@ class ControlEvents:
             return None
         if self.other_ev_connected():
             return None
+        if (value in CHARGER_NOT_READY_STATUS or old_value in CHARGER_NOT_READY_STATUS) and self._charger_restart_disabling():
+            # a charger the restart (is_charging) disabled may report off or disconnected: not an unplug and a plug-in,
+            # which would end the economy window and turn the manual and forced charging off. An unplug that is still so
+            # when the restart has settled is handled then (is_charging)
+            _LOGGER.info("Charger status changed from %s to %s during a restart of the charger: not an unplug yet", old_value, value)
+            self._charger_restart_unplug_pending = value in CHARGER_NOT_READY_STATUS
+            if value in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS and not self.restarting_charger:
+                # enabled again and ready: the plan publishes its action now, not an interval later
+                self.charge_if_needed()
+            return None
         _LOGGER.info("Charger port status changed from %s to %s", old_value, value)
-        if value in CHARGER_READY_STATUS and old_value in CHARGER_NOT_READY_STATUS:
+        # plugged in: from no car to any state that shows one (a charger can go from unplugged to charging, or to done, without
+        # a state of its own in between, e.g. Peblar and Tesla Wall Connector)
+        if value in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS and old_value in CHARGER_NOT_READY_STATUS:
+            self.charger_restart_unplugged()  # it was unplugged: a restart begins again
             self.economy_plugged_in()
             self.set_setting("allow_manual_charging_now", False)
             self.set_setting("allow_manual_charging_solar", False)
@@ -257,19 +300,29 @@ class ControlEvents:
             self.notify_set_battery_level()
             return "wait"
         if value in CHARGER_NOT_READY_STATUS:
-            # the charger is at home: the connection window ends wherever the car says it is
-            self.economy_unplugged()
+            self.charger_unplugged(value)
+            return None
         if not self.is_ev_home():
             return None
-        if value in CHARGER_NOT_READY_STATUS:
-            self.stop_current_charging_session()
-            self.wake_up_ev()
-            self.power_connected_trigger(value)
-        elif old_value in CHARGER_CHARGING_STATUS and value in CHARGER_COMPLETED_STATUS:
+        if old_value in CHARGER_CHARGING_STATUS and value in CHARGER_COMPLETED_STATUS:
             if not self.is_ev_configured() and self.current_charging_session["start"]:
                 self.stop_current_charging_session()
                 self.set_setting("battery_level", self.get_completed_battery_level())
         return None
+
+    def charger_unplugged(self, value) -> None:
+        """The charger's status went to off/disconnected (charger_status_changed, or is_charging for one seen during a
+        restart of the charger)."""
+        # the charger is at home: the connection window ends wherever the car says it is
+        self.economy_unplugged()
+        # a restart of a charger that did not start begins again, also when it is plugged in before the next cron
+        self.charger_restart_unplugged()
+        self.virtual_charge_unplugged()
+        if not self.is_ev_home():
+            return
+        self.stop_current_charging_session()
+        self.wake_up_ev()
+        self.power_connected_trigger(value)
 
     def charger_connected(self, value) -> None:
         """state_trigger_charger_port, after waiting for the car."""

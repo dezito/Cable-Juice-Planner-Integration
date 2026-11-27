@@ -445,6 +445,13 @@ triggers:
     id: start
 
 variables:
+  # the power units as factors to W (utils/power.py): an h is ignored (kWh is read as kW); no unit or another unit is read as W
+  power_factors:
+    mW: 0.001
+    W: 1
+    kW: 1000
+    MW: 1000000
+    GW: 1000000000
   action_sensor: !input action_sensor
   charger_status: !input charger_status
   charging_states: !input charging_states
@@ -488,7 +495,7 @@ variables:
   already_charging: >
     {% set ns = namespace(on=false) %}
     {% for e in power_entities if states(e) | is_number %}
-      {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) > power_threshold %}{% set ns.on = true %}{% endif %}
+      {% if states(e) | float * power_factors.get((state_attr(e, 'unit_of_measurement') or '') | replace('h', ''), 1) > power_threshold %}{% set ns.on = true %}{% endif %}
     {% endfor %}
     {{ ns.on or status_entities | map('states') | select('in', charging_states) | list | count > 0 }}
   has_charging_state: "{{ status_entities | count > 0 or power_entities | count > 0 }}"
@@ -627,7 +634,7 @@ actions:
                       - wait_template: >
                           {% set ns = namespace(on=false) %}
                           {% for e in power_entities if states(e) | is_number %}
-                            {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) > power_threshold %}{% set ns.on = true %}{% endif %}
+                            {% if states(e) | float * power_factors.get((state_attr(e, 'unit_of_measurement') or '') | replace('h', ''), 1) > power_threshold %}{% set ns.on = true %}{% endif %}
                           {% endfor %}
                           {{ ns.on or status_entities | map('states') | select('in', charging_states + completed_states) | list | count > 0 }}
                         timeout: "{{ check_seconds }}"
@@ -796,7 +803,7 @@ actions:
                       - wait_template: >
                           {% set ns = namespace(off=false) %}
                           {% for e in power_entities if states(e) | is_number %}
-                            {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) < power_threshold %}{% set ns.off = true %}{% endif %}
+                            {% if states(e) | float * power_factors.get((state_attr(e, 'unit_of_measurement') or '') | replace('h', ''), 1) < power_threshold %}{% set ns.off = true %}{% endif %}
                           {% endfor %}
                           {{ ns.off or status_entities | map('states') | select('in', not_ready_states) | list | count > 0 }}
                         timeout: "{{ check_seconds }}"

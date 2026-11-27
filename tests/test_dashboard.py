@@ -51,6 +51,52 @@ def _cards(node):
             yield from _cards(item)
 
 
+@pytest.mark.parametrize(
+    ("platform", "forecast"),
+    [("forecast_solar", "sensor.energy_production_today"), ("helios_forecast", "sensor.helios_forecast_power_now")],
+)
+def test_the_solcast_entities_are_not_mapped_to_another_forecast_integration(platform: str, forecast: str) -> None:
+    """The price charts read Solcast's detailedHourly. Forecast.Solar's energy_production_today would match the _today
+    rule and Helios' power_now has no such attribute: with those the Solcast entities stay unmapped (no solar forecast in
+    the charts, as without a forecast)."""
+    from custom_components.cable_juice_planner.management.dashboard_build import external_entities
+
+    options = {**OPTIONS, "language": "da", "production_entity_id": "sensor.solar"}
+    config = const.build_config({**options, "forecast_entity_id": forecast})
+    solcast = {key: value for key, value in external_entities(config, platform).items() if key.startswith("sensor.solcast_pv_forecast_forecast_")}
+    assert len(solcast) == 7 and set(solcast.values()) == {""}
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price", forecast, "sensor.energy_production_tomorrow"}
+    content = render_dashboard(config, "tesla", "entry1", existing, forecast_platform=platform)
+    assert forecast not in content and "sensor.energy_production_tomorrow" not in content
+    assert content == render_dashboard(const.build_config({**options, "forecast_entity_id": ""}), "tesla", "entry1", existing)
+    # a Solcast sensor, and a sensor whose integration is unknown, are mapped as before
+    solcast_config = const.build_config({**options, "forecast_entity_id": "sensor.my_solcast_today"})
+    mapping = external_entities(solcast_config, "solcast_solar")
+    assert mapping["sensor.solcast_pv_forecast_forecast_today"] == "sensor.my_solcast_today"
+    assert mapping["sensor.solcast_pv_forecast_forecast_day_3"] == "sensor.my_solcast_day_3"
+    assert external_entities(solcast_config) == mapping
+    assert "sensor.my_solcast_day_3" in render_dashboard(solcast_config, "tesla", "entry1", existing, forecast_platform="solcast_solar")
+
+
+async def test_the_dashboard_setup_reads_the_integration_of_the_forecast_sensor(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
+    """async_setup_dashboard looks the forecast sensor up in the entity registry (on the event loop) and hands its
+    platform to the render in the executor."""
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.cable_juice_planner.management import dashboard_build
+
+    er.async_get(hass).async_get_or_create("sensor", "forecast_solar", "plane_today", suggested_object_id="energy_production_today")
+    seen: list[str | None] = []
+    monkeypatch.setattr(dashboard_build, "render_dashboard", lambda *args, **kwargs: seen.append(args[6] if len(args) > 6 else kwargs.get("forecast_platform")) or "")
+    monkeypatch.setattr(dashboard_build, "_write_if_changed", lambda path, content: False)
+    hass.data[LOVELACE_DATA] = SimpleNamespace(dashboards={})
+    entry = make_entry(options={**MOCK_OPTIONS, "production_entity_id": "sensor.solar", "forecast_entity_id": "sensor.energy_production_today"})
+    entry.add_to_hass(hass)
+    config = const.build_config(dict(entry.options))
+    await dashboard_build.async_setup_dashboard(hass, entry, config, "test")
+    assert seen == ["forecast_solar"]
+
+
 def test_dashboard_for_a_car_without_solar() -> None:
     config = const.build_config({**OPTIONS, "language": "da"})
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}
@@ -316,6 +362,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert switch not in workplan, language
         assert switch in advanced, language
         assert "switch.cjp_tesla_learn_soc_charge_power" in advanced, language
+        assert "switch.cjp_tesla_learn_departure_time" in advanced and "switch.cjp_tesla_learn_departure_time" not in workplan, language
         text = render_dashboard(const.build_config({**OPTIONS, "language": language}), "tesla", "entry1", existing)
         assert "@@" not in text, language
         settings = yaml.safe_load(text)["views"][1]
@@ -330,6 +377,8 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         ]
         assert actual_order == [
             switch,
+            "switch.cjp_tesla_learn_departure_time",
+            "switch.cjp_tesla_temperature_efficiency",
             ("section", None),
             "switch.cjp_tesla_auto_forecast_type",
             "select.cjp_tesla_forecast_type",
@@ -345,6 +394,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert "ns.soc_power_help" in read_more, language
         attributes = {
             ("switch.cjp_tesla_learn_driving_distance", "help"): "learn-help",
+            ("switch.cjp_tesla_temperature_efficiency", "help"): "temperature-help",
             ("switch.cjp_tesla_auto_forecast_type", "help"): "forecast-help",
             ("select.cjp_tesla_forecast_type", "description"): "forecast-type-description",
             ("switch.cjp_tesla_price_forecast_correction", "help"): "price-help",
@@ -354,6 +404,8 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         )
         ordered_sections = (
             "learn-help",
+            "---",
+            "temperature-help",
             "---",
             "forecast-help",
             "forecast-type-description",
@@ -367,7 +419,7 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
             section_positions.append(position)
             cursor = position + len(section)
         assert section_positions == sorted(section_positions), language
-        assert rendered_read_more.count("---") == 2, language
+        assert rendered_read_more.count("---") == 3, language
 
 
 def _settings_sections(options: dict, existing: set[str]) -> dict[str, list[str]]:
@@ -772,7 +824,9 @@ def test_soc_power_section_on_analysis() -> None:
     assert "row.sample_sessions" in table["content"]
     assert "row.sessions" in table["content"]
     assert "row.cap_kw" in table["content"]
-    assert [series["name"] for series in chart["series"]] == ["1 fase", "3 faser"]
+    assert [series["name"] for series in chart["series"]] == ["1 fase", "3 faser", "1 fase, målt", "3 faser, målt"]
+    assert "Status: " in table["content"] and "row.observed_kw" in table["content"]
+    assert chart["apex_config"]["markers"]["size"] > 0  # a single learned level is a point, not a line
     assert " %'" in chart["apex_config"]["xaxis"]["labels"]["formatter"]
     assert " %'" in chart["apex_config"]["tooltip"]["x"]["formatter"]
 
@@ -783,7 +837,7 @@ def test_economy_section_on_analysis() -> None:
     assert "@@" not in text
     analysis = yaml.safe_load(text)["views"][2]
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
-    assert headings[0] == "Økonomi"
+    assert headings[:2] == ["Resultater og plan", "Økonomi"]  # (the group heading first)
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c["series"][0]["entity"] == "sensor.cjp_tesla_economy"]
     assert len(charts) == 2
     # the simulated subscription comparison lives on the What-if view, not under Economy
@@ -905,6 +959,59 @@ def test_analysis_sections_without_a_car() -> None:
     assert any("attributes.forecast or {}" in content and "Husets forbrug pr. time i kWh" in content for content in contents)
 
 
+def _analysis_groups(dashboard: dict) -> list[tuple[str, list[str]]]:
+    """The analysis view as (group heading, [section headings]); the History has its own heading and closes the last group."""
+    view = next(view for view in dashboard["views"] if view["path"] == "analysis")
+    assert "dense_section_placement" not in view  # dense placement could pull a section above its group heading
+    groups: list[tuple[str, list[str]]] = []
+    for section in view["sections"]:
+        cards = section.get("cards") or []
+        headings = [card for card in cards if card.get("type") == "heading"]
+        if len(cards) == 1 and headings and headings[0].get("heading_style") == "title":
+            assert section["column_span"] == 4
+            groups.append((headings[0]["heading"], []))
+        elif not headings:  # the History: its heading and Read more are dropped as empty (as before), the graphs stay
+            if groups[-1][0] != "Historik":
+                groups.append(("Historik", []))
+        else:
+            groups[-1][1].append(headings[0]["heading"])
+    return groups
+
+
+def test_the_analysis_sections_are_grouped_under_full_width_headings() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    dashboard = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing))
+    assert [view["path"] for view in dashboard["views"]] == ["overview", "settings", "analysis", "what-if"]
+    assert [group for group in _analysis_groups(dashboard) if group[0] != "Historik"] == [
+        ("Resultater og plan", ["Økonomi", "Planlagt mod faktisk ladet", "Klar til afgang"]),
+        ("Kørsel og læring", ["Kørsel og temperatur", "Lært kørselsafstand", "Lært afgang og hjemkomst"]),
+        ("Prognoser", ["Prisprognose", "Prognosens træfsikkerhed"]),
+        ("Bilens batteri", ["Batterikapacitet", "Ladetab pr. effekt", "Ladeeffekt efter batteriniveau"]),
+    ]
+
+
+def test_the_car_battery_group_goes_with_its_sections_without_a_car() -> None:
+    """A group heading never stands alone: without a car integration the car's battery group is left out with its sections."""
+    no_ev_entities = {f"sensor.cjp_tesla_{key}" for key, info in const.SENSOR_DEFS.items() if info[3] == "ev"} | {
+        "sensor.cjp_tesla_charging_loss_model",
+        "sensor.cjp_tesla_soc_charging_power_model",
+        "button.cjp_tesla_recalculate_charging_loss",
+        "switch.cjp_tesla_use_measured_charging_loss",
+        "switch.cjp_tesla_learn_soc_charge_power",
+    }
+    config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": "", "energidataservice_buy_entity_id": "sensor.eds"})
+    for existing in (
+        (_own("tesla") - no_ev_entities) | {"sensor.charger_status", "sensor.eds"},
+        # the car integration was removed afterwards: its entities can stay registered
+        _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds"},
+    ):
+        groups = _analysis_groups(yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing)))
+        names = [name for name, _ in groups]
+        assert "Bilens batteri" not in names
+        assert all(sections for name, sections in groups if name != "Historik"), groups
+        assert dict(groups)["Prognoser"] == ["Prisprognose", "Prognosens træfsikkerhed"]
+
+
 async def test_sidebar_dashboard_can_be_edited_and_reset(hass: HomeAssistant, hass_ws_client, tmp_path) -> None:
     hass.config.config_dir = str(tmp_path)
     set_source_states(hass)
@@ -955,3 +1062,26 @@ async def test_sidebar_icon_follows_the_dashboard_icon_option(hass: HomeAssistan
     await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.data["frontend_panels"]["cjp-test"].sidebar_icon == "mdi:ev-station"
     await async_unload_and_join(hass, entry)
+
+
+def _group(title: str) -> dict:
+    return {"type": "grid", "column_span": 4, "cards": [{"type": "heading", "heading": title, "heading_style": "title"}]}
+
+
+def _section(title: str, icon: str = "mdi:x") -> dict:
+    return {"type": "grid", "column_span": 2, "cards": [{"type": "heading", "heading": title, "icon": icon}, {"type": "markdown", "content": "x"}]}
+
+
+def test_a_group_heading_never_stands_alone() -> None:
+    """Without a section below it (before the next group or the History) the group heading goes; other views are left alone."""
+    from custom_components.cable_juice_planner.management.dashboard_build import _drop_empty_groups
+
+    history = _section("History", "mdi:chart-line")
+    graphs = {"type": "grid", "cards": [{"type": "history-graph"}]}  # (a History whose heading was dropped as empty)
+    sections = [_group("A"), _section("a1"), _group("B"), _group("C"), _section("c1"), _group("D"), history, _group("E")]
+    kept = _drop_empty_groups({"views": [{"path": "analysis", "sections": sections}]})["views"][0]["sections"]
+    assert [s["cards"][0]["heading"] for s in kept] == ["A", "a1", "C", "c1", "History"]
+    kept = _drop_empty_groups({"path": "analysis", "sections": [_group("A"), _section("a1"), _group("B"), graphs]})["sections"]
+    assert [s["cards"][0].get("heading") for s in kept] == ["A", "a1", None]
+    other = {"path": "what-if", "sections": [_group("A"), _group("B")]}
+    assert _drop_empty_groups(other) == other

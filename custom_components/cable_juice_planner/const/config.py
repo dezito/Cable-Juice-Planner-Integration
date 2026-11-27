@@ -32,7 +32,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "cable_connected_entity_id": "",
             "other_ev_using_this_charger_entity_ids": [],
         },
-        "power_voltage": 240.0,
+        "power_voltage": 230.0,
         "charging_phases": 3.0,
         "charging_max_amp": 16.0,
         "charging_loss": -0.05,
@@ -99,6 +99,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "invert_powerwall_watt_flow_entity_id": False,
         # also leave out the power of the chargers of the other cars (found at start, see utils/chargers.py)
         "ignore_cjp_chargers": True,
+        # the house consumption sensor includes this car's charger (it is then subtracted). False: the charger is on its own
+        # meter, so its power is added to the house consumption instead (engine/energy/power.py), and the other cars and
+        # BattMind don't subtract it either (utils/chargers.py, BattMind utils/cjp.py)
+        "charger_in_house_meter": True,
         # the chargers of the cars behind this one, also when they are not added automatically (set by the coordinator, not an
         # option): the only left-out sensors that are checked for a hung reading (engine/energy/power.py)
         "charger_entity_ids": [],
@@ -107,6 +111,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "notification": {
         "efficiency_on_cable_plug_in": True,
         "preheating": True,
+        "departure_readiness": True,
+        "notify_charger_offline": True,
+        "notify_cheap_power": True,
+        "notify_manual_expensive": True,
+        "notify_monthly_summary": True,
+        "notify_site_limit": True,
+        "notify_battery_full": True,
+        "notify_charging_loss": True,
     },
     "notify_list": [],
     "prices": {
@@ -173,6 +185,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "site": {
         "priority": 1,
         "phase_order": "L1-L2-L3",
+        # whether the site's phase sensors measure this car's charger. False: the charger is on its own meter, so the phase
+        # sensors do not include it; load balancing adds its draw to the measured phases (never less protection)
+        "charger_in_phase_meter": True,
     },
 }
 
@@ -219,6 +234,7 @@ OPTION_PATHS: dict[str, str] = {
     "power_consumption_entity_id_include_powerwall_discharging": "home.power_consumption_entity_id_include_powerwall_discharging",
     "ignore_consumption_from_entity_ids": "home.entity_ids.ignore_consumption_from_entity_ids",
     "ignore_cjp_chargers": "home.ignore_cjp_chargers",
+    "charger_in_house_meter": "home.charger_in_house_meter",
     "powerwall_watt_flow_entity_id": "home.entity_ids.powerwall_watt_flow_entity_id",
     "invert_powerwall_watt_flow_entity_id": "home.invert_powerwall_watt_flow_entity_id",
     "powerwall_battery_level_entity_id": "home.entity_ids.powerwall_battery_level_entity_id",
@@ -280,6 +296,14 @@ OPTION_PATHS: dict[str, str] = {
     "notify_list": "notify_list",
     "efficiency_on_cable_plug_in": "notification.efficiency_on_cable_plug_in",
     "preheating": "notification.preheating",
+    "departure_readiness": "notification.departure_readiness",
+    "notify_charger_offline": "notification.notify_charger_offline",
+    "notify_cheap_power": "notification.notify_cheap_power",
+    "notify_manual_expensive": "notification.notify_manual_expensive",
+    "notify_monthly_summary": "notification.notify_monthly_summary",
+    "notify_site_limit": "notification.notify_site_limit",
+    "notify_battery_full": "notification.notify_battery_full",
+    "notify_charging_loss": "notification.notify_charging_loss",
     # advanced / database
     "cron_interval": "cron_interval",
     "dashboard": "dashboard",
@@ -287,6 +311,7 @@ OPTION_PATHS: dict[str, str] = {
     "enable_diagnostic_file_log": "enable_diagnostic_file_log",
     "site_priority": "site.priority",
     "site_phase_order": "site.phase_order",
+    "charger_in_phase_meter": "site.charger_in_phase_meter",
     "power_values_db_data_to_save": "database.power_values_db_data_to_save",
     "solar_available_db_data_to_save": "database.solar_available_db_data_to_save",
     "kwh_avg_prices_db_data_to_save": "database.kwh_avg_prices_db_data_to_save",
@@ -307,7 +332,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "cable_connected_entity_id",
     ],
     "charger_specs": ["power_voltage", "charging_phases", "charging_max_amp", "charging_loss"],
-    "load_balancing": ["site_priority", "site_phase_order"],
+    "load_balancing": ["site_priority", "site_phase_order", "charger_in_phase_meter"],
     "ev": [
         "usable_battery_level_entity_id",
         "simulate_battery_level_while_charging",
@@ -324,6 +349,7 @@ FLOW_STEPS: dict[str, list[str]] = {
     "home": [
         "power_consumption_entity_id",
         "ignore_consumption_from_entity_ids",
+        "charger_in_house_meter",
         "ignore_cjp_chargers",
     ],
     "powerwall": [
@@ -374,7 +400,10 @@ FLOW_STEPS: dict[str, list[str]] = {
         "charging_three_phase_min_amp",
     ],
     "weather": ["hourly_service_entity_id", "daily_service_entity_id", "outdoor_temp_entity_id"],
-    "notifications": ["notify_list", "efficiency_on_cable_plug_in", "preheating"],
+    "notifications": [
+        "notify_list", "efficiency_on_cable_plug_in", "preheating", "departure_readiness", "notify_charger_offline", "notify_cheap_power",
+        "notify_manual_expensive", "notify_monthly_summary", "notify_site_limit", "notify_battery_full", "notify_charging_loss",
+    ],
     "advanced": ["cron_interval", "dashboard", "enable_diagnostic_file_log"],
     "database": [
         "power_values_db_data_to_save",

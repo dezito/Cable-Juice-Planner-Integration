@@ -19,6 +19,7 @@ from ..engine.economy import economy_keep_days
 from ..engine.loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from ..engine.soc_power import SOC_POWER_HISTORY_DAYS
 from ..utils.helpers import float_or_none
+from ..utils.power import STATISTICS_POWER_UNITS, power_factor_to_w, statistic_power_factor_to_w
 from .constants import CHARGING_LOSS_STATISTICS_CHUNK_DAYS, CHARGING_LOSS_STATISTICS_DAYS, CONNECTED_STATUS
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,6 +65,34 @@ def hourly_means(rows: list[tuple[float, float | None]], start: float, end: floa
     return {hour: row[0] for hour, row in hourly_stats(rows, start, end).items()}
 
 
+def current_unit(hass, entity_id: str, metadata: dict | None = None) -> tuple[bool, Any]:
+    """(known, unit) of an entity: the unit of its state now (no unit attribute on an available state is None, which is W;
+    Home Assistant keeps the unit on an unavailable state), or the unit it was recorded in (metadata) when its state has
+    none. (False, None) when neither is known: the reader then drops the values."""
+    state = hass.states.get(entity_id)
+    if state is not None:
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        if unit is not None or state.state not in ENTITY_UNAVAILABLE_STATES:
+            return True, unit
+    if metadata and entity_id in metadata:
+        return True, metadata[entity_id][1].get("unit_of_measurement")
+    return False, None
+
+
+def current_power_factor(hass, entity_id: str, metadata: dict | None = None) -> float | None:
+    """The factor that brings the raw states of a power entity to W (its current unit), or None when the unit is not known."""
+    known, unit = current_unit(hass, entity_id, metadata)
+    return power_factor_to_w(unit) if known else None
+
+
+def statistic_factor(metadata: dict, entity_id: str) -> float | None:
+    """The factor that brings the values of statistics_during_period(..., STATISTICS_POWER_UNITS) of this entity to W.
+    None without metadata (its statistics are of unknown unit) or when the unit it was recorded in is not a power."""
+    if entity_id not in metadata:
+        return None
+    return statistic_power_factor_to_w(metadata[entity_id][1].get("unit_of_measurement"))
+
+
 class CoordinatorRefresh:
     """Reads long-term statistics for the charging loss, economy, analysis and learned driving distance."""
 
@@ -107,25 +136,25 @@ class CoordinatorRefresh:
             metadata = await instance.async_add_executor_job(partial(get_metadata, self.hass, statistic_ids={*ids, power_id}))
             states = await raw_history(ids)
             power_stats = await instance.async_add_executor_job(
-                statistics_during_period, self.hass, raw_start, end, {power_id}, "5minute", None, {"mean", "min", "max"}
+                statistics_during_period, self.hass, raw_start, end, {power_id}, "5minute", STATISTICS_POWER_UNITS, {"mean", "min", "max"}
             )
-            if not power_stats.get(power_id):
-                # no statistics for the power sensor (no state_class): its raw readings, which can be many
+            # the statistics come in W (a power sensor) or kWh (a sensor in an h unit), by the unit they were recorded in
+            power_stat_factor = statistic_factor(metadata, power_id)
+            if power_stat_factor is None or not power_stats.get(power_id):
+                # no usable statistics for the power sensor (no state_class, or a unit that is not a power): its raw readings, which can be many
                 states.update(await raw_history([power_id]))
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Charging loss: could not load the history: %s", err)
             return
 
-        def unit(entity_id):
-            if entity_id in metadata:
-                return metadata[entity_id][1].get("unit_of_measurement")
-            state = self.hass.states.get(entity_id)
-            return state.attributes.get("unit_of_measurement") if state else None
-
-        power_factor = 1000.0 if unit(power_id) == "kW" else 1.0
-        meter_factor = {"Wh": 0.001, "MWh": 1000.0}.get(unit(meter_id), 1.0)
+        # the raw states are in the unit the sensor has now; the meter's statistics come in kWh whatever its unit (STATISTICS_POWER_UNITS)
+        power_raw_factor = current_power_factor(self.hass, power_id, metadata)
+        meter_known, meter_unit = current_unit(self.hass, meter_id, metadata)
+        meter_factor = {"Wh": 0.001, "MWh": 1000.0}.get(meter_unit, 1.0) if meter_known else 1.0
 
         def series(entity_id, factor=1.0):
+            if factor is None:
+                return []  # a unit that is not a power: no value, never a guess
             rows = [(state.last_changed.timestamp(), state.state) for state in states.get(entity_id, [])]
             return [(ts, value * factor) for ts, value in as_series(rows)]
 
@@ -133,13 +162,15 @@ class CoordinatorRefresh:
             start = row.get("start")
             return start.timestamp() if isinstance(start, datetime.datetime) else float(start)
 
-        power_rows = [
-            (stat_ts(row), row["mean"] * power_factor, row["min"] * power_factor, row["max"] * power_factor)
-            for row in power_stats.get(power_id, []) if None not in (row.get("mean"), row.get("min"), row.get("max"))
-        ]
+        power_rows = []
+        if power_stat_factor is not None:
+            power_rows = [
+                (stat_ts(row), row["mean"] * power_stat_factor, row["min"] * power_stat_factor, row["max"] * power_stat_factor)
+                for row in power_stats.get(power_id, []) if None not in (row.get("mean"), row.get("min"), row.get("max"))
+            ]
         if not power_rows:
             # no statistics for the power sensor: the raw readings in 5 minute steps
-            power_rows = resample_steps(series(power_id, power_factor), raw_start.timestamp(), end.timestamp())
+            power_rows = resample_steps(series(power_id, power_raw_factor), raw_start.timestamp(), end.timestamp())
         data: dict[str, Any] = {
             "soc": series(soc_id),
             "meter": series(meter_id, meter_factor),
@@ -161,10 +192,15 @@ class CoordinatorRefresh:
             soc_power_done = (end - chunk_end).days >= SOC_POWER_HISTORY_DAYS
             if groups and all(count >= LOSS_GROUP_SIZE for count in groups.values()) and soc_power_done:
                 break
+            if power_stat_factor is None:
+                # no statistics for the power sensor (nothing older is read, as before the statistics began), or statistics in a
+                # unit that is not a power: nothing older is read either. The backfill still counts as done, as without
+                # statistics: retrying it would read the whole raw history again at every start
+                break
             chunk_start = chunk_end - datetime.timedelta(days=CHARGING_LOSS_STATISTICS_CHUNK_DAYS)
             try:
                 hourly = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, chunk_start, chunk_end, {soc_id, meter_id, power_id}, "hour", None, {"mean", "min", "max", "change"}
+                    statistics_during_period, self.hass, chunk_start, chunk_end, {soc_id, meter_id, power_id}, "hour", STATISTICS_POWER_UNITS, {"mean", "min", "max", "change"}
                 )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Charging loss: could not load the statistics: %s", err)
@@ -176,10 +212,10 @@ class CoordinatorRefresh:
             for row in hourly.get(power_id, []):
                 if row.get("mean") is not None:
                     hours.setdefault(stat_ts(row), {})
-                    hours[stat_ts(row)].update(power_mean=row["mean"] * power_factor, power_min=(row.get("min") or 0.0) * power_factor, power_max=(row.get("max") or 0.0) * power_factor)
+                    hours[stat_ts(row)].update(power_mean=row["mean"] * power_stat_factor, power_min=(row.get("min") or 0.0) * power_stat_factor, power_max=(row.get("max") or 0.0) * power_stat_factor)
             for row in hourly.get(meter_id, []):
                 if row.get("change") is not None and stat_ts(row) in hours:
-                    hours[stat_ts(row)]["kwh"] = row["change"] * meter_factor
+                    hours[stat_ts(row)]["kwh"] = row["change"]  # kWh: the statistics of a meter come in kWh (STATISTICS_POWER_UNITS)
             for row in hourly.get(soc_id, []):
                 if row.get("mean") is not None and stat_ts(row) in hours:
                     hours[stat_ts(row)]["soc"] = row["mean"]
@@ -243,13 +279,20 @@ class CoordinatorRefresh:
 
     def _power_to_watt(self, entity_id: str):
         """A function that brings a state of this power entity to W (its unit as it is now), or None when it has no known unit."""
-        from homeassistant.util.unit_conversion import PowerConverter  # noqa: PLC0415
-
-        state = self.hass.states.get(entity_id)
-        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if state is not None else None
-        if unit not in PowerConverter.VALID_UNITS:
+        factor = current_power_factor(self.hass, entity_id)
+        if factor is None:
             return None
-        return lambda value: PowerConverter.convert(value, unit, "W")
+        return lambda value: value * factor
+
+    async def _async_statistic_factors(self, instance, stats: dict, entity_ids: tuple[str, ...]) -> dict[str, float | None]:
+        """The factor to W of the statistics (STATISTICS_POWER_UNITS) of each entity that has rows; the metadata is read only for those."""
+        from homeassistant.components.recorder.statistics import get_metadata  # noqa: PLC0415
+
+        with_rows = [entity_id for entity_id in entity_ids if stats.get(entity_id)]
+        if not with_rows:
+            return {}
+        metadata = await instance.async_add_executor_job(partial(get_metadata, self.hass, statistic_ids=set(with_rows)))
+        return {entity_id: statistic_factor(metadata, entity_id) for entity_id in with_rows}
 
     @callback
     def _economy_daily(self, _now) -> None:
@@ -323,7 +366,7 @@ class CoordinatorRefresh:
                 )
                 windows, start = [], None
                 for state in states.get(status_id, []):
-                    connected = state.state in CONNECTED_STATUS
+                    connected = self.canonical_status(state.state) in CONNECTED_STATUS
                     if connected and start is None:
                         start = state.last_changed.timestamp()
                     elif not connected and start is not None and state.state not in ENTITY_UNAVAILABLE_STATES:
@@ -372,13 +415,17 @@ class CoordinatorRefresh:
             ev_id = self.config["charger"]["entity_ids"].get("charger_power_entity_id")
             if solar_id and house_id and ev_id:
                 stats = await instance.async_add_executor_job(
-                    statistics_during_period, self.hass, start, end, {solar_id, house_id, ev_id}, "hour", {"power": "W"}, {"mean"}
+                    statistics_during_period, self.hass, start, end, {solar_id, house_id, ev_id}, "hour", STATISTICS_POWER_UNITS, {"mean"}
                 )
+                # W, or kWh for a sensor in an h unit: an entity whose statistics have no known power unit is left out (not guessed)
+                factors = await self._async_statistic_factors(instance, stats, (solar_id, house_id, ev_id))
                 hours: dict[float, dict[str, float]] = {}
                 for key, entity_id in (("solar", solar_id), ("house", house_id), ("ev", ev_id)):
+                    if factors.get(entity_id) is None:
+                        continue
                     for row in stats.get(entity_id, []):
                         if row.get("mean") is not None:
-                            hours.setdefault(stat_ts(row), {})[key] = abs(float(row["mean"]))
+                            hours.setdefault(stat_ts(row), {})[key] = abs(float(row["mean"]) * factors[entity_id])
                 converters = {entity_id: self._power_to_watt(entity_id) for entity_id in (solar_id, house_id, ev_id)}
                 filled = await self._async_fill_hours(
                     instance, {
@@ -411,13 +458,17 @@ class CoordinatorRefresh:
         try:
             stats = await instance.async_add_executor_job(
                 statistics_during_period, self.hass, end - datetime.timedelta(days=economy_keep_days(self.config)), end, {soc_id, power_id},
-                "hour", {"power": "W"}, {"mean", "min", "max"},
+                "hour", STATISTICS_POWER_UNITS, {"mean", "min", "max"},
             )
             hours: dict[float, list[float | None]] = {}
             for row in stats.get(soc_id, []):
                 if None not in (row.get("mean"), row.get("min"), row.get("max")):
                     hours[stat_ts(row)] = [row["mean"], row["min"], row["max"], None]
-            power: dict[float, float] = {stat_ts(row): abs(float(row["mean"])) for row in stats.get(power_id, []) if row.get("mean") is not None}
+            # the charger power in W (kWh for a sensor in an h unit, read as kW); no known power unit: no statistics (the raw states may fill in)
+            power_factor = (await self._async_statistic_factors(instance, stats, (power_id,))).get(power_id)
+            power: dict[float, float] = {} if power_factor is None else {
+                stat_ts(row): abs(float(row["mean"]) * power_factor) for row in stats.get(power_id, []) if row.get("mean") is not None
+            }
             # the hours the statistics lack (an entity without a state_class has none): from the recorder states, like BattMind
             to_watt = self._power_to_watt(power_id)
             first = end - datetime.timedelta(days=economy_keep_days(self.config))
@@ -474,7 +525,7 @@ class CoordinatorRefresh:
                     )
                 )
                 data["status"] = [
-                    (state.last_changed.timestamp(), state.state in CONNECTED_STATUS)
+                    (state.last_changed.timestamp(), self.canonical_status(state.state) in CONNECTED_STATUS)
                     for state in states.get(status_id, []) if state.state not in ENTITY_UNAVAILABLE_STATES
                 ]
                 data["odometer"] = as_series((state.last_changed.timestamp(), state.state) for state in states.get(ev["odometer_entity_id"], []))

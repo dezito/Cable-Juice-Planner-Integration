@@ -56,11 +56,13 @@
         "data": {
           "site_priority": "Prioritet",
           "site_phase_order": "Laderens fasefølge",
+          "charger_in_phase_meter": "Fasesensorerne indeholder denne bils lader",
           "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
           "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "charger_in_phase_meter": "Til (standard): fasesensorerne på den fælles nettilslutning måler også denne bils lader. Slå fra, hvis laderen sidder på sin egen måler, som fasesensorerne ikke indeholder (men bag samme hovedsikring): dens træk lægges så oven i den målte fasestrøm i overbelastningstjekket og hovedsikringstjekket og trækkes ikke fra den målte strøm for at finde huset, så beskyttelsen aldrig bliver lavere. Er du i tvivl, så lad bilen lade og se på fasesensorerne: stiger de med det, bilen trækker, indeholder de den. At slå den fra er den sikre side for sikringen, men for en lader, som sensorerne måler, tæller den dobbelt: bilen får så mindre strøm, og reparationen om hovedsikringen kan dukke op. Uden fasesensorer har indstillingen ingen virkning. Uden en måling fra laderens effektsensor tæller bilen med den strøm, den har fået.",
           "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
@@ -109,11 +111,13 @@
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "charger_in_house_meter": "Husets forbrug indeholder denne bils lader",
           "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "charger_in_house_meter": "Til (standard): husets forbrugssensor måler også denne bils lader, så Cable Juice Planner trækker laderen fra. Slå fra, hvis laderen har sin egen måler, som husets forbrugssensor ikke indeholder, bag samme nettilslutning som solcellerne (ikke en separat tilslutning): så trækkes laderen ikke fra, hverken her, af bilerne bagved eller af BattMind, og bilerne bag denne (eller med samme prioritet) lægger i stedet dens ladning til deres husforbrug, som én måler ville. Uden et tal fra laderens effektsensor tæller laderen med sin maksimale effekt. Er du i tvivl, så lad den være slået til: en reparation fortæller dig, når historikken viser et husforbrug under halvdelen af det, laderen bruger.",
           "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
@@ -312,17 +316,17 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nForecast.Solar og Helios Forecast læses fra deres solprognose til Energi-dashboardet; de timer, de ikke dækker, planlægges ud fra vejrudsigten og den gemte solhistorik; en time uden nogen af dem regnes som ingen sol.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
-          "forecast_entity_id": "Solprognose (Solcast)",
+          "forecast_entity_id": "Solprognose",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
           "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
           "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
-          "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar eller Helios Forecast. Solcast: f.eks. sensor.solcast_pv_forecast_forecast_today, de kommende dage findes automatisk. Forecast.Solar: en vilkårlig af dens sensorer; tagfladerne i samme solkilde i Energi-dashboardet lægges sammen. Helios Forecast: f.eks. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
           "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
           "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"
@@ -350,7 +354,7 @@
       },
       "weather": {
         "title": "Vejr",
-        "description": "Vejrprognosen bruges til at forudsige soloverskuddet og til forvarmning.",
+        "description": "Vejrprognosen bruges til at forudsige soloverskuddet (med solceller), til forvarmning og til funktionen »Tilpas kørselseffektivitet til temperaturen«. Siden kan også udfyldes uden solceller.",
         "data": {
           "hourly_service_entity_id": "Timeprognose",
           "daily_service_entity_id": "Dagsprognose",
@@ -359,7 +363,7 @@
         "data_description": {
           "hourly_service_entity_id": "Timeprognose entity_id",
           "daily_service_entity_id": "Dagsprognose entity_id",
-          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast"
+          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast og giver turene under Analyse deres udetemperatur"
         }
       },
       "notifications": {
@@ -368,12 +372,28 @@
         "data": {
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
-          "preheating": "Forvarmning start/stop"
+          "preheating": "Forvarmning start/stop",
+          "departure_readiness": "Bil ikke klar / sæt stik i",
+          "notify_charger_offline": "Laderen svarer ikke før en afgang",
+          "notify_cheap_power": "Billig strøm, bilen er ikke sat til",
+          "notify_manual_expensive": "Manuel opladning i en dyr time",
+          "notify_monthly_summary": "Månedsoversigt",
+          "notify_site_limit": "Lastfordelingen begrænsede opladningen",
+          "notify_battery_full": "Batteriet længe fuldt",
+          "notify_charging_loss": "Ladetabet er steget"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
-          "preheating": "Notifikation ved start/stop af forvarmning"
+          "preheating": "Notifikation ved start/stop af forvarmning",
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til.",
+          "notify_charger_offline": "Giver besked én gang pr. afgang, når laderens status har været utilgængelig eller ukendt i 30 minutter, mens der er planlagt opladning til en afgang inden for 24 timer.",
+          "notify_cheap_power": "Giver højst besked én gang om dagen, når opladning til en meget billig pris eller en pris under 0 er planlagt inden for en time, og bilen er hjemme uden at være sat til. Ikke for den opladning, en afgang kræver (det dækker Bil ikke klar / sæt stik i).",
+          "notify_manual_expensive": "Giver højst besked én gang om dagen, når manuel opladning er slået til, og bilen lader i en af dagens 4 dyreste timer.",
+          "notify_monthly_summary": "Giver besked én gang om måneden med sidste måneds ladede kWh, pris, gennemsnitspris og besparelsen i forhold til daglig opladning. Ikke for en måned, CJP ikke har set fra starten, eller uden kendt pris.",
+          "notify_site_limit": "Giver besked, når lastfordelingen (hovedsikringen eller grænsen for installationen) har stoppet eller sænket opladningen af den tilsluttede bil i to kontrolintervaller og mindst 10 minutter, hver højst én gang om dagen. Ikke under testen af laderen.",
+          "notify_battery_full": "Giver besked, når bilens egen batteriprocent har stået på 99 % eller mere i 12 timer (24 timer, når fuld opladning hver X. dag er sat eller ukendt), én gang pr. gang den er fuld. Igen efter 30 dage, hvis det stadig er fuldt. Kræver bilens integration.",
+          "notify_charging_loss": "Giver højst besked én gang om måneden, når kWh pr. 1 % ved 4 kW eller mere de sidste 30 dage er mindst 15 % over for 3–6 måneder siden, med nok målinger i begge, og også over de samme måneder året før, når de har nok målinger. Kulde hæver det også."
         }
       },
       "advanced": {
@@ -464,10 +484,10 @@
           "fuse_l2": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "fuse_l3": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "margin": "Trækkes fra sikringen, så der er luft til korte spidser.",
-          "voltage": "Bruges når fase-sensorerne måler effekt (W) i stedet for strøm (A).",
-          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
+          "voltage": "Bruges når fasesensorerne måler effekt (W, kW …) i stedet for strøm (A).",
+          "phase_l1_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l2_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l3_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
           "urgent_trip_hours": "En planlagt tur inden for så mange timer giver bilen forrang."
         }
       },
@@ -506,7 +526,7 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot og Nord Pool, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot og Nord Pool, pr. MWh eller Wh, og for Energy Price Forecast pr. Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
@@ -592,11 +612,13 @@
         "data": {
           "site_priority": "Prioritet",
           "site_phase_order": "Laderens fasefølge",
+          "charger_in_phase_meter": "Fasesensorerne indeholder denne bils lader",
           "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
           "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "charger_in_phase_meter": "Til (standard): fasesensorerne på den fælles nettilslutning måler også denne bils lader. Slå fra, hvis laderen sidder på sin egen måler, som fasesensorerne ikke indeholder (men bag samme hovedsikring): dens træk lægges så oven i den målte fasestrøm i overbelastningstjekket og hovedsikringstjekket og trækkes ikke fra den målte strøm for at finde huset, så beskyttelsen aldrig bliver lavere. Er du i tvivl, så lad bilen lade og se på fasesensorerne: stiger de med det, bilen trækker, indeholder de den. At slå den fra er den sikre side for sikringen, men for en lader, som sensorerne måler, tæller den dobbelt: bilen får så mindre strøm, og reparationen om hovedsikringen kan dukke op. Uden fasesensorer har indstillingen ingen virkning. Uden en måling fra laderens effektsensor tæller bilen med den strøm, den har fået.",
           "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
@@ -645,11 +667,13 @@
         "data": {
           "power_consumption_entity_id": "Husets forbrug",
           "ignore_consumption_from_entity_ids": "Ignorer forbrug fra",
+          "charger_in_house_meter": "Husets forbrug indeholder denne bils lader",
           "ignore_cjp_chargers": "Ignorer ladere til biler med lavere prioritet"
         },
         "data_description": {
           "power_consumption_entity_id": "Hjemmets forbrug (watt-entitet), ikke netforbrug",
           "ignore_consumption_from_entity_ids": "Liste over effekt-sensorer der skal ignoreres",
+          "charger_in_house_meter": "Til (standard): husets forbrugssensor måler også denne bils lader, så Cable Juice Planner trækker laderen fra. Slå fra, hvis laderen har sin egen måler, som husets forbrugssensor ikke indeholder, bag samme nettilslutning som solcellerne (ikke en separat tilslutning): så trækkes laderen ikke fra, hverken her, af bilerne bagved eller af BattMind, og bilerne bag denne (eller med samme prioritet) lægger i stedet dens ladning til deres husforbrug, som én måler ville. Uden et tal fra laderens effektsensor tæller laderen med sin maksimale effekt. Er du i tvivl, så lad den være slået til: en reparation fortæller dig, når historikken viser et husforbrug under halvdelen af det, laderen bruger.",
           "ignore_cjp_chargers": "Trækker ladeeffekten fra laderne til dine Cable Juice Planner-biler med lavere prioritet (højere tal) fra husets forbrug, også for biler der tilføjes senere. Bilen med prioritet 1 har første ret til soloverskuddet, dernæst 2 osv.: denne bil tæller ladning fra biler foran sig som forbrug, men ikke fra biler bagved. Bilens egen lader tælles ikke med, og en lader der også står på listen ovenfor, trækkes kun fra én gang. Biler med samme prioritet ignorerer ikke hinanden. Slå fra hvis din forbrugssensor ikke indeholder laderne."
         }
       },
@@ -848,17 +872,17 @@
       },
       "solar": {
         "title": "Solceller (valgfri)",
-        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
+        "description": "Udfyld hvis du har solceller. Soloverskud bruges til at lade bilen, og prognosen bruges i planen.\n\nForecast.Solar og Helios Forecast læses fra deres solprognose til Energi-dashboardet; de timer, de ikke dækker, planlægges ud fra vejrudsigten og den gemte solhistorik; en time uden nogen af dem regnes som ingen sol.\n\nSolcast slår som standard prognosesensorerne fra dag 3 og frem fra: aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** (*Vis deaktiverede entiteter*) og slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger, ellers planlægges de dage uden Solcast.\nDeaktiverede Solcast-sensorer nu: {solcast_disabled}",
         "data": {
           "production_entity_id": "Solproduktion",
-          "forecast_entity_id": "Solprognose (Solcast)",
+          "forecast_entity_id": "Solprognose",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
           "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
           "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
-          "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
+          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar eller Helios Forecast. Solcast: f.eks. sensor.solcast_pv_forecast_forecast_today, de kommende dage findes automatisk. Forecast.Solar: en vilkårlig af dens sensorer; tagfladerne i samme solkilde i Energi-dashboardet lægges sammen. Helios Forecast: f.eks. sensor.helios_forecast_power_now.",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
           "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
           "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"
@@ -886,7 +910,7 @@
       },
       "weather": {
         "title": "Vejr",
-        "description": "Vejrprognosen bruges til at forudsige soloverskuddet og til forvarmning.",
+        "description": "Vejrprognosen bruges til at forudsige soloverskuddet (med solceller), til forvarmning og til funktionen »Tilpas kørselseffektivitet til temperaturen«. Siden kan også udfyldes uden solceller.",
         "data": {
           "hourly_service_entity_id": "Timeprognose",
           "daily_service_entity_id": "Dagsprognose",
@@ -895,7 +919,7 @@
         "data_description": {
           "hourly_service_entity_id": "Timeprognose entity_id",
           "daily_service_entity_id": "Dagsprognose entity_id",
-          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast"
+          "outdoor_temp_entity_id": "Bruges til at vælge forvarmning/afisning med mere præcis temperatur end forecast og giver turene under Analyse deres udetemperatur"
         }
       },
       "notifications": {
@@ -904,12 +928,28 @@
         "data": {
           "notify_list": "Notifikationer til",
           "efficiency_on_cable_plug_in": "Kørselseffektivitet ved tilslutning",
-          "preheating": "Forvarmning start/stop"
+          "preheating": "Forvarmning start/stop",
+          "departure_readiness": "Bil ikke klar / sæt stik i",
+          "notify_charger_offline": "Laderen svarer ikke før en afgang",
+          "notify_cheap_power": "Billig strøm, bilen er ikke sat til",
+          "notify_manual_expensive": "Manuel opladning i en dyr time",
+          "notify_monthly_summary": "Månedsoversigt",
+          "notify_site_limit": "Lastfordelingen begrænsede opladningen",
+          "notify_battery_full": "Batteriet længe fuldt",
+          "notify_charging_loss": "Ladetabet er steget"
         },
         "data_description": {
           "notify_list": "notify-tjenester der får CJP-notifikationer (f.eks. notify.mobile_app_telefon). Tom = notify.notify. Brug mobile_app for interaktive notifikationer.",
           "efficiency_on_cable_plug_in": "Notifikation om seneste køre-effektivitet ved tilslutning af ladekabel",
-          "preheating": "Notifikation ved start/stop af forvarmning"
+          "preheating": "Notifikation ved start/stop af forvarmning",
+          "departure_readiness": "Giver besked én gang pr. afgang, når bilen ikke bliver klar til næste afgang (inden for 24 timer): for få ladetimer, behov over ladegrænsen, bilens egen ladegrænse for lav (allerede ved tilslutning, når laderautomationen ikke sætter den), bilen stopper opladningen for tidligt, eller opladningen går meget langsommere end planlagt. Også når planlagt opladning til den starter inden for en time, mens bilen er hjemme uden at være sat til.",
+          "notify_charger_offline": "Giver besked én gang pr. afgang, når laderens status har været utilgængelig eller ukendt i 30 minutter, mens der er planlagt opladning til en afgang inden for 24 timer.",
+          "notify_cheap_power": "Giver højst besked én gang om dagen, når opladning til en meget billig pris eller en pris under 0 er planlagt inden for en time, og bilen er hjemme uden at være sat til. Ikke for den opladning, en afgang kræver (det dækker Bil ikke klar / sæt stik i).",
+          "notify_manual_expensive": "Giver højst besked én gang om dagen, når manuel opladning er slået til, og bilen lader i en af dagens 4 dyreste timer.",
+          "notify_monthly_summary": "Giver besked én gang om måneden med sidste måneds ladede kWh, pris, gennemsnitspris og besparelsen i forhold til daglig opladning. Ikke for en måned, CJP ikke har set fra starten, eller uden kendt pris.",
+          "notify_site_limit": "Giver besked, når lastfordelingen (hovedsikringen eller grænsen for installationen) har stoppet eller sænket opladningen af den tilsluttede bil i to kontrolintervaller og mindst 10 minutter, hver højst én gang om dagen. Ikke under testen af laderen.",
+          "notify_battery_full": "Giver besked, når bilens egen batteriprocent har stået på 99 % eller mere i 12 timer (24 timer, når fuld opladning hver X. dag er sat eller ukendt), én gang pr. gang den er fuld. Igen efter 30 dage, hvis det stadig er fuldt. Kræver bilens integration.",
+          "notify_charging_loss": "Giver højst besked én gang om måneden, når kWh pr. 1 % ved 4 kW eller mere de sidste 30 dage er mindst 15 % over for 3–6 måneder siden, med nok målinger i begge, og også over de samme måneder året før, når de har nok målinger. Kulde hæver det også."
         }
       },
       "advanced": {
@@ -976,10 +1016,10 @@
           "fuse_l2": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "fuse_l3": "Hovedsikringen (eller den grænse bilerne tilsammen må bruge) pr. fase.",
           "margin": "Trækkes fra sikringen, så der er luft til korte spidser.",
-          "voltage": "Bruges når fase-sensorerne måler effekt (W) i stedet for strøm (A).",
-          "phase_l1_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l2_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
-          "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
+          "voltage": "Bruges når fasesensorerne måler effekt (W, kW …) i stedet for strøm (A).",
+          "phase_l1_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l2_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
+          "phase_l3_entity_id": "Valgfri: målt strøm (A eller mA) eller effekt (W, kW, mW, MW eller GW) pr. fase for hele huset (f.eks. HAN/P1-måler). En sensor i en energienhed (Wh, kWh) kan ikke bruges: den viser ikke strømmen lige nu. Med alle tre trækkes husets forbrug fra. Uden bruges sikringen som fast budget til bilerne, og hver bils ladeeffekt-sensor viser, hvad den reelt trækker. I begge tilfælde begrænser en overbelastet fase straks den sidste bil.",
           "urgent_trip_hours": "En planlagt tur inden for så mange timer giver bilen forrang."
         }
       },
@@ -1015,7 +1055,7 @@
       "invalid_icon": "Brug et ikonnavn som mdi:ev-station.",
       "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
       "circuit_own_charger_missing": "Vælg også denne bils lader.",
-      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot og Nord Pool, pr. MWh eller Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
+      "price_unit_subunit": "Sensoren angiver prisen i cent, pence eller øre (eller, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot og Nord Pool, pr. MWh eller Wh, og for Energy Price Forecast pr. Wh). Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh). Wattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den.",
       "price_sensor_not_retail": "Det er ikke sensoren med detailprisen. Vælg Energy Price Forecasts sensor med detailprisen som købspris (engrosprisen er salgsprisen).",
       "price_sensor_not_wholesale": "Det er sensoren med detailprisen. Vælg Energy Price Forecasts sensor med engrosprisen som salgspris (detailprisen er højere end det, et salg giver).",
       "price_sensor_forecast_only": "Sensoren har lige nu ingen offentliggjorte priser for i dag, kun en prognose. Hvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden), og vælg så sensoren igen. Ellers prøv igen, når priserne er offentliggjort.",
@@ -1065,6 +1105,9 @@
   },
   "entity": {
     "switch": {
+      "charger_test_run": {
+        "name": "Test min laderautomation"
+      },
       "forced_charging_daily_battery_level": {
         "name": "Tvangsladning under dagligt batteriniveau"
       },
@@ -1139,6 +1182,12 @@
       },
       "learn_driving_distance": {
         "name": "Lær kørselsafstand"
+      },
+      "learn_departure_time": {
+        "name": "Lær afgang og hjemkomst"
+      },
+      "temperature_efficiency": {
+        "name": "Tilpas kørselseffektivitet til temperaturen"
       },
       "learn_soc_charge_power": {
         "name": "Lær ladeeffekt efter batteriniveau"
@@ -1360,6 +1409,16 @@
       }
     },
     "sensor": {
+      "charger_test": {
+        "name": "Laderautomationstest",
+        "state": {
+          "idle": "Inaktiv",
+          "running": "Kører",
+          "done": "Færdig",
+          "stopped": "Stoppet",
+          "failed": "Mislykket"
+        }
+      },
       "current_charging_rule": {
         "name": "Nuværende laderegel"
       },
@@ -1641,9 +1700,16 @@
       "title": "Energy Price Forecast-sensorer, som Cable Juice Planner bruger, har ingen offentliggjorte priser ({prefix})",
       "description": "Cable Juice Planner ({prefix}) bruger Energy Price Forecast-sensorer, der i mindst en time ikke har haft offentliggjorte priser for i dag eller i morgen, kun en prognose:\n{entities}\n\nUden en pris for i dag har de timer, der er gået, ingen pris, så de mangler i ladehistorikken og prishistorikken.\n\nHvis Energy Price Forecast ikke offentliggør priser for dit marked (fx Finland eller Storbritannien), så vælg en Nord Pool- eller ENTSO-e-sensor som “Egen priskilde” i Energy Price Forecast (til købsprisen skal du også vælge “Egen formel” under “Detailpris” dér: estimatet bruger ikke priskilden). Ellers er priserne blot forsinket.\n\nDenne reparation forsvinder af sig selv, når sensorerne har offentliggjorte priser igen."
     },
-    "price_sensor_unit": {
-      "title": "Prissensorer som Cable Juice Planner bruger giver prisen i en forkert enhed ({prefix})",
-      "description": "Cable Juice Planner ({prefix}) bruger prissensorer, der giver prisen i en underenhed af valutaen (fx ct/kWh eller p/kWh) eller, for Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot og Nord Pool, pr. MWh eller Wh:\n{entities}\n\nDeres priser er 100 eller 1000 gange forkerte, så Cable Juice Planner bruger dem ikke: den planlægger i stedet på de gemte priser. Vælg en sensor med prisen pr. kWh i valutaen (fx EUR/kWh) i prisindstillingerne, eller sæt sensorens enhed tilbage.\n\nDenne reparation forsvinder af sig selv, når sensorerne igen giver prisen pr. kWh.\n\nWattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den."
+    "voltage_old_default": {
+      "title": "Netspændingen for {name} er den gamle standard {voltage} V",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Sæt netspændingen for {name} til {default} V",
+            "description": "Netspændingen for **{name}** (under *Lader - specifikationer* i indstillingerne) er {voltage} V, standardværdien i tidligere versioner af Cable Juice Planner. Standarden er nu {default} V, den nominelle spænding i det meste af Europa. CJP regner planens og solcelletrinnenes ladeeffekt ud fra den og omregner laderens målte effekt til ampere for belastningsstyringen: en for høj spænding tæller en bils strøm for lavt.\n\nVælg **Send** for at sætte den til {default} V (posten genindlæses). Har dit net virkelig {voltage} V, så ignorer denne reparation. Du kan altid ændre spændingen i indstillingerne."
+          }
+        }
+      }
     },
     "stromligning_entities": {
       "title": "Strømligning-sensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",
@@ -1652,6 +1718,54 @@
     "solcast_entities": {
       "title": "Solcast-prognosesensorer som Cable Juice Planner skal bruge er ikke tilgængelige ({prefix})",
       "description": "Cable Juice Planner ({prefix}) kan ikke bruge alle de Solcast-prognosesensorer, den skal bruge, så dagene uden en planlægges i stedet ud fra vejrudsigten og den gemte solhistorik. Solcast deaktiverer som standard prognosesensorerne fra dag 3 og frem.\n\nDeaktiveret i Home Assistant (aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** med *Vis deaktiverede entiteter*):\n{disabled}\n\nIkke navngivet som Cable Juice Planner forventer (entity-id'et skal ende på _today, _tomorrow eller _day_3 …):\n{renamed}\n\nUden timedetaljer (slå *Hourly detail* til under *Forecast attributes breakdown* i Solcasts indstillinger):\n{no_detail}\n\nDenne reparation forsvinder af sig selv, når sensorerne er rettet."
+    },
+    "entities_missing": {
+      "title": "Entiteter som Cable Juice Planner ({prefix}) bruger er deaktiveret eller mangler",
+      "description": "Cable Juice Planner ({prefix}) læser disse entiteter, men de er deaktiveret i Home Assistant, eller de findes hverken i entitetsregistret eller i tilstandene (omdøbt eller slettet). Planen kan ikke bruge dem.\n\nDeaktiveret (aktivér dem under **Indstillinger → Enheder og tjenester → Entiteter** med *Vis deaktiverede entiteter*):\n{disabled}\n\nMangler (tjek entiteten under indstillingerne for Cable Juice Planner, eller den integration der leverer den):\n{missing}\n\nKør ladertesten efter rettelsen: slå **Test min laderautomation** til under *Indstillinger* på dashboardet. Reparationen forsvinder af sig selv, når entiteterne er aktiveret eller fundet igen."
+    },
+    "entity_units": {
+      "title": "Sensorer med en enhed, som Cable Juice Planner ikke kan læse ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) læser disse sensorer i en fast enhed. De har en anden enhed, så koden læser deres værdier, som om de var i en godkendt enhed, og værdierne er forkerte:\n{entities}\n\nGodkendte enheder: effektsensorer {power_units} (en enhed med h, fx Wh eller kWh, læses som enheden uden h; en effektsensor uden enhed læses som W); batteriniveau-sensorer %; kWh-målere kun i {energy_units}. Så længe reparationen om at opdatere lader-blueprintet er åben, læses ladeeffekt-sensoren kun rigtigt i W eller kW.\n\nÆndr enheden i integrationen, der leverer sensoren, eller vælg en anden sensor. Kør derefter ladertesten: slå **Test min laderautomation** til under *Indstillinger* på dashboardet. Reparationen forsvinder af sig selv, når alle sensorer igen har en godkendt enhed."
+    },
+    "site_phase_units": {
+      "title": "Fasesensorer i en energienhed (lastfordeling)",
+      "description": "Disse fasesensorer måler en energi (fx Wh eller kWh), ikke en strøm eller en effekt:\n{entities}\n\nEn energimåler kan ikke vise, hvor meget strøm der løber på fasen lige nu, så lastfordelingen læser ikke disse sensorer. Indtil de er rettet, regnes husets forbrug som den sidste måling eller prognosen, eller som hele budgettet uden nogen af dem: så får bilerne ingen strøm, før sensorerne er rettet. Den sidste måling og prognosen er kun et skøn: bruger huset mere, er hovedsikringen ikke beskyttet af en måling, og ellers kan bilerne få mindre strøm, end de kunne have fået. Husets prognose bliver heller ikke opdateret.\n\nVælg en sensor i A, W eller kW for hver fase i indstillingerne for den fælles el-tilslutning. Reparationen forsvinder af sig selv, når ingen fasesensor længere måler en energi."
+    },
+    "blueprint_automation_lost": {
+      "title": "Laderautomationen fra Cable Juice Planner ({prefix}) er deaktiveret eller væk",
+      "description": "Automatiseringen lavet ud fra Cable Juice Planners laderblueprint har kørt før, men nu er den deaktiveret eller ikke længere i automations.yaml. Uden den får laderen ikke planens handlinger.\n\nDeaktiveret:\n{automations}\n\nNår listen viser –, er automatiseringen slettet.\n\nSlå automatiseringen til igen under **Indstillinger → Automatiseringer og scener**, eller lav den igen ud fra blueprintet. Kør derefter ladertesten: slå **Test min laderautomation** til under *Indstillinger* på dashboardet. Reparationen forsvinder af sig selv, når automatiseringen kører igen."
+    },
+    "charger_status_unknown": {
+      "title": "Laderens status er en værdi, Cable Juice Planner ikke kender ({prefix})",
+      "description": "Laderens status har i mindst {minutes} minutter været en af disse værdier, som Cable Juice Planner ikke kender. De er hverken klar, ikke klar, oplader, færdig eller fejl. Det sidste tidspunkt, hvor hver blev set, vises:\n{values}\n\nMens statussen har en sådan værdi, fortsætter planen, som om laderen var klar. Cable Juice Planner genstarter dog ikke en lader, der ikke oplader, og ser ikke en bil, der sættes til (manuel og tvunget opladning nulstilles ikke, og bilen vækkes ikke), tæller ikke laderens kWh-måler med i batteriniveau-simulationen og regner laderen som opladende i lastfordelingen.\n\nHvis værdien er en normal status for din lader, så indrapportér den med **Eksportér debug-info** på enheden. Ellers tjek laderens integration. Kør derefter ladertesten: slå **Test min laderautomation** til under *Indstillinger* på dashboardet. Reparationen forsvinder af sig selv, når ingen sådan værdi har været set i {days} dage."
+    },
+    "power_without_unit": {
+      "title": "Effektsensorer uden enhed læses som W ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) læser disse effektsensorer i watt (W), fordi de ikke har en enhed:\n{entities}\n\nTallet efter ≤ er den højeste værdi, der er set (uden fortegn).\n\nI de seneste {days} dage har deres værdier aldrig været over {max}, og nogle af dem er decimaltal, så de ligner kilowatt (kW). Læst som W er de 1000 gange for små, og planen bruger alt for lidt effekt.\n\nRet det ved sensoren: giv den dens enhed, fx `unit_of_measurement: kW` på en template-sensor, eller den enhed, integrationen leverer. Hvis værdierne virkelig er watt, så vælg **Ignorer** på denne reparation. Reparationen forsvinder af sig selv, når sensorerne har en enhed, eller når deres værdier viser, at de er watt."
+    },
+    "battery_level_fraction": {
+      "title": "Batteriniveauer, der ligner en andel og ikke en procent ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) læser disse batteriniveauer som procent:\n{entities}\n\nTallet efter ≤ er den højeste værdi, der er set (uden fortegn).\n\nI de seneste {days} dage har hver værdi på disse sensorer ligget mellem 0 og 1, så de ligner en andel (0,85 betyder 85 %). Læst som procent er 0,85 kun 0,85 %, så planen regner med et batteriniveau, der er 100 gange for lavt.\n\nRet det ved sensoren: lad den vise 0 til 100, fx ved at gange med 100 i en template-sensor, og vælg den sensor i indstillingerne. Hvis værdierne virkelig er procent og bare ligger under 1, så vælg **Ignorer** på denne reparation. Reparationen forsvinder af sig selv, når sensorerne viser 0 til 100, eller når deres værdier viser procent."
+    },
+    "price_unit_scale": {
+      "title": "Prissensorer i en underenhed, pr. MWh eller pr. Wh ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) læser disse prissensorer som priser pr. kWh i valutaen, men deres enhed er en underenhed af valutaen (øre eller cent), pr. MWh eller pr. Wh:\n{entities}\n\nPriserne er 100 gange for store (underenhed), 1000 gange for store (pr. MWh) eller 1000 gange for små (pr. Wh). Cable Juice Planner bruger ikke priserne fra en sådan sensor hos Energi Data Service, Energy Price Forecast, Spot Forecast, Elprisprognos, Wattcast, EPEX Spot, GE-Spot og Nord Pool: i stedet bruges den næste udbyders priser eller de gemte priser (Energy Price Forecast omregner selv en pris pr. MWh). En Strømligning-sensor, en Octopus Energy-sensor eller en tarifsensor læses, som den er, så for dem er planen og besparelsesberegningen forkerte. Det er kun enheden, der bedømmes, ikke størrelsen på priserne.\n\nRet det ved kilden: i Energi Data Service slås **Vis priser i øre** fra, og **Pris beregnes i** sættes til kWh i integrationens indstillinger, eller også vælges en sensor, hvis enhed er valutaen pr. kWh (fx kr/kWh). Hvis enheden virkelig er rigtig, så vælg **Ignorer** på denne reparation. Reparationen forsvinder af sig selv, når alle prissensorer er i valutaen pr. kWh (fx kr/kWh).\n\nWattcasts prissensor skal give ct/kWh; en anden enhed er forkert for den."
+    },
+    "consumption_frozen": {
+      "title": "Husforbrugssensoren viser den samme værdi i 6 timer ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) bruger husforbrugssensoren {entity} som husforbrug i planen. Den har vist {value} siden {since}: mindst 6 timer uden ændring.\n\nPlanen bruger sensoren til huset, så en sensor der står stille giver et forkert husforbrug. Tjek integrationen eller enheden der leverer sensoren: den sender måske ikke længere værdier. Hvis værdien virkelig er konstant, så vælg **Ignorer** på denne reparation.\n\nDenne reparation forsvinder af sig selv, når sensoren viser en anden værdi. En utilgængelig sensor lader reparationen stå. Planens underretning om en utilgængelig sensor gælder kun en sensor med en registreringspost i entitetsregistret (for eksempel fra en integration, oprettet i brugerfladen eller YAML med et unikt ID)."
+    },
+    "charger_outside_house_meter": {
+      "title": "Husets forbrug ser ikke ud til at indeholde laderen ({prefix})",
+      "description": "Cable Juice Planner ({prefix}) trækker denne bils lader fra husforbrugssensoren {entity}, fordi indstillingen **Husets forbrug indeholder denne bils lader** er slået til. Men i {hours} timer inden for de seneste {days} dage var husets forbrug under {share} % af det, laderen alene brugte, uden sol og uden at hjemmebatteriet lades op eller aflades. En sensor, der indeholder laderen, kan aldrig være lavere end laderen, så laderen sidder sandsynligvis på sin egen måler. Så trækkes laderen fra et hus, der aldrig havde den: husets forbrug bliver for lavt, og planen ser soloverskud og billige timer, der ikke er der.\n\nHvis laderen sidder på sin egen måler, så slå **Husets forbrug indeholder denne bils lader** fra i indstillingerne for denne bil (siden Husets forbrug). Hvis forbrugssensoren burde indeholde laderen, så tjek sensoren. Hvis værdierne er rigtige, som de er, så vælg **Ignorer** på denne reparation.\n\nDenne reparation forsvinder af sig selv, når indstillingen slås fra, når husforbrugssensoren eller laderens effektsensor fjernes, eller når timerne i de seneste {days} dage viser, at husets forbrug indeholder laderen."
+    },
+    "site_fuse_exceeded": {
+      "title": "Huset og bilerne trækker mere end hovedsikringen (lastfordeling)",
+      "description": "I de seneste {days} dage har den gennemsnitlige strøm pr. time på disse faser været over {factor} gange hovedsikringen i {hours} timer eller mere. Hver linje viser fasen, hovedsikringen → den højeste gennemsnitlige strøm pr. time (timer over grænsen > grænsen, altså hovedsikringen gange {factor}):\n{phases}\n\nEn sikring af den størrelse kan næppe bære en sådan strøm i en time. Enten er hovedsikringen på siden for den fælles el-tilslutning sat for lavt (bilerne får så mindre strøm, end de kunne), eller også er en lader, som fasesensorerne måler, sat til at være uden for dem (*Fasesensorerne indeholder denne bils lader* slået fra), så dens træk tælles to gange, eller også måler en fasesensor noget andet: faserne er i forkert rækkefølge, sensoren er ikke netfasen, eller enheden er forkert. Tjek sikringens størrelse og fasesensorerne. Hvis sikringen virkelig er så stor, og værdierne er rigtige, så vælg **Ignorer** på denne reparation.\n\nReparationen forsvinder af sig selv, når den næste prognose ikke længere finder den: efter at sikringen er rettet, senest når timerne er ude af de seneste {days} dage."
+    },
+    "charger_not_following": {
+      "title": "Laderen fulgte ikke planen {count} gange inden for {days} dage ({prefix})",
+      "description": "De seneste {days} dage fulgte laderen ikke planen {count} gange. Reparationen vises ved {limit} gange eller flere. Genstarterne af laderen gav op {gave_up} gange, og laderen oplod uden regel {no_rule} gange. Hver af dem havde sin egen besked.\n\nSeneste hændelser (lokal tid):\n{latest}\n\nTjek integrationen af laderen og bilen (rapporterer laderen sin status og effekt?) og andre apps eller automatiseringer, der styrer laderen eller bilen: de kan stoppe eller starte den. Kør derefter ladertesten: slå **Test min laderautomation** til under *Indstillinger* på dashboardet. Reparationen forsvinder af sig selv, når der er færre end {limit} af disse hændelser inden for {days} dage."
     }
   }
 }

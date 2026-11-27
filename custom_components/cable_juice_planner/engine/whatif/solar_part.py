@@ -93,9 +93,12 @@ class WhatIfSolar:
         hours = data.get("power_hours")
         if isinstance(hours, dict) and hours:
             stored = self.economy_db.setdefault("power_hours", {})
+            # the house is stored with the EV included (hour_energy subtracts it): a charger on its own meter is added
+            outside = not self.config["home"].get("charger_in_house_meter", True)
             for ts, values in hours.items():
                 if ts >= oldest and all(_finite(values.get(key)) for key in ("solar", "house", "ev")):
-                    stored[float(ts)] = [round(values["solar"], 1), round(values["house"], 1), round(values["ev"], 1)]
+                    house = values["house"] + values["ev"] if outside else values["house"]
+                    stored[float(ts)] = [round(values["solar"], 1), round(house, 1), round(values["ev"], 1)]
             for ts in [ts for ts in stored if float(ts) < oldest]:
                 del stored[ts]
         sell = data.get("sell_history")

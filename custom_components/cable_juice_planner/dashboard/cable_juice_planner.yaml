@@ -785,13 +785,17 @@ views:
       icon: mdi:cog
     - type: markdown
       content: |-
-        {% set ns = namespace(learn_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
+        {% set ns = namespace(learn_help=none, learn_departure_help=none, temperature_help=none, forecast_help=none, forecast_type_description=none, price_help=none, soc_power_help=none, sections=[], forecast_section='') %}
         {% set ns.learn_help = state_attr('switch.cjp_learn_driving_distance', 'help') %}
+        {% set ns.learn_departure_help = state_attr('switch.cjp_learn_departure_time', 'help') %}
+        {% set ns.temperature_help = state_attr('switch.cjp_temperature_efficiency', 'help') %}
         {% set ns.forecast_help = state_attr('switch.cjp_auto_forecast_type', 'help') %}
         {% set ns.forecast_type_description = state_attr('select.cjp_forecast_type', 'description') %}
         {% set ns.price_help = state_attr('switch.cjp_price_forecast_correction', 'help') %}
         {% set ns.soc_power_help = state_attr('switch.cjp_learn_soc_charge_power', 'help') %}
         {% if ns.learn_help %}{% set ns.sections = ns.sections + [ns.learn_help] %}{% endif %}
+        {% if ns.learn_departure_help %}{% set ns.sections = ns.sections + [ns.learn_departure_help] %}{% endif %}
+        {% if ns.temperature_help %}{% set ns.sections = ns.sections + [ns.temperature_help] %}{% endif %}
         {% if ns.forecast_help %}{% set ns.forecast_section = ns.forecast_help %}{% endif %}
         {% if ns.forecast_type_description %}
         {% if ns.forecast_section %}{% set ns.forecast_section = ns.forecast_section ~ '\n\n' %}{% endif %}
@@ -813,6 +817,12 @@ views:
       - entity: switch.cjp_learn_driving_distance
         name:
           type: entity
+      - entity: switch.cjp_learn_departure_time
+        name:
+          type: entity
+      - entity: switch.cjp_temperature_efficiency
+        name:
+          type: entity
       - type: section
       - entity: switch.cjp_auto_forecast_type
         name:
@@ -828,6 +838,25 @@ views:
       - entity: switch.cjp_learn_soc_charge_power
         name:
           type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_charger_test@@'
+      icon: mdi:test-tube
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@help_charger_test@@\n\n</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_charger_test_run
+        name:
+          type: entity
+      - entity: sensor.cjp_charger_test
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      content: '{{ state_attr(''sensor.cjp_charger_test'', ''markdown'') or '''' }}'
       grid_options: *id001
     - type: heading
       heading: '@@section_problem@@'
@@ -847,8 +876,21 @@ views:
   path: analysis
   title: '@@view_analysis@@'
   max_columns: 4
-  dense_section_placement: true
   sections:
+  # group: group_results_plan (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_results_plan@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:chart-box-outline
   # charging economy per month (engine/economy.py)
   - type: grid
     column_span: 2
@@ -1008,162 +1050,6 @@ views:
           return (entity.attributes.months || []).filter(m => m.lowest_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.lowest_unit]; });
       grid_options:
         columns: full
-  # driving against the outdoor temperature: apexcharts only has a time axis, so -30 °C is drawn at midnight and 1 °C as 1 hour
-  - type: grid
-    column_span: 2
-    cards:
-    - type: heading
-      heading: '@@section_drive_temperature@@'
-      icon: mdi:snowflake-thermometer
-    - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@drive_temperature_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: markdown
-      card_mod: *id003
-      content: |-
-        {% set a = states.sensor.cjp_analysis.attributes %}
-        {% set f = a.temperature_fit %}
-        {% if f -%}
-        @@drive_temperature_fit_1@@ **{{ (f.per_degree | abs) | round(2) }} @@distance_kwh@@** @@drive_temperature_fit_2@@
-
-        | -10 °C | 0 °C | 10 °C | 20 °C |
-        |---:|---:|---:|---:|
-        | {{ f.at_minus_10 }} | {{ f.at_0 }} | {{ f.at_10 }} | {{ f.at_20 }} |
-
-        @@drive_temperature_cold_1@@ **{{ ((f.cold_cost or 0) * 100) | round(0) }} %** @@drive_temperature_cold_2@@
-        {%- else -%}
-        <ha-alert alert-type="info">@@drive_temperature_no_data@@ ({{ a.drives | length if a.drives else 0 }})</ha-alert>
-        {%- endif %}
-      grid_options:
-        columns: full
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: '@@drive_temperature_title@@'
-        show_states: false
-      graph_span: 70h
-      span:
-        start: day
-      now:
-        show: false
-      yaxis:
-      - min: 0
-        decimals: 1
-      all_series_config:
-        unit: ' @@distance_kwh@@'
-        float_precision: 2
-        extend_to: false
-        show:
-          legend_value: false
-          in_header: false
-      apex_config:
-        chart:
-          height: 300px
-        markers:
-          size:
-          - 4
-          - 0
-        stroke:
-          curve: straight
-        dataLabels:
-          enabled: false
-        xaxis:
-          labels:
-            formatter: |
-              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((value - b.getTime()) / 3600000 - 30) + ' °C'; }
-          tooltip:
-            enabled: false
-        tooltip:
-          shared: true
-          intersect: false
-          x:
-            formatter: |
-              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000 - 30).toFixed(1).replace('.', ',') + ' °C'; }
-      series:
-      - entity: sensor.cjp_analysis
-        name: '@@drive_temperature_drives@@'
-        type: line
-        color: '#2a78d6'
-        stroke_width: 0
-        data_generator: |
-          const b = new Date(); b.setHours(0, 0, 0, 0);
-          return (entity.attributes.drives || []).map(d => [b.getTime() + (d.temp + 30) * 3600000, d.km_per_kwh]).sort((x, y) => x[0] - y[0]);
-      - entity: sensor.cjp_analysis
-        name: '@@drive_temperature_bins@@'
-        type: line
-        color: '#eb6834'
-        stroke_width: 2
-        data_generator: |
-          const b = new Date(); b.setHours(0, 0, 0, 0);
-          return (entity.attributes.temperature_bins || []).map(x => [b.getTime() + ((x.from + x.to) / 2 + 30) * 3600000, x.km_per_kwh]);
-      grid_options:
-        columns: full
-  # ready at departure
-  - type: grid
-    column_span: 2
-    cards:
-    - type: heading
-      heading: '@@section_departures@@'
-      icon: mdi:car-clock
-    - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@departures_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: markdown
-      card_mod: *id003
-      content: |-
-        {% set a = states.sensor.cjp_analysis.attributes %}
-        {% if a.departures -%}
-        @@departures_met_1@@ **{{ (a.departures_met * 100) | round(0) }} %** @@departures_met_2@@ {{ a.departures_count }} @@departures_met_3@@
-
-        | @@departures_day@@ | @@departures_level@@ | @@departures_target@@ | @@departures_required@@ | |
-        |:---|---:|---:|---:|:---:|
-        {% for d in a.departures | reverse -%}
-        | {{ d.date[8:10] }}/{{ d.date[5:7] }} {{ d.time }} | {{ d.level | round(0) }} % | {{ d.target | round(0) }} % | {{ d.required | round(0) }} % | {{ '✅' if d.met else '❌' }} |
-        {% endfor %}
-        {%- else -%}
-        <ha-alert alert-type="info">@@departures_no_data@@</ha-alert>
-        {%- endif %}
-      grid_options:
-        columns: full
-  # learned driving distance per weekday (engine/distance.py): entered number against the learned_distance attribute
-  - type: grid
-    column_span: 2
-    cards:
-    - type: heading
-      heading: '@@section_learn_distance@@'
-      icon: mdi:map-marker-distance
-    - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@learn_distance_explain@@\n\n</details>"
-      grid_options:
-        columns: full
-    - type: markdown
-      card_mod: *id003
-      content: |-
-        {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
-        {% set typical = 'number.cjp_typical_daily_distance' -%}
-        {% if is_state('switch.cjp_learn_driving_distance', 'on') %}@@learn_distance_on@@{% else %}@@learn_distance_off@@{% endif %}
-
-        {% if (state_attr(typical, 'learned_days') or 0) == 0 -%}
-        <ha-alert alert-type="info">@@learn_distance_no_data@@</ha-alert>
-
-        {% endif -%}
-        | @@learn_distance_day@@ | @@learn_distance_workday@@ | @@learn_distance_entered@@ | @@learn_distance_learned@@ | @@learn_distance_days@@ |
-        |:---|:---:|---:|---:|---:|
-        {% for key, name in days -%}
-        {% set number = 'number.cjp_workday_distance_needed_' ~ key -%}
-        {% set entered = states(number) | float(none) -%}
-        {% set learned = state_attr(number, 'learned_distance') -%}
-        {% set count = state_attr(number, 'learned_days') or 0 -%}
-        | **{{ name }}** | {{ '✅' if is_state('switch.cjp_workday_' ~ key, 'on') else '–' }} | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 3 else '' }} |
-        {% endfor -%}
-        {% set entered = states(typical) | float(none) -%}
-        {% set learned = state_attr(typical, 'learned_distance') -%}
-        {% set count = state_attr(typical, 'learned_days') or 0 -%}
-        | **@@learn_distance_typical@@** | | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 14 else '' }} |
-      grid_options:
-        columns: full
   # planned against actually charged
   - type: grid
     column_span: 2
@@ -1231,6 +1117,253 @@ views:
           return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.manual + d.low_battery + d.other]);
       grid_options:
         columns: full
+  # ready at departure
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_departures@@'
+      icon: mdi:car-clock
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@departures_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% if a.departures -%}
+        @@departures_met_1@@ **{{ (a.departures_met * 100) | round(0) }} %** @@departures_met_2@@ {{ a.departures_count }} @@departures_met_3@@
+
+        | @@departures_day@@ | @@departures_level@@ | @@departures_target@@ | @@departures_required@@ | |
+        |:---|---:|---:|---:|:---:|
+        {% for d in a.departures | reverse -%}
+        | {{ d.date[8:10] }}/{{ d.date[5:7] }} {{ d.time }} | {{ d.level | round(0) }} % | {{ d.target | round(0) }} % | {{ d.required | round(0) }} % | {{ '✅' if d.met else '❌' }} |
+        {% endfor %}
+        {%- else -%}
+        <ha-alert alert-type="info">@@departures_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+  # group: group_driving (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_driving@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:road-variant
+  # driving against the outdoor temperature: apexcharts only has a time axis, so -30 °C is drawn at midnight and 1 °C as 1 hour
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_drive_temperature@@'
+      icon: mdi:snowflake-thermometer
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@drive_temperature_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% set f = a.temperature_fit %}
+        {% if f -%}
+        @@drive_temperature_fit_1@@ **{{ (f.per_degree | abs) | round(2) }} @@distance_kwh@@** @@drive_temperature_fit_2@@
+
+        | -10 °C | 0 °C | 10 °C | 20 °C |
+        |---:|---:|---:|---:|
+        | {{ f.at_minus_10 }} | {{ f.at_0 }} | {{ f.at_10 }} | {{ f.at_20 }} |
+
+        @@drive_temperature_cold_1@@ **{{ ((f.cold_cost or 0) * 100) | round(0) }} %** @@drive_temperature_cold_2@@
+        {%- else -%}
+        <ha-alert alert-type="info">@@drive_temperature_no_data@@ ({{ a.drives | length if a.drives else 0 }})</ha-alert>
+        {%- endif %}
+
+        {% set adj = state_attr('sensor.cjp_km_per_kwh', 'temperature_adjustment') -%}
+        {% set reasons = {'too_few_drives': '@@drive_temperature_reason_too_few_drives@@', 'too_narrow': '@@drive_temperature_reason_too_narrow@@', 'no_cold_effect': '@@drive_temperature_reason_no_cold_effect@@', 'implausible': '@@drive_temperature_reason_implausible@@', 'no_forecast': '@@drive_temperature_reason_no_forecast@@', 'too_few_matched': '@@drive_temperature_reason_too_few_matched@@', 'no_learned': '@@drive_temperature_reason_no_learned@@', 'failed': '@@drive_temperature_reason_failed@@'} -%}
+        {% if not is_state('switch.cjp_temperature_efficiency', 'on') or not adj or not adj.enabled -%}
+        @@drive_temperature_plan_off@@
+        {%- elif adj.reason -%}
+        @@drive_temperature_plan_waiting@@ {{ reasons.get(adj.reason, adj.reason) }} ({{ adj.drives or 0 }})
+        {%- elif adj.drives_used -%}
+        @@drive_temperature_plan_on@@
+
+        | @@drive_temperature_plan_drive@@ | @@drive_temperature_plan_forecast@@ | @@drive_temperature_plan_learned@@ | @@drive_temperature_plan_used@@ |
+        |:---|---:|---:|---:|
+        {% for d in adj.drives_used -%}
+        | {{ d.start[8:10] }}/{{ d.start[5:7] }} {{ d.start[11:16] }}{{ ('–' ~ ((d.end[8:10] ~ '/' ~ d.end[5:7] ~ ' ') if d.end[:10] != d.start[:10] else '') ~ d.end[11:16]) if d.end else '' }} | {{ (d.temp ~ ' °C') if d.temp is not none else '–' }} | {{ d.learned if d.learned is not none else '–' }} | {{ ('**' ~ d.km_per_kwh ~ '**') if d.km_per_kwh is not none else ((d.learned if d.learned is not none else '–') ~ ' (' ~ reasons.get(d.reason, d.reason) ~ ')') }} |
+        {% endfor -%}
+        {%- else -%}
+        @@drive_temperature_plan_none@@
+        {%- endif %}
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@drive_temperature_title@@'
+        show_states: false
+      graph_span: 70h
+      span:
+        start: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 1
+      all_series_config:
+        unit: ' @@distance_kwh@@'
+        float_precision: 2
+        extend_to: false
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 300px
+        markers:
+          size:
+          - 4
+          - 0
+        stroke:
+          curve: straight
+        dataLabels:
+          enabled: false
+        xaxis:
+          labels:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((value - b.getTime()) / 3600000 - 30) + ' °C'; }
+          tooltip:
+            enabled: false
+        tooltip:
+          shared: true
+          intersect: false
+          x:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000 - 30).toFixed(1).replace('.', ',') + ' °C'; }
+      series:
+      - entity: sensor.cjp_analysis
+        name: '@@drive_temperature_drives@@'
+        type: line
+        color: '#2a78d6'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.drives || []).map(d => [b.getTime() + (d.temp + 30) * 3600000, d.km_per_kwh]).sort((x, y) => x[0] - y[0]);
+      - entity: sensor.cjp_analysis
+        name: '@@drive_temperature_bins@@'
+        type: line
+        color: '#eb6834'
+        stroke_width: 2
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.temperature_bins || []).map(x => [b.getTime() + ((x.from + x.to) / 2 + 30) * 3600000, x.km_per_kwh]);
+      grid_options:
+        columns: full
+  # learned driving distance per weekday (engine/distance.py): entered number against the learned_distance attribute
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_learn_distance@@'
+      icon: mdi:map-marker-distance
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@learn_distance_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
+        {% set typical = 'number.cjp_typical_daily_distance' -%}
+        {% if is_state('switch.cjp_learn_driving_distance', 'on') %}@@learn_distance_on@@{% else %}@@learn_distance_off@@{% endif %}
+
+        {% if (state_attr(typical, 'learned_days') or 0) == 0 -%}
+        <ha-alert alert-type="info">@@learn_distance_no_data@@</ha-alert>
+
+        {% endif -%}
+        | @@learn_distance_day@@ | @@learn_distance_workday@@ | @@learn_distance_entered@@ | @@learn_distance_learned@@ | @@learn_distance_days@@ |
+        |:---|:---:|---:|---:|---:|
+        {% for key, name in days -%}
+        {% set number = 'number.cjp_workday_distance_needed_' ~ key -%}
+        {% set entered = states(number) | float(none) -%}
+        {% set learned = state_attr(number, 'learned_distance') -%}
+        {% set count = state_attr(number, 'learned_days') or 0 -%}
+        | **{{ name }}** | {{ '✅' if is_state('switch.cjp_workday_' ~ key, 'on') else '–' }} | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 3 else '' }} |
+        {% endfor -%}
+        {% set entered = states(typical) | float(none) -%}
+        {% set learned = state_attr(typical, 'learned_distance') -%}
+        {% set count = state_attr(typical, 'learned_days') or 0 -%}
+        | **@@learn_distance_typical@@** | | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 14 else '' }} |
+      grid_options:
+        columns: full
+  # learned departure and homecoming per weekday (engine/workplan.py): entered times against the learned_time attribute
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_learn_departure@@'
+      icon: mdi:clock-time-eight-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>
+
+@@learn_departure_explain@@
+
+</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
+        {% set learning = is_state('switch.cjp_learn_departure_time', 'on') -%}
+        {% if learning %}@@learn_departure_on@@{% else %}@@learn_departure_off@@{% endif %}
+
+        {% set ns = namespace(days=0) -%}
+        {% for key, name in days -%}
+        {% set ns.days = ns.days + (state_attr('time.cjp_workday_departure_' ~ key, 'learned_days') or 0) -%}
+        {% endfor -%}
+        {% if ns.days == 0 -%}
+        <ha-alert alert-type="info">@@learn_departure_no_data@@</ha-alert>
+
+        {% endif -%}
+        | @@learn_departure_day@@ | @@learn_departure_workday@@ | @@learn_departure_entered@@ | @@learn_departure_learned@@ | @@learn_departure_used@@ | @@learn_departure_days@@ |
+        |:---|:---:|---:|---:|---:|---:|
+        {% for key, name in days -%}
+        {% set departure = 'time.cjp_workday_departure_' ~ key -%}
+        {% set homecoming = 'time.cjp_workday_homecoming_' ~ key -%}
+        {% set entered_departure = states(departure)[:5] -%}
+        {% set entered_homecoming = states(homecoming)[:5] -%}
+        {% set learned_departure = state_attr(departure, 'learned_time') -%}
+        {% set learned_homecoming = state_attr(homecoming, 'learned_time') -%}
+        {% set count = state_attr(departure, 'learned_days') or 0 -%}
+        {% set used = learning and is_state('switch.cjp_workplan_charging', 'on') and count >= 3 and learned_departure and learned_homecoming and entered_departure < entered_homecoming -%}
+        | **{{ name }}** | {{ '✅' if is_state('switch.cjp_workday_' ~ key, 'on') else '–' }} | {{ entered_departure }}–{{ entered_homecoming }} | {{ (learned_departure ~ '–' ~ learned_homecoming) if learned_departure and learned_homecoming else '–' }} | {{ ([entered_departure, learned_departure] | min ~ '–' ~ [entered_homecoming, learned_homecoming] | max) if used else (entered_departure ~ '–' ~ entered_homecoming) }} | {{ count }}{{ ' ⏳' if count < 3 else '' }} |
+        {% endfor -%}
+      grid_options:
+        columns: full
+  # group: group_forecasts (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_forecasts@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:chart-timeline-variant
   # the price forecast of the price integration against the real prices (engine/analysis)
   - type: grid
     column_span: 2
@@ -1542,6 +1675,20 @@ views:
         {%- endif %}
       grid_options:
         columns: full
+  # group: group_car_battery (a full-width heading; removed with the group when no section of it is left)
+  - type: grid
+    column_span: 4
+    cards:
+    - type: heading
+      heading: '@@group_car_battery@@'
+      heading_style: title
+      card_mod:
+        style: |
+          ha-card {
+            --ha-heading-card-title-font-size: 22px;
+            border-bottom: 1px solid var(--divider-color);
+          }
+      icon: mdi:car-battery
   # battery capacity over time: kWh from the charger per % and month
   - type: grid
     column_span: 2
@@ -1841,11 +1988,16 @@ views:
       content: |-
         {% set rows = state_attr('sensor.cjp_soc_charging_power_model', 'bands') or [] %}
         {% set minimum = state_attr('sensor.cjp_soc_charging_power_model', 'minimum_sessions') or 3 %}
+        {% set best = state_attr('sensor.cjp_soc_charging_power_model', 'best_sessions') or 0 %}
+        {% set status = states('sensor.cjp_soc_charging_power_model') %}
+        {% if status == 'ready' %}**@@soc_power_status_ready@@** {{ best }} / {{ minimum }}
+        {% elif status == 'learning' %}**@@soc_power_status_learning@@** {{ best }} / {{ minimum }}
+        {% endif %}
         {% if rows %}
-        | @@soc_power_phases@@ | @@soc_power_soc@@ | @@soc_power_samples@@ | @@soc_power_tapers@@ | @@soc_power_cap@@ |
-        |:---:|:---:|---:|---:|---:|
+        | @@soc_power_phases@@ | @@soc_power_soc@@ | @@soc_power_samples@@ | @@soc_power_tapers@@ | @@soc_power_observed@@ | @@soc_power_cap@@ |
+        |:---:|:---:|---:|---:|---:|---:|
         {% for row in rows -%}
-        | {{ row.phases }} | {{ row.soc_start }}-{{ row.soc_end }} % | {{ row.sample_sessions }} | {{ row.sessions }} / {{ minimum }} | {{ (row.cap_kw ~ ' kW' ~ (' 📊' if row.source == 'statistics' else '')) if row.cap_kw is not none else '@@soc_power_no_cap@@' }} |
+        | {{ row.phases }} | {{ row.soc_start }}-{{ row.soc_end }} % | {{ row.sample_sessions }} | {{ row.sessions }} / {{ minimum }} | {{ (row.observed_kw ~ ' kW') if row.observed_kw is not none else '-' }} | {{ (row.cap_kw ~ ' kW' ~ (' 📊' if row.get('source') == 'statistics' else '')) if row.cap_kw is not none else '@@soc_power_no_cap@@' }} |
         {% endfor -%}
         {% else %}
         @@soc_power_no_data@@
@@ -1874,6 +2026,8 @@ views:
       apex_config:
         chart:
           height: 300px
+        markers:
+          size: 5
         xaxis:
           labels:
             formatter: |
@@ -1897,6 +2051,23 @@ views:
         data_generator: |
           const b = new Date(); b.setHours(0, 0, 0, 0);
           return (entity.attributes.bands || []).filter(r => r.phases === 3 && r.cap_kw !== null).map(r => [b.getTime() + (r.soc_start + 5) * 3600000, r.cap_kw]);
+      # what the car typically drew in each level, with or without a learned limit (points only, never used by the plan)
+      - entity: sensor.cjp_soc_charging_power_model
+        name: '@@soc_power_1_phase_observed@@'
+        type: line
+        color: '#7fb2ec'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.bands || []).filter(r => r.phases === 1 && r.observed_kw !== null && r.observed_kw !== undefined).map(r => [b.getTime() + (r.soc_start + 5) * 3600000, r.observed_kw]);
+      - entity: sensor.cjp_soc_charging_power_model
+        name: '@@soc_power_3_phases_observed@@'
+        type: line
+        color: '#f4a98a'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.bands || []).filter(r => r.phases === 3 && r.observed_kw !== null && r.observed_kw !== undefined).map(r => [b.getTime() + (r.soc_start + 5) * 3600000, r.observed_kw]);
       grid_options: *id001
   - type: grid
     cards:

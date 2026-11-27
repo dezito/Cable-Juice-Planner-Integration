@@ -14,7 +14,7 @@ cheapest hours before each departure.
 | Setting | Meaning |
 |---|---|
 | Workday (per weekday) | the car drives to work this day |
-| Departure / homecoming | when the car leaves and comes home (default 07:00 and 16:00) |
+| Departure / homecoming | when the car leaves and comes home (default 07:00 and 16:00). Can be [learned from the charger](../learn-departure.md): the plan then uses the earlier departure and the later homecoming of the entered and the learned |
 | km needed | the day's round trip in km (default 50). Can be [learned from the odometer](../learn-distance.md) |
 | Preheat (per weekday) | preheat the car before departure |
 | Daily arrival battery level | the level the car must still have at homecoming (default 30 %) |
@@ -61,6 +61,8 @@ With *Preheat* on for a weekday (and a car integration with a climate entity), C
 `preheat_start` on `event.cjp_<prefix>_ev_request` before departure – with `departure` and `defrost` (from
 the weather forecast or the outdoor temperature) in the data – and `preheat_stop` afterwards. Your
 automation starts and stops the climate. See [Charger and car control](../charger-control.md#the-action-entities).
+The departure is the one the plan uses: with [*Learn departure and homecoming*](../learn-departure.md) on, the earlier of
+the entered and the learned departure.
 
 ## Together with other rules
 

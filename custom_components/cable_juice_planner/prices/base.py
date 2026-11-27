@@ -7,8 +7,10 @@ import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from ..const import CURRENCY_PRICE_SCALE, PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
+from ..const import CURRENCY_PRICE_SCALE, ENTITY_UNAVAILABLE_STATES, PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
+from ..management.value_checks import is_price_per_mwh, is_price_per_wh, is_price_subunit, price_unit_wrong
 from ..utils.helpers import days_between, float_or_none, reset_time_to_hour, to_local_datetime
+from .intervals import common_interval_minutes, interval_slots, provider_intervals
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,20 +71,9 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def is_price_per_mwh(unit) -> bool:
-    """A price per MWh (EUR/MWh): 1000 times the price per kWh, as a wholesale sensor often gives it."""
-    return isinstance(unit, str) and "/" in unit and unit.rsplit("/", 1)[1].strip().lower() == "mwh"
-
-
 def price_unit_divisor(unit) -> float:
     """What the numbers of a price sensor are divided by to get the price per kWh: 1000 for a price per MWh, else 1."""
     return 1000.0 if is_price_per_mwh(unit) else 1.0
-
-
-_SUBUNITS = {
-    "c", "ct", "cts", "cent", "cents", "eurocent", "eurocents", "c€", "¢", "p", "pence", "penny", "gbx",
-    "øre", "ore", "öre", "snt", "gr", "grosz", "groszy", "rp", "rappen", "bani", "st", "stotinki",
-}
 
 
 def _is_subunit_code(currency: str) -> bool:
@@ -90,34 +81,19 @@ def _is_subunit_code(currency: str) -> bool:
     return len(currency) > 1 and currency[:-1].isupper() and currency[-1].islower() and currency.upper() in CURRENCY_PRICE_SCALE
 
 
-def is_price_subunit(unit: Any) -> bool:
-    """A price per kWh in a subunit of the currency (ct/kWh, p/kWh, GBp/kWh, EURct/kWh): 100 times the price in the currency.
-
-    price_scale_of_unit() is None for these (they are not a currency), this tells that apart from a unit it just does not know."""
-    if not isinstance(unit, str) or "/" not in unit:
-        return False
-    currency, per = (part.strip() for part in unit.rsplit("/", 1))
-    if per.lower() not in ("kwh", "mwh") or not currency:
-        return False
-    token = currency.lower()
-    return token in _SUBUNITS or token.endswith(("ct", "cent", "cents")) or _is_subunit_code(currency)
-
-
-def is_price_per_wh(unit) -> bool:
-    """A price per Wh (DKK/Wh): 1000 times too small as a price per kWh, one of the price types of Energi Data Service."""
-    return isinstance(unit, str) and "/" in unit and unit.rsplit("/", 1)[1].strip().lower() == "wh"
-
-
 WATTCAST_BUY_KEY = "wattcast_buy_entity_id"
+WATTCAST_FORECAST_KEY = "wattcast_forecast_entity_id"
 
 
 def price_unit_error(key: str, unit: Any) -> bool:
     """A price sensor whose unit makes its prices 100 or 1000 times off: a price in a subunit of the currency (ct/kWh,
     p/kWh) on any price key, a price per MWh or per Wh on an Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot, Octopus or Nord Pool key (Energy Price Forecast converts its own
-    price per MWh, see price_unit_divisor())."""
+    price per MWh, see price_unit_divisor(); a price per Wh is wrong there too)."""
     if key == WATTCAST_BUY_KEY:
         # Wattcast gives ct/kWh (euro) and nothing else: that unit is its own and known, any other is wrong
         return isinstance(unit, str) and bool(unit.strip()) and unit.strip().lower() != "ct/kwh"
+    if key.startswith("energypriceforecast_"):
+        return is_price_subunit(unit) or is_price_per_wh(unit)  # it converts a price per MWh itself, never one per Wh
     return is_price_subunit(unit) or (key.startswith(("energidataservice_", "spotforecast_", "elprognos_", "epexspot_", "gespot_", "octopus_", "nordpool_")) and (is_price_per_mwh(unit) or is_price_per_wh(unit)))
 
 
@@ -343,6 +319,41 @@ class CombinedPriceProvider(BasePriceProvider):
         """Every configured price entity (each once)."""
         return list(dict.fromkeys(entity_id for entity_id in self.entity_ids.values() if entity_id))
 
+    def price_unit_problems(self, get_state: GetState) -> tuple[list[tuple[str, str]], bool]:
+        """The configured price entities in a unit the prices are not read in: (entity id, unit) of each, and whether every entity
+        was judged. A state that is missing, or unavailable or unknown without a unit, is not judged.
+
+        A price sensor is judged by the rules of the key it is configured under (price_unit_error: Energy Price Forecast converts its
+        own price per MWh, Wattcast gives ct/kWh); any other entity of a price integration (Strømligning's and Octopus Energy's sensors,
+        the tariffs) by its unit alone (price_unit_wrong). Wattcast's forecast sensor has a unit of its own that its provider checks."""
+        from .currency import PRICE_SENSOR_KEYS  # noqa: PLC0415 (currency.py imports this module)
+
+        def wrong(key: str, unit: Any) -> bool:
+            if key in PRICE_SENSOR_KEYS:
+                return price_unit_error(key, unit)
+            return price_unit_wrong(unit)
+
+        keys_of: dict[str, list[str]] = {}
+        for key, entity_id in self.entity_ids.items():
+            if entity_id:
+                keys_of.setdefault(entity_id, []).append(key)
+        problems: list[tuple[str, str]] = []
+        judged = True
+        for entity_id, keys in keys_of.items():
+            if keys == [WATTCAST_FORECAST_KEY]:
+                continue  # its provider checks its unit: it neither names a repair nor keeps one open
+            state = get_state(entity_id)
+            if state is None:
+                judged = False
+                continue
+            unit = state.attributes.get("unit_of_measurement")
+            if unit is None and state.state in ENTITY_UNAVAILABLE_STATES:
+                judged = False
+                continue
+            if any(wrong(key, unit) for key in keys):
+                problems.append((entity_id, unit))
+        return problems, judged
+
     def buy_price_entity_ids(self) -> list[str]:
         """The buy price entities of the providers, in priority order."""
         return [entity_id for entity_id in (p.get_buy_price_entity_id() for p in self.providers if p.records_history) if entity_id]
@@ -460,48 +471,53 @@ class CombinedPriceProvider(BasePriceProvider):
         self.sell_price_details = {timestamp: provider.sell_price_details[timestamp].copy() for timestamp in self.buy_prices if timestamp in provider.sell_price_details}
 
     def _combine(self, kind: str) -> tuple[dict, dict, dict, dict]:
+        """The prices of every provider on one common interval (the finest all of them fit on).
+
+        A provider's price covers the interval to its next timestamp (an hourly price the whole hour) and is
+        repeated over every slot of it. Per slot the first provider with a real price wins, then the first with a
+        forecast, so one hour never gets a falsely cheap quarter from an hourly price next to another provider's
+        quarters. A price that is no finite number covers its slots without a price, so another provider fills them."""
         prices: dict = {}
         real_prices: dict = {}
         sources: dict = {}
         details: dict = {}
         sell = kind == "sell"
-        claimed_hours: set = set()  # the hours that a provider before has real prices in
+        layers = []
         for provider in self.providers:
-            own_hours: set = set()
+            entries: dict = {}
+            real_starts: set = set()
+            for label in ("forecast", "real"):
+                try:
+                    for timestamp, price in getattr(provider, f"get_{kind}_{label}_prices")().items():
+                        timestamp = _naive(timestamp)
+                        if label == "real" and not is_number(price) and is_number(entries.get(timestamp)):
+                            continue  # a real price that is no number leaves the provider's forecast for it, as before
+                        entries[timestamp] = price
+                        if label == "real":
+                            real_starts.add(timestamp)
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("Can't get %s prices from %s: %s %s", label, provider.source_name, err, type(err))
             try:
-                for timestamp, price in getattr(provider, f"get_{kind}_real_prices")().items():
-                    timestamp = _naive(timestamp)
-                    if not is_number(price):
-                        continue  # NaN/infinity is no price: the hour gets another provider's price, else the price history's, else none
-                    # a real price of a provider before this one is the price of the whole hour: the rows of another period (quarters of an
-                    # hourly price) of a later provider are not mixed into it
-                    if timestamp not in prices and reset_time_to_hour(timestamp) not in claimed_hours:
-                        own_hours.add(reset_time_to_hour(timestamp))
-                        price = round(price, self.decimals)
-                        prices[timestamp] = price
-                        real_prices[timestamp] = price
-                        sources[timestamp] = f"{provider.source_name}:real"
-                        if sell and timestamp in provider.sell_price_details:
-                            details[timestamp] = provider.sell_price_details[timestamp].copy()
+                layers.append((provider, provider_intervals(entries), real_starts))
             except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("Can't get real prices from %s: %s %s", provider.source_name, err, type(err))
-            claimed_hours |= own_hours
-        # a forecast never enters an hour with a real price, also not one of another provider with other periods (an hourly
-        # real price and forecast quarters): the real price is the price of the whole hour
-        real_hours = {reset_time_to_hour(timestamp) for timestamp in real_prices}
-        for provider in self.providers:
-            try:
-                for timestamp, price in getattr(provider, f"get_{kind}_forecast_prices")().items():
-                    timestamp = _naive(timestamp)
-                    if not is_number(price):
-                        continue
-                    if timestamp not in prices and reset_time_to_hour(timestamp) not in real_hours:
-                        prices[timestamp] = round(price, self.decimals)
-                        sources[timestamp] = f"{provider.source_name}:forecast"
-                        if sell and timestamp in provider.sell_price_details:
-                            details[timestamp] = provider.sell_price_details[timestamp].copy()
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("Can't get forecast prices from %s: %s %s", provider.source_name, err, type(err))
+                _LOGGER.warning("Can't read the %s prices of %s: %s %s", kind, provider.source_name, err, type(err))
+        grid = common_interval_minutes(end - start for _provider, intervals, _real in layers for start, end, _price in intervals)
+        for want_real in (True, False):
+            label = "real" if want_real else "forecast"
+            for provider, intervals, real_starts in layers:
+                for start, end, price in intervals:
+                    if (start in real_starts) != want_real or not is_number(price):
+                        continue  # NaN/infinity is no price: the slots get another provider's price, else the price history's, else none
+                    price = round(price, self.decimals)
+                    for slot in interval_slots(start, end, grid):
+                        if slot in prices:
+                            continue
+                        prices[slot] = price
+                        if want_real:
+                            real_prices[slot] = price
+                        sources[slot] = f"{provider.source_name}:{label}"
+                        if sell and start in provider.sell_price_details:
+                            details[slot] = provider.sell_price_details[start].copy()
         if not prices:
             raise ValueError("No prices available from configured price providers")
         return (

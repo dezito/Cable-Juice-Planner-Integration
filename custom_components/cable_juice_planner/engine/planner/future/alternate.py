@@ -30,7 +30,9 @@ class FutureAlternate:
                 else:
                     work_battery_level_needed_alternative = ctx.charging_plan[day]['work_battery_level_needed']
                     trip_battery_level_needed_alternative = ctx.charging_plan[day]['trip_battery_level_needed'] + ctx.charging_plan[day]['trip_battery_level_above_max'] + ctx.charging_plan[ctx.day_after]['trip_battery_level_needed'] + ctx.charging_plan[ctx.day_after]['trip_battery_level_above_max']
-                    typical_daily_battery_level_needed_alternative = self.calc_distance_to_battery_level(self.get_entity_daily_distance()) if self.fill_up_charging_enabled() else 0.0
+                    typical_daily_battery_level_needed_alternative = self.calc_distance_to_battery_level_for(
+                        self.get_entity_daily_distance(), *self.day_drive_window(ctx.charging_plan[day], ctx.now)
+                    ) if self.fill_up_charging_enabled() else 0.0
                     total_battery_level_needed_alternative = work_battery_level_needed_alternative + trip_battery_level_needed_alternative + typical_daily_battery_level_needed_alternative
                     used_battery_level_alternative = max(total_battery_level_needed_alternative, 0.0)
 

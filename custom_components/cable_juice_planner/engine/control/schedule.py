@@ -7,18 +7,27 @@ import logging
 from ...const import (
     CHARGER_CHARGING_STATUS,
     CHARGER_COMPLETED_STATUS,
+    CHARGER_HELD_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_ALLOWED_AFTER_GOTO_TIME,
     ENTITY_UNAVAILABLE_STATES,
     EV_PLUGGED_STATES,
     POWERWALL_DISCHARGING_TRIGGER,
+    normalize_state,
 )
 from ...utils.formatting import emoji_parse
 from ...utils.helpers import date_to_string, minutes_between, reset_datetime, round_up
+from ...utils.power import power_to_w, power_unit_known
 from ...prices.intervals import naive_timestamp, price_interval_at
 
 _LOGGER = logging.getLogger(__name__)
+
+# restarts of a charger that does not charge before is_charging gives up
+CHARGER_MAX_RESTARTS = 3
+# minutes after the test of the charger automation released the charger: a charger that does not follow the plan then is
+# not noted (it may still charge from the test)
+NOT_FOLLOWING_AFTER_TEST = 60
 
 
 class ControlSchedule:
@@ -43,25 +52,33 @@ class ControlSchedule:
 
         charger_status = self.get_state(charger["status_entity_id"], error_state="connected")
         charger_enabled = self.get_state(charger["enabled_entity_id"], error_state="off") if self.is_entity_configured(charger["enabled_entity_id"]) else "on"
-        if charger_enabled != "on":
+        if charger_enabled != "on" and not self.restarting_charger:
+            # not while is_charging has disabled it for a restart: it enables it again itself a cron interval later
             _LOGGER.warning("Charger was off, turning it on")
             self.start_charging(["enabled"])
 
         if charger_status in CHARGER_NOT_READY_STATUS:
             _LOGGER.debug("Charger cable disconnected")
             self.set_charging_rule(self.t("ui.ready_to_charge.cable_disconnected"))
-            if not self.is_ev_configured() and float(self.number_state("battery_level", error_state=0.0)) != 0.0:
+            # not for a charger the restart (is_charging) disabled: it may report off, and it was not unplugged
+            if not self.is_ev_configured() and float(self.number_state("battery_level", error_state=0.0)) != 0.0 and not self._charger_restart_disabling():
                 _LOGGER.info("Reseting battery level to 0.0")
                 self.set_setting("battery_level", 0.0)
+                self.virtual_charge_level_cleared()
             return None
         if self.manual_charging_enabled() or self.manual_charging_solar_enabled():
             return True
         if self.is_ev_configured():
             ids = self.config["ev_car"]["entity_ids"]
             ev_charger_connector = self.get_state(ids["charge_cable_entity_id"], error_state="on") if self.is_entity_configured(ids["charge_cable_entity_id"]) else "not_configured"
-            if (ev_charger_connector in EV_PLUGGED_STATES or charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS) and not self.is_ev_home():
+            if not self.is_ev_home():
+                # a car that is away is never woken: not with the cable unplugged, whatever the charger status says (a status
+                # that is not known is not "unplugged"), nor with the port closed or an entity unavailable
                 _LOGGER.debug("To long away from home")
-                self.set_charging_rule(f"⛔{self.t('ui.ready_to_charge.cable_connected_ev_not_home')}")
+                # the status only counts when there is a status entity (without one it reads "connected")
+                status_plugged = self.is_entity_configured(charger["status_entity_id"]) and charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS
+                plugged_in = ev_charger_connector in EV_PLUGGED_STATES or status_plugged
+                self.set_charging_rule(f"⛔{self.t('ui.ready_to_charge.cable_connected_ev_not_home' if plugged_in else 'ui.ready_to_charge.ev_not_home')}")
                 return None
             if ev_charger_connector not in EV_PLUGGED_STATES:
                 _LOGGER.debug("Charger cable is Disconnected")
@@ -80,102 +97,287 @@ class ControlSchedule:
                 return None
         return True
 
+    def _minutes_since(self, moment) -> float | None:
+        """Minutes from moment (naive local, like now()) to now, across a change of the clock (the time zone of the
+        snapshot); None without a datetime."""
+        if not isinstance(moment, datetime.datetime):
+            return None
+        now = self.now()
+        tz = self._snap.tz if self._snap is not None else None
+        if tz is None:
+            return (now.replace(tzinfo=None) - moment.replace(tzinfo=None)).total_seconds() / 60
+        return (now.replace(tzinfo=tz).timestamp() - moment.replace(tzinfo=tz).timestamp()) / 60
+
+    def _charging_grace(self) -> bool:
+        """Whether a charger that does not charge yet is still given time: within two cron intervals of when it was
+        first seen waiting with a current to charge at (_charger_restart_waiting_since: a new plan window, a site that
+        gives current again, power that stopped), of the end of the test of the charger automation, or of the last
+        restart's start (the charger and the car take a while to start on the action). Not the charging session's start:
+        it ends every hour. Whole minutes: the crons of one interval are not a second apart. No time to count from keeps
+        the grace (no restart on missing data)."""
+        grace = self.config["cron_interval"] * 2
+        moments = (self._charger_restart_waiting_since, self._charger_test_released_at, self._charger_restart_started_at)
+        for index, moment in enumerate(moments):
+            if moment is None and index > 0:
+                continue
+            minutes = self._minutes_since(moment)
+            if minutes is None or round(minutes) <= grace:
+                return True
+        return False
+
+    def _waited_an_interval(self, moment) -> bool:
+        """Whether a whole cron interval has passed since moment (not a datetime: no)."""
+        minutes = self._minutes_since(moment)
+        return minutes is not None and round(minutes) >= self.config["cron_interval"]
+
+    def _charger_power_readable(self, entity_id: str) -> bool:
+        """Whether the power sensor's values can be read in W now. Not when its unit is no power unit (a size is never
+        guessed), nor when the sensor is unavailable and HA has dropped its unit: its last values could be kW or mW."""
+        unit = self.history.units.get(entity_id)
+        if not power_unit_known(unit):
+            return False
+        return unit is not None or self.get_state(entity_id, try_history=False, error_state=None) not in ENTITY_UNAVAILABLE_STATES
+
+    def _charger_power_idle(self) -> bool | None:
+        """Whether the charger's power shows that it does not charge, now and on average (the window of
+        charging_without_rule). None when it can't be told (no power entity, unavailable, a unit that is no power): the
+        status alone is no reason to stop a charger, a status that is stuck at ready while the car charges would stop it.
+        The state now, not the last value before it became unavailable, and an average from the history: without one it
+        can't be told."""
+        entity_id = self.config["charger"]["entity_ids"]["charger_power_entity_id"]
+        if not self.is_entity_configured(entity_id):
+            return None
+        state = self.get_state(entity_id, float_type=True, try_history=False, error_state=None)
+        power = power_to_w(state, self.history.units.get(entity_id)) if state is not None and self._charger_power_readable(entity_id) else None
+        if power is None:
+            return None
+        minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
+        now = self.now()
+        average = self.history.get_average_value(entity_id, now - datetime.timedelta(minutes=minutes), now, convert_to="W", error_state=None)
+        if average is None:
+            return None
+        voltage = self.config["charger"]["power_voltage"]
+        return abs(power) <= voltage and abs(float(average)) <= voltage
+
+    def _charger_restart_reset(self, full: bool) -> None:
+        """Forget the mark and when it was first seen waiting (with full the restarts made and the give-up too: it
+        charged, or the cable was unplugged). Never leaves the charger disabled."""
+        self.charging_is_beginning = False
+        self._charger_restart_marked_at = None
+        self._charger_restart_waiting_since = None
+        if self.restarting_charger:
+            self.restarting_charger = False
+            self.start_charging(["enabled"])
+        if full:
+            if self.restarting_charger_count > 0 or self._charger_restart_gave_up:
+                self.start_charging(["enabled"])
+            self.restarting_charger_count = 0
+            self._charger_restart_gave_up = False
+            self._charger_restart_started_at = None
+            self._charger_restart_stopped_at = None
+            self._charger_restart_enabled_seen_at = None
+            self._charger_restart_rule = ""
+
+    def _charger_restart_disabling(self) -> bool:
+        """With an enabled entity, from the restart's disable until the entity is seen on again and two cron intervals, at
+        least 10 minutes, have passed since: some chargers report off or disconnected while disabled, and a status read
+        from a cloud comes late. Not an unplug in that time. Without an enabled entity the restart is a stop at 0 A, and
+        off/disconnected is an unplug."""
+        enabled_entity = self.config["charger"]["entity_ids"]["enabled_entity_id"]
+        if not self.is_entity_configured(enabled_entity):
+            return False
+        if self.restarting_charger:
+            return True
+        started = self._charger_restart_started_at
+        if started is None or not self._charger_restart_within_an_hour():
+            return False
+        if self.get_state(enabled_entity, try_history=False, error_state="off") != "on":
+            self._charger_restart_enabled_seen_at = None
+            return self._charger_restart_within_an_hour()
+        if self._charger_restart_enabled_seen_at is None:
+            self._charger_restart_enabled_seen_at = self.now()
+        minutes = self._minutes_since(self._charger_restart_enabled_seen_at)
+        return minutes is None or round(minutes) < max(2 * self.config["cron_interval"], 10)
+
+    def _charger_restart_within_an_hour(self) -> bool:
+        """The charger is not enabled again yet after the restart: still the restart's, for at most an hour (an automation
+        that never enables it again is not kept from an unplug for ever)."""
+        minutes = self._minutes_since(self._charger_restart_started_at)
+        return minutes is None or round(minutes) < 60
+
+    def charger_restart_unplugged(self) -> None:
+        """The cable was unplugged (charger_status_changed): the restarts made and a give-up are forgotten, also when the
+        cable is in again before the next cron."""
+        if not self._charger_restart_disabling():
+            self._charger_restart_unplug_pending = False
+            self._charger_restart_reset(full=True)
+
+    def _charger_restart_history_emoji(self, emoji: str, replace: str | None = None) -> None:
+        """Mark the session's row in the charging history. The row may be gone (an unfinished row is removed)."""
+        start = self.current_charging_session["start"]
+        entry = self.charging_history_db.get(start) if start else None
+        if entry is None:
+            return
+        if replace is not None and replace in entry["emoji"]:
+            entry["emoji"] = entry["emoji"].replace(replace, emoji)
+        elif emoji not in entry["emoji"]:
+            entry["emoji"] = f"{entry['emoji']} {emoji}".strip()
+        else:
+            return
+        try:
+            self.charging_history_combine_and_set()
+        except Exception as err:  # noqa: BLE001 - the stop, the start and the notification must not be skipped for it
+            _LOGGER.error("Error marking the charging history for a restart: %s %s", err, type(err))
+
     def is_charging(self):  # noqa: C901
-        """Check that the charger charges when it should, else stop/start it (restart sequence)."""
+        """Check that the charger charges when the plan says charge, else stop and start it (restart sequence).
+
+        A charger that reports ready (or error) while the plan charges, after the grace (_charging_grace), with a power
+        that shows it does not charge, is marked (charging_is_beginning). A whole cron interval later, still so, it is
+        stopped (restarting_charger: the stop at 0 A, or the disable with an enabled entity, is what is published, see
+        _charge_if_needed and ready_to_charge), and a whole cron interval after that it is enabled again and the plan
+        starts it. After MAX restarts it gives up (one notification on the alarm channel), also across the session
+        that ends every hour, a stop of the plan or a test of the charger automation, until it charges (status, and power
+        when it can be read), is done or the cable is unplugged."""
         t = self.t
         charger = self.config["charger"]["entity_ids"]
-
-        def reset():
-            if self.restarting_charger_count > 0 or charger_enabled != "on":
-                self.start_charging(["enabled"])
-            self.charging_is_beginning = False
-            self.restarting_charger = False
-            self.restarting_charger_count = 0
-
-        charger_enabled = self.get_state(charger["enabled_entity_id"], error_state="off")
+        restarts = CHARGER_MAX_RESTARTS
         charger_status = self.get_state(charger["status_entity_id"], error_state="unavailable")
-        data = {"ttl": 0, "priority": "high", "channel": "alarm_stream"} if self.restarting_charger_count == 3 else {}
         emoji_charging_problem = f"{emoji_parse({'charging_problem': True})}"
         emoji_charging_error = f"{emoji_parse({'charging_error': True})}"
-        db = self.charging_history_db
 
-        if charger_status in CHARGER_COMPLETED_STATUS or charger_status in CHARGER_CHARGING_STATUS:
-            if self.restarting_charger_count > 0:
+        if self._charger_restart_unplug_pending and not self._charger_restart_disabling():
+            # an off/disconnected status seen while the restart had the charger disabled (charger_status_changed): still
+            # so when it has settled, it was unplugged
+            self._charger_restart_unplug_pending = False
+            if charger_status in CHARGER_NOT_READY_STATUS:
+                _LOGGER.info("Charger status is %s after the restart of the charger: unplugged", charger_status)
+                self.charger_unplugged(charger_status)
+
+        charging_by_power = self._charger_restart_gave_up and self._charger_power_idle() is False
+        if charger_status in CHARGER_COMPLETED_STATUS or charger_status in CHARGER_CHARGING_STATUS or charging_by_power:
+            # after giving up also the power: a status entity that only says on/connected, or hangs, would keep the
+            # fail-safe charging at full power in every hour
+            if charger_status in CHARGER_CHARGING_STATUS and self._charger_power_idle():
+                # "charging" without power (a car that refuses it): not charging again, the restarts made are kept
+                self._charger_restart_reset(full=False)
+                return True
+            if self.restarting_charger_count > 0 or self._charger_restart_gave_up:
                 _LOGGER.info("Ev is charging as it should again")
-                if self.current_charging_session["start"]:
-                    when = self.current_charging_session["start"]
-                    if 1 < self.restarting_charger_count < 3 and emoji_charging_error not in db[when]["emoji"]:
-                        db[when]["emoji"] = db[when]["emoji"].replace(emoji_charging_error, emoji_charging_problem)
-                        self.charging_history_combine_and_set()
-                self.my_notify(t("ui.is_charging.charging_again"), title=f"{self.title} {t('ui.is_charging.charging_title')}", data=data, always=True, persistent_notification=True)
-            reset()
+                if self.restarting_charger_count >= 2 or self._charger_restart_gave_up:
+                    self._charger_restart_history_emoji(emoji_charging_problem, replace=emoji_charging_error)
+                self._charger_restart_gave_up = False  # the plan's rule is shown again
+                self.my_notify(t("ui.is_charging.charging_again"), title=f"{self.title} {t('ui.is_charging.charging_title')}", always=True, persistent_notification=True)
+            self._charger_restart_reset(full=True)
             return True if charger_status in CHARGER_CHARGING_STATUS else None
 
-        if not self.ready_to_charge() or not self.current_charging_session["start"]:
-            reset()
+        if self.restarting_charger:
+            # stopped for the restart: the stop is kept for a whole cron interval, so the automation acts on it. Then the
+            # charger is enabled again and the plan (charge_if_needed) publishes its own action
+            if not self._waited_an_interval(self._charger_restart_stopped_at):
+                return None
+            _LOGGER.warning("Restarting charger (attempt %s): starting it again", self.restarting_charger_count)
+            self.restarting_charger = False
+            self._charger_restart_started_at = self.now()
+            self.start_charging(["enabled"])
             return None
 
-        when = self.current_charging_session["start"]
-        if self.restarting_charger_count == 0 and minutes_between(self.now(), when, error_value=self.config["cron_interval"] + 5) <= self.config["cron_interval"] * 2:
+        if charger_status in CHARGER_NOT_READY_STATUS and not self._charger_restart_disabling():
+            # unplugged: start over (also after the plan stopped). Not a status of a charger the restart just disabled
+            self._charger_restart_reset(full=True)
+            return None
+        if self.charger_action != "charge":
+            # the plan (or the site) stopped: the restarts made and a give-up are kept for its next charge
+            self._charger_restart_reset(full=False)
+            return None
+        if not self.ready_to_charge():
+            self._charger_restart_reset(full=False)
+            return None
+        if not self.current_charging_session["start"] or self._charger_restart_gave_up:
+            # the session ends every hour (hour_end) while the plan goes on: the mark and the restarts made are kept
             return None
 
-        current_charging_amps = sum(self.current_charging_amps)
-        dynamic_charger_limit = sum(self.current_charging_amps)
-        try:
-            if self.restarting_charger:
-                message = f"{t('ui.is_charging.charging_failed')}\n{t('ui.is_charging.charger_restart_count', count=self.restarting_charger_count)}"
-                self.set_charging_rule(f"⛔{message}")
-                _LOGGER.warning("Starting charging (attempts %s): Starting charging again", self.restarting_charger_count)
-                self.my_notify(message, title=f"{self.title} {t('ui.is_charging.fail_title')}", data=data, always=True, persistent_notification=True)
-                self.start_charging(force=True)
-                self.restarting_charger = False
-            elif charger_status in ENTITY_UNAVAILABLE_STATES:
-                self.set_charging_rule(f"⛔{t('ui.is_charging.charging_failed')}\n{t('ui.is_charging.charger_unavailable')}")
-                raise ValueError(f"Charger is unavailable, entity id: {charger['status_entity_id']}")
-            elif charger_status == "error":
-                self.set_charging_rule(f"⛔{t('ui.is_charging.charging_failed')}\n{t('ui.is_charging.charger_error')}")
-                raise ValueError("Charger critical error, check mobile app or Home Assistant")
-            elif charger_status in CHARGER_READY_STATUS:
-                if current_charging_amps == 0:
-                    if self.charging_is_beginning or self.restarting_charger or self.restarting_charger_count or charger_enabled != "on":
-                        reset()
-                elif self.restarting_charger_count == 3:
-                    self.set_charging_rule(f"⛔{t('ui.is_charging.charging_failed')}")
-                    raise ValueError("Charging has not started even after restarting multiple times")
-                elif self.restarting_charger_count < 3:
-                    if current_charging_amps != dynamic_charger_limit:
-                        self.set_charging_rule(f"⛔{t('ui.is_charging.charging_failed')}\n{t('ui.is_charging.charger_dynamic_failed')}")
-                        raise ValueError("Chargers dynamic circuit limit not set")
-                    if self.charging_is_beginning:
-                        self.set_charging_rule(f"⛔{t('ui.is_charging.charging_failed')}\n{t('ui.is_charging.charger_restart')}")
-                        raise ValueError("Ev is not charging, restarting charger")
-                    self.charging_is_beginning = True
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("Charging has not started as expected: %s", err)
-            if 1 < self.restarting_charger_count < 3:
-                if emoji_charging_problem not in db[when]["emoji"]:
-                    db[when]["emoji"] = db[when]["emoji"] + f" {emoji_charging_problem}"
-                    self.charging_history_combine_and_set()
-            elif self.restarting_charger_count == 3:
-                if emoji_charging_problem in db[when]["emoji"]:
-                    db[when]["emoji"] = db[when]["emoji"].replace(emoji_charging_problem, emoji_charging_error)
-                    self.charging_history_combine_and_set()
-            restarting = ""
-            if not self.restarting_charger:
-                self.restarting_charger = True
-                self.restarting_charger_count += 1
-                if self.is_entity_configured(charger["enabled_entity_id"]):
-                    _LOGGER.warning("Restarting charger (attempts %s): Stopping charger for now", self.restarting_charger_count)
-                    restarting = f"\n{t('ui.is_charging.charger_restart_count', count=self.restarting_charger_count)}"
-                    self.stop_charging(["enabled"], force=True)
-                else:
-                    _LOGGER.warning("Restarting charging (attempts %s): Stopping charging for now", self.restarting_charger_count)
-                    restarting = f"\n{t('ui.is_charging.ev_restart_count', count=self.restarting_charger_count)}"
-                    self.stop_charging(force=True)
-            self.my_notify(f"{t('ui.is_charging.ev_not_charging')}:\n{err}{restarting}", title=f"{self.title} {t('ui.is_charging.fail_title')}", data=data, always=True, persistent_notification=True)
+        if normalize_state(charger_status) == "error":
+            problem = t("ui.is_charging.charger_error")
+        elif charger_status in CHARGER_READY_STATUS and charger_status not in CHARGER_HELD_STATUS and sum(self.current_charging_amps) > 0:
+            problem = t("ui.is_charging.charger_restart")
+        else:
+            self._charger_restart_reset(full=False)  # e.g. the site gives no current: nothing to start
+            return None
+        if self._charger_restart_waiting_since is None:
+            self._charger_restart_waiting_since = self.now()
+        if self._charging_grace():
+            return None
+        idle = self._charger_power_idle()
+        if not idle:
+            if idle is None:
+                _LOGGER.debug("Charger reports %s, but its power can't tell whether it charges: no restart", charger_status)
+            self._charger_restart_reset(full=False)
+            return None
+        if not self.charging_is_beginning:
+            self.charging_is_beginning = True
+            self._charger_restart_marked_at = self.now()
+            return None
+        if not self._waited_an_interval(self._charger_restart_marked_at):
+            return None
+
+        message = f"⛔{t('ui.is_charging.charging_failed')}\n{problem}"
+        self.charging_is_beginning = False
+        self._charger_restart_marked_at = None
+        if self.restarting_charger_count >= restarts:
+            _LOGGER.warning("Charging has not started after %s restarts: giving up until it charges or is unplugged", restarts)
+            # the reason, not "restarting the charger": it doesn't any more
+            reason = f"{problem}\n" if normalize_state(charger_status) == "error" else ""
+            # shown while the plan charges (_charge_if_needed), also in the plan's later charges
+            self._charger_restart_rule = f"⛔{t('ui.is_charging.charging_failed')}\n{reason}{t('ui.is_charging.gave_up', count=restarts)}"
+            self.set_charging_rule(self._charger_restart_rule)
+            self._charger_restart_gave_up = True
+            self._note_charger_problem("gave_up")
+            self._charger_restart_history_emoji(emoji_charging_error, replace=emoji_charging_problem)
+            self.my_notify(
+                f"{t('ui.is_charging.ev_not_charging')}:\n{reason}{t('ui.is_charging.gave_up', count=restarts)}",
+                title=f"{self.title} {t('ui.is_charging.fail_title')}",
+                data={"ttl": 0, "priority": "high", "channel": "alarm_stream"}, always=True, persistent_notification=True,
+            )
+            return None
+
+        self.restarting_charger = True
+        self.restarting_charger_count += 1
+        self._charger_restart_stopped_at = self.now()
+        self._charger_restart_enabled_seen_at = None
+        if self.restarting_charger_count >= 2:
+            self._charger_restart_history_emoji(emoji_charging_problem)
+        if self.is_entity_configured(charger["enabled_entity_id"]):
+            _LOGGER.warning("Restarting charger (attempt %s): disabling the charger for now", self.restarting_charger_count)
+            restarting = t("ui.is_charging.charger_restart_count", count=self.restarting_charger_count)
+            self.stop_charging(["enabled"])
+        else:
+            _LOGGER.warning("Restarting charging (attempt %s): stopping charging for now", self.restarting_charger_count)
+            restarting = t("ui.is_charging.ev_restart_count", count=self.restarting_charger_count)
+            self.stop_charging()
+        self._charger_restart_rule = f"{message}\n{restarting}"
+        self.set_charging_rule(self._charger_restart_rule)
+        self.my_notify(f"{t('ui.is_charging.ev_not_charging')}:\n{problem}\n{restarting}", title=f"{self.title} {t('ui.is_charging.fail_title')}", always=True, persistent_notification=True)
         return None
 
+    def _note_charger_problem(self, kind: str) -> None:
+        """Note a charger that did not follow the plan (JobResult.charger_problems, the repair of management/health_checks.py).
+
+        Not while the test of the charger automation holds the charger, nor in the hour after it released it: the charger may
+        still charge from the test then. Only in a job: the coordinator publishes the note."""
+        if self._out is None or self._charger_hold is not None:
+            return
+        minutes = self._minutes_since(self._charger_test_released_at)
+        if minutes is not None and round(minutes) < NOT_FOLLOWING_AFTER_TEST:
+            return
+        self._out.charger_problems.append(kind)
+
     def charging_without_rule(self) -> bool | None:
+        if self._charger_restart_gave_up:
+            # the fail-safe asks for charging (_charge_if_needed): it is not charging without a rule
+            self.charging_no_rule_count = 0
+            self._charging_no_rule_noted = False
+            return False
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
         now = self.now()
         past = now - datetime.timedelta(minutes=minutes)
@@ -184,9 +386,17 @@ class ControlSchedule:
         # a stop "in the future" after the clock went back an hour doesn't count)
         if self.charger_stopped_at is not None and past < self.charger_stopped_at <= now:
             return False
+        # just released from the test of the charger automation (restored, not a stop): its charging is in the average too
+        released = self._minutes_since(self._charger_test_released_at)
+        if released is not None and 0 <= released < minutes:
+            return False
         entity_id = self.config["charger"]["entity_ids"]["charger_power_entity_id"]
-        power = abs(float(self.get_state(entity_id, float_type=True, error_state=0.0)))
-        power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3)
+        # the power in W, read in the sensor's own unit (a kW sensor reads 7.4 kW, not 7.4 W). No reading (not a power unit,
+        # or unavailable without its unit) is 0 W: it never triggers, and a size is never guessed
+        readable = self._charger_power_readable(entity_id)
+        state = self.get_state(entity_id, float_type=True, error_state=None)
+        power = abs(power_to_w(state, self.history.units.get(entity_id)) or 0.0) if readable else 0.0
+        power_avg = round(abs(float(self.history.get_average_value(entity_id, past, now, convert_to="W", error_state=0.0))), 3) if readable else 0.0
         trigger_count = 3
         voltage = self.config["charger"]["power_voltage"]
         if power > voltage and power_avg > voltage:
@@ -198,6 +408,9 @@ class ControlSchedule:
                 self.set_charging_rule(f"{emoji_parse({'no_rule': True})}{self.t('ui.charging_without_rule.charging_no_rule', watt=int(power_avg))}")
                 _LOGGER.warning("Charging without rule for %s power: %sW, power_avg: %sW %s times", entity_id, power, power_avg, self.charging_no_rule_count)
                 if self.charging_no_rule_count == trigger_count + 1:
+                    if not self._charging_no_rule_noted:  # the alarm runs on every cron of this run of it: noted once
+                        self._charging_no_rule_noted = True
+                        self._note_charger_problem("no_rule")
                     unavailable_entities = self.get_all_unavailable_entities()
                     if unavailable_entities:
                         lines = [f"\n\n{self.t('ui.charging_without_rule.entities_not_available')}:", *(f"\n- {entity}" for entity in unavailable_entities)]
@@ -219,6 +432,7 @@ class ControlSchedule:
             self.charging_no_rule_count += 1
         else:
             self.charging_no_rule_count = 0
+            self._charging_no_rule_noted = False
         return False
 
     def other_ev_connected(self) -> bool:
@@ -253,6 +467,10 @@ class ControlSchedule:
         updated time of the last calculation; an automation can fall back to charging
                 when it gets old (the integration stopped or hangs)
         """
+        if self.charger_hold_active():
+            # the test of the automation holds the current: nothing is planned or published until it ends
+            self._charger_test_publish()
+            return self.charger_action
         self.charger_mode = "normal"
         try:
             self.is_battery_fully_charged()
@@ -327,6 +545,10 @@ class ControlSchedule:
 
             solar = self.is_solar_production_available(inverter_watt_solar_only)
             powerwall = self.is_powerwall_discharging(powerwall_discharge_watt)
+            # the fail-safe after the restarts gave up (is_charging): charge at full power whatever the plan says. A status
+            # of "charging" without power counts too (else it starts and stops every cron)
+            charger_status = self.get_state(config["charger"]["entity_ids"]["status_entity_id"], error_state="unavailable")
+            fail_safe = self._charger_restart_gave_up and charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + ("error",)
 
             if self.no_charging_modes_active():
                 _LOGGER.debug("No charging modes active, setting amps to max")
@@ -425,19 +647,40 @@ class ControlSchedule:
                         charging_rule = f"{emoji_parse({'solar': True})}{t('ui.charge_if_needed.local_energy_charging_not_needed', percentage=self.get_max_recommended_charge_limit_battery_level())}"
                         _LOGGER.debug("EV solar charging not needed, battery over %s%%", self.get_max_recommended_charge_limit_battery_level())
                 else:
-                    if not self.charging_without_rule():
+                    if not self.charging_without_rule() and not fail_safe:
                         self.stop_current_charging_session()
                         _LOGGER.debug("No rules for charging")
                         charging_rule = t("ui.charge_if_needed.not_charging")
             else:
-                if not self.charging_without_rule():
+                if not self.charging_without_rule() and not fail_safe:
                     self.stop_current_charging_session()
                     _LOGGER.debug("EV not ready to charge")
 
             if self.fill_up_charging_enabled():
                 charging_limit = max(charging_limit, self.get_max_recommended_charge_limit_battery_level())
 
-            if sum(charger_amps) > 0.0:
+            if fail_safe:
+                # fail-safe: the restarts (is_charging) did not get the charger to charge on the plan. Charge at full power,
+                # like an error in the plan, whatever the plan says, until it charges, is done or is unplugged (is_charging
+                # ends the give-up then, and the plan decides again). The site still limits the current. Never below the
+                # plan's limit (a trip may need more than the recommended level)
+                charging_limit = max(charging_limit, self.get_max_recommended_charge_limit_battery_level())
+                circuit_amps = max_amps()
+                charger_amps = max_amps()
+                if not self.current_charging_session["start"]:
+                    self.charging_history({"Price": current_price, "Cost": 0.0, "kWh": 0.0, "battery_level": 0.0, "error": True}, "error")
+                fail_safe = t("ui.is_charging.fail_safe_max", watt=int(sum(charger_amps) * config["charger"]["power_voltage"]))
+                charging_rule = f"{self._charger_restart_rule}\n{fail_safe}" if self._charger_restart_rule else fail_safe
+
+            if self.restarting_charger and sum(charger_amps) > 0.0:
+                # the restart (is_charging) stopped or disabled the charger for this cron: starting it again here would
+                # undo it in the same publish (the automation only sees the last action). The next cron starts it. A stop
+                # is published like the plan's, at 0 A: a charger that is set by its current alone starts on the amps
+                if self.charger_action == "stop":
+                    charger_amps = [0.0, 0.0, 0.0]
+                # the reason is the restart's, not the plan's charge
+                charging_rule = self._charger_restart_rule or charging_rule
+            elif sum(charger_amps) > 0.0:
                 self.publish_charging_limit(self.verify_charge_limit(charging_limit))
                 self.start_charging()
             else:

@@ -135,23 +135,6 @@ def energypriceforecast_entities(prices: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(prices.get(key) for key in ("energypriceforecast_buy_entity_id", "energypriceforecast_sell_entity_id") if prices.get(key)))
 
 
-def price_unit_sensors(prices: Mapping[str, Any]) -> dict[str, str]:
-    """{entity_id: config key} of the configured price sensors whose unit is judged (PRICE_SENSOR_KEYS)."""
-    return {prices[key]: key for key in PRICE_SENSOR_KEYS if prices.get(key)}
-
-
-def wrong_unit_sensors(get_state: Callable[[str], Any], sensors: Mapping[str, str]) -> dict[str, str]:
-    """{entity_id: unit} of the price sensors whose unit makes their prices 100 or 1000 times too large (price_unit_error).
-    The unit attribute stays while a sensor is down, so it is judged then too; a sensor that is not there has none."""
-    found: dict[str, str] = {}
-    for entity_id, key in sensors.items():
-        state = get_state(entity_id)
-        unit = getattr(state, "attributes", {}).get("unit_of_measurement") if state is not None else None
-        if price_unit_error(key, unit):
-            found[entity_id] = str(unit)
-    return found
-
-
 def spot_without_published(key: str, values: Mapping[str, Any], get_state: Callable[[str], Any]) -> bool:
     """A spot forecast sensor that is loaded and has price rows but none of them published (spot_rows): not the price sensor of
     the integration, or attributes that differ from what the provider reads. It would give no price for today and so no real

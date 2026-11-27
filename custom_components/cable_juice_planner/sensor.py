@@ -10,9 +10,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import CHARGER_ACTION_STATES, DOMAIN, MANUFACTURER, SENSOR_DEFS, SIGNAL_SITE_UPDATE, SITE_SENSORS, SITE_TITLE
+from .const import CHARGER_ACTION_STATES, CHARGER_TEST_STATUSES, DOMAIN, MANUFACTURER, SENSOR_DEFS, SIGNAL_SITE_UPDATE, SITE_SENSORS, SITE_TITLE
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 from .site import CJPSite
@@ -30,6 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
         async_add_entities(CJPSiteSensor(entry.runtime_data, key) for key in SITE_SENSORS)
         return
     coordinator: CJPCoordinator = entry.runtime_data
+    async_add_entities([CJPChargerTestSensor(coordinator)])
     async_add_entities(
         (CJPUnrecordedSensor if key in UNRECORDED else CJPActionSensor if key == "charger_action" else CJPSensor)(coordinator, key, *definition)
         for key, definition in SENSOR_DEFS.items()
@@ -115,6 +117,38 @@ class CJPActionSensor(CJPSensor):
         return attributes
 
 
+class CJPChargerTestSensor(CJPUpdatingEntity, SensorEntity, RestoreEntity):
+    """The test of the user's charger automation: its status, and the result of every step as markdown in the attributes.
+
+    The result of the last finished test is kept over a restart. A test that was running is not (it did not finish),
+    unless it had changed the car's charge limit: then it is kept as stopped, with the note to check the limit."""
+
+    _unrecorded_attributes = frozenset({MATCH_ALL})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(CHARGER_TEST_STATUSES)
+
+    def __init__(self, coordinator: CJPCoordinator) -> None:
+        super().__init__(coordinator, "sensor", "charger_test")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_state()) is not None and last.state in ("done", "stopped", "failed", "running"):
+            self.coordinator.async_restore_charger_test({**last.attributes, "status": last.state})
+
+    @property
+    def native_value(self):
+        return self.coordinator.charger_test_state["status"]
+
+    @property
+    def extra_state_attributes(self):
+        state = self.coordinator.charger_test_state
+        return {
+            "markdown": state["markdown"], "steps": state["steps"], "reason": state["reason"], "finished": state["finished"],
+            "automation": state["automation"], "amps_control": state["amps_control"], "car_phases": state["car_phases"],
+            "limit_put_back": state.get("limit_put_back"), "plan": state.get("plan", []), "current": state.get("current"),
+        }
+
+
 class CJPUnrecordedSensor(CJPSensor):
     _unrecorded_attributes = frozenset({MATCH_ALL})
 
@@ -169,6 +203,7 @@ class CJPSiteSensor(SensorEntity):
                 "priority": coordinator.site_priority,
                 "urgent": self.site.urgent.get(entry_id, False),
                 "phase_order": coordinator.site_phase_order,
+                "in_phase_meter": coordinator.site_in_phase_meter,
                 "request": [round(a, 1) for a in self.site.requests.get(entry_id, [0.0, 0.0, 0.0])],
                 "available": [round(a, 1) for a in self.site.available_now.get(entry_id, [0.0, 0.0, 0.0])],
                 "reserved_hours": len(self.site.reservations.get(entry_id, {})),

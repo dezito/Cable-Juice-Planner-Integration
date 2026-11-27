@@ -10,6 +10,7 @@ from queue import SimpleQueue
 from typing import Any
 
 from homeassistant.components import persistent_notification
+from homeassistant.config import AUTOMATION_CONFIG_PATH
 from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED, ConfigEntry, ConfigEntryChange
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CoreState, Event, State, callback
@@ -24,8 +25,9 @@ from ..management.backup import async_load_backup, async_restore_databases, pend
 from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, PRICE_CORRECTION_MAX, SIGNAL_HELP_VALUES_CHANGED, TITLE, normalize_language, price_scale
 from ..engine import CJPEngine
 from ..management.dependency_checks import DependencyWatcher
+from ..management.health_checks import HealthWatcher
 from ..prices import stromligning_entities_to_watch
-from ..prices.currency import energypriceforecast_entities, price_unit_sensors
+from ..prices.currency import energypriceforecast_entities
 from ..utils.formatting import load_texts
 from ..utils.solcast import solcast_endings_for_days
 from ..utils.helpers import float_or_none
@@ -51,6 +53,12 @@ class CoordinatorLifecycle:
             if key.startswith(f"component.{DOMAIN}.entity.") and key.endswith(".name") and key.count(".") == 5
         }
         self.engine = CJPEngine(self.config, self.object_prefix, self.texts, title=self.title)
+        # before the first snapshot and the history buffers: the states the charger blueprint adds (coordinator/status_states.py)
+        try:
+            await self._async_load_status_aliases()
+        except Exception:  # noqa: BLE001 - a file that can't be read: the built in states alone (never stops the setup)
+            _LOGGER.debug("Could not read the states of the charger blueprint", exc_info=True)
+        self._start_status_aliases()
         if self.site is not None:
             self.site.register(self)
 
@@ -59,9 +67,10 @@ class CoordinatorLifecycle:
         # Home Assistant stopping does not unload the entries, and the what-if thread (a worker thread of an executor) is
         # waited for when the process exits: a replay with minutes left would hold up the stop or the restart
         self.entry.async_on_unload(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._on_ha_stop))
-        if self.config["home"]["ignore_cjp_chargers"]:
-            self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
-        self._start_dependency_checks()
+        # always: the chargers on their own meter of the cars ahead are added whatever ignore_cjp_chargers says
+        self.entry.async_on_unload(async_dispatcher_connect(self.hass, SIGNAL_CONFIG_ENTRY_CHANGED, self._on_config_entry_changed))
+        watched = self._start_dependency_checks()
+        await self._async_start_health_checks(watched)
 
         ent_reg = er.async_get(self.hass)
         dev_reg = dr.async_get(self.hass)
@@ -76,32 +85,79 @@ class CoordinatorLifecycle:
         await self._async_apply_restore()
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
 
-    def _start_dependency_checks(self) -> None:
-        """Repairs for Strømligning, Solcast and Energy Price Forecast sensors this car needs but that are disabled or not provided."""
+    def _start_dependency_checks(self) -> frozenset[str]:
+        """Repairs for Strømligning, Solcast and Energy Price Forecast sensors this car needs but that are disabled or not provided.
+        Returns the sensors they judge (the health checks leave them out)."""
         stromligning = stromligning_entities_to_watch(self.config["prices"]["entity_ids"])
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"] if self.solar_configured else ""
         watcher = DependencyWatcher(
             self.hass, self.entry, self.prefix, stromligning, forecast_entity, solcast_endings_for_days(7),
             price_forecast_entities=energypriceforecast_entities(self.config["prices"]["entity_ids"]),
-            price_unit_sensors=price_unit_sensors(self.config["prices"]["entity_ids"]),
         )
         watcher.start()
         self.entry.async_on_unload(watcher.stop)
+        return watcher.watched_entities
+
+    async def _async_start_health_checks(self, watched: frozenset[str]) -> None:
+        """Repairs for what this car needs and for what went wrong with it (management/health_checks.py)."""
+        charger = self.config["charger"]["entity_ids"]
+        ev = self.config["ev_car"]["entity_ids"]
+        home = self.config["home"]["entity_ids"]
+        solar = self.config["solar"]["entity_ids"]
+        watcher = HealthWatcher(
+            self.hass,
+            self.entry,
+            self.prefix,
+            entities=[*self.configured_entities, *self.price_entities],
+            watched=watched,
+            charger_power_entities=[charger["charger_power_entity_id"]],
+            power_entities=[
+                home["power_consumption_entity_id"],
+                home["powerwall_watt_flow_entity_id"],
+                solar["production_entity_id"],
+                # the chargers of the other cars are read by the other car's entry, not here
+                *(entity_id for entity_id in home["ignore_consumption_from_entity_ids"] if entity_id not in self.auto_ignored_entities),
+            ],
+            battery_entities=[home["powerwall_battery_level_entity_id"], ev["usable_battery_level_entity_id"] if self.ev_configured else ""],
+            energy_entities=[charger["kwh_meter_entity_id"], charger["lifetime_kwh_meter_entity_id"]],
+            status_entity=charger["status_entity_id"],
+            consumption_entity=home["power_consumption_entity_id"],
+            charger_in_house_meter=self.config["home"].get("charger_in_house_meter", True),
+            action_sensor=f"sensor.{self.object_prefix}_charger_action",
+            automations_path=self.hass.config.path(AUTOMATION_CONFIG_PATH),
+            price_problems=self._price_unit_problems,
+            canonical_status=self.canonical_status,
+        )
+        await watcher.async_load()
+        watcher.start()
+        self.entry.async_on_unload(watcher.stop)
+        self.health_watcher = watcher
+
+    def _price_unit_problems(self) -> tuple[list[tuple[str, str]], bool] | None:
+        """The price entities in a wrong unit (CombinedPriceProvider.price_unit_problems); None while there is no price provider
+        yet, so the repair is not judged. Only reads the states."""
+        provider = self.price_provider
+        if provider is None:
+            return None
+        return provider.price_unit_problems(self.hass.states.get)
 
     @callback
     def _on_config_entry_changed(self, change: ConfigEntryChange, entry: ConfigEntry) -> None:
-        """A car was added, removed, enabled, disabled, got another charger or another priority: start again with the new list.
+        """A car was added, removed, enabled, disabled, got another charger or priority, or had its charger moved into or
+        out of the house meter (charger_in_house_meter): start again with the new lists.
 
         The signal also comes for every state change of a car's entry (loading, reloading), so the chargers of the cars
-        with a lower priority are compared with the ones this start used; only a real difference reloads, and only once.
+        with a lower priority (only while ignore_cjp_chargers is on) and the chargers on their own meter of the cars ahead
+        (always) are compared with the ones this start used; only a real difference reloads, and only once.
         A reload changes nothing in the options of the other cars, so the cars never reload each other in turn.
         """
         if entry.domain != DOMAIN or entry.entry_id == self.entry.entry_id or self._chargers_reload_scheduled:
             return
-        if self._lower_priority_chargers() == self.lower_priority_chargers:
+        lower = self._lower_priority_chargers() if self.config["home"]["ignore_cjp_chargers"] else []
+        if lower == self.lower_priority_chargers and self._own_meter_chargers_ahead() == self.added_chargers:
             return
         self._chargers_reload_scheduled = True
-        _LOGGER.info("The chargers of the cars with a lower priority changed, reloading %s to leave out their consumption", self.entry.title)
+        _LOGGER.info("The chargers of the other cars changed, reloading %s to count their consumption right", self.entry.title)
         self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 
     async def _async_apply_restore(self) -> None:
@@ -159,6 +215,8 @@ class CoordinatorLifecycle:
             self._settings_debounce()
         if self._charging_loss_timeout:
             self._charging_loss_timeout()
+        # a running test of the charger automation puts the plan back while the worker still runs
+        await self.async_unload_charger_test()
         for task in (self._public_cost_task, *self._tasks):
             if task and not task.done():
                 task.cancel()

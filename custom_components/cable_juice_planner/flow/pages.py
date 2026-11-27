@@ -14,7 +14,7 @@ from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTIT
 from ..site import charger_devices, circuit_of, update_circuits
 from ..management.dependency_checks import disabled_sensors
 from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices, price_currency_errors, price_sensor_errors, DEFAULT_COUNTRY, default_providers, provider_errors
-from ..utils.chargers import charger_power_entity, lower_priority_charger_power_entities, site_priority
+from ..utils.chargers import charger_in_house_meter, charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
 from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDERS, SPOT_PRICE_PROVIDERS, build_schema, normalize_input, validate_step
@@ -73,8 +73,10 @@ class CJPFlowPages:
             return "stromligning" in self._providers
         if step == "prices_stromligning_tariffs":
             return "stromligning" in self._providers and has_stromligning_sell_prices(self._options)
-        if step in ("solar_charging", "weather"):
+        if step == "solar_charging":
             return bool(self._options.get("production_entity_id"))
+        # weather is not only for solar: preheating, the outdoor temperature of the drives and Adjust driving efficiency
+        # to temperature use it too, so the page is shown without solar as well
         if step == "detection_review":
             return bool(self._options.get("powerwall_watt_flow_entity_id"))  # without a home battery there is nothing to suggest
         return True
@@ -216,7 +218,10 @@ class CJPFlowPages:
             if self._options.get("ignore_cjp_chargers", True)
             else []
         )
-        return [*([ignored] if isinstance(ignored, str) else ignored), *([own] if own else []), *behind]
+        # a charger on its own meter is not in the house consumption: the engine adds it instead of subtracting it, and the
+        # detection reads the sensors as they are, so it is not left out there
+        left_out = [own] if own and charger_in_house_meter(self._options) else []
+        return [*([ignored] if isinstance(ignored, str) else ignored), *left_out, *behind]
 
     # the country field is suggested from Home Assistant's country once, for a new entry (an import or a backup keeps its own)
     _price_country_shown = False

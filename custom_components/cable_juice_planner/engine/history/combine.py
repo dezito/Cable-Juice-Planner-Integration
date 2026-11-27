@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 
 from ...const import ENTITY_UNAVAILABLE_STATES, price_decimals
 from ...utils.formatting import (
@@ -366,7 +367,15 @@ class HistoryCombine:
         history.append("\n</details>\n")
 
     def charging_power_to_emulated_battery_level(self) -> None:
-        """Without a car integration the virtual battery level follows the charger meter."""
+        """Without a car integration the virtual battery level follows the charger meter.
+
+        Counted from an anchor (meter kWh, level, base) that is kept across CJP's hourly sessions and restarts (runtime
+        state): only whole percents are added, and the anchor moves by their kWh, so a slow charge (under 1 % per cron)
+        still adds up instead of being rounded away. A level that is not the one counted (entered by the user, or set when
+        the car was done), a meter that went back (a meter per session) or an unplug (virtual_charge_unplugged) starts
+        again from the meter now: never from an older meter, whose kWh may be another car's or already counted (a less
+        favourable level, at most one cron of charging). base is the level the count started from: 0 % is the level of an
+        unplugged car, no level entered (the departure notices need a real level). An unknown meter changes nothing."""
         if self.is_ev_configured() or not self.current_charging_session.get("start"):
             return
         now = self.now()
@@ -375,17 +384,47 @@ class HistoryCombine:
         watt = self.history.get_average_value(charger["charger_power_entity_id"], past, now, convert_to="W", error_state=0.0)
         if watt == 0.0:
             return
-        current_charger_meter = float(self.get_state(charger["kwh_meter_entity_id"], float_type=True))
-        added_kwh = round(current_charger_meter - self.current_charging_session.get("start_charger_meter", 0.0), 1)
-        if "last_charger_meter" in self.current_charging_session:
-            added_kwh = round(current_charger_meter - self.current_charging_session["last_charger_meter"], 1)
-        self.current_charging_session["last_charger_meter"] = current_charger_meter
-        added_percentage = round(self.kwh_to_percentage(added_kwh, include_charging_loss=True))
-        current_battery_level = self.battery_level()
-        charging_ceiling = max(current_battery_level, self.get_completed_battery_level() - 1.0)
-        new_battery_level = min(round(current_battery_level + added_percentage, 0), charging_ceiling)
-        _LOGGER.debug("Adding %s%% to virtual battery level: %s%% -> %s%%", added_percentage, current_battery_level, new_battery_level)
-        self.set_setting("battery_level", new_battery_level)
+        meter_id = charger["kwh_meter_entity_id"]
+        meter = self.get_state(meter_id, float_type=True, try_history=False, error_state=None)
+        if not isinstance(meter, float) or not math.isfinite(meter):
+            return
+        factor = {"Wh": 0.001, "MWh": 1000.0}.get(self._snap.units.get(meter_id) if self._snap is not None else None, 1.0)
+        meter *= factor
+        level = float(self.battery_level())
+        anchor = self.virtual_charge_anchor
+        entered = not isinstance(anchor, dict) or abs(level - anchor["level"]) > 0.5
+        if entered or anchor["meter"] is None or meter < anchor["meter"]:
+            # a new meter (unplugged, a meter per session) does not make the counted level an entered one
+            anchor = {"meter": meter, "level": level, "base": level if entered else anchor["base"]}
+        added = math.floor(self.kwh_to_percentage(meter - anchor["meter"], include_charging_loss=True))
+        if added >= 1:
+            ceiling = max(level, self.get_completed_battery_level() - 1.0)
+            new_level = min(level + added, ceiling)
+            # at the ceiling the rest is not kept for later
+            used = self.percentage_to_kwh(added, include_charging_loss=True) if new_level == level + added else meter - anchor["meter"]
+            anchor = {"meter": anchor["meter"] + used, "level": new_level, "base": anchor["base"]}
+            _LOGGER.debug("Adding %s%% to virtual battery level: %s%% -> %s%%", added, level, new_level)
+            self.set_setting("battery_level", new_level)
+        if anchor != self.virtual_charge_anchor:
+            self.virtual_charge_anchor = anchor
+            self.mark_dirty("runtime")
+
+    def virtual_charge_unplugged(self) -> None:
+        """Unplugged: the next charge counts from the meter then. The level and its base are kept: plugged in again before
+        the cron set the level to 0 %, a level counted up from 0 % is still no entered one."""
+        anchor = self.virtual_charge_anchor
+        if isinstance(anchor, dict) and anchor["meter"] is not None:
+            self.virtual_charge_anchor = {**anchor, "meter": None}
+            self.mark_dirty("runtime")
+
+    def virtual_charge_level_cleared(self) -> None:
+        """The cron set an unplugged car's level to 0 %: the count is at 0 % from 0 % (no level entered), so any level
+        entered after it is one (also the one counted before the unplug), and a charge without one is counted from 0 %."""
+        anchor = self.virtual_charge_anchor
+        cleared = {"meter": None, "level": 0.0, "base": 0.0}
+        if isinstance(anchor, dict) and anchor != cleared:
+            self.virtual_charge_anchor = cleared
+            self.mark_dirty("runtime")
 
     def charging_history(self, charging_data=None, charging_type="") -> dict | None:
         """Start, update or end the current charging session (the old queue worker)."""

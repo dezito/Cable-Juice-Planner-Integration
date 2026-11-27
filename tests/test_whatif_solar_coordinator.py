@@ -57,8 +57,13 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
         # the first sell sensor has no statistics: the history (and its conversion) is the second one's
         return {entity_id: [] if entity_id == "sensor.sell_first" else [{"start": start, "mean": 1500.0 if "solar" in entity_id else 800.0}] for entity_id in ids}
 
+    def metadata(hass_, *, statistic_ids):
+        return {entity_id: (n, {"unit_of_measurement": "W"}) for n, entity_id in enumerate(sorted(statistic_ids)) if entity_id in ("sensor.solar", "sensor.house", "sensor.charger")}
+
     provider = coordinator.price_provider
-    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch.object(
+    with patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics), patch(
+        "homeassistant.components.recorder.statistics.get_metadata", side_effect=metadata
+    ), patch.object(
         coordinator.engine, "is_solar_configured", return_value=True
     ), patch.dict(coordinator.config["solar"]["entity_ids"], {"production_entity_id": "sensor.solar"}), patch.dict(
         coordinator.config["home"]["entity_ids"], {"power_consumption_entity_id": "sensor.house"}
@@ -70,8 +75,8 @@ async def test_the_economy_refresh_reads_the_sell_price_and_the_solar_house_and_
     assert data["sell_history"] == {start.timestamp(): 800.0}
     assert data["sell_history_entity_id"] == "sensor.sell"
     assert data["power_hours"] == {start.timestamp(): {"solar": 1500.0, "house": 800.0, "ev": 800.0}}
-    # the power is asked for in watts whatever unit the sensors have, hourly means
-    assert seen[("sensor.charger", "sensor.house", "sensor.solar")] == ("hour", {"power": "W"}, {"mean"})
+    # the power is asked for in watts (kWh for a power sensor in an h unit) whatever unit the sensors have, hourly means
+    assert seen[("sensor.charger", "sensor.house", "sensor.solar")] == ("hour", {"power": "W", "energy": "kWh"}, {"mean"})
 
 
 async def test_the_recorded_sell_price_of_a_sensor_per_mwh_is_converted_to_kwh(hass: HomeAssistant, loaded_entry) -> None:

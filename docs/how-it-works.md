@@ -28,20 +28,55 @@ each departure.
 
 CJP measures every drive (from unplugging to plugging in): km, battery % used and the outdoor temperature.
 From that it knows the car's **driving efficiency**, km/kWh and the realistic range – so "50 km" means the
-battery % the car really uses, also in winter.
+battery % the car really uses, also in winter. With [*Adjust driving efficiency to temperature*](temperature-efficiency.md)
+on, the plan also moves the learned km/kWh to the forecast outdoor temperature of each planned drive when that is
+colder – never above the learned value.
 
 ### Solar surplus
 
 With solar panels, the plan uses the forecast **surplus** (production minus the house's consumption) from
-Solcast and/or CJP's own history per weather type. With both, Solcast counts 75 % and the history 25 %;
-when the history has no measurement for the hour and weather type (e.g. on a new installation), Solcast is
-used alone. The surplus the car can use is subtracted from what has to be bought. See
+the solar forecast integration (Solcast, Forecast.Solar or Helios Forecast) and/or CJP's own history per weather
+type. With both, the forecast integration counts 75 % and the history 25 %; when the history has no measurement for
+the hour and weather type (e.g. on a new installation), the forecast integration is used alone. An hour with neither
+counts as no sun. The surplus the car can use is subtracted from what has to be bought. See
 [Solar surplus charging](rules/solar.md).
+
+Solcast gives the production per hour in the `detailedHourly` attribute of its day sensors. Forecast.Solar and Helios
+Forecast are read from the forecast they give the Energy dashboard (energy per period, keyed by time), turned into
+the same hourly rows:
+
+- Helios Forecast keys a value by the **start** of its hour, Forecast.Solar by the **end** of its period (the sunrise,
+  the whole hours and the sunset). A Forecast.Solar value therefore counts in the hour before its key; its first value
+  has no known start and is not used.
+- The energy of a period is spread over the time it covers and added up per hour of the Home Assistant time zone. On
+  the day the clocks go back, the hour that occurs twice gets the energy of both; the hour skipped in spring gets none.
+- Only hours the forecast covers completely are used. A missing hour, a value that is not a number or is negative,
+  and a partly covered hour at either end of the forecast are not counted as a forecast of 0: they are planned from
+  the weather forecast and the stored solar history, and an hour with neither counts as no sun. The hours are kept by
+  their time, so a missing hour never moves another one. Values more than a day old or more than 16 days ahead are
+  ignored.
+- Forecast.Solar has one entry per roof plane. The planes listed together with the selected one as the forecast of a
+  solar source in the Energy dashboard are added up, only for the hours every plane covers; a plane that is not
+  loaded means no forecast until it is.
+- How old the forecast is, is not checked (as with Solcast). See
+  [Forecast.Solar or Helios Forecast](getting-started.md#forecastsolar-or-helios-forecast).
 
 ### Prices
 
 Buy prices per hour (or 15 minutes) from Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast
 integration, and sell prices for the solar surplus.
+
+**Two price integrations with different intervals.** The providers can have different interval lengths
+(Strømligning's buy price is hourly, Energi Data Service's is every 15 minutes). CJP puts all prices on one common
+interval: the finest one they all fit on (the greatest common divisor of the interval lengths, for example 15 minutes
+for hourly plus 15 minute prices, 5 minutes for 10 plus 15 minute prices). A price that covers a longer interval is
+repeated over every slot of it, and each slot gets the price of the first provider that has one (Strømligning before
+Energi Data Service, real prices before forecasts). So an hourly price covers its whole hour: it is never mixed with
+the other provider's quarters inside that hour. The plan is made per slot, but the overview and the charging history
+still show hours or longer stretches as one window (for example 03:00-03:52).
+A price missing from a feed (for example one that is not a number) is a gap in the combined prices: the price before
+it is not repeated over it, and the next price integration fills it. The price history only fills an hour that has no
+price at all, and the planner reads a slot without a price as running to the next one.
 
 Price timestamps mark the start of each interval. CJP supports different interval lengths in the same hour:
 each price applies until the next timestamp, up to the end of that hour. After a longer gap, CJP limits the
@@ -64,14 +99,14 @@ from tomorrow on, and today's hours without a published price are not planned. T
 **Providers of your own published prices** (EPEX Spot, GE-Spot, Octopus Energy, Nord Pool) give the buy price of the sensor as it is (the
 VAT, surcharge and fees are the user's, set in the integration); the sell price is the wholesale price of a second sensor, a field of the
 same sensor (GE-Spot) or the export rates (Octopus Energy), less the sell fee, and 0 less the fee for Octopus without an export tariff.
-They give today and tomorrow, no forecast, and stand before the estimating providers: a provider with a forecast fills the days after. The real
-prices of a provider are the price of the whole hour: the rows of another period of a later provider (quarters next to an hourly price) are not
-mixed into it.
+They give today and tomorrow, no forecast, and stand before the estimating providers: a provider with a forecast fills the days after. An hourly
+price is repeated over the quarters of the hour when another provider has 15-minute prices (one common interval for the whole plan), so the
+quarters of a later provider never fill a slot of it.
 
 **A market without published prices** (Energy Price Forecast in Finland, Great Britain, SE1/SE2 and others) needs
 the own price source of Energy Price Forecast (a Nord Pool or ENTSO-e sensor), which gives it published prices from
 midnight: with only a forecast, today has no price before the present, so the price page refuses the sensor, and an existing setup gets a repair when a sensor has had only a forecast for at least an hour (it goes by itself when published prices are back). A
-forecast never enters an hour that has a real price, also not one of another provider with other periods, and only
+forecast never fills a slot that has a real price, also not one of another provider with other periods, and only
 real prices are stored in the price history.
 
 **Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
@@ -91,7 +126,7 @@ prices are rounded to 3 decimals instead of 2. Your own settings are never chang
 suggested for a new car follows the currency (an import or a restored backup keeps its fee), so after changing
 to prices in another currency, check the *Sell fee*. A sensor without a known unit
 leaves the scale as it is (kroner for a new car), and Home Assistant's own currency setting is not used for
-this. The price pages of Energi Data Service, Energy Price Forecast and the spot forecast integrations refuse a sensor in cents or pence (Wattcast gives ct/kWh and is read as euro) (and Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool one per MWh or Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). The forecast sensor of Wattcast says its unit too (`forecast_unit`): in another unit than ct/kWh it gives no prices, with a warning in the log and no repair. Every
+this. The price pages of Energi Data Service, Energy Price Forecast and the spot forecast integrations refuse a sensor in cents or pence (Wattcast gives ct/kWh and is read as euro) (and Energi Data Service, Spot Forecast, Elprisprognos, EPEX Spot, GE-Spot and Nord Pool one per MWh or Wh, Energy Price Forecast one per Wh; Energy Price Forecast converts a price per MWh to kWh). A sensor that gets such a unit after the setup gives no prices (the planner uses the stored prices instead and the charging is booked at the stored price of the hour, not at 0, a repair names the sensor, and its recorded history is left out of the what-if). The forecast sensor of Wattcast says its unit too (`forecast_unit`): in another unit than ct/kWh it gives no prices, with a warning in the log and no repair. Every
 price sensor must be in the same currency (a backup provider in another currency is refused). The rates are rough: they only set the size of the limits, no price is ever converted between currencies. Currencies worth
 much less than a krone (CZK, HUF, ISK) are not recognised yet.
 
@@ -124,7 +159,12 @@ existing capacity assumption unchanged. The learned cap never raises the charger
 
 The comparison within a session reduces, but cannot eliminate, the effect of solar, charger, or site limits on
 the observed power. Phase grouping uses CJP's recorded per-phase amp settings, not separate measurements of
-current on each physical phase. This is a planning estimate only; the integration does not send a lower-power
+current on each physical phase. The measured power must agree with them: a segment whose power is more than 15 % above
+what the commanded current on the commanded phases can give (the charger charged by itself, or on more phases or current
+than CJP commanded) has no confirmed phase count and is not used. Power below the commanded power is a taper and is kept.
+The same phase count feeds the charging-loss model: a segment without a confirmed count takes the count the power implies
+(above 3.8 kW on a 3-phase charger it is 3 phases). Segments stored earlier are not judged again, they age out of the
+history. This is a planning estimate only; the integration does not send a lower-power
 command to the charger. The [battery-level power analysis](dashboard-analysis.md#charging-power-by-battery-level) shows the learned
 bands.
 
@@ -165,9 +205,12 @@ daily minimum, or the max. recommended limit.
   the plan starts from the last level it reported in the last 24 hours. When the value is broken (`nan`,
   `inf`, text), it only looks 6 hours back. Without a level in that time the plan starts from 0 %, so it plans
   more charging, never less.
-- **Solcast missing:** the solar forecast uses CJP's own history.
+- **The solar forecast integration missing** (Solcast, Forecast.Solar or Helios Forecast, or an hour it does not
+  cover): the solar forecast uses CJP's own history with the weather forecast; an hour with neither counts as no sun.
 - **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the max.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.
-- **The charger doesn't charge although it should:** `charger_enabled` is toggled off and on (up to 3
-  times), with notifications along the way.
+- **The charger doesn't charge although it should:** it is stopped and started again (or `charger_enabled`
+  toggled off and on), up to 3 times, with notifications along the way. Then, as a fail-safe, the action is
+  `charge` at max. current in every hour until it charges, is done or the cable is unplugged
+  ([details](charger-control.md)).
 - **The integration stops or hangs:** covered by the [blueprint's fail-safe](charger-control.md#fail-safe).

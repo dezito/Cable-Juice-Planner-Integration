@@ -181,8 +181,9 @@ def test_a_forecast_of_another_provider_never_enters_an_hour_with_a_real_price()
         _Stub("quarters", {}, {_at(10, minute): 99.0 for minute in (0, 15, 30, 45)} | {_at(11, 15): 5.0}),
     ]
     prices, real, sources, _details = combined._combine("buy")
-    assert prices == {_at(10): 1.0, _at(11, 15): 5.0} and real == {_at(10): 1.0}
-    assert sources[_at(11, 15)] == "quarters:forecast"
+    hour = {_at(10, minute): 1.0 for minute in (0, 15, 30, 45)}  # the hourly price is repeated over the four quarters of the common interval
+    assert prices == {**hour, _at(11, 15): 5.0} and real == hour
+    assert all(sources[start] == "hourly:real" for start in hour) and sources[_at(11, 15)] == "quarters:forecast"
 
 
 def test_a_missing_or_wrong_attribute_gives_no_prices_instead_of_an_error() -> None:

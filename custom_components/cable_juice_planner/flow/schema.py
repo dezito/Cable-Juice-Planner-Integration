@@ -11,6 +11,8 @@ from homeassistant.helpers import selector
 
 from ..const import DASHBOARD_ICON_RE, DEFAULT_DASHBOARD_ICON, PHASE_ORDERS, SITE_DEFAULTS, SITE_FIELDS, CONFIG_KEYS_RENAMING, ENTITY_OPTION_KEYS, LANGUAGES, LIST_OPTION_KEYS, NUMBER_SETTINGS, OPTION_PATHS, currency_symbol, dashboard_icon, default_options, normalize_language
 from ..utils.helpers import delete_dict_key_with_path, get_dict_value_with_path, set_dict_value_with_path
+from ..utils.solar_forecast import KEY_SEMANTICS
+from ..utils.solcast import SOLCAST_PLATFORM
 
 
 PREFIX_RE = re.compile(r"^(?:[a-z][a-z0-9_]{0,40})?$")  # optional, entity ids are cjp_<prefix>_*
@@ -54,14 +56,23 @@ CONFIG_FLOW_STEPS = [
 ]
 
 
-def _entity(domain: str | list[str], *, device_class: str | list[str] | None = None, integration: str | None = None, multiple: bool = False) -> selector.EntitySelector:
-    """Entity picker limited to the relevant entities (domain + device class or integration)."""
+def _entity(
+    domain: str | list[str],
+    *,
+    device_class: str | list[str] | None = None,
+    integration: str | tuple[str, ...] | None = None,
+    multiple: bool = False,
+) -> selector.EntitySelector:
+    """Entity picker limited to the relevant entities (domain + device class or integration).
+
+    Several integrations give one filter each: the picker offers an entity that matches any of them.
+    """
     entity_filter: dict[str, Any] = {"domain": domain}
     if device_class:
         entity_filter["device_class"] = device_class
-    if integration:
-        entity_filter["integration"] = integration
-    return selector.EntitySelector(selector.EntitySelectorConfig(filter=[entity_filter], multiple=multiple))
+    integrations = (integration,) if isinstance(integration, str) else integration or ()
+    filters = [{**entity_filter, "integration": name} for name in integrations] or [entity_filter]
+    return selector.EntitySelector(selector.EntitySelectorConfig(filter=filters, multiple=multiple))
 
 
 def _number(minimum: float, maximum: float, step: float, unit: str | None = None) -> selector.NumberSelector:
@@ -94,6 +105,7 @@ SELECTORS: dict[str, Any] = {
     # load balancing (only shown when a site entry exists)
     "site_priority": _number(1, 10, 1),
     "site_phase_order": selector.SelectSelector(selector.SelectSelectorConfig(options=list(PHASE_ORDERS), mode=selector.SelectSelectorMode.DROPDOWN)),
+    "charger_in_phase_meter": BOOLEAN,
     # car
     "usable_battery_level_entity_id": _entity("sensor", device_class="battery"),
     "simulate_battery_level_while_charging": BOOLEAN,
@@ -113,6 +125,7 @@ SELECTORS: dict[str, Any] = {
     "power_consumption_entity_id_include_powerwall_discharging": BOOLEAN,
     "ignore_consumption_from_entity_ids": _entity("sensor", device_class="power", multiple=True),
     "ignore_cjp_chargers": BOOLEAN,
+    "charger_in_house_meter": BOOLEAN,
     "powerwall_watt_flow_entity_id": _entity("sensor", device_class="power"),
     "invert_powerwall_watt_flow_entity_id": BOOLEAN,
     "powerwall_battery_level_entity_id": _entity("sensor", device_class="battery"),
@@ -154,7 +167,8 @@ SELECTORS: dict[str, Any] = {
     "spot_surcharge": _number(0, 10, 0.001, "{valuta_kwh}"),
     # solar / weather
     "production_entity_id": _entity("sensor", device_class="power"),
-    "forecast_entity_id": _entity("sensor", integration="solcast_solar"),
+    # Solcast (its detailedHourly), or Forecast.Solar / Helios Forecast (their solar forecast for the Energy dashboard)
+    "forecast_entity_id": _entity("sensor", integration=(SOLCAST_PLATFORM, *KEY_SEMANTICS)),
     "inverter_discharging_power_limit": _number(100, 100000, 100, "W"),
     "enable_selling_during_expensive_hours": BOOLEAN,
     # -1 = use the hourly sell price
@@ -171,6 +185,14 @@ SELECTORS: dict[str, Any] = {
     # notifications
     "efficiency_on_cable_plug_in": BOOLEAN,
     "preheating": BOOLEAN,
+    "departure_readiness": BOOLEAN,
+    "notify_charger_offline": BOOLEAN,
+    "notify_cheap_power": BOOLEAN,
+    "notify_manual_expensive": BOOLEAN,
+    "notify_monthly_summary": BOOLEAN,
+    "notify_site_limit": BOOLEAN,
+    "notify_battery_full": BOOLEAN,
+    "notify_charging_loss": BOOLEAN,
     # advanced / database
     "cron_interval": selector.SelectSelector(selector.SelectSelectorConfig(options=CRON_INTERVALS, mode=selector.SelectSelectorMode.DROPDOWN)),
     "dashboard": BOOLEAN,

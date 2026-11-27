@@ -23,9 +23,13 @@ class Snapshot:
     statistics: dict[str, list] = field(default_factory=dict)
     price_data: dict | None = None
     forecast_dict: dict | None = None
+    # normalised hourly solar forecast rows by entity id: Solcast's detailedHourly, or the rows of Forecast.Solar or Helios
+    # Forecast in the same shape (utils/solar_forecast.py); the name stays for the debug exports that hold it
     solcast: dict[str, list] = field(default_factory=dict)
     astral: Any = None  # astral.Observer
     site: dict | None = None  # load balancing, see engine/site
+    # whether the charger automation has steps that set the car's charge limit; None: not known (coordinator/status_states.py)
+    car_limit_steps: bool | None = None
 
 
 @dataclass
@@ -45,5 +49,10 @@ class JobResult:
     error: BaseException | None = None
     request_reload: bool = False
     site: dict | None = None  # reservation / request / urgent for the site
+    # charger events for the repair "charger_not_following" (management/health_checks.py): "gave_up" or "no_rule"
+    charger_problems: list[str] = field(default_factory=list)
+    # whether the house consumption sensor includes the charger, for the repair "charger_outside_house_meter"
+    # (engine/energy/meter_check.py charger_meter_verdict); None: not judged in this job
+    charger_meter: dict[str, Any] | None = None
     worker_thread: str = ""
     duration: float = 0.0
