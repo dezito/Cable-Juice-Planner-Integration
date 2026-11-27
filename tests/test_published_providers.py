@@ -32,7 +32,7 @@ from custom_components.cable_juice_planner.prices.published_rows import epex_row
 
 from custom_components.cable_juice_planner.management.dashboard_build import TEMPLATE_DIR
 from .test_energypriceforecast import _balanced
-from .test_price_country import _defaults, _to_price_provider
+from .test_price_country import _defaults, _offered, _to_price_provider
 
 CHART_DIR = TEMPLATE_DIR / "prices"
 
@@ -361,11 +361,11 @@ def test_the_unit_rules_of_the_new_keys() -> None:
 
 # --- the config flow ------------------------------------------------------------------------------------------------------------------
 async def test_octopus_with_a_forecast_provider_in_great_britain_asks_for_its_rates_and_not_for_a_vat_and_a_surcharge(hass: HomeAssistant) -> None:
-    result = await _to_price_provider(hass)
+    result = await _to_price_provider(hass, price_country="GB")
     flow = hass.config_entries.flow
-    refused = await flow.async_configure(result["flow_id"], {"price_country": "GB", "price_providers": ["octopus"]})
+    refused = await flow.async_configure(result["flow_id"], {"price_providers": ["octopus"]})
     assert refused["errors"] == {"base": "price_provider_no_forecast"}
-    result = await flow.async_configure(result["flow_id"], {"price_country": "GB", "price_providers": ["octopus", "energypriceforecast"]})
+    result = await flow.async_configure(result["flow_id"], {"price_providers": ["octopus", "energypriceforecast"]})
     assert result["step_id"] == "prices_energypriceforecast"
     result = await flow.async_configure(result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf", "energypriceforecast_sell_entity_id": "sensor.epf_sell"})
     assert result["step_id"] == "prices_octopus"
@@ -375,11 +375,16 @@ async def test_octopus_with_a_forecast_provider_in_great_britain_asks_for_its_ra
 
 
 async def test_nord_pool_is_not_offered_in_great_britain_and_epex_spot_is_offered_anywhere(hass: HomeAssistant) -> None:
-    result = await _to_price_provider(hass)
+    from homeassistant.data_entry_flow import InvalidData
+
+    result = await _to_price_provider(hass, price_country="GB")
     flow = hass.config_entries.flow
-    refused = await flow.async_configure(result["flow_id"], {"price_country": "GB", "price_providers": ["nordpool", "energypriceforecast"]})
-    assert refused["errors"] == {"base": "price_provider_country"}
-    result = await flow.async_configure(result["flow_id"], {"price_country": "PL", "price_providers": ["epexspot", "energypriceforecast"]})
+    assert "nordpool" not in _offered(result) and {"octopus", "epexspot"} <= set(_offered(result))
+    with pytest.raises(InvalidData):  # the page only takes what it lists
+        await flow.async_configure(result["flow_id"], {"price_providers": ["nordpool", "energypriceforecast"]})
+    result = await _to_price_provider(hass, price_country="PL")
+    assert "epexspot" in _offered(result)
+    result = await flow.async_configure(result["flow_id"], {"price_providers": ["epexspot", "energypriceforecast"]})
     assert result["step_id"] == "prices_energypriceforecast"
     result = await flow.async_configure(result["flow_id"], {"energypriceforecast_buy_entity_id": "sensor.epf", "energypriceforecast_sell_entity_id": "sensor.epf_sell"})
     assert result["step_id"] == "prices_epexspot"
@@ -389,9 +394,9 @@ async def test_nord_pool_is_not_offered_in_great_britain_and_epex_spot_is_offere
 async def test_the_fee_page_of_a_provider_of_published_prices_has_no_vat_and_surcharge(hass: HomeAssistant) -> None:
     from homeassistant.data_entry_flow import InvalidData
 
-    result = await _to_price_provider(hass)
+    result = await _to_price_provider(hass, price_country="DK")
     flow = hass.config_entries.flow
-    result = await flow.async_configure(result["flow_id"], {"price_country": "DK", "price_providers": ["nordpool", "energidataservice"]})
+    result = await flow.async_configure(result["flow_id"], {"price_providers": ["nordpool", "energidataservice"]})
     assert result["step_id"] == "prices_energidataservice"
     result = await flow.async_configure(result["flow_id"], {"energidataservice_buy_entity_id": "sensor.eds"})
     assert result["step_id"] == "prices_nordpool"

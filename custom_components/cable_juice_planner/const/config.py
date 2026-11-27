@@ -158,7 +158,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         # none by default, a buy price without them would be too low, so they must be set
         "spot_vat": None,
         "spot_surcharge": None,
-        "country": "DK",  # ISO 3166-1 alpha-2: the country of the prices (the price provider page); Denmark for entries from before it
+        "country": "DK",  # ISO 3166-1 alpha-2: the country of the prices (the country page of the flow and General); Denmark for entries from before it
         # not a page of the flow: set when the entry is made from the unit of the price sensors (const/base.py price_scale)
         "price_scale": 1.0,
     },
@@ -322,7 +322,7 @@ OPTION_PATHS: dict[str, str] = {
 
 # Config/options flow pages: step id -> option keys shown on that page
 FLOW_STEPS: dict[str, list[str]] = {
-    "general": ["language", "dashboard_icon"],
+    "general": ["language", "price_country", "dashboard_icon"],
     "charger": [
         "status_entity_id",
         "charger_power_entity_id",
