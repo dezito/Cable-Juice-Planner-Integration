@@ -179,6 +179,15 @@ def register_charger(hass: HomeAssistant, entity_id: str, name: str) -> str:
 
 
 @pytest.fixture
+def charges_at_max(monkeypatch) -> None:
+    """For tests that need a plan that charges at max current whatever the prices and the hour: manual charging is on in
+    every engine, also after an unplug (with every charging rule off nothing is charged)."""
+    from custom_components.cable_juice_planner.engine import CJPEngine  # noqa: PLC0415
+
+    monkeypatch.setattr(CJPEngine, "manual_charging_enabled", lambda self: True)
+
+
+@pytest.fixture
 def mock_entry() -> MockConfigEntry:
     return make_entry()
 

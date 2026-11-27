@@ -23,6 +23,9 @@ from .conftest import CHARGER_POWER, CHARGER_STATUS, MOCK_OPTIONS, MOCK_OPTIONS_
 ACTION = "sensor.cjp_test_charger_action"
 ENABLED = "switch.charger_enabled"
 INTERVAL = 5  # the default cron interval
+# the restart needs a plan that charges: with every charging rule off nothing is charged
+pytestmark = pytest.mark.usefixtures("charges_at_max")
+
 MOMENTS = ("_charger_restart_enabled_seen_at", "_charger_restart_waiting_since", "_charger_test_released_at", "_charger_restart_marked_at", "_charger_restart_stopped_at", "_charger_restart_started_at")
 
 
@@ -385,11 +388,13 @@ async def test_an_unplug_while_the_restart_has_the_charger_disabled_is_handled_w
     _pass(engine, INTERVAL)
     await _cron(coordinator)
     assert engine.restarting_charger
+    hass.states.async_set(ENABLED, "off")  # the automation disabled it
     hass.states.async_set(CHARGER_STATUS, "disconnected")  # the car leaves during the pause
     await coordinator.async_run_job("charger_status_changed", "disconnected", "awaiting_start")
     assert calls == [] and engine._charger_restart_unplug_pending
     _pass(engine, INTERVAL)
     await _cron(coordinator)  # enabled again
+    hass.states.async_set(ENABLED, "on")  # the automation enabled it
     _pass(engine, INTERVAL)
     await _cron(coordinator)  # the switch seen on: a status read from a cloud may come late, not yet
     _pass(engine, INTERVAL)
@@ -399,7 +404,7 @@ async def test_an_unplug_while_the_restart_has_the_charger_disabled_is_handled_w
     await _cron(coordinator)  # settled (10 minutes, the switch on) and still disconnected: it was unplugged
     assert calls == ["unplugged"] and not engine._charger_restart_unplug_pending
     assert engine.restarting_charger_count == 0
-    assert _published(hass)[1] is True  # enabled again (the action is the plan's: the fixture charges with CJP deactivated)
+    assert _published(hass)[1] is True  # enabled again (the action is the plan's)
     assert "job cron failed" not in caplog.text
 
 
@@ -421,7 +426,7 @@ async def test_a_disabled_charger_that_reports_off_keeps_the_battery_level_witho
             pytest.skip("the plan does not charge without a car integration here")
         hass.states.async_set(CHARGER_STATUS, "off")
         await coordinator.async_run_job("charger_status_changed", "off", "awaiting_start")
-        # what the plan and the status job ask (the fixture's plan runs with CJP deactivated and doesn't)
+        # what the plan and the status job ask
         await coordinator.async_run_job("ready_to_charge")
         assert float(coordinator.settings.get("battery_level")) == 40.0
     finally:
@@ -479,7 +484,7 @@ async def test_after_giving_up_it_charges_at_full_power_as_a_fail_safe_until_it_
     await _cron(coordinator)
     assert engine._charger_restart_gave_up
     # a plan that doesn't charge now (no charge hour): the fail-safe charges anyway
-    monkeypatch.setattr(engine, "no_charging_modes_active", lambda: False)
+    _plan_stops(engine, monkeypatch)
     await coordinator.async_run_job("recalculate", include_forecast=True)
     assert _published(hass) == ("charge", True, (16, 16, 16))
     fail_safe = engine.t("ui.is_charging.fail_safe_max", watt=int(48 * engine.config["charger"]["power_voltage"]))
@@ -498,11 +503,18 @@ async def test_after_giving_up_it_charges_at_full_power_as_a_fail_safe_until_it_
 async def test_no_fail_safe_when_unplugged_after_giving_up(hass, waiting_entry, monkeypatch) -> None:
     coordinator = waiting_entry.runtime_data
     engine = coordinator.engine
-    monkeypatch.setattr(engine, "no_charging_modes_active", lambda: False)
+    _plan_stops(engine, monkeypatch)
     engine.restarting_charger_count, engine._charger_restart_gave_up = CHARGER_MAX_RESTARTS, True
     hass.states.async_set(CHARGER_STATUS, "disconnected")
     await _cron(coordinator)
     assert not engine._charger_restart_gave_up and _published(hass)[0] == "stop"
+
+
+def _plan_stops(engine, monkeypatch) -> None:
+    """A charging rule is on, but the plan does not charge now: no manual charging any more (charges_at_max), and no
+    charge hour."""
+    monkeypatch.setattr(engine, "manual_charging_enabled", lambda: None)
+    monkeypatch.setattr(engine, "no_charging_modes_active", lambda: False)
 
 
 async def _give_up(coordinator) -> None:
@@ -522,7 +534,7 @@ async def test_power_that_shows_charging_ends_the_fail_safe_with_a_status_that_s
     coordinator = waiting_entry.runtime_data
     engine = coordinator.engine
     await _give_up(coordinator)
-    monkeypatch.setattr(engine, "no_charging_modes_active", lambda: False)
+    _plan_stops(engine, monkeypatch)
     hass.states.async_set(CHARGER_POWER, "11000", {"unit_of_measurement": "W", "device_class": "power"})
     await _cron(coordinator)  # the status still awaiting_start
     assert not engine._charger_restart_gave_up and engine.restarting_charger_count == 0
@@ -533,7 +545,7 @@ async def test_the_fail_safe_keeps_one_charging_session(hass, waiting_entry, mon
     coordinator = waiting_entry.runtime_data
     engine = coordinator.engine
     await _give_up(coordinator)
-    monkeypatch.setattr(engine, "no_charging_modes_active", lambda: False)  # a plan that doesn't charge now
+    _plan_stops(engine, monkeypatch)  # a plan that doesn't charge now
     await coordinator.async_run_job("recalculate", include_forecast=True)
     start = engine.current_charging_session["start"]
     assert start is not None

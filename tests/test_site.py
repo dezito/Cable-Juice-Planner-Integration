@@ -57,9 +57,9 @@ async def _settle(hass: HomeAssistant) -> None:
 async def _setup_two_cars(
     hass: HomeAssistant, b_level: float = 60, circuits: list | None = None
 ) -> tuple[MockConfigEntry, MockConfigEntry, MockConfigEntry]:
-    set_source_states(hass)
+    set_source_states(hass, charger_status="awaiting_start")
     hass.states.async_set(EV_B_LEVEL, str(b_level), {"unit_of_measurement": "%", "device_class": "battery"})
-    hass.states.async_set(CHARGER_B_STATUS, "disconnected")
+    hass.states.async_set(CHARGER_B_STATUS, "awaiting_start")
     site = make_site_entry(fuse_l1=25, fuse_l2=25, fuse_l3=25, margin=1, **({CONF_CIRCUITS: circuits} if circuits else {}))
     await async_setup(hass, site)
     car_a = make_entry("a", {**MOCK_OPTIONS, "site_priority": 1})
@@ -94,8 +94,9 @@ async def test_cars_register_with_the_site(hass: HomeAssistant) -> None:
     await _unload(hass, car_a, car_b, site)
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_lower_priority_gets_what_is_left(hass: HomeAssistant) -> None:
-    """Both cars want 3 x 16 A (no charging modes = max), the fuse allows 24 A per phase."""
+    """Both cars want 3 x 16 A (manual charging = max), the fuse allows 24 A per phase."""
     site, car_a, car_b = await _setup_two_cars(hass)
     assert _amps(hass, "a") == [16, 16, 16]
     assert _amps(hass, "b") == [8, 8, 8]
@@ -103,6 +104,7 @@ async def test_lower_priority_gets_what_is_left(hass: HomeAssistant) -> None:
     await _unload(hass, car_a, car_b, site)
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_urgent_car_overtakes(hass: HomeAssistant) -> None:
     """Car b under its daily minimum (30 %) charges first despite the lower priority."""
     site, car_a, car_b = await _setup_two_cars(hass, b_level=10)
@@ -112,6 +114,7 @@ async def test_urgent_car_overtakes(hass: HomeAssistant) -> None:
     await _unload(hass, car_a, car_b, site)
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_fuse_budget_respected_after_cron(hass: HomeAssistant) -> None:
     """Both cars recalculate in the same cron minute; the sum must stay within 24 A per phase."""
     site, car_a, car_b = await _setup_two_cars(hass, b_level=10)
@@ -125,6 +128,7 @@ async def test_fuse_budget_respected_after_cron(hass: HomeAssistant) -> None:
     await _unload(hass, car_a, car_b, site)
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_unloading_the_site_releases_the_limit(hass: HomeAssistant) -> None:
     site, car_a, car_b = await _setup_two_cars(hass)
     await hass.config_entries.async_unload(site.entry_id)
@@ -143,6 +147,7 @@ def _circuit(hass: HomeAssistant, prefix: str) -> tuple[list[int], list[str] | N
     return amps, attributes.get("circuit_chargers")
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_cars_on_one_circuit_publish_the_sum(hass: HomeAssistant) -> None:
     """Two chargers behind one circuit (Easee master): both cars publish the sum, so the master's
     automation sets the circuit for both (16 A + 8 A per phase)."""
@@ -158,6 +163,7 @@ async def test_cars_on_one_circuit_publish_the_sum(hass: HomeAssistant) -> None:
     await _unload(hass, car_a, car_b, site)
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_without_a_circuit_each_car_keeps_its_own_limit(hass: HomeAssistant) -> None:
     site, car_a, car_b = await _setup_two_cars(hass)
     assert _circuit(hass, "a") == ([16, 16, 16], None)

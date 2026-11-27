@@ -29,6 +29,7 @@ async def _marked_after(hass: HomeAssistant, status: str) -> tuple[bool, int, bo
     try:
         coordinator = entry.runtime_data
         engine = coordinator.engine
+        assert engine.charger_action == "charge"  # else nothing is ever marked, whatever the status
         hass.states.async_set(CHARGER_STATUS, status)
         await hass.async_block_till_done()
         _pass(engine, 60)
@@ -42,11 +43,13 @@ async def _marked_after(hass: HomeAssistant, status: str) -> tuple[bool, int, bo
 
 
 @pytest.mark.parametrize("status", HELD)
+@pytest.mark.usefixtures("charges_at_max")
 async def test_a_held_charger_is_not_marked_or_restarted(hass: HomeAssistant, status: str) -> None:
     assert await _marked_after(hass, status) == (False, 0, False)
 
 
 @pytest.mark.parametrize("status", ["awaiting_start", "Connected_Requesting", "Waiting for car demand"])
+@pytest.mark.usefixtures("charges_at_max")
 async def test_a_charger_that_only_waits_for_the_car_is_still_restarted(hass: HomeAssistant, status: str) -> None:
     marked, restarts, restarting = await _marked_after(hass, status)
     assert marked or restarts > 0 or restarting  # marked at the first cron past the grace, stopped for the restart at the next

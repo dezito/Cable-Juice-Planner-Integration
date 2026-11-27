@@ -193,7 +193,8 @@ get a notification. One interval after that the charger is enabled again and the
 After three restarts it gives up and notifies you once more (on the alarm channel). As a fail-safe the action
 is then `charge` at full power (the charger's maximum current; the charge limit is the plan's, or the max
 recommended level if that is higher), whatever the plan says – also in hours the plan wouldn't charge, and
-from the grid in the solar modes – so the car charges as soon as it can; the site's load balancing still
+from the grid in the solar modes (but not with
+[every charging rule off](rules/manual-forced.md#no-rules-at-all)) – so the car charges as soon as it can; the site's load balancing still
 limits the current, and the cars behind it get what it doesn't draw (see
 [Multiple cars](load-balancing.md#how-it-works)). The charging rule shows why and the fail-safe. It lasts, and no new restart is tried,
 until the charger reports charging (with power, when the power can be read) or done, *Charging power* shows

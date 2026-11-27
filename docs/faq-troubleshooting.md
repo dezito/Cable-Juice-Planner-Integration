@@ -44,9 +44,10 @@ As long as the car is ready at the departure, the plan has done its job. To see 
 If the action was `charge` but the car didn't charge, the automation or the charger is the problem – see
 [Why doesn't it charge now?](#why-doesnt-it-charge-now).
 
-## Why does it charge at max. current all the time?
+## Why does it say that no charging rules are active?
 
-All charging rules are off – then CJP charges like a normal charger. Turn on at least one rule.
+All charging rules are off – then CJP does not charge. Turn on at least one rule, or
+[manual charging](rules/manual-forced.md#-manual-charging) to charge at once.
 
 ## The car's consumption / range looks wrong
 

@@ -404,7 +404,18 @@ place and extend them to new code:
 - A fixed solar sell price (`production_price` != -1) is a settlement: a sold
   kWh is worth fixed price − the hour's raw sell price, can be negative. Use
   `sell_value()` (`engine/pricing.py`); keep price data and DBs raw.
-- "No charging mode active" charges at max by design (fallback).
+- With no charging rule on (`no_charging_modes_active()`; forced charging counts as a rule) CJP does not charge: stop
+  at 0 A, also not through the restart fail-safe. The error mode (the calculation failed) still charges at max.
+- The manual charging switches are turned off at the unplug, not at the plug-in (forced charging is still turned off
+  at the plug-in). The unplug is the change from the last known plugged state of the charger (runtime state) to a
+  not-ready status, so one across `unavailable` or a restart counts, and a switch turned on while nothing is plugged
+  in stays on.
+- Manual charging looks only at the charger status, never at the own car (location, cable, port): a guest's car can be
+  on the charger.
+- Manual charging and the charging loss measurement publish stop at 0 charger amps while the charger reports nothing
+  plugged in. A planned solar hour publishes stop at 0 charger amps whenever the car is not ready (`ready_to_charge()`
+  falsy, e.g. unplugged, own car away, or the status, enabled or car cable/port entity unavailable). The circuit stays
+  open.
 - Without "Car charge limit" (`charging_limit_entity_id`) the dashboard and the
   help texts leave out `min_charge_limit_battery_level` (`hidden_settings()` in
   `const/config.py`; the entity still exists). `max_recommended_charge_limit_battery_level`

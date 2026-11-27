@@ -156,6 +156,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
         self._charger_restart_gave_up = False  # after the last restart: none until it charges, is done or is unplugged
         self._charger_restart_rule = ""  # the reason shown while it restarts, or while the plan charges after it gave up
         self._charger_restart_unplug_pending = False  # off/disconnected while the restart had the charger disabled
+        # the last known plugged state of the charger (track_charger_plugged); None: never known. Kept in the runtime state
+        self.charger_plugged: bool | None = None
         self.current_charging_amps = [0, 0, 0]
         self.current_circuit_amps = [0, 0, 0]
         # amps asked for before the site limit (site_limit re-applies them)
@@ -303,6 +305,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             "departure_notices": dict(self.departure_notices),
             "sent_notices": dict(self.sent_notices),
             "virtual_charge_anchor": dict(self.virtual_charge_anchor) if self.virtual_charge_anchor else None,
+            "charger_plugged": self.charger_plugged,
             "charging_loss_measurement": {
                 "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
                 "car_begin_kwh": self.charging_loss_car_begin_kwh,
@@ -686,6 +689,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             or self.workplan_charging_enabled()
             or self.fill_up_charging_enabled()
             or self.cheap_grid_charging_enabled()
+            or self.switch_state("forced_charging_daily_battery_level", error_state="off") == "on"
             or self.number_state("full_charge_recommended", error_state=0.0) > 0.0
             or self.is_calculating_charging_loss()
             or self.manual_charging_enabled()
