@@ -21,6 +21,19 @@ IMPORT_NONE = "none"
 BACKUP_EXPORT = "export"
 CRON_INTERVALS = ["1", "2", "3", "4", "5", "6", "10", "12", "15", "20", "30"]
 PRICE_PROVIDERS = ["energidataservice", "stromligning", "energypriceforecast", "spotforecast", "elprognos", "wattcast", "epexspot", "gespot", "octopus", "nordpool"]
+# the names of the providers (proper names, not translated): the price provider page lists the ones a country does not have
+PRICE_PROVIDER_NAMES = {
+    "energidataservice": "Energi Data Service",
+    "stromligning": "Strømligning",
+    "energypriceforecast": "Energy Price Forecast",
+    "spotforecast": "Spot Forecast",
+    "elprognos": "Elprisprognos",
+    "wattcast": "Wattcast",
+    "epexspot": "EPEX Spot",
+    "gespot": "GE-Spot",
+    "octopus": "Octopus Energy",
+    "nordpool": "Nord Pool",
+}
 # the providers of wholesale prices: the VAT and the surcharge on the fee page are for them
 SPOT_PRICE_PROVIDERS = ("spotforecast", "elprognos", "wattcast")
 ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
@@ -34,6 +47,7 @@ CONFIG_FLOW_STEPS = [
     "home",
     "powerwall",
     "detection_review",
+    "country",
     "price_provider",
     "prices_energidataservice",
     "prices_energypriceforecast",
@@ -84,6 +98,7 @@ def _number(minimum: float, maximum: float, step: float, unit: str | None = None
 
 BOOLEAN = selector.BooleanSelector()
 SELECTORS: dict[str, Any] = {
+    "price_country": selector.CountrySelector(),
     "language": selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=[selector.SelectOptionDict(value=code, label=label) for code, label in LANGUAGES.items()],
@@ -207,6 +222,7 @@ SELECTORS: dict[str, Any] = {
 }
 REQUIRED_KEYS = {
     "language",
+    "price_country",
     "site_priority",
     "site_phase_order",
     "status_entity_id",

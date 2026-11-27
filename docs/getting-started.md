@@ -175,6 +175,13 @@ again.
 
 ### Prices
 
+First comes the **country** of the prices (Home Assistant's country is suggested; a restored backup or an import shows its
+own). It can be changed later under **General** next to the language. A new entry outside Denmark starts with Energy Price
+Forecast. The price provider page lists only the providers that have prices in the country and names the ones it leaves out;
+changing the country under **General** leads on to the price pages when a chosen provider has none in the new one. Strømligning
+only works in Denmark, Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the
+Netherlands, Belgium, Austria, Germany and Luxembourg, and Energy Price Forecast in most of Europe.
+
 Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast integration. With several, the priority is Strømligning, then
 Energi Data Service, then Octopus Energy, Nord Pool, EPEX Spot and GE-Spot, then Energy Price Forecast, then the spot forecast integrations: the price of the first one that has one is used for every hour,
 and the next fills the gaps (also in the economy statement).
@@ -225,11 +232,6 @@ a sensor without price rows (Home Assistant's own Nord Pool has none), the same 
 Market Price and Total Price swapped, an Octopus Energy import event as export or the other way, a gas event) and EPEX Spot's sources Tibber and Energyforecast.de, whose price is not
 the exchange price. Octopus Energy's rates are in pounds: a rate above 5 is taken for pence and gives no prices. A price page with its sensors
 asks for no VAT and surcharge; those are only for the wholesale prices of the spot forecast integrations.
-
-The **country** of the prices is chosen on the same page as the providers (Home Assistant's country is suggested, and a new
-entry outside Denmark starts with Energy Price Forecast). A provider with no prices in the country is refused: Strømligning
-only works in Denmark, Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the
-Netherlands, Belgium, Austria, Germany and Luxembourg, and Energy Price Forecast in most of Europe.
 
 Strømligning switches its sensors excl. VAT (which the sell sensors and the tariffs use) off by default, and a
 disabled sensor can't be selected: enable them first under **Settings → Devices & services → Entities** (*Show

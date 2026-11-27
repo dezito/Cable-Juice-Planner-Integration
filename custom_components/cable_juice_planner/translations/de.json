@@ -4,13 +4,15 @@
     "step": {
       "general": {
         "title": "Allgemein",
-        "description": "Sprache von Texten und Benachrichtigungen.",
+        "description": "Sprache von Texten und Benachrichtigungen und das Land der Strompreise.",
         "data": {
           "language": "Sprache",
+          "price_country": "Land",
           "dashboard_icon": "Symbol in der Seitenleiste"
         },
         "data_description": {
           "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen.",
+          "price_country": "Das Land, für das die Strompreise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Das Land von Home Assistant wird vorgeschlagen. Ein wiederhergestelltes Backup oder ein Import behält sein eigenes Land.",
           "dashboard_icon": "Symbol des Dashboards in der Seitenleiste, z. B. mdi:ev-station. Leer lassen für das Standardsymbol."
         }
       },
@@ -430,15 +432,24 @@
           "charging_history_db_data_to_save": "X Monate Historie vorhalten"
         }
       },
+      "country": {
+        "title": "Land",
+        "description": "Wähle das Land, für das die Strompreise gelten. Auf der nächsten Seite werden die Preisanbieter angeboten, die in diesem Land Preise haben. Das Land von Home Assistant wird vorgeschlagen; ein wiederhergestelltes Backup oder ein Import zeigt sein eigenes.",
+        "data": {
+          "price_country": "Land"
+        },
+        "data_description": {
+          "price_country": "Es bestimmt, welche Preisanbieter gewählt werden können. Es lässt sich später unter Allgemein ändern."
+        }
+      },
       "price_provider": {
         "title": "Strompreise",
-        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken. Die Börsenpreis-Integrationen (Spot Forecast, Elprisprognos, Wattcast) kommen zuletzt; sie liefern Großhandelspreise, deshalb werden MwSt. und Aufschlag auf der Gebührenseite abgefragt. EPEX Spot, GE-Spot, Octopus Energy und Nord Pool liefern deine eigenen veröffentlichten Preise (heute und morgen): neben ihnen braucht es einen Anbieter mit Prognose, und sie stehen direkt nach Energi Data Service, vor Energy Price Forecast und den anderen Schätzungen.",
+        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken. Die Börsenpreis-Integrationen (Spot Forecast, Elprisprognos, Wattcast) kommen zuletzt; sie liefern Großhandelspreise, deshalb werden MwSt. und Aufschlag auf der Gebührenseite abgefragt. EPEX Spot, GE-Spot, Octopus Energy und Nord Pool liefern deine eigenen veröffentlichten Preise (heute und morgen): neben ihnen braucht es einen Anbieter mit Prognose, und sie stehen direkt nach Energi Data Service, vor Energy Price Forecast und den anderen Schätzungen.\n\n**In {country} nicht verfügbar:** {unavailable}",
         "data": {
-          "price_country": "Land",
           "price_providers": "Preisanbieter"
         },
         "data_description": {
-          "price_country": "Das Land, für das die Preise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Das Land von Home Assistant wird vorgeschlagen."
+          "price_providers": "Es werden nur die Anbieter angezeigt, die im gewählten Land Preise haben. Das Land lässt sich nach der Einrichtung unter Allgemein ändern."
         }
       },
       "user": {
@@ -517,7 +528,7 @@
       "prefix_in_use": "Dieses Präfix wird bereits verwendet.",
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
-      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle Energy Price Forecast (der größte Teil Europas) oder ändere das Land. Die Börsenpreis-Integrationen: Spot Forecast in Deutschland, Luxemburg, den Niederlanden und Norwegen, Elprisprognos in Schweden und Wattcast in Finnland, Estland, Lettland und Litauen. EPEX Spot und GE-Spot: der größte Teil Europas (GE-Spot auch Australien und die USA), Octopus Energy: Großbritannien, Nord Pool: Dänemark, Norwegen, Schweden, Finnland, das Baltikum, Frankreich, die Niederlande, Belgien, Österreich und Deutschland.",
+      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle einen Anbieter, der in diesem Land Preise hat, zum Beispiel Energy Price Forecast (der größte Teil Europas). Die Börsenpreis-Integrationen: Spot Forecast in Deutschland, Luxemburg, den Niederlanden und Norwegen, Elprisprognos in Schweden und Wattcast in Finnland, Estland, Lettland und Litauen. EPEX Spot und GE-Spot: der größte Teil Europas (GE-Spot auch Australien und die USA), Octopus Energy: Großbritannien, Nord Pool: Dänemark, Norwegen, Schweden, Finnland, das Baltikum, Frankreich, die Niederlande, Belgien, Österreich und Deutschland.",
       "price_provider_no_forecast": "Keiner der gewählten Preisanbieter liefert eine Preisprognose, daher könnte die Planung nur die Preise von heute und morgen nutzen. Wähle zusätzlich einen weiteren Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
@@ -560,13 +571,15 @@
       },
       "general": {
         "title": "Allgemein",
-        "description": "Sprache von Texten und Benachrichtigungen.",
+        "description": "Sprache von Texten und Benachrichtigungen und das Land der Strompreise.",
         "data": {
           "language": "Sprache",
+          "price_country": "Land",
           "dashboard_icon": "Symbol in der Seitenleiste"
         },
         "data_description": {
           "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen.",
+          "price_country": "Das Land, für das die Strompreise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Hat ein gewählter Anbieter in diesem Land keine Preise, folgen die Preisseiten, damit du neu wählen kannst.",
           "dashboard_icon": "Symbol des Dashboards in der Seitenleiste, z. B. mdi:ev-station. Leer lassen für das Standardsymbol."
         }
       },
@@ -988,13 +1001,12 @@
       },
       "price_provider": {
         "title": "Strompreise",
-        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken. Die Börsenpreis-Integrationen (Spot Forecast, Elprisprognos, Wattcast) kommen zuletzt; sie liefern Großhandelspreise, deshalb werden MwSt. und Aufschlag auf der Gebührenseite abgefragt. EPEX Spot, GE-Spot, Octopus Energy und Nord Pool liefern deine eigenen veröffentlichten Preise (heute und morgen): neben ihnen braucht es einen Anbieter mit Prognose, und sie stehen direkt nach Energi Data Service, vor Energy Price Forecast und den anderen Schätzungen.",
+        "description": "Wähle, woher die Stundenpreise kommen. Bei mehreren gilt die Reihenfolge Strømligning, dann Energi Data Service, dann Energy Price Forecast: Für jede Stunde wird der Preis des ersten genutzt, der einen hat, und der nächste füllt die Lücken. Die Börsenpreis-Integrationen (Spot Forecast, Elprisprognos, Wattcast) kommen zuletzt; sie liefern Großhandelspreise, deshalb werden MwSt. und Aufschlag auf der Gebührenseite abgefragt. EPEX Spot, GE-Spot, Octopus Energy und Nord Pool liefern deine eigenen veröffentlichten Preise (heute und morgen): neben ihnen braucht es einen Anbieter mit Prognose, und sie stehen direkt nach Energi Data Service, vor Energy Price Forecast und den anderen Schätzungen.\n\n**In {country} nicht verfügbar:** {unavailable}",
         "data": {
-          "price_country": "Land",
           "price_providers": "Preisanbieter"
         },
         "data_description": {
-          "price_country": "Das Land, für das die Preise gelten. Es bestimmt, welche Preisanbieter gewählt werden können. Das Land von Home Assistant wird vorgeschlagen."
+          "price_providers": "Es werden nur die Anbieter angezeigt, die in dem unter Allgemein eingestellten Land Preise haben."
         }
       },
       "site": {
@@ -1046,7 +1058,7 @@
       "prefix_in_use": "Dieses Präfix wird bereits verwendet.",
       "prefix_entities_exist": "Es gibt bereits Entitäten mit diesem Präfix (z. B. aus der PyScript-Version).",
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
-      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle Energy Price Forecast (der größte Teil Europas) oder ändere das Land. Die Börsenpreis-Integrationen: Spot Forecast in Deutschland, Luxemburg, den Niederlanden und Norwegen, Elprisprognos in Schweden und Wattcast in Finnland, Estland, Lettland und Litauen. EPEX Spot und GE-Spot: der größte Teil Europas (GE-Spot auch Australien und die USA), Octopus Energy: Großbritannien, Nord Pool: Dänemark, Norwegen, Schweden, Finnland, das Baltikum, Frankreich, die Niederlande, Belgien, Österreich und Deutschland.",
+      "price_provider_country": "Ein gewählter Preisanbieter hat in diesem Land keine Preise. Strømligning funktioniert nur in Dänemark, Energi Data Service in Dänemark, Norwegen, Schweden, Finnland, Estland, Lettland, Litauen, Frankreich, den Niederlanden, Belgien, Österreich, Deutschland und Luxemburg. Wähle einen Anbieter, der in diesem Land Preise hat, zum Beispiel Energy Price Forecast (der größte Teil Europas). Die Börsenpreis-Integrationen: Spot Forecast in Deutschland, Luxemburg, den Niederlanden und Norwegen, Elprisprognos in Schweden und Wattcast in Finnland, Estland, Lettland und Litauen. EPEX Spot und GE-Spot: der größte Teil Europas (GE-Spot auch Australien und die USA), Octopus Energy: Großbritannien, Nord Pool: Dänemark, Norwegen, Schweden, Finnland, das Baltikum, Frankreich, die Niederlande, Belgien, Österreich und Deutschland.",
       "price_provider_no_forecast": "Keiner der gewählten Preisanbieter liefert eine Preisprognose, daher könnte die Planung nur die Preise von heute und morgen nutzen. Wähle zusätzlich einen weiteren Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Akkustand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",

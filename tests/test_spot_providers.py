@@ -25,7 +25,7 @@ from custom_components.cable_juice_planner.prices import (
 from custom_components.cable_juice_planner.prices.base import price_unit_error
 from custom_components.cable_juice_planner.prices.spot_rows import elprognos_rows, spot_forecast_rows, wattcast_rows
 
-from .test_price_country import _defaults, _to_price_provider
+from .test_price_country import _defaults, _offered, _to_price_provider
 from .test_energypriceforecast import _balanced, _generators
 from custom_components.cable_juice_planner.management.dashboard_build import TEMPLATE_DIR
 
@@ -312,9 +312,9 @@ def test_published_quarter_hour_rows_give_a_price_per_quarter_and_no_forecast_in
 async def test_the_fee_page_asks_for_the_vat_and_the_surcharge_without_a_default_and_only_for_these_providers(hass: HomeAssistant) -> None:
     from homeassistant.data_entry_flow import InvalidData
 
-    result = await _to_price_provider(hass)
+    result = await _to_price_provider(hass, price_country="SE")
     flow = hass.config_entries.flow
-    result = await flow.async_configure(result["flow_id"], {"price_country": "SE", "price_providers": ["elprognos"]})
+    result = await flow.async_configure(result["flow_id"], {"price_providers": ["elprognos"]})
     assert result["step_id"] == "prices_elprognos"
     result = await flow.async_configure(result["flow_id"], {"elprognos_buy_entity_id": ELPROGNOS})
     assert result["step_id"] == "price_fees"
@@ -326,18 +326,18 @@ async def test_the_fee_page_asks_for_the_vat_and_the_surcharge_without_a_default
 
 
 async def test_the_fee_page_has_no_vat_and_surcharge_for_the_other_providers(hass: HomeAssistant) -> None:
-    result = await _to_price_provider(hass)
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"price_country": "DK", "price_providers": ["energidataservice"]})
+    result = await _to_price_provider(hass, price_country="DK")
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"price_providers": ["energidataservice"]})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"energidataservice_buy_entity_id": "sensor.eds"})
     assert result["step_id"] == "price_fees" and "spot_vat" not in {str(key) for key in result["data_schema"].schema}
 
 
 async def test_wattcast_is_offered_in_finland_with_both_sensors_and_not_in_denmark(hass: HomeAssistant) -> None:
-    result = await _to_price_provider(hass)
-    flow = hass.config_entries.flow
-    refused = await flow.async_configure(result["flow_id"], {"price_country": "DK", "price_providers": ["wattcast"]})
-    assert refused["errors"] == {"base": "price_provider_country"}
-    result = await flow.async_configure(result["flow_id"], {"price_country": "FI", "price_providers": ["wattcast"]})
+    result = await _to_price_provider(hass, price_country="DK")
+    assert "wattcast" not in _offered(result) and "elprognos" not in _offered(result)
+    result = await _to_price_provider(hass, price_country="FI")
+    assert "wattcast" in _offered(result)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"price_providers": ["wattcast"]})
     assert result["step_id"] == "prices_wattcast"
     assert {str(key) for key in result["data_schema"].schema} == {"wattcast_buy_entity_id", "wattcast_forecast_entity_id"}
 

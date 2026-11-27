@@ -13,6 +13,11 @@ def default_providers(country: str) -> list[str]:
     return ["energidataservice"] if country == DEFAULT_COUNTRY else ["energypriceforecast"]
 
 
+def providers_for_country(country: str, names: list[str]) -> list[str]:
+    """The providers of names (in their order) that have prices in the country: the choice of the price provider page."""
+    return [name for name in names if PROVIDER_CLASSES[name].countries is None or country in PROVIDER_CLASSES[name].countries]
+
+
 def provider_errors(country: str, providers: list[str]) -> dict[str, str]:
     """The error of a choice of providers ({} when it is fine): one that has no prices in the country, or none with a forecast.
 
