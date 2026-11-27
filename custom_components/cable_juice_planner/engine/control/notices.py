@@ -223,7 +223,7 @@ class ControlNotices:
     # ------------------------------------------------------------------ #
 
     def _notice_manual_expensive(self, now: datetime.datetime) -> None:
-        """Manual charging stays on until the next plug-in: it charges now in one of the day's 4 most expensive hours.
+        """Manual charging stays on until the charger is unplugged: it charges now in one of the day's 4 most expensive hours.
         Once a day."""
         if not self._notice_on("notify_manual_expensive") or not self.manual_charging_enabled():
             return

@@ -487,6 +487,10 @@ class ControlSchedule:
         self.rule_set_this_run = False
         try:
             charging_rule = None
+            # an unplug no status event told of (unavailable between, or during a restart of Home Assistant): the manual
+            # charging is off before the plan reads it
+            status_entity_id = config["charger"]["entity_ids"]["status_entity_id"]
+            self.track_charger_plugged(self.get_state(status_entity_id, try_history=False, error_state=None))
             trip_date_time = self.get_trip_date_time() if self.get_trip_date_time() != reset_datetime() else reset_datetime()
             if self.is_trip_planned():
                 if trip_date_time != reset_datetime() and minutes_between(self.now(), trip_date_time, error_value=0) < CHARGING_ALLOWED_AFTER_GOTO_TIME:
@@ -549,15 +553,32 @@ class ControlSchedule:
             # of "charging" without power counts too (else it starts and stops every cron)
             charger_status = self.get_state(config["charger"]["entity_ids"]["status_entity_id"], error_state="unavailable")
             fail_safe = self._charger_restart_gave_up and charger_status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + ("error",)
+            # not with every charging rule off: then nothing is charged
+            fail_safe = fail_safe and not self.no_charging_modes_active()
 
+            # manual charging is turned off at the unplug, so it can be on with nothing plugged into the charger (turned on
+            # before the plug-in): nothing to charge then (the charger automation would restart a charge that never
+            # starts). Only the charger's own status
+            # says so (also the last known one while the entity is unavailable, like everywhere else); an unknown status
+            # keeps manual charging as it was, and it never asks about the own car (home or not, cable in or not), because
+            # a guest's car can be on the charger
+            # (not for a charger the restart disabled: it may report off or disconnected without being unplugged, and the
+            # restart's own stop is published below)
+            charger_unplugged = charger_status in CHARGER_NOT_READY_STATUS and not self._charger_restart_disabling()
+            manual_unplugged = (self.manual_charging_enabled() or self.manual_charging_solar_enabled()) and charger_unplugged
             if self.no_charging_modes_active():
-                _LOGGER.debug("No charging modes active, setting amps to max")
-                charging_limit = self.get_max_recommended_charge_limit_battery_level()
-                circuit_amps = max_amps()
-                charger_amps = max_amps()
-                charging_rule = f"⛔{t('ui.charge_if_needed.no_charging_modes_active', watt=int(sum(charger_amps) * config['charger']['power_voltage']))}"
-                self.charging_history({"Price": self.get_solar_sell_price() if sum(inverter_amps) != 0.0 else current_price, "Cost": 0.0, "kWh": 0.0, "battery_level": 0.0, "manual": True, "solar": solar}, "deactivate")
-            elif self.is_calculating_charging_loss():
+                # every charging rule is off: nothing is charged, also not a solar surplus in a planned hour
+                charger_amps = [0.0, 0.0, 0.0]
+                if self.charging_without_rule():
+                    # the car charges anyway: the alarm's rule stays, with why there is no rule for it
+                    charging_rule = f"{self.last_charging_rule_text}\n⛔{t('ui.charge_if_needed.no_charging_rules')}"
+                else:
+                    self.stop_current_charging_session()
+                    charging_rule = f"⛔{t('ui.charge_if_needed.no_charging_modes_active')}"
+                    _LOGGER.debug("No charging modes active, not charging")
+            # the charging loss measurement charges a car that is plugged in: with the charger unplugged it falls to the
+            # not-ready branch below like the plan
+            elif self.is_calculating_charging_loss() and not charger_unplugged:
                 limit_entity = config["ev_car"]["entity_ids"]["charging_limit_entity_id"]
                 if self.is_ev_configured() and self.is_entity_configured(limit_entity):
                     completed_battery_level = float(self.get_state(limit_entity, float_type=True, error_state=100.0))
@@ -575,7 +596,7 @@ class ControlSchedule:
                 kwh = round(self.percentage_to_kwh(battery, include_charging_loss=True))
                 cost = round(current_price * kwh, 2)
                 self.charging_history({"Price": current_price, "Cost": cost, "kWh": kwh, "battery_level": battery, "charging_loss": True, "solar": solar, "powerwall": powerwall}, "charging_loss")
-            elif self.manual_charging_enabled() or self.manual_charging_solar_enabled():
+            elif (self.manual_charging_enabled() or self.manual_charging_solar_enabled()) and not manual_unplugged:
                 charging_limit = self.get_max_recommended_charge_limit_battery_level()
                 voltage = config["charger"]["power_voltage"]
                 if not self.manual_charging_solar_enabled():
@@ -592,6 +613,16 @@ class ControlSchedule:
                     self.charging_history({"Price": self.get_solar_sell_price() if sum(inverter_amps) != 0.0 else current_price, "Cost": 0.0, "kWh": 0.0, "battery_level": 0.0, "manual": True, "solar": solar}, "manual")
                 else:
                     self.stop_current_charging_session()
+            elif manual_unplugged:
+                # as the plan's not-ready branch below: ready_to_charge() sets the rule (cable disconnected) and does what it
+                # does for an unplugged charger; the plan's rules do not take over
+                self.ready_to_charge()
+                # a solar surplus in a planned hour has set the amps to max above: nothing is plugged in to take them
+                # (the plan's stop leaves the circuit open)
+                charger_amps = [0.0, 0.0, 0.0]
+                if not self.charging_without_rule():
+                    self.stop_current_charging_session()
+                    _LOGGER.debug("Manual charging, but the charger is unplugged")
             elif self.ready_to_charge():
                 if charge_hour:
                     hour_data = self.charge_hours[charge_hour]
@@ -652,6 +683,9 @@ class ControlSchedule:
                         _LOGGER.debug("No rules for charging")
                         charging_rule = t("ui.charge_if_needed.not_charging")
             else:
+                # a solar surplus in a planned hour has set the amps to max above: whatever makes it not ready, nothing is
+                # charged (the fail-safe below sets its own)
+                charger_amps = [0.0, 0.0, 0.0]
                 if not self.charging_without_rule() and not fail_safe:
                     self.stop_current_charging_session()
                     _LOGGER.debug("EV not ready to charge")

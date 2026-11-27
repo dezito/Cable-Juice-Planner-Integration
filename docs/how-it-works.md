@@ -181,9 +181,9 @@ Every interval the current situation is checked in this order. The first that ap
 
 | Priority | When | The charger |
 |---|---|---|
-| 1 | all charging rules are off | charges at max. current, like a normal charger |
-| 2 | the [charging loss](charging-loss.md#one-time-measurement) is being measured | charges at max. current to the car's limit |
-| 3 | [manual charging](rules/manual-forced.md#-manual-charging) is on | charges at max. current – or with the solar surplus only |
+| 1 | [all charging rules are off](rules/manual-forced.md#no-rules-at-all) | stops |
+| 2 | the [charging loss](charging-loss.md#one-time-measurement) is being measured and the charger is not reported unplugged | charges at max. current to the car's limit |
+| 3 | [manual charging](rules/manual-forced.md#-manual-charging) is on and the charger is not reported unplugged | charges at max. current – or with the solar surplus only |
 | 4 | the car isn't ready to charge (not plugged in at home) | stops |
 | 5 | the hour is a planned charge hour | charges at max. current up to the planned level |
 | 6 | [forced charging](rules/manual-forced.md#-forced-charging-below-the-daily-battery-level) is on and the battery is below the daily minimum | charges to the daily minimum – except in the 4 most expensive hours of the day |
@@ -211,6 +211,6 @@ daily minimum, or the max. recommended limit.
   recommended charge limit. After 3 failures in a row, the integration is reloaded.
 - **The charger doesn't charge although it should:** it is stopped and started again (or `charger_enabled`
   toggled off and on), up to 3 times, with notifications along the way. Then, as a fail-safe, the action is
-  `charge` at max. current in every hour until it charges, is done or the cable is unplugged
-  ([details](charger-control.md)).
+  `charge` at max. current in every hour until it charges, is done or the cable is unplugged, unless every
+  charging rule is off ([details](charger-control.md)).
 - **The integration stops or hangs:** covered by the [blueprint's fail-safe](charger-control.md#fail-safe).

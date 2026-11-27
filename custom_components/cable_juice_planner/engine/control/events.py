@@ -73,6 +73,8 @@ class ControlEvents:
         self.trip_days = {date for date in (runtime.get("trip_days") or []) if isinstance(date, str)}
         self.restore_departure_notices(runtime.get("departure_notices"))
         self.restore_sent_notices(runtime.get("sent_notices"))
+        plugged = runtime.get("charger_plugged")
+        self.charger_plugged = plugged if isinstance(plugged, bool) else None
         anchor = runtime.get("virtual_charge_anchor")
         # meter None: unplugged, the next charge counts from the meter then
         valid = isinstance(anchor, dict) and all(
@@ -273,6 +275,10 @@ class ControlEvents:
     def charger_status_changed(self, value, old_value) -> str | None:
         """state_trigger_charger_port, first part. Returns 'wait' when the coordinator
         should wait for the car (odometer/battery level) and then call charger_connected."""
+        if self.charger_plugged is None:
+            # only to start from: a plan may have seen the new status already, and the old one must not undo that
+            self.track_charger_plugged(old_value)
+        self.track_charger_plugged(value)
         if old_value in ENTITY_UNAVAILABLE_STATES or value in ENTITY_UNAVAILABLE_STATES:
             return None
         if self.other_ev_connected():
@@ -293,8 +299,8 @@ class ControlEvents:
         if value in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS and old_value in CHARGER_NOT_READY_STATUS:
             self.charger_restart_unplugged()  # it was unplugged: a restart begins again
             self.economy_plugged_in()
-            self.set_setting("allow_manual_charging_now", False)
-            self.set_setting("allow_manual_charging_solar", False)
+            # the manual charging is not turned off here: it is turned off at the unplug (track_charger_plugged), so it can
+            # be turned on before a guest plugs in
             self.set_setting("forced_charging_daily_battery_level", False)
             self.wake_up_ev()
             self.notify_set_battery_level()
@@ -309,6 +315,28 @@ class ControlEvents:
                 self.stop_current_charging_session()
                 self.set_setting("battery_level", self.get_completed_battery_level())
         return None
+
+    def track_charger_plugged(self, status) -> None:
+        """Remember whether the charger last showed something plugged in, and turn the manual charging off when it goes
+        from that to unplugged, whatever car it was (the own car or a guest's). Only a status that surely says one of the
+        two counts: an unplug across unavailable or a restart of Home Assistant is seen at the next known status, and a
+        switch turned on while nothing is plugged in stays on."""
+        if status in CHARGER_NOT_READY_STATUS:
+            plugged = False
+        elif status in CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS:
+            plugged = True
+        else:
+            return
+        if not self.is_entity_configured(self.config["charger"]["entity_ids"]["status_entity_id"]) or self.other_ev_connected():
+            return
+        # a charger the restart (is_charging) disabled may report off or disconnected: not an unplug
+        if plugged == self.charger_plugged or (not plugged and self._charger_restart_disabling()):
+            return
+        if self.charger_plugged and not plugged:
+            self.set_setting("allow_manual_charging_now", False)
+            self.set_setting("allow_manual_charging_solar", False)
+        self.charger_plugged = plugged
+        self.mark_dirty("runtime")
 
     def charger_unplugged(self, value) -> None:
         """The charger's status went to off/disconnected (charger_status_changed, or is_charging for one seen during a

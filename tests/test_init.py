@@ -134,11 +134,11 @@ async def test_setup_creates_entities(hass: HomeAssistant, loaded_entry) -> None
     assert hass.states.get(f"switch.{OBJECT_PREFIX}_solar_charging") is None
 
 
-async def test_no_charging_mode_charges_like_a_dumb_charger(hass: HomeAssistant, loaded_entry) -> None:
-    """With every charging mode off ev.py charged at max amps (⛔ no charging rules active)."""
-    assert _state(hass, "sensor", "charger_action") == "charge"
+async def test_no_charging_mode_does_not_charge(hass: HomeAssistant, loaded_entry) -> None:
+    """With every charging rule off nothing is charged (⛔ no charging rules active)."""
+    assert _state(hass, "sensor", "charger_action") == "stop"
     assert _state(hass, "sensor", "current_charging_rule").startswith("⛔")
-    assert _state(hass, "sensor", "charger_phase_1_amps") == "16"
+    assert _state(hass, "sensor", "charger_phase_1_amps") == "0"
 
 
 async def test_fill_up_stops_charging_when_unplugged(hass: HomeAssistant, loaded_entry) -> None:
@@ -715,6 +715,7 @@ async def test_charging_loss_statistics_only_as_far_back_as_needed(hass: HomeAss
     assert hass.states.get(f"button.{OBJECT_PREFIX}_recalculate_charging_loss") is not None
 
 
+@pytest.mark.usefixtures("charges_at_max")
 async def test_economy_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> None:
     """Hourly prices, the odometer per month and (the first time) the connection windows."""
     from types import SimpleNamespace  # noqa: PLC0415
@@ -722,6 +723,10 @@ async def test_economy_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> 
     from homeassistant.util import dt as dt_util  # noqa: PLC0415
 
     coordinator = loaded_entry.runtime_data
+    # a charge now (charges_at_max, plugged in): the month of the charging history is in the economy
+    hass.states.async_set(CHARGER_STATUS, "awaiting_start")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await coordinator.async_run_job("recalculate", include_forecast=True)
     now = dt_util.utcnow()
     plugged, unplugged = now - datetime.timedelta(hours=30), now - datetime.timedelta(hours=10)
     states = {CHARGER_STATUS: [

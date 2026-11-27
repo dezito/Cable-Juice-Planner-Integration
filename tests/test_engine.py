@@ -19,6 +19,7 @@ from astral import Observer
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.utils.codec import decode
+from custom_components.cable_juice_planner.utils.formatting import emoji_parse
 from custom_components.cable_juice_planner.engine.control.preheat import preheat_lead_time
 from custom_components.cable_juice_planner.engine import CJPEngine, Snapshot
 from custom_components.cable_juice_planner.engine.planner.charge_plan import ChargePlan
@@ -158,19 +159,78 @@ def charge_hours(engine: CJPEngine) -> list[datetime.datetime]:
 PLUGGED_IN = {"status": "awaiting_start", "port": "on"}
 
 
-def test_no_charging_mode_charges_at_max() -> None:
-    """ev.py's fallback: every charging mode off -> charge like a normal charger."""
-    engine, result = run(3)
+def _charger_amps(result) -> list:
+    return [result.states[f"charger_phase_{i}_amps"] for i in (1, 2, 3)]
+
+
+def _circuit_amps(result) -> list:
+    return [result.attributes["charger_action"][f"circuit_phase_{i}_amps"] for i in (1, 2, 3)]
+
+
+@pytest.mark.parametrize("status", ["awaiting_start", "disconnected"])
+def test_no_charging_mode_does_not_charge(status: str) -> None:
+    """Every charging rule off: nothing is charged, whether a car is plugged in or not."""
+    engine, result = run(3, status=status, port="on")
+    assert engine.charger_action == "stop"
+    assert _charger_amps(result) == [0, 0, 0]
+    assert min(_circuit_amps(result)) > 0, "the plan's stop leaves the circuit open"
+    assert result.states["current_charging_rule"] == "⛔" + TEXTS["ui.charge_if_needed.no_charging_modes_active"]
+    assert result.attributes["charger_action"]["mode"] == "normal"
+
+
+def test_forced_charging_alone_is_a_charging_rule() -> None:
+    """Forced charging is a rule the user turned on: with only it on, a battery under the daily minimum is charged."""
+    engine, result = run(3, level=10, settings={"forced_charging_daily_battery_level": True}, **PLUGGED_IN)
     assert engine.charger_action == "charge"
     assert result.states["charging_watts"] == MAX_WATT
-    assert result.states["current_charging_rule"].startswith("⛔")
-    assert result.attributes["charger_action"]["mode"] == "normal"
+
+
+def test_no_charging_mode_does_not_charge_after_the_restarts_gave_up() -> None:
+    """The fail-safe after the restarts gave up charges whatever the plan says, but not with every rule turned off."""
+    now = datetime.datetime.combine(DAY, datetime.time(3, 30))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, **PLUGGED_IN)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine._charger_restart_gave_up = True
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "stop"
+    assert _charger_amps(result) == [0, 0, 0]
 
 
 def test_unplugged_stops() -> None:
     engine, result = run(3, settings={"fill_up": True})
     assert engine.charger_action == "stop"
     assert result.states["charger_phase_1_amps"] == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "location"),
+    [("disconnected", "home"), ("awaiting_start", "not_home"), ("unavailable", "home")],
+    ids=["charger unplugged", "own car away", "charger status unavailable"],
+)
+def test_planned_solar_hour_when_not_ready_stops(monkeypatch: pytest.MonkeyPatch, status: str, location: str) -> None:
+    """A solar surplus in a planned charge hour sets the amps to max before the branches are chosen: whatever makes the
+    car not ready (the plan's not-ready branch), the action must still be stop at 0 A, like the rule says."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    hour = now.replace(minute=0)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, settings={"fill_up": True}, status=status)
+    snap.states["device_tracker.ev"] = location
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine.charge_hours = {hour: {"Price": 1.0, "Cost": 1.0, "kWh": 3.0, "battery_level": 10.0, "ChargingAmps": 16}}
+    patches = {
+        "cheap_grid_charge_hours": lambda *args, **kwargs: None,
+        "max_local_energy_available_remaining_period": lambda: (5000.0, 5000.0),
+        "current_hour_in_charge_hours": lambda: hour,
+    }
+    for name, func in patches.items():
+        monkeypatch.setattr(engine, name, func)
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "stop"
+    assert _charger_amps(result) == [0, 0, 0]
+    assert min(_circuit_amps(result)) > 0, "the plan's stop leaves the circuit open"
 
 
 @pytest.mark.parametrize("hour", [3, 12, 18])
@@ -250,6 +310,25 @@ def _check_no_rule(engine: CJPEngine, at: datetime.datetime, kwargs: dict) -> bo
     result = engine.run_job(snapshot(at, **kwargs), engine.charging_without_rule)
     assert result.error is None, result.error
     return result.value
+
+
+def test_charging_with_every_rule_off_says_that_no_rules_are_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A car that starts by itself with every rule off: the alarm stays (stop again, its own rule text), and the rule
+    sensor also says that no charging rules are active, before the alarm and with it."""
+    start = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine, kwargs = _no_rule_engine(monkeypatch, start)
+    no_rules = "⛔" + TEXTS["ui.charge_if_needed.no_charging_rules"]
+    rules = []
+    for cron in range(7):
+        result = engine.run_job(snapshot(start + datetime.timedelta(minutes=5 * cron), **kwargs), engine.charge_if_needed, True)
+        assert result.error is None, result.error
+        assert engine.charger_action == "stop"
+        rules.append(engine.last_charging_rule_text)
+    assert rules[0].startswith(no_rules)
+    alarm, reason = rules[-1].split("\n")
+    assert alarm == f"{emoji_parse({'no_rule': True})}{TEXTS['ui.charging_without_rule.charging_no_rule'].format(watt=3000)}"
+    assert reason == no_rules
+    assert engine.charger_stop_request > 0
 
 
 @pytest.mark.parametrize("minute", [0, 2, 4])
@@ -349,6 +428,173 @@ def test_manual_charging() -> None:
     engine, result = run(12, settings={"allow_manual_charging_now": True}, **PLUGGED_IN)
     assert engine.charger_action == "charge"
     assert result.states["charging_watts"] == MAX_WATT
+
+
+@pytest.mark.parametrize("switch", ["allow_manual_charging_now", "allow_manual_charging_solar"])
+def test_manual_charging_with_the_charger_unplugged_does_not_charge(switch: str) -> None:
+    """The switch can be on with nothing plugged into the charger (turned on before the plug-in). The action must be stop
+    then: a charge that never starts made the charger automation restart the charger and send its "not charging" notice."""
+    engine, result = run(12, settings={switch: True}, status="disconnected")
+    assert engine.charger_action == "stop"
+    assert _charger_amps(result) == [0, 0, 0]
+    assert min(_circuit_amps(result)) > 0, "the plan's stop leaves the circuit open"
+    assert result.states["current_charging_rule"] == TEXTS["ui.ready_to_charge.cable_disconnected"]
+
+
+def test_manual_charging_with_the_charger_unplugged_ignores_a_planned_solar_hour(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A solar surplus in a planned charge hour sets the amps to max before the branches are chosen: with nothing plugged
+    in, the unplugged branch must still publish stop at 0 A."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    hour = now.replace(minute=0)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, settings={"allow_manual_charging_now": True}, status="disconnected")
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    engine.charge_hours = {hour: {"Price": 1.0, "Cost": 1.0, "kWh": 3.0, "battery_level": 10.0, "ChargingAmps": 16}}
+    patches = {
+        "cheap_grid_charge_hours": lambda *args, **kwargs: None,
+        "max_local_energy_available_remaining_period": lambda: (5000.0, 5000.0),
+        "current_hour_in_charge_hours": lambda: hour,
+    }
+    for name, func in patches.items():
+        monkeypatch.setattr(engine, name, func)
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "stop"
+    assert [result.states[f"charger_phase_{i}_amps"] for i in (1, 2, 3)] == [0, 0, 0]
+
+
+@pytest.mark.parametrize(
+    ("location", "port"),
+    [("not_home", "on"), ("home", "off"), ("not_home", "off")],
+    ids=["own car away", "own car home, port closed", "own car away, port closed"],
+)
+def test_manual_charging_for_a_guest_whatever_the_own_car_does(location: str, port: str) -> None:
+    """Manual charging is also for a guest's car: it only needs something plugged into the charger (its status), not the
+    own car at home with its port open."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, settings={"allow_manual_charging_now": True}, status="awaiting_start", port=port)
+    snap.states["device_tracker.ev"] = location
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "charge"
+    assert result.states["charging_watts"] == MAX_WATT
+
+
+def test_unplugging_the_charger_turns_the_manual_charging_off() -> None:
+    """Manual charging ends with the connection, also a guest's: the switches go off when the charger is unplugged, and
+    the forced charging switch is left to the plug-in."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    settings = {"allow_manual_charging_now": True, "allow_manual_charging_solar": True, "forced_charging_daily_battery_level": True}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now, settings=dict(settings), **PLUGGED_IN), engine.startup, {}).error is None
+    result = engine.run_job(snapshot(now, settings=dict(settings), status="disconnected"), engine.charger_status_changed, "disconnected", "awaiting_start")
+    assert result.error is None, result.error
+    assert result.settings["allow_manual_charging_now"] is False
+    assert result.settings["allow_manual_charging_solar"] is False
+    assert "forced_charging_daily_battery_level" not in result.settings
+
+
+@pytest.mark.parametrize("plan_first", [False, True], ids=["status event first", "a plan saw the plug-in first"])
+def test_plugging_in_keeps_the_manual_charging_turned_on_before_it(plan_first: bool) -> None:
+    """A switch turned on while nothing is plugged in (a guest is on the way) stays on at the plug-in, and charges then;
+    the forced charging is still turned off at the plug-in."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    settings = {"allow_manual_charging_now": True, "forced_charging_daily_battery_level": True}
+    snap = snapshot(now, settings=settings, **PLUGGED_IN)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    # started unplugged, or with a plan that saw the new status before the status event came
+    before = PLUGGED_IN if plan_first else {"status": "disconnected"}
+    assert engine.run_job(snapshot(now, settings=dict(settings), **before), engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charger_status_changed, "awaiting_start", "disconnected")
+    assert result.error is None, result.error
+    assert "allow_manual_charging_now" not in result.settings
+    assert result.settings["forced_charging_daily_battery_level"] is False
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "charge"
+
+
+MANUAL_BOTH = {"allow_manual_charging_now": True, "allow_manual_charging_solar": True}
+
+
+def _started(runtime: dict | None = None, **kwargs) -> tuple[CJPEngine, object, object]:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, **kwargs)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    result = engine.run_job(snap, engine.startup, {"runtime": runtime} if runtime is not None else {})
+    assert result.error is None, result.error
+    return engine, snap, result
+
+
+def test_an_unplug_not_seen_before_a_restart_turns_the_manual_charging_off() -> None:
+    """Plugged in before the restart, unplugged after it: no status event says so, the first plan must see it."""
+    _, _, result = _started(runtime={"charger_plugged": True}, settings=dict(MANUAL_BOTH), status="disconnected")
+    assert result.settings["allow_manual_charging_now"] is False
+    assert result.settings["allow_manual_charging_solar"] is False
+
+
+@pytest.mark.parametrize("hole", ["unavailable", "unknown"])
+def test_an_unplug_across_an_unknown_status_turns_the_manual_charging_off(hole: str) -> None:
+    """The charger's integration reloads while the car leaves: charging -> unavailable -> disconnected."""
+    engine, _, _ = _started(settings=dict(MANUAL_BOTH), status="charging", port="on")
+    now = datetime.datetime.combine(DAY, datetime.time(12, 35))
+    for value, old in ((hole, "charging"), ("disconnected", hole)):
+        result = engine.run_job(snapshot(now, settings=dict(MANUAL_BOTH), status=value), engine.charger_status_changed, value, old)
+        assert result.error is None, result.error
+    assert result.settings["allow_manual_charging_now"] is False
+    assert result.settings["allow_manual_charging_solar"] is False
+
+
+@pytest.mark.parametrize(("value", "old"), [("off", "disconnected"), ("disconnected", None), ("disconnected", "unavailable")])
+def test_manual_charging_stays_on_while_nothing_was_plugged_in(value: str, old: str | None) -> None:
+    """Turned on for a guest on the way: a change between two not-ready states (or from no state) is no unplug."""
+    engine, snap, started = _started(runtime={"charger_plugged": False}, settings=dict(MANUAL_BOTH), status=value)
+    result = engine.run_job(snap, engine.charger_status_changed, value, old)
+    assert result.error is None, result.error
+    for outcome in (started, result):
+        assert "allow_manual_charging_now" not in outcome.settings
+        assert "allow_manual_charging_solar" not in outcome.settings
+
+
+def test_a_charger_the_restart_disabled_does_not_turn_the_manual_charging_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine, _, _ = _started(settings=dict(MANUAL_BOTH), status="awaiting_start", port="on")
+    monkeypatch.setattr(engine, "_charger_restart_disabling", lambda: True)
+    now = datetime.datetime.combine(DAY, datetime.time(12, 35))
+    result = engine.run_job(snapshot(now, settings=dict(MANUAL_BOTH), status="disconnected"), engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert "allow_manual_charging_now" not in result.settings
+
+
+@pytest.mark.parametrize(("stored", "restored"), [(True, True), (False, False), ("yes", None), (1, None), (None, None)])
+def test_the_plugged_state_survives_a_restart(stored, restored) -> None:
+    # an unknown status: the first plan learns nothing, so what was restored is what is kept
+    engine, _, _ = _started(runtime={"charger_plugged": stored}, status="unavailable")
+    assert engine._runtime_state()["charger_plugged"] is restored
+
+
+@pytest.mark.parametrize("status", ["unavailable", "unknown"])
+def test_manual_charging_keeps_charging_while_the_charger_status_is_not_known(status: str) -> None:
+    """Without any known status (no history) manual charging goes on: only a status that says unplugged stops it."""
+    engine, result = run(12, settings={"allow_manual_charging_now": True}, status=status)
+    assert engine.charger_action == "charge"
+    assert result.states["charging_watts"] == MAX_WATT
+
+
+@pytest.mark.parametrize(("last_known", "action"), [("awaiting_start", "charge"), ("charging", "charge"), ("disconnected", "stop")])
+def test_manual_charging_follows_the_last_known_status_while_unavailable(last_known: str, action: str) -> None:
+    """The status entity drops out for seconds when the charger's integration reloads: a charge for a guest goes on, and
+    an unplugged charger does not start one (the charger automation would restart a charge that never starts)."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    snap = snapshot(now, settings={"allow_manual_charging_now": True}, status="unavailable")
+    snap.buffers = {"sensor.charger_status": [(now.replace(tzinfo=TZ).timestamp() - 60, last_known)]}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == action
+    assert "allow_manual_charging_now" not in result.settings, "only a known status turns the switch off"
 
 
 def test_workday_departure_plans_before_departure() -> None:
@@ -673,6 +919,18 @@ def test_charging_loss_needs_enough_charged() -> None:
     assert "charging_loss" not in result.config_updates
     assert result.settings["calculate_charging_loss"] is False
     assert engine.charging_loss_charger_begin_kwh == 0.0
+
+
+def test_charging_loss_with_the_charger_unplugged_stops() -> None:
+    """The measurement charges a car that is plugged in; with nothing plugged in the action must be stop."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(now, settings={"calculate_charging_loss": True}, status="disconnected")
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None, result.error
+    assert engine.charger_action == "stop"
+    assert [result.states[f"charger_phase_{i}_amps"] for i in (1, 2, 3)] == [0, 0, 0]
 
 
 def test_charging_loss_charges_to_the_car_limit() -> None:

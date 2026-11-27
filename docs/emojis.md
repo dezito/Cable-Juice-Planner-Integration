@@ -63,7 +63,7 @@ always means the same rule.
 | ⚠️ | Charging without a defined rule |
 | ❗ | Charging problems – the charger didn't charge and is being restarted |
 | ❌ | Charging failed completely – also after the restarts |
-| ⛔ | In the current rule: all charging rules are off (charges at max. current like a normal charger), or charging didn't start and the charger is being restarted |
+| ⛔ | In the current rule: all charging rules are off (nothing is charged), or charging didn't start and the charger is being restarted |
 
 ## Info
 

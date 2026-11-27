@@ -15,8 +15,19 @@ Charges at once, without waiting for the plan – e.g. for a guest, or when you 
 | Allow manual charging now | charges at max. current from the grid (and solar) |
 | Allow manual solar-only charging | charges only with the solar surplus |
 
-Both charge up to the max. recommended charge limit, and both are turned off automatically the next time
-the car is plugged in.
+Both charge up to the max. recommended charge limit, and both are turned off automatically when the charging
+cable is unplugged: the charger status goes from a plugged in state to disconnected or off. That is also seen
+when the status was unavailable in between, or Home Assistant restarted. Without a charger status entity CJP
+cannot see the unplug, and the switches stay on. Nothing is charged while the charger reports that nothing is
+plugged in (the action stays *stop* and the rule shows that the cable is disconnected), so you can turn a
+switch on before the car is plugged in. While the charger status is unavailable, its last known value counts.
+If that was a plugged in state and the status comes back as unplugged, the switches are turned off, also a
+switch you turned on in between.
+
+Manual charging only looks at the charger, not at your own car, so it also works for a guest's car, whether
+your own car is home or not. Turn the switch on before or after the guest plugs in; it turns itself off
+again when the guest unplugs. While your own car is away, charging starts at the next calculation (every few
+minutes), not at the moment of the plug-in.
 
 ## 🪫 Forced charging below the daily battery level
 
@@ -34,5 +45,9 @@ Use it as a safety net: whatever the plan says, the car never stays below the da
 
 ## No rules at all
 
-If every charging rule is off, CJP charges like a normal charger: at max. current whenever the car is
-plugged in.
+If every charging rule is off, CJP does not charge: the action is *stop* and the rule says that no charging
+rules are active. If the car or charger starts by itself anyway, CJP asks for *stop* again and reports
+[charging without a rule](../charger-control.md); the rule then also says that no charging rules are active.
+All rules are off after the setup, so turn on at least one. Forced charging counts as a
+rule: with only that on, the car is charged when it is below the daily minimum. It is turned off at the next
+plug-in, like always.
