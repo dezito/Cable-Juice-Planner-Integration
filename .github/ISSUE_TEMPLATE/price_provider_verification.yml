@@ -1,0 +1,61 @@
+name: Price Provider Verification Report (Confirmed)
+description: A price provider works with real data in your country
+title: "Price Provider Verification Report (Confirmed): "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when you have seen a price provider work with **real data** in your country. The easiest way:
+        open it from the link under *Price check* on the Cable Juice Planner dashboard (*Settings*). It fills in the providers, the
+        country, the versions and the results of the check.
+
+        **This issue is public.** Check the fields before you submit, and don't add sensor names, addresses or other
+        personal data. A report does not mark a provider as confirmed by itself: the maintainer does that.
+  - type: input
+    id: providers
+    attributes:
+      label: Price providers you have seen work
+      description: Remove the ones you have not checked.
+    validations:
+      required: true
+  - type: input
+    id: country
+    attributes:
+      label: Country
+      description: The two letters of the country of the prices, for example DE.
+    validations:
+      required: true
+  - type: textarea
+    id: amounts
+    attributes:
+      label: How did you check the amounts?
+      description: Compare a few hours of the buy price (and the sell price, if you use it) with your price integration, supplier or exchange, and say what you compared with. The check of Cable Juice Planner does not test the amounts.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have used it with real data for at least a whole day, also after the next day's prices had arrived.
+          required: true
+        - label: The prices matched what I compared them with.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cable Juice Planner version
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+  - type: textarea
+    id: price_check
+    attributes:
+      label: Price check result
+      description: The attribute `price_check` of `sensor.cjp_current_charging_rule`, filled in by the link on the dashboard.
+      render: json
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?

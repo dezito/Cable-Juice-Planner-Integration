@@ -27,6 +27,7 @@ it is reset (reset_dashboard button, or deleting the config in the raw configura
 from __future__ import annotations
 
 from collections.abc import Callable
+import json
 import logging
 import re
 from pathlib import Path
@@ -38,6 +39,7 @@ from homeassistant.components import frontend
 from homeassistant.components.lovelace import dashboard as lovelace_dashboard
 from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.json import cached_json_fragment, json_fragment
@@ -446,6 +448,9 @@ def render_dashboard(
     if not is_ev_configured(config):
         template = _drop_sections(template, (*EV_SECTIONS, *EV_WHAT_IF_SECTIONS))
     texts = load_texts(normalize_language(config.get("language")), currency, distance, PRICE_CORRECTION_MAX * price_scale(config))
+    # the link to the price provider report fills them in
+    texts["dashboard.report_version"] = json.loads((Path(__file__).parent.parent / "manifest.json").read_text(encoding="utf-8"))["version"]
+    texts["dashboard.report_ha_version"] = HA_VERSION
     template = _translate(_drop_empty_groups(_drop_empty_sections(_drop_empty_headings(_prune(template, missing)))), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 

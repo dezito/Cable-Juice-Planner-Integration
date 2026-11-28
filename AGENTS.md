@@ -581,7 +581,12 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   can be older than the job). A missing last hour of the day is tolerated (a market day can end before the local day): today
   until 20:00, in tomorrow's prices also after it. It only reports, in the
   attribute `price_check` of `sensor.cjp_current_charging_rule`, keyed by provider name with no entity ids; no price, plan,
-  repair or store depends on it.
+  repair or store depends on it. The price check
+  on the Settings view links to the issue form `.github/ISSUE_TEMPLATE/price_provider_verification.yml` (*Price Provider
+  Verification Report (Confirmed)*), pre-filled with only the provider names, the country, the versions and the `price_check`
+  results (no entity ids, prices or other user data); the integration sends nothing itself, and the form's field ids must
+  match the link's query parameters. A report never confirms a provider by itself: the maintainer adds the country to
+  `confirmed_countries`.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - Every price chart (`dashboard/prices/<provider>.yaml`, one per provider) is the Energy Price Forecast chart with its data source replaced by
   one inline `adapt()`: it reads the prices the plan is made on, whatever provider gave them, from attribute `price_chart` of

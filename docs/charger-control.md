@@ -234,7 +234,7 @@ To find out whether your automation does what the plan asks, run the test: turn 
 under *Settings* on the dashboard (the switch `switch.cjp_<prefix>_charger_test_run`). A car must be plugged in and
 not full. CJP then publishes one charging current after the other on `sensor.cjp_<prefix>_charger_action`, reads
 the charger's power sensor, and shows the result as a table under the switch (the attribute `markdown` of
-`sensor.cjp_<prefix>_charger_test`).
+`sensor.cjp_<prefix>_charger_test`). Click *Show the test result* to see it; it is open while the test runs.
 
 As soon as CJP knows which steps it will try (a few seconds after the start), the table lists every one of them, so you
 can see what will be tested and how far the test is: ⏳ waits, ▶️ is tested now, and a step gets its result (✅, ⚠️,

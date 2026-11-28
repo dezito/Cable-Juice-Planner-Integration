@@ -417,6 +417,7 @@ views:
   - *id002
   sections:
   - type: grid
+    column_span: 2
     cards:
     - type: heading
       heading: '@@section_workplan@@'
@@ -438,6 +439,13 @@ views:
       - entity: switch.cjp_workplan_charging
         name:
           type: entity
+      grid_options:
+        columns: full
+        rows: auto
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
       - type: section
         label: '@@monday@@'
       - entity: switch.cjp_workday_monday
@@ -506,6 +514,13 @@ views:
       - entity: switch.cjp_preheat_thursday
         name:
           type: entity
+      grid_options:
+        columns: 12
+        rows: auto
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
       - type: section
         label: '@@friday@@'
       - entity: switch.cjp_workday_friday
@@ -557,7 +572,9 @@ views:
       - entity: switch.cjp_preheat_sunday
         name:
           type: entity
-      grid_options: *id001
+      grid_options:
+        columns: 12
+        rows: auto
   - type: grid
     cards:
     - type: heading
@@ -584,41 +601,6 @@ views:
         name:
           type: entity
       grid_options: *id001
-    - type: heading
-      heading: '@@section_battery_levels@@'
-      icon: mdi:battery-heart-variant
-    - type: markdown
-      content: |-
-        {% set ns = namespace(help=none) %}
-        {% set ns.help = ns.help or state_attr('number.cjp_max_recommended_charge_limit_battery_level', 'help') %}
-        {% if ns.help %}<details><summary>@@read_more@@</summary>
-
-        {{ ns.help }}
-
-        </details>{% endif %}
-      grid_options: *id001
-    - type: entities
-      state_color: true
-      show_header_toggle: false
-      entities:
-      - entity: number.cjp_min_daily_battery_level
-        name:
-          type: entity
-      - entity: number.cjp_min_trip_battery_level
-        name:
-          type: entity
-      - entity: number.cjp_min_charge_limit_battery_level
-        name:
-          type: entity
-      - entity: number.cjp_max_recommended_charge_limit_battery_level
-        name:
-          type: entity
-      - entity: number.cjp_preheat_minutes_before
-        name:
-          type: entity
-      grid_options: *id001
-  - type: grid
-    cards:
     - type: heading
       heading: '@@section_cheap@@'
       icon: mdi:cash-clock
@@ -656,6 +638,30 @@ views:
           type: entity
       grid_options: *id001
     - type: heading
+      heading: '@@section_solar@@'
+      icon: mdi:solar-power-variant
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set solar_help = state_attr('switch.cjp_solar_charging', 'help') %}
+        {% if solar_help %}<details><summary>@@read_more@@</summary>
+
+        {{ solar_help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_solar_charging
+        name:
+          type: entity
+      - entity: sensor.cjp_solar_over_production_current_hour
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
       heading: '@@section_full_charge@@'
       icon: mdi:battery-check
     - type: markdown
@@ -682,15 +688,15 @@ views:
   - type: grid
     cards:
     - type: heading
-      heading: '@@section_solar@@'
-      icon: mdi:solar-power-variant
+      heading: '@@section_battery_levels@@'
+      icon: mdi:battery-heart-variant
     - type: markdown
-      card_mod: *id003
       content: |-
-        {% set solar_help = state_attr('switch.cjp_solar_charging', 'help') %}
-        {% if solar_help %}<details><summary>@@read_more@@</summary>
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('number.cjp_max_recommended_charge_limit_battery_level', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
 
-        {{ solar_help }}
+        {{ ns.help }}
 
         </details>{% endif %}
       grid_options: *id001
@@ -698,10 +704,19 @@ views:
       state_color: true
       show_header_toggle: false
       entities:
-      - entity: switch.cjp_solar_charging
+      - entity: number.cjp_min_daily_battery_level
         name:
           type: entity
-      - entity: sensor.cjp_solar_over_production_current_hour
+      - entity: number.cjp_min_trip_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_min_charge_limit_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_max_recommended_charge_limit_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_preheat_minutes_before
         name:
           type: entity
       grid_options: *id001
@@ -839,6 +854,8 @@ views:
         name:
           type: entity
       grid_options: *id001
+  - type: grid
+    cards:
     - type: heading
       heading: '@@section_charger_test@@'
       icon: mdi:test-tube
@@ -856,7 +873,55 @@ views:
           type: entity
       grid_options: *id001
     - type: markdown
-      content: '{{ state_attr(''sensor.cjp_charger_test'', ''markdown'') or '''' }}'
+      content: |-
+        {% set result = state_attr('sensor.cjp_charger_test', 'markdown') or '' %}
+        {% if result %}<details{% if is_state('sensor.cjp_charger_test', 'running') %} open{% endif %}><summary>@@test_result_show@@</summary>
+
+        {{ result }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_price_check@@'
+      icon: mdi:cash-check
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@help_price_check@@\n\n</details>"
+      grid_options: *id001
+    - type: markdown
+      content: |-
+        {% set check = state_attr('sensor.cjp_current_charging_rule', 'price_check') or {} %}
+        {% set providers = check.get('providers') or {} %}
+        {% set names = {'stromligning': 'Strømligning', 'energidataservice': 'Energi Data Service', 'energypriceforecast': 'Energy Price Forecast', 'spotforecast': 'Spot Forecast', 'elprognos': 'Elprisprognos', 'wattcast': 'Wattcast', 'epexspot': 'EPEX Spot', 'gespot': 'GE-Spot', 'octopus': 'Octopus Energy', 'nordpool': 'Nord Pool'} %}
+        {% macro mark(value) %}{{ '✅' if value is true else '❌' if value is false else '➖' }}{% endmacro %}
+        <details><summary>@@price_check_show@@</summary>
+
+        {% if providers %}
+        @@price_check_checked@@: {{ check.get('checked', '')[:16] | replace('T', ' ') }} ({{ check.get('country', '') }})
+
+        | |{% for key in providers %} {{ names.get(key, key) }} |{% endfor %}
+        |:--|{% for key in providers %}:-:|{% endfor %}
+        | @@price_check_confirmed@@ |{% for provider in providers.values() %} {{ '✅' if provider.get('confirmed') is true else '🧪' }} |{% endfor %}
+        | @@price_check_ok@@ |{% for provider in providers.values() %} {{ mark(provider.get('ok')) }} |{% endfor %}
+        | @@price_check_unit@@ |{% for provider in providers.values() %} {{ mark(provider.get('unit')) }} |{% endfor %}
+        | @@price_check_today@@ |{% for provider in providers.values() %} {{ mark(provider.get('today')) }} |{% endfor %}
+        | @@price_check_tomorrow@@ |{% for provider in providers.values() %} {{ mark(provider.get('tomorrow')) }} |{% endfor %}
+        | @@price_check_sell_today@@ |{% for provider in providers.values() %} {{ mark(provider.get('sell_today')) }} |{% endfor %}
+        | @@price_check_sell_tomorrow@@ |{% for provider in providers.values() %} {{ mark(provider.get('sell_tomorrow')) }} |{% endfor %}
+        | @@price_check_forecast_days@@ |{% for provider in providers.values() %} {{ provider.get('forecast_days') if provider.get('forecast_days') is not none else '➖' }} |{% endfor %}
+
+        @@price_check_legend@@
+        {% else %}
+        @@price_check_none@@
+        {% endif %}
+
+        </details>
+
+        {% set report = namespace(chosen=[], unconfirmed=[]) %}
+        {% for key, provider in providers.items() %}{% set report.chosen = report.chosen + [names.get(key, key)] %}{% if provider.get('confirmed') is not true %}{% set report.unconfirmed = report.unconfirmed + [names.get(key, key)] %}{% endif %}{% endfor %}
+        {% set reported = (report.unconfirmed or report.chosen) | join(', ') %}
+        {% set query = {'template': 'price_provider_verification.yml', 'title': 'Price Provider Verification Report (Confirmed)' ~ (': ' ~ reported ~ ' (' ~ check.get('country', '') ~ ')' if reported else ''), 'providers': reported, 'country': check.get('country', ''), 'version': '@@report_version@@', 'ha_version': '@@report_ha_version@@', 'price_check': {'checked': check.get('checked'), 'providers': providers} | to_json if providers else ''} %}
+        @@price_check_report@@
+        [Price Provider Verification Report (Confirmed)](https://github.com/dezito/Cable-Juice-Planner-Integration/issues/new?{{ query | urlencode }})
       grid_options: *id001
     - type: heading
       heading: '@@section_problem@@'

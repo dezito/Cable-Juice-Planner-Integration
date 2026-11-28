@@ -198,11 +198,17 @@ Data Service and Strømligning in Denmark. The others can be chosen too; check t
 
 With every price update the integration also tests each chosen provider on its own prices: the unit, whether the buy and
 sell prices are complete from the current hour to the end of today and for tomorrow, and how many days the forecast reaches.
-The result is in the attribute `price_check` of `sensor.cjp_current_charging_rule` (see it under **Developer tools → States**):
-`true` is passed, `false` failed, and an empty value could not be judged:
+The result is in the attribute `price_check` of `sensor.cjp_current_charging_rule` (the raw values are under **Developer tools → States**).
+The dashboard shows them under **Settings → Price check**; click *Show the price check* to open it (✅ passed, ❌ failed,
+➖ empty). `true` is passed, `false` failed, and an empty value could not be judged:
 - tomorrow's prices before 20:00, so `ok` is normally empty until they arrive,
 - a sensor of the provider that is unavailable,
-- no sell prices (for example no sell sensor): `ok` then never becomes `true`, except with Octopus Energy without an export tariff.
+- no sell sensor and no sell prices: `ok` then never becomes `true`, except with Octopus Energy without an export tariff.
+
+At the bottom of the section is the link **Price Provider Verification Report (Confirmed)**. Use it when you have seen a provider work with your real data and the
+amounts are right. It opens a new, public issue on GitHub, filled in with the providers (the ones not confirmed yet, or all
+chosen ones when all are confirmed), the country, the versions and the results of the check, but no sensor names, prices or
+other data of yours. Clicking the link sends these fields to GitHub; nothing is published until you submit the issue there. A report does not confirm a provider by itself.
 
 In a market without published prices for the next day, tomorrow shows `false` in the evening. A passed test says that the
 prices are there, not that their amounts are right, and no price or plan depends on it.
