@@ -37,6 +37,8 @@ applies it. The [blueprint](docs/charger-control.md#the-blueprint) with a fail-s
 > [!NOTE]
 > Coming from the [PyScript version](https://github.com/dezito/Cable-Juice-Planner)? Keep it running while the integration is added, so its helpers and sensors can be copied. See [Switching from the PyScript version](docs/migration.md).
 
+🌐 **[Documentation website](https://dezito.github.io/Cable-Juice-Planner-Integration/)** – the documentation as a website with a menu.
+
 📖 **[Documentation](docs/README.md)** – [tested integrations by country](docs/tested-integrations.md), [getting started](docs/getting-started.md), [how CJP plans](docs/how-it-works.md),
 every charging rule explained with examples, [charger control](docs/charger-control.md) and [FAQ](docs/faq-troubleshooting.md).
 
