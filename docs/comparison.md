@@ -1,6 +1,6 @@
 # How Cable Juice Planner compares with other smart chargers
 
-[← Back to the README](../README.md)
+[← Back to the README](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md)
 
 Smart charging can mean different things: a Home Assistant integration, a charger app that schedules a session, or a bundled electricity tariff that automatically controls a compatible car or charger.
 

@@ -430,7 +430,7 @@ Then set the battery levels: **min. daily battery level** (e.g. 30 %) and **max.
 (e.g. 90 %). If all rules are off, CJP does not charge.
 
 <p align="center">
-  <img src="../images/settings-battery-levels.png" alt="The Battery levels settings" width="380">
+  <img src="images/settings-battery-levels.png" alt="The Battery levels settings" width="380">
 </p>
 
 ## 5. Control the charger

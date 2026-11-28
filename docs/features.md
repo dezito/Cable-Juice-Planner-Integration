@@ -1,6 +1,6 @@
 # Features and charging rules
 
-[← Back to the README](../README.md). The README has the short list; this page has all of it. For what is behind each rule, see the pages under *Charging rules* in the [documentation index](README.md).
+[← Back to the README](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md). The README has the short list; this page has all of it. For what is behind each rule, see the pages under *Charging rules* in the [documentation index](README.md).
 
 ## Charging rules
 
@@ -125,8 +125,8 @@
 
 | Battery level costs and charging overview | Departure plan | Charging history |
 | --- | --- | --- |
-| ![Battery level costs and charging overview](../images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](../images/departure-plan.png) | ![Charging history](../images/charging-history.png) |
+| ![Battery level costs and charging overview](images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](images/departure-plan.png) | ![Charging history](images/charging-history.png) |
 
 | Economy | Driving and temperature |
 | --- | --- |
-| ![Economy per month compared with daily charging](../images/economy.png) | ![km/kWh against the outdoor temperature](../images/driving-and-temperature.png) |
+| ![Economy per month compared with daily charging](images/economy.png) | ![km/kWh against the outdoor temperature](images/driving-and-temperature.png) |

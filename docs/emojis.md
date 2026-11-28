@@ -14,10 +14,10 @@ always means the same rule.
 | The charging history | each charge with the rules that were active – e.g. `⚡💵` for planned charging at a very cheap price, `🧾` for a public charge, `❗`/`❌` when the charging had problems |
 | The emoji explanation (dashboard → overview) | `sensor.cjp_<prefix>_emoji_description` – the list below in your language |
 
-<details>
+<details markdown="1">
 <summary>Screenshot of the emoji explanation</summary>
 
-<p align="center"><img src="../images/emoji-description.png" alt="The emoji explanation on the dashboard" width="380"></p>
+<p align="center"><img src="images/emoji-description.png" alt="The emoji explanation on the dashboard" width="380"></p>
 
 </details>
 

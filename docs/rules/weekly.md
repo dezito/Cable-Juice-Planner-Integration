@@ -6,7 +6,7 @@ Without a fixed pattern – or on holiday – CJP keeps the car ready for a norm
 power is cheapest during the week.
 
 <p align="center">
-  <img src="../../images/settings-optimal-weekly-charging.png" alt="The Optimal weekly charging settings" width="380">
+  <img src="../images/settings-optimal-weekly-charging.png" alt="The Optimal weekly charging settings" width="380">
 </p>
 
 ## How it plans
