@@ -7,17 +7,18 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.helpers import device_registry as dr
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
-from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, OPTIONS_MENU, PRICE_PROVIDER_KEYS, default_options, object_prefix, price_scale
+from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, OPTIONS_MENU, PRICE_PROVIDER_KEYS, PRICE_PROVIDER_PRIORITY, default_options, object_prefix, price_scale
 from ..site import charger_devices, circuit_of, update_circuits
 from ..management.dependency_checks import disabled_sensors
-from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices, price_currency_errors, price_sensor_errors, DEFAULT_COUNTRY, default_providers, provider_errors, providers_for_country
+from ..prices import STROMLIGNING_PLATFORM, STROMLIGNING_UNIQUE_ID_PREFIXES, detect_price_scale, has_stromligning_sell_prices, price_currency_errors, price_sensor_errors, DEFAULT_COUNTRY, default_providers, provider_errors, providers_for_country, unconfirmed_providers, provider_sections
 from ..utils.chargers import charger_in_house_meter, charger_power_entity, lower_priority_charger_power_entities, site_priority
 from ..utils.solcast import SOLCAST_PLATFORM
 from .detection import Detection, async_detect, evidence_placeholders, verdict_values
-from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDER_NAMES, PRICE_PROVIDERS, SELECTORS, SPOT_PRICE_PROVIDERS, build_schema, normalize_input, validate_step
+from .schema import BOOLEAN, ENERGIDATASERVICE_URL, PRICE_PROVIDER_NAMES, PRICE_PROVIDERS, SELECTORS, SPOT_PRICE_PROVIDERS, UNCONFIRMED_SUFFIX, ProviderSelector, build_schema, normalize_input, provider_of, validate_step
 
 # the sensors the suggestions are made from; they are only made again when one of them was changed in this session
 DETECTION_SENSORS = ("power_consumption_entity_id", "powerwall_watt_flow_entity_id", "powerwall_battery_level_entity_id")
@@ -249,9 +250,13 @@ class CJPFlowPages:
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         country = self._price_country()
-        offered = providers_for_country(country, PRICE_PROVIDERS)  # only the providers that have prices in the country
+        # only the providers that have prices in the country, in the order their prices are taken in (the lists follow it)
+        offered = providers_for_country(country, PRICE_PROVIDER_PRIORITY)
+        unconfirmed = unconfirmed_providers(country, offered)
+        listed = {p: p + UNCONFIRMED_SUFFIX if p in unconfirmed else p for p in offered}  # the value shows 🧪
         if user_input is not None:
-            providers = [p for p in user_input.get("price_providers", []) if p in offered]
+            picked = {provider_of(value) for part in provider_sections(offered) for value in user_input.get(part, {}).get("providers", [])}
+            providers = [p for p in offered if p in picked]
             if not providers:
                 errors["base"] = "no_price_provider"
             elif errors := provider_errors(country, providers):
@@ -265,13 +270,24 @@ class CJPFlowPages:
                 return await self._async_next()
         # what was chosen before stays as far as the country has it; nothing left starts as a new entry in the country does
         chosen = [p for p in self._providers if p in offered] or default_providers(country)
-        schema = vol.Schema(
-            {
-                vol.Required("price_providers", default=chosen): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=offered, multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="price_providers")
+        # two sections, both open: the providers with a forecast, and those with published prices only
+        fields = {
+            vol.Required(part): section(
+                vol.Schema(
+                    {
+                        vol.Required("providers", default=[listed[p] for p in names if p in chosen]): ProviderSelector(
+                            selector.SelectSelectorConfig(
+                                options=[listed[p] for p in names], multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="price_providers"
+                            )
+                        )
+                    }
                 ),
-            }
-        )
+                {"collapsed": False},
+            )
+            for part, names in provider_sections(offered).items()
+            if names
+        }
+        schema = vol.Schema(fields)
         return self.async_show_form(  # type: ignore[attr-defined]
             step_id="price_provider",
             data_schema=schema,
@@ -281,6 +297,8 @@ class CJPFlowPages:
                 "country": country,
                 # what the country does not have, so the user sees why a provider is missing from the list
                 "unavailable": ", ".join(PRICE_PROVIDER_NAMES[p] for p in PRICE_PROVIDERS if p not in offered) or "–",
+                # the order the prices are taken in, for the providers the country has
+                "priority": " → ".join(PRICE_PROVIDER_NAMES[p] for p in offered),
             },
         )
 

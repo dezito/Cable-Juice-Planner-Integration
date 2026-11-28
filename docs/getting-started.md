@@ -182,12 +182,30 @@ changing the country under **General** leads on to the price pages when a chosen
 only works in Denmark, Energi Data Service in Denmark, Norway, Sweden, Finland, Estonia, Latvia, Lithuania, France, the
 Netherlands, Belgium, Austria, Germany and Luxembourg, and Energy Price Forecast in most of Europe.
 
-Energi Data Service, Strømligning, Energy Price Forecast and/or a spot forecast integration. With several, the priority is Strømligning, then
-Energi Data Service, then Octopus Energy, Nord Pool, EPEX Spot and GE-Spot, then Energy Price Forecast, then the spot forecast integrations: the price of the first one that has one is used for every hour,
-and the next fills the gaps (also in the economy statement).
+The page has two sections: **📈 Prices and forecast**, and **🕐 Prices only (today and tomorrow)** with EPEX Spot, GE-Spot,
+Octopus Energy and Nord Pool, which need a provider from the first section next to them. At the top it shows the order the
+prices are taken in, with the providers of your country, and each section lists them in that order.
+
+Choose one or more. With several, the priority is Strømligning, then
+Energi Data Service, then Octopus Energy, Nord Pool, EPEX Spot and GE-Spot, then Energy Price Forecast, then the spot forecast integrations: each hour uses the first one that has a price (a real price
+always goes before a forecast), and the next fills the gaps (also in the economy statement).
 Enable *Carnot* in Energi Data Service to plan beyond the published prices – without a forecast, CJP fills
 the rest of the week from its own [price database](how-it-works.md#prices).
-The page also sets the electricity tax refund and the selling fee, which are explained under [Prices](how-it-works.md#prices).
+The fee page sets the electricity tax refund and the selling fee, which are explained under [Prices](how-it-works.md#prices).
+
+**🧪** before a name means that the provider is **not confirmed with real data** in your country yet. Confirmed so far: Energi
+Data Service and Strømligning in Denmark. The others can be chosen too; check their prices after the setup.
+
+With every price update the integration also tests each chosen provider on its own prices: the unit, whether the buy and
+sell prices are complete from the current hour to the end of today and for tomorrow, and how many days the forecast reaches.
+The result is in the attribute `price_check` of `sensor.cjp_current_charging_rule` (see it under **Developer tools → States**):
+`true` is passed, `false` failed, and an empty value could not be judged:
+- tomorrow's prices before 20:00, so `ok` is normally empty until they arrive,
+- a sensor of the provider that is unavailable,
+- no sell prices (for example no sell sensor): `ok` then never becomes `true`, except with Octopus Energy without an export tariff.
+
+In a market without published prices for the next day, tomorrow shows `false` in the evening. A passed test says that the
+prices are there, not that their amounts are right, and no price or plan depends on it.
 
 **Energy Price Forecast** (for prices outside Denmark): choose its retail price sensor (*Current retail price*) as the
 buy price – it gives the published prices of today and tomorrow and the forecast after them. It only exists when

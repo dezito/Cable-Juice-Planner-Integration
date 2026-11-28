@@ -444,12 +444,22 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat. EPEX Spot, GE-Spot, Octopus Energy i Nord Pool podają Twoje własne opublikowane ceny (dziś i jutro): obok nich potrzebny jest dostawca z prognozą, a one są zaraz po Energi Data Service, przed Energy Price Forecast i innymi szacunkami.\n\n**Niedostępni w kraju {country}:** {unavailable}",
-        "data": {
-          "price_providers": "Dostawcy cen"
-        },
-        "data_description": {
-          "price_providers": "Wyświetlani są tylko dostawcy, którzy mają ceny w wybranym kraju. Kraj można zmienić w sekcji Ogólne po zakończeniu konfiguracji."
+        "description": "Wybierz jednego lub kilku.\n\n**Przy kilku** dla każdej godziny używany jest pierwszy w tej kolejności, który ma cenę (rzeczywista cena zawsze ma pierwszeństwo przed prognozą):\n{priority}\n\n🧪 W kraju {country} jeszcze niepotwierdzony na prawdziwych danych. Można go wybrać: sprawdź ceny po konfiguracji.\n\n**Niedostępni w kraju {country}:** {unavailable}\nKraj można zmienić w sekcji Ogólne po zakończeniu konfiguracji.",
+        "sections": {
+          "with_forecast": {
+            "name": "📈 Ceny i prognoza",
+            "description": "Mogą podawać prognozę. Niektórzy wymagają włączenia jej we własnej integracji.",
+            "data": {
+              "providers": "Dostawcy"
+            }
+          },
+          "prices_only": {
+            "name": "🕐 Tylko ceny (dziś i jutro)",
+            "description": "Bez prognozy: wybierz też co najmniej jednego w sekcji Ceny i prognoza.",
+            "data": {
+              "providers": "Dostawcy"
+            }
+          }
         }
       },
       "user": {
@@ -1001,12 +1011,22 @@
       },
       "price_provider": {
         "title": "Ceny energii",
-        "description": "Wybierz, skąd pochodzą ceny godzinowe. Przy kilku kolejność to Strømligning, potem Energi Data Service, potem Energy Price Forecast: dla każdej godziny używana jest cena pierwszego, który ją ma, a następny uzupełnia luki. Integracje cen giełdowych (Spot Forecast, Elprisprognos, Wattcast) są na końcu; podają ceny hurtowe, więc VAT i dopłata są pytane na stronie opłat. EPEX Spot, GE-Spot, Octopus Energy i Nord Pool podają Twoje własne opublikowane ceny (dziś i jutro): obok nich potrzebny jest dostawca z prognozą, a one są zaraz po Energi Data Service, przed Energy Price Forecast i innymi szacunkami.\n\n**Niedostępni w kraju {country}:** {unavailable}",
-        "data": {
-          "price_providers": "Dostawcy cen"
-        },
-        "data_description": {
-          "price_providers": "Wyświetlani są tylko dostawcy, którzy mają ceny w kraju ustawionym w sekcji Ogólne."
+        "description": "Wybierz jednego lub kilku.\n\n**Przy kilku** dla każdej godziny używany jest pierwszy w tej kolejności, który ma cenę (rzeczywista cena zawsze ma pierwszeństwo przed prognozą):\n{priority}\n\n🧪 W kraju {country} jeszcze niepotwierdzony na prawdziwych danych. Można go wybrać: sprawdź ceny po konfiguracji.\n\n**Niedostępni w kraju {country}:** {unavailable}\nKraj ustawia się w sekcji Ogólne.",
+        "sections": {
+          "with_forecast": {
+            "name": "📈 Ceny i prognoza",
+            "description": "Mogą podawać prognozę. Niektórzy wymagają włączenia jej we własnej integracji.",
+            "data": {
+              "providers": "Dostawcy"
+            }
+          },
+          "prices_only": {
+            "name": "🕐 Tylko ceny (dziś i jutro)",
+            "description": "Bez prognozy: wybierz też co najmniej jednego w sekcji Ceny i prognoza.",
+            "data": {
+              "providers": "Dostawcy"
+            }
+          }
         }
       },
       "site": {
@@ -1093,15 +1113,25 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
+        "energidataservice_unconfirmed": "🧪 Energi Data Service",
         "stromligning": "Strømligning",
+        "stromligning_unconfirmed": "🧪 Strømligning",
         "energypriceforecast": "Energy Price Forecast (Europa)",
+        "energypriceforecast_unconfirmed": "🧪 Energy Price Forecast (Europa)",
         "spotforecast": "Spot Forecast (DE, LU, NL, NO)",
+        "spotforecast_unconfirmed": "🧪 Spot Forecast (DE, LU, NL, NO)",
         "elprognos": "Elprisprognos (Szwecja)",
+        "elprognos_unconfirmed": "🧪 Elprisprognos (Szwecja)",
         "wattcast": "Wattcast (Finlandia, kraje bałtyckie)",
+        "wattcast_unconfirmed": "🧪 Wattcast (Finlandia, kraje bałtyckie)",
         "epexspot": "EPEX Spot (Europa, bez prognozy)",
+        "epexspot_unconfirmed": "🧪 EPEX Spot (Europa, bez prognozy)",
         "gespot": "GE-Spot (Europa i inne, bez prognozy)",
+        "gespot_unconfirmed": "🧪 GE-Spot (Europa i inne, bez prognozy)",
         "octopus": "Octopus Energy (Wielka Brytania, bez prognozy)",
-        "nordpool": "Nord Pool (HACS, bez prognozy)"
+        "octopus_unconfirmed": "🧪 Octopus Energy (Wielka Brytania, bez prognozy)",
+        "nordpool": "Nord Pool (HACS, bez prognozy)",
+        "nordpool_unconfirmed": "🧪 Nord Pool (HACS, bez prognozy)"
       }
     },
     "restore_backup": {

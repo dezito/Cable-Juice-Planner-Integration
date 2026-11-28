@@ -563,6 +563,25 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   property of the provider, not of what its sensor shows now).
 - CO2 is removed from Cable Juice Planner (user decision): `co2_entity_id` is in `REMOVED_OPTION_KEYS` and the 2.6 migration
   removes the sensor `co2_emitted`. Do not add it back without asking.
+- A price provider is confirmed per country only by hand: `confirmed_countries` on its class (a subset of `countries`),
+  added when the user has seen it work with real data. Passing the self test or the automated tests (synthetic fixtures)
+  never confirms one; so far Energi Data Service and Strømligning in DK are confirmed (user decision). The price provider
+  page marks the offered providers not confirmed in the country with 🧪 before the name; they stay selectable. It lists the
+  providers in two open sections by `has_forecast` (`provider_sections()` in `prices/availability.py`): with a forecast, and published prices only, each in the order of
+  `PRICE_PROVIDER_PRIORITY`. Its description and the section texts stay short, and the section texts name no providers (a country
+  may not have them). The description shows the offered providers in
+  the order of `PRICE_PROVIDER_PRIORITY` (`priority`). The mark comes from the option value `<provider>_unconfirmed`
+  (`ProviderSelector` in `flow/schema.py`), translated in `selector.price_providers` as 🧪 followed by the provider's name, so the
+  list stays in the user's own language: keep `translation_key`, accept the plain name too, and store only the plain name.
+  `prices/verification.py` (the same file in both repositories) is the self test: each provider is judged on its own prices,
+  never the combined ones; the results are True, False or None, and None (tomorrow's prices before 20:00, a buy or sell sensor
+  without a state, no sell prices unless the provider sells nothing) never counts as passed. Today only the slots from the
+  current hour count; a False becomes None while another sensor of the provider has no state; a failed update fails even with
+  old prices left. The prices are judged at the moment they were read (Cable Juice Planner: `last_update`, its price snapshot
+  can be older than the job). A missing last hour of the day is tolerated (a market day can end before the local day): today
+  until 20:00, in tomorrow's prices also after it. It only reports, in the
+  attribute `price_check` of `sensor.cjp_current_charging_rule`, keyed by provider name with no entity ids; no price, plan,
+  repair or store depends on it.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - Every price chart (`dashboard/prices/<provider>.yaml`, one per provider) is the Energy Price Forecast chart with its data source replaced by
   one inline `adapt()`: it reads the prices the plan is made on, whatever provider gave them, from attribute `price_chart` of

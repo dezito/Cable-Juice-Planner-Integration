@@ -17,6 +17,7 @@ class EnergiDataServicePriceProvider(BasePriceProvider):
     buy_key = "energidataservice_buy_entity_id"
     # the regions of the Energi Data Service integration (its REGIONS): DK1/DK2, FI, EE, LT, LV, NO1-5, SE1-4, FR, NL, BE, AT, DE, LU
     countries = frozenset({"DK", "FI", "EE", "LT", "LV", "NO", "SE", "FR", "NL", "BE", "AT", "DE", "LU"})
+    confirmed_countries = frozenset({"DK"})
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)

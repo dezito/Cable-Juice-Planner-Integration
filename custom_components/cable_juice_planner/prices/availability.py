@@ -18,6 +18,20 @@ def providers_for_country(country: str, names: list[str]) -> list[str]:
     return [name for name in names if PROVIDER_CLASSES[name].countries is None or country in PROVIDER_CLASSES[name].countries]
 
 
+def unconfirmed_providers(country: str, names: list[str]) -> list[str]:
+    """The providers of names (in their order) that nobody has seen work with real data in the country yet."""
+    return [name for name in names if country not in PROVIDER_CLASSES[name].confirmed_countries]
+
+
+def provider_sections(names: list[str]) -> dict[str, list[str]]:
+    """The providers of names (in their order) in the two sections of the price provider page: those with a forecast, and
+    those with published prices only."""
+    return {
+        "with_forecast": [name for name in names if PROVIDER_CLASSES[name].has_forecast],
+        "prices_only": [name for name in names if not PROVIDER_CLASSES[name].has_forecast],
+    }
+
+
 def provider_errors(country: str, providers: list[str]) -> dict[str, str]:
     """The error of a choice of providers ({} when it is fine): one that has no prices in the country, or none with a forecast.
 
