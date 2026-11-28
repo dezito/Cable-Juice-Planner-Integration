@@ -1,5 +1,7 @@
 # Charger and car control
 
+<!-- {% raw %} -->
+
 CJP sends **no commands** to the charger or the car. It publishes what should happen on the action
 entities, and your automation does it – easiest with the blueprint that comes with the integration.
 
@@ -422,3 +424,5 @@ actions:
             target:
               entity_id: climate.my_car_climate
 ```
+
+<!-- {% endraw %} -->

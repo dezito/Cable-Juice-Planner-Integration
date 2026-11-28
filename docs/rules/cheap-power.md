@@ -6,7 +6,7 @@
 When the power is cheap, it pays to charge more than the plan needs – the kWh will cost more later.
 
 <p align="center">
-  <img src="../../images/settings-cheap-power.png" alt="The Cheap power settings" width="380">
+  <img src="../images/settings-cheap-power.png" alt="The Cheap power settings" width="380">
 </p>
 
 ## When is it cheap?

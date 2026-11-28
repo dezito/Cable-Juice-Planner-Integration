@@ -257,6 +257,13 @@ private agent memory). Update or remove a note when it stops being true.
   `hass_storage` mocks the Store, so they place the files on disk themselves.
 - `input_boolean.dezito_show_debug_button` in the generated dashboard is the
   user's own toggle for the debug-info badge. It is intentional; do not flag it.
+- `docs/` is also published as a website with GitHub Pages (deploy from branch `main`, folder `/docs`: `_config.yml`,
+  `_layouts/`, `assets/` and the menu in `_data/navigation.yml`; `docs/development/` is left out). Images are in
+  `docs/images/`. A link in a public page never leaves `docs/`: a file outside it gets its full github.com address. A page
+  with Jinja (`{{` or `{%`) has `<!-- {% raw %} -->` after its title and `<!-- {% endraw %} -->` at its end. `<details>` has
+  `markdown="1"`. A new page goes into the index `docs/README.md` and into the menu. `tests/test_docs_site.py` checks this.
+  A heading (not the title) whose emoji has the invisible variation selector U+FE0F has an `<a id="…"></a>` line before it,
+  with the anchor without that character, so the same link works on the site and on github.com.
 - README/docs audience: first-time installs, possibly migrating from PyScript. The HACS integration is new, so no release notes or "changed since" text
   about removed/renamed entities between development versions. Detailed docs
   live in `docs/` (English); the README is a short landing page that links into

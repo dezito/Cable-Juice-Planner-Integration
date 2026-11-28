@@ -35,7 +35,7 @@ Instead of guessing the km per workday, CJP can learn them from the odometer.
   weekday side by side, with the number of measured days – see [Dashboard](dashboard-analysis.md#learned-driving-distance).
 
 <p align="center">
-  <img src="../images/learned-driving-distance.png" alt="Entered against learned driving distance per weekday" width="760">
+  <img src="images/learned-driving-distance.png" alt="Entered against learned driving distance per weekday" width="760">
 </p>
 
 **Example:** the last 8 Tuesdays were 42, 44, 43, 120, 41, 45, 44 and 43 km. The median is 43.5 km, so

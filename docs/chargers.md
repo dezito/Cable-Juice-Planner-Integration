@@ -1,5 +1,7 @@
 # Ready-made charger actions
 
+<!-- {% raw %} -->
+
 Actions for the [charger control blueprint](charger-control.md#the-blueprint) with a few common chargers.
 Choose *Edit in YAML* in the blueprint's field and paste. The variables (`max_phase` and the others in
 [Charger and car control](charger-control.md#charger-and-car)) come from CJP, so you don't read any sensor
@@ -218,3 +220,5 @@ session is not verified. Check the real entity id, as it can depend on your lang
 
 For chargers that are not on this page, see the typical actions in
 [Charger and car control](charger-control.md#charger-and-car).
+
+<!-- {% endraw %} -->

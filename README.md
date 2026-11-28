@@ -16,7 +16,7 @@ Cable Juice Planner (CJP) plans the charging from electricity prices, solar surp
 car's measured consumption.
 
 <p align="center">
-  <a href="https://sloth.nu/cable-juice-planner.mp4" target="_blank"><img src="images/dashboard-demo.gif" alt="The Cable Juice Planner dashboard in use: battery and charging plan, electricity prices, settings and analysis" width="100%"></a>
+  <a href="https://sloth.nu/cable-juice-planner.mp4" target="_blank"><img src="docs/images/dashboard-demo.gif" alt="The Cable Juice Planner dashboard in use: battery and charging plan, electricity prices, settings and analysis" width="100%"></a>
 </p>
 
 - **Cheapest hours across the week, not just tonight.** CJP can wait for cheaper hours later in the week and avoid buying energy before it is needed.
@@ -72,7 +72,7 @@ The complete list is in [Features and charging rules](docs/features.md).
 
 | Battery level costs and charging overview | Departure plan | Charging history |
 | --- | --- | --- |
-| ![Battery level costs and charging overview](images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](images/departure-plan.png) | ![Charging history](images/charging-history.png) |
+| ![Battery level costs and charging overview](docs/images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](docs/images/departure-plan.png) | ![Charging history](docs/images/charging-history.png) |
 
 ## Requirements
 

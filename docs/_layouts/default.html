@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if page.url == "/" or page.title == nil %}{{ site.title }}{% else %}{{ page.title | strip_html }} · {{ site.title }}{% endif %}</title>
+  <meta name="description" content="{{ site.description }}">
+  <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
+    <a href="{{ site.repository_url }}">GitHub</a>
+  </header>
+  <div class="layout">
+    <details class="menu" open>
+      <summary>Menu</summary>
+      <nav>
+        {% for group in site.data.navigation %}
+        <p class="group">{{ group.title }}</p>
+        <ul>
+          {% for item in group.pages %}
+          <li><a href="{{ item.url | relative_url }}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.title }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endfor %}
+      </nav>
+    </details>
+    <main class="content">
+      {{ content }}
+    </main>
+  </div>
+  <script>
+    // the menu is folded on a narrow screen
+    if (window.matchMedia("(max-width: 800px)").matches) {
+      document.querySelector(".menu").removeAttribute("open");
+    }
+    // GitHub shows "> [!NOTE]" as a coloured box; the site's Markdown leaves the marker as text, so it is made a box here
+    document.querySelectorAll(".content blockquote > p:first-child").forEach(function (first) {
+      var marker = first.innerHTML.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(<br\s*\/?>)?/);
+      if (!marker) { return; }
+      var kind = marker[1].toLowerCase();
+      first.parentNode.classList.add("alert", "alert-" + kind);
+      first.innerHTML = '<span class="alert-title">' + kind.charAt(0).toUpperCase() + kind.slice(1) + "</span>" + first.innerHTML.slice(marker[0].length);
+    });
+  </script>
+</body>
+</html>

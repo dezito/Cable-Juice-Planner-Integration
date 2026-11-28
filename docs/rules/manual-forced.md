@@ -7,7 +7,7 @@
 Charges at once, without waiting for the plan – e.g. for a guest, or when you need the car sooner than planned.
 
 <p align="center">
-  <img src="../../images/settings-manual-charging.png" alt="The Manual charging switches" width="380">
+  <img src="../images/settings-manual-charging.png" alt="The Manual charging switches" width="380">
 </p>
 
 | Switch | The car |
@@ -40,7 +40,7 @@ charges up to that level at once – except in the **4 most expensive hours** of
 Use it as a safety net: whatever the plan says, the car never stays below the daily minimum for long.
 
 <p align="center">
-  <img src="../../images/settings-forced-charging.png" alt="The Forced charging switch" width="380">
+  <img src="../images/settings-forced-charging.png" alt="The Forced charging switch" width="380">
 </p>
 
 ## No rules at all

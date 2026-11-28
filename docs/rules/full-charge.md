@@ -8,7 +8,7 @@ maker's recommendation for how often. The rest of the time the car stays below t
 limit.
 
 <p align="center">
-  <img src="../../images/settings-full-charge.png" alt="The Full charge settings" width="380">
+  <img src="../images/settings-full-charge.png" alt="The Full charge settings" width="380">
 </p>
 
 ## How it works

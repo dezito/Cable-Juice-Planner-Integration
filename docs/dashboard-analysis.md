@@ -28,7 +28,7 @@ some of them, a persistent notification lists the missing cards with links to th
 
 | Battery and charging plan | Electricity prices |
 | --- | --- |
-| ![Battery level forecast with planned driving and planned charging](../images/battery-and-charging-plan.png) | ![Electricity prices with solar forecast and planned charging](../images/electricity-prices-per-hour.png) |
+| ![Battery level forecast with planned driving and planned charging](images/battery-and-charging-plan.png) | ![Electricity prices with solar forecast and planned charging](images/electricity-prices-per-hour.png) |
 
 At the top: **Force planning** recalculates the plan now. The overview also has the emoji explanation – see [Emojis](emojis.md).
 
@@ -78,10 +78,10 @@ Older months (before the recorder's history) only show kWh per source, cost and 
 the work plan as it is set now. `sensor.cjp_<prefix>_economy` holds this month's saving, the months in the
 attributes.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/economy.png" alt="Economy per month compared with daily charging" width="760"></p>
+<p align="center"><img src="images/economy.png" alt="Economy per month compared with daily charging" width="760"></p>
 
 </details>
 
@@ -90,10 +90,10 @@ attributes.
 The kWh planned the evening before against what was charged, and how much was charged outside the plan
 (manual, forced charging …). Saved every evening from the first start.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
+<p align="center"><img src="images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
 
 </details>
 
@@ -102,10 +102,10 @@ The kWh planned the evening before against what was charged, and how much was ch
 Whether the car had the battery level it needed at each work plan departure, saved at every departure from
 the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 departures that were ready.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/ready-at-departure.png" alt="Battery level at each work plan departure" width="760"></p>
+<p align="center"><img src="images/ready-at-departure.png" alt="Battery level at each work plan departure" width="760"></p>
 
 </details>
 
@@ -116,10 +116,10 @@ temperature's statistics – and how much more energy per km the car uses at 0 �
 [*Adjust driving efficiency to temperature*](temperature-efficiency.md) on, the km/kWh the plan uses for each planned
 drive at its forecast temperature next to the learned one, or why the learned one is used.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
+<p align="center"><img src="images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
 
 </details>
 
@@ -139,10 +139,10 @@ Above the table it says whether *Learn driving distance* is on, so the plan uses
 the learned distance (the entered numbers are not changed).
 The first distance comes the evening after the first start.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/learned-driving-distance.png" alt="Entered against learned driving distance per weekday" width="760"></p>
+<p align="center"><img src="images/learned-driving-distance.png" alt="Entered against learned driving distance per weekday" width="760"></p>
 
 </details>
 
@@ -190,10 +190,10 @@ from its own price database are not included. The measurements always use the fo
 integration published it, never the corrected one. The first numbers come at 13:00 the day after the first
 start, "3 days ahead" after 3 days.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/price-forecast.png" alt="The price forecast against the real price per day ahead" width="760"></p>
+<p align="center"><img src="images/price-forecast.png" alt="The price forecast against the real price per day ahead" width="760"></p>
 
 </details>
 
@@ -238,10 +238,10 @@ which type is best can change over time (e.g. into winter):
 An info line under each table shows which type is used, or how many measurements it is still waiting for. The numbers are collected
 from the first start: the house consumption after the first whole day, km/kWh after the first drive.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/forecast-accuracy.png" alt="Forecast accuracy for the house consumption and the car's km/kWh" width="760"></p>
+<p align="center"><img src="images/forecast-accuracy.png" alt="Forecast accuracy for the house consumption and the car's km/kWh" width="760"></p>
 
 </details>
 
@@ -251,10 +251,10 @@ kWh from the charger per 1 % per month and power group, from the [charging loss]
 measurements. Falling over the years = less capacity (fewer kWh fill 1 %) or a lower charging loss; rising = a higher
 charging loss. Compare the same month year by year – winter is higher.
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/battery-capacity.png" alt="kWh from the charger per 1 % per month and power group" width="760"></p>
+<p align="center"><img src="images/battery-capacity.png" alt="kWh from the charger per 1 % per month and power group" width="760"></p>
 
 </details>
 
@@ -266,10 +266,10 @@ charging loss. Compare the same month year by year – winter is higher.
 
 See [Charging loss](charging-loss.md).
 
-<details>
+<details markdown="1">
 <summary>Screenshot</summary>
 
-<p align="center"><img src="../images/charging-loss-per-power.png" alt="Measured charging loss per power group" width="760"></p>
+<p align="center"><img src="images/charging-loss-per-power.png" alt="Measured charging loss per power group" width="760"></p>
 
 </details>
 

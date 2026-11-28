@@ -131,7 +131,7 @@ price sensor must be in the same currency (a backup provider in another currency
 much less than a krone (CZK, HUF, ISK) are not recognised yet.
 
 <p align="center">
-  <img src="../images/settings-advanced.png" alt="The Advanced settings: forecast type, choose the forecast type automatically and correct the price forecast" width="380">
+  <img src="images/settings-advanced.png" alt="The Advanced settings: forecast type, choose the forecast type automatically and correct the price forecast" width="380">
 </p>
 
 CJP also keeps its **own price database**: every day the prices from the price integration are stored per
@@ -146,7 +146,7 @@ missing:
   7 days with prices from the database, so charging keeps working until the integration is back.
 
 The hours with prices from the database are listed under *Using offline prices for some hours* in the
-overview. The database is part of the [backup](../README.md#backup-export-and-import-of-data).
+overview. The database is part of the [backup](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md#backup-export-and-import-of-data).
 
 ### Vehicle charging power by battery level
 

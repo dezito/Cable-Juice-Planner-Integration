@@ -1,6 +1,6 @@
 # Entities and services
 
-[← Back to the README](../README.md)
+[← Back to the README](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md)
 
 ## Entities
 
@@ -34,7 +34,7 @@ are not stored in the recorder database.
 | `cable_juice_planner.manual_add_public_charging_session` | Calculate (and optionally save) a public charging session |
 | `cable_juice_planner.debug_info` | Returns internal state for troubleshooting |
 | `cable_juice_planner.export_debug` | Save an anonymised debug file for a GitHub issue |
-| `cable_juice_planner.export_data` | Save a backup of data and settings (see [Backup](../README.md#backup-export-and-import-of-data)) |
+| `cable_juice_planner.export_data` | Save a backup of data and settings (see [Backup](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md#backup-export-and-import-of-data)) |
 | `cable_juice_planner.import_data` | Replace data and settings with a backup |
 
 All services optionally take `config_entry_id` so they only affect one car (`import_data` requires it).

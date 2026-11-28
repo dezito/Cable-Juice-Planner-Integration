@@ -6,7 +6,7 @@ The car charges with the solar surplus – the production the house doesn't use 
 recommended charging limit**.
 
 <p align="center">
-  <img src="../../images/settings-solar-and-home-battery.png" alt="The Solar and home battery settings" width="380">
+  <img src="../images/settings-solar-and-home-battery.png" alt="The Solar and home battery settings" width="380">
 </p>
 
 ## How the surplus becomes charging current

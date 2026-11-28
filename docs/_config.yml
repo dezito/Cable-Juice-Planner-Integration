@@ -1,0 +1,15 @@
+# The website of the documentation: GitHub Pages, deploy from the branch main, folder /docs.
+title: Cable Juice Planner
+description: Documentation of Cable Juice Planner, an EV charging planner for Home Assistant
+repository_url: https://github.com/dezito/Cable-Juice-Planner-Integration
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false  # a line break in the Markdown is no line break on the page, as on github.com
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+exclude:
+  - development  # for contributors, not part of the site

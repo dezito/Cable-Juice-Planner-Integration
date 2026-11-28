@@ -1,6 +1,6 @@
 # Cable Juice Planner documentation
 
-The [README](../README.md) gives the short version. These pages go into detail: how Cable Juice Planner
+The [README](https://github.com/dezito/Cable-Juice-Planner-Integration/blob/main/README.md) gives the short version. These pages go into detail: how Cable Juice Planner
 (CJP) plans, what every charging rule does, and how to connect it to your charger and car.
 
 ## Start here
