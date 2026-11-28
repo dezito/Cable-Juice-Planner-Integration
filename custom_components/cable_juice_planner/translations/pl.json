@@ -2,6 +2,13 @@
   "title": "Cable Juice Planner",
   "config": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Prognoza solarna",
+        "description": "Z której prognozy solarnej korzystasz? Jeśli nie masz paneli lub prognozy, wybierz Bez prognozy.\n\n🧪 = jeszcze niepotwierdzona na prawdziwych danych. Można ją wybrać: po konfiguracji porównaj prognozę na pulpicie.",
+        "data": {
+          "solar_forecast_source": "Prognoza solarna"
+        }
+      },
       "general": {
         "title": "Ogólne",
         "description": "Język tekstów i powiadomień oraz kraj cen energii.",
@@ -265,7 +272,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\n\n⚠️ Wyłączone czujniki Strømligning, których nie można tu wybrać: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nPrognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\n\n✅ Wszystkie czujniki Strømligning, które można wybrać na tej stronie, są włączone.",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\n⚠️ Nie znaleziono czujników Strømligning dla tej strony. Najpierw skonfiguruj integrację Strømligning.",
         "data": {
           "stromligning_buy_current_price": "Cena zakupu",
           "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
@@ -285,7 +332,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\nWyłączone teraz w Strømligning: {stromligning_disabled}",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\n\n⚠️ Wyłączone czujniki Strømligning, których nie można tu wybrać: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\n✅ Wszystkie czujniki Strømligning, które można wybrać na tej stronie, są włączone.",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\n⚠️ Nie znaleziono czujników Strømligning dla tej strony. Najpierw skonfiguruj integrację Strømligning.",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",
@@ -318,17 +401,87 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne. Nadwyżka służy do ładowania samochodu.",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_solcast": {
+        "title": "Panele słoneczne – Solcast PV Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\n\n⚠️ Czujniki Solcast wyłączone, brakujące, niedostępne lub bez szczegółów godzinowych: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.solcast_pv_forecast_forecast_today; kolejne dni są znajdowane automatycznie. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Panele słoneczne – Solcast PV Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\n✅ Wszystkie potrzebne czujniki Solcast są włączone.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.solcast_pv_forecast_forecast_today; kolejne dni są znajdowane automatycznie. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Panele słoneczne – Forecast.Solar",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nForecast.Solar jest odczytywany z jego prognozy słonecznej dla panelu Energia; godziny, których ona nie obejmuje, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Forecast.Solar",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_helios": {
+        "title": "Panele słoneczne – Helios Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nHelios Forecast jest odczytywany z jego prognozy słonecznej dla panelu Energia; godziny, których ona nie obejmuje, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Helios Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.helios_forecast_power_now. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
@@ -528,6 +681,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "Ten czujnik nie pochodzi z wybranej prognozy solarnej. Wybierz inny czujnik albo wyczyść pole, aby ponownie wybrać prognozę.",
+      "forecast_sensor_missing": "Nie wybrano czujnika. Wybierz ponownie prognozę solarną albo Bez prognozy.",
       "detection_recorder": "Nie udało się przygotować propozycji: rejestrator nie działa, więc nie ma historii. Obecne wartości zostają.",
       "detection_timeout": "Odczyt historii trwał zbyt długo. Obecne wartości zostają; zaznacz *Wykryj ponownie*, aby spróbować jeszcze raz.",
       "detection_error": "Nie udało się odczytać historii. Obecne wartości zostają; zaznacz *Wykryj ponownie*, aby spróbować jeszcze raz.",
@@ -564,6 +719,13 @@
   },
   "options": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Prognoza solarna",
+        "description": "Z której prognozy solarnej korzystasz? Jeśli nie masz paneli lub prognozy, wybierz Bez prognozy.\n\n🧪 = jeszcze niepotwierdzona na prawdziwych danych. Można ją wybrać: po konfiguracji porównaj prognozę na pulpicie.",
+        "data": {
+          "solar_forecast_source": "Prognoza solarna"
+        }
+      },
       "init": {
         "title": "Cable Juice Planner",
         "description": "Wybierz, co zmienić. Integracja zostanie przeładowana po zapisaniu.",
@@ -842,7 +1004,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\nWyłączone teraz w Strømligning: {stromligning_disabled}",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nStrømligning domyślnie wyłącza czujniki bez VAT, a wyłączonego czujnika nie można tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*). Prognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\n\n⚠️ Wyłączone czujniki Strømligning, których nie można tu wybrać: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\nPrognozy cen wymagają też opcji *Include price forecasts for the next week?* w ustawieniach Strømligning.\n\n✅ Wszystkie czujniki Strømligning, które można wybrać na tej stronie, są włączone.",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.\n\n⚠️ Nie znaleziono czujników Strømligning dla tej strony. Najpierw skonfiguruj integrację Strømligning.",
         "data": {
           "stromligning_buy_current_price": "Cena zakupu",
           "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
@@ -862,7 +1064,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - taryfy przy sprzedaży",
-        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\nWyłączone teraz w Strømligning: {stromligning_disabled}",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\nCzujniki taryf mogą być wyłączone w Strømligning i wtedy nie można ich tu wybrać: najpierw włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*).\n\n⚠️ Wyłączone czujniki Strømligning, których nie można tu wybrać: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\n✅ Wszystkie czujniki Strømligning, które można wybrać na tej stronie, są włączone.",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Przy sprzedaży odejmowane są taryfy i podatki zawarte w cenie, a następnie opłata za sprzedaż oraz taryfa sieciowa i systemowa. Zostaw puste, aby użyć 0.\n\n⚠️ Nie znaleziono czujników Strømligning dla tej strony. Najpierw skonfiguruj integrację Strømligning.",
         "data": {
           "stromligning_sell_distribution": "Taryfa dystrybucyjna",
           "stromligning_sell_electricity_tax": "Podatek od energii",
@@ -895,17 +1133,87 @@
       },
       "solar": {
         "title": "Panele słoneczne (opcjonalnie)",
-        "description": "Wypełnij, jeśli masz panele słoneczne.\n\nForecast.Solar i Helios Forecast są odczytywane z ich prognozy słonecznej dla panelu Energia; godziny, których nie obejmują, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\nWyłączone teraz czujniki Solcast: {solcast_disabled}",
+        "description": "Wypełnij, jeśli masz panele słoneczne. Nadwyżka służy do ładowania samochodu.",
         "data": {
           "production_entity_id": "Produkcja słoneczna",
-          "forecast_entity_id": "Prognoza słoneczna",
           "inverter_discharging_power_limit": "Maks. moc falownika",
           "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
           "solar_sell_fixed_price": "Stała cena sprzedaży solara"
         },
         "data_description": {
           "production_entity_id": "Produkcja solarna (W)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar lub Helios Forecast. Solcast: np. sensor.solcast_pv_forecast_forecast_today, kolejne dni są znajdowane automatycznie. Forecast.Solar: dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Helios Forecast: np. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_solcast": {
+        "title": "Panele słoneczne – Solcast PV Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nSolcast domyślnie wyłącza czujniki prognozy od dnia 3: włącz je w **Ustawienia → Urządzenia i usługi → Encje** (*Pokaż wyłączone encje*) i włącz *Szczegóły godzinowe* w sekcji *Podział atrybutów prognozy* w opcjach Solcast, w przeciwnym razie te dni są planowane bez Solcast.\n\n⚠️ Czujniki Solcast wyłączone, brakujące, niedostępne lub bez szczegółów godzinowych: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.solcast_pv_forecast_forecast_today; kolejne dni są znajdowane automatycznie. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Panele słoneczne – Solcast PV Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\n✅ Wszystkie potrzebne czujniki Solcast są włączone.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.solcast_pv_forecast_forecast_today; kolejne dni są znajdowane automatycznie. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Panele słoneczne – Forecast.Solar",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nForecast.Solar jest odczytywany z jego prognozy słonecznej dla panelu Energia; godziny, których ona nie obejmuje, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Forecast.Solar",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Dowolny z jego czujników; połacie dachu z tego samego źródła słonecznego w panelu Energia są sumowane. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
+          "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
+        }
+      },
+      "solar_helios": {
+        "title": "Panele słoneczne – Helios Forecast",
+        "description": "Nadwyżka służy do ładowania samochodu, a prognoza jest używana w planie.\n\nHelios Forecast jest odczytywany z jego prognozy słonecznej dla panelu Energia; godziny, których ona nie obejmuje, są planowane na podstawie prognozy pogody i zapisanej historii słonecznej; godzina bez żadnej z nich liczy się jako brak słońca.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Czujnik Helios Forecast",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach",
+          "solar_sell_fixed_price": "Stała cena sprzedaży solara"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Np. sensor.helios_forecast_power_now. Zostaw puste pole, aby ponownie wybrać prognozę solarną.",
           "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
           "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. “Stała cena sprzedaży solara” musi być -1,0 aby użyć ceny spot",
           "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej."
@@ -1068,6 +1376,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "Ten czujnik nie pochodzi z wybranej prognozy solarnej. Wybierz inny czujnik albo wyczyść pole, aby ponownie wybrać prognozę.",
+      "forecast_sensor_missing": "Nie wybrano czujnika. Wybierz ponownie prognozę solarną albo Bez prognozy.",
       "detection_recorder": "Nie udało się przygotować propozycji: rejestrator nie działa, więc nie ma historii. Obecne wartości zostają.",
       "detection_timeout": "Odczyt historii trwał zbyt długo. Obecne wartości zostają; zaznacz *Wykryj ponownie*, aby spróbować jeszcze raz.",
       "detection_error": "Nie udało się odczytać historii. Obecne wartości zostają; zaznacz *Wykryj ponownie*, aby spróbować jeszcze raz.",
@@ -1105,6 +1415,17 @@
     }
   },
   "selector": {
+    "solar_forecast_sources": {
+      "options": {
+        "none": "Bez prognozy",
+        "solcast_solar": "Solcast PV Forecast",
+        "solcast_solar_unconfirmed": "🧪 Solcast PV Forecast",
+        "forecast_solar": "Forecast.Solar",
+        "forecast_solar_unconfirmed": "🧪 Forecast.Solar",
+        "helios_forecast": "Helios Forecast",
+        "helios_forecast_unconfirmed": "🧪 Helios Forecast"
+      }
+    },
     "import_source": {
       "options": {
         "none": "Nie importuj"

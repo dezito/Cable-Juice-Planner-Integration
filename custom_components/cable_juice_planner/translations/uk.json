@@ -2,6 +2,13 @@
   "title": "Cable Juice Planner",
   "config": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Прогноз сонячної генерації",
+        "description": "Яким прогнозом сонячної генерації ви користуєтеся? Якщо у вас немає панелей або прогнозу, виберіть «Без прогнозу».\n\n🧪 = ще не підтверджено реальними даними. Його все одно можна вибрати: після налаштування порівняйте прогноз на панелі.",
+        "data": {
+          "solar_forecast_source": "Прогноз сонячної генерації"
+        }
+      },
       "general": {
         "title": "Загальне",
         "description": "Мова текстів і сповіщень та країна цін на електроенергію.",
@@ -265,7 +272,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\n\n⚠️ Вимкнені датчики Strømligning, які тут не можна вибрати: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
+          "stromligning_buy_forecasts": "Прогнози ціни купівлі",
+          "stromligning_sell_current_price": "Ціна продажу (необов’язково)",
+          "stromligning_sell_tomorrow_available": "Ціна продажу завтра (необов’язково)",
+          "stromligning_sell_forecasts": "Прогнози ціни продажу (необов’язково)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning поточна ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Strømligning ціни купівлі на завтра доступні",
+          "stromligning_buy_forecasts": "Strømligning прогнози цін купівлі",
+          "stromligning_sell_current_price": "Strømligning поточна ціна продажу",
+          "stromligning_sell_tomorrow_available": "Strømligning ціни продажу на завтра",
+          "stromligning_sell_forecasts": "Strømligning прогнози цін продажу"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nПрогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\n\n✅ Усі датчики Strømligning, які можна вибрати на цій сторінці, увімкнені.",
+        "data": {
+          "stromligning_buy_current_price": "Ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
+          "stromligning_buy_forecasts": "Прогнози ціни купівлі",
+          "stromligning_sell_current_price": "Ціна продажу (необов’язково)",
+          "stromligning_sell_tomorrow_available": "Ціна продажу завтра (необов’язково)",
+          "stromligning_sell_forecasts": "Прогнози ціни продажу (необов’язково)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning поточна ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Strømligning ціни купівлі на завтра доступні",
+          "stromligning_buy_forecasts": "Strømligning прогнози цін купівлі",
+          "stromligning_sell_current_price": "Strømligning поточна ціна продажу",
+          "stromligning_sell_tomorrow_available": "Strømligning ціни продажу на завтра",
+          "stromligning_sell_forecasts": "Strømligning прогнози цін продажу"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\n⚠️ Для цієї сторінки не знайдено датчиків Strømligning. Спочатку налаштуйте інтеграцію Strømligning.",
         "data": {
           "stromligning_buy_current_price": "Ціна купівлі",
           "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
@@ -285,7 +332,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - тарифи при продажу",
-        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\nДатчики тарифів можуть бути вимкнені в Strømligning, і тоді їх тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*).\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\nДатчики тарифів можуть бути вимкнені в Strømligning, і тоді їх тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*).\n\n⚠️ Вимкнені датчики Strømligning, які тут не можна вибрати: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Податок на електроенергію",
+          "stromligning_sell_nettariff": "Мережевий тариф",
+          "stromligning_sell_systemtariff": "Системний тариф",
+          "stromligning_sell_surcharge": "Надбавка до спотової ціни"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning продаж тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Strømligning продаж податок на електроенергію",
+          "stromligning_sell_nettariff": "Strømligning продаж мережевий тариф",
+          "stromligning_sell_systemtariff": "Strømligning продаж системний тариф",
+          "stromligning_sell_surcharge": "Strømligning продаж надбавка до спотової ціни"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - тарифи при продажу",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\n✅ Усі датчики Strømligning, які можна вибрати на цій сторінці, увімкнені.",
+        "data": {
+          "stromligning_sell_distribution": "Тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Податок на електроенергію",
+          "stromligning_sell_nettariff": "Мережевий тариф",
+          "stromligning_sell_systemtariff": "Системний тариф",
+          "stromligning_sell_surcharge": "Надбавка до спотової ціни"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning продаж тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Strømligning продаж податок на електроенергію",
+          "stromligning_sell_nettariff": "Strømligning продаж мережевий тариф",
+          "stromligning_sell_systemtariff": "Strømligning продаж системний тариф",
+          "stromligning_sell_surcharge": "Strømligning продаж надбавка до спотової ціни"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - тарифи при продажу",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\n⚠️ Для цієї сторінки не знайдено датчиків Strømligning. Спочатку налаштуйте інтеграцію Strømligning.",
         "data": {
           "stromligning_sell_distribution": "Тариф на розподіл",
           "stromligning_sell_electricity_tax": "Податок на електроенергію",
@@ -318,17 +401,87 @@
       },
       "solar": {
         "title": "Сонячні панелі (необов’язково)",
-        "description": "Заповніть, якщо маєте сонячні панелі.\n\nForecast.Solar і Helios Forecast зчитуються з їхнього сонячного прогнозу для панелі «Енергія»; години, які вони не охоплюють, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
+        "description": "Заповніть, якщо маєте сонячні панелі. Надлишок використовується для заряджання авто.",
         "data": {
           "production_entity_id": "Сонячне виробництво",
-          "forecast_entity_id": "Сонячний прогноз",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
           "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
           "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar або Helios Forecast. Solcast: напр. sensor.solcast_pv_forecast_forecast_today, наступні дні знаходяться автоматично. Forecast.Solar: будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Helios Forecast: напр. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_solcast": {
+        "title": "Сонячні панелі – Solcast PV Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\n\n⚠️ Датчики Solcast, які вимкнені, відсутні, недоступні або без погодинних деталей: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.solcast_pv_forecast_forecast_today; наступні дні знаходяться автоматично. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Сонячні панелі – Solcast PV Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\n✅ Усі потрібні датчики Solcast увімкнені.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.solcast_pv_forecast_forecast_today; наступні дні знаходяться автоматично. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Сонячні панелі – Forecast.Solar",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nForecast.Solar зчитується з його сонячного прогнозу для панелі «Енергія»; години, які він не охоплює, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Forecast.Solar",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_helios": {
+        "title": "Сонячні панелі – Helios Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nHelios Forecast зчитується з його сонячного прогнозу для панелі «Енергія»; години, які він не охоплює, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Helios Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.helios_forecast_power_now. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
           "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
           "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
@@ -528,6 +681,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "Цей датчик не належить до вибраного прогнозу. Виберіть інший датчик або очистьте поле, щоб вибрати прогноз ще раз.",
+      "forecast_sensor_missing": "Датчик не вибрано. Виберіть прогноз ще раз або «Без прогнозу».",
       "detection_recorder": "Не вдалося підготувати пропозиції: recorder не працює, тож історії немає. Поточні значення зберігаються.",
       "detection_timeout": "Читання історії тривало надто довго. Поточні значення зберігаються; позначте *Визначити знову*, щоб спробувати ще раз.",
       "detection_error": "Не вдалося прочитати історію. Поточні значення зберігаються; позначте *Визначити знову*, щоб спробувати ще раз.",
@@ -564,6 +719,13 @@
   },
   "options": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Прогноз сонячної генерації",
+        "description": "Яким прогнозом сонячної генерації ви користуєтеся? Якщо у вас немає панелей або прогнозу, виберіть «Без прогнозу».\n\n🧪 = ще не підтверджено реальними даними. Його все одно можна вибрати: після налаштування порівняйте прогноз на панелі.",
+        "data": {
+          "solar_forecast_source": "Прогноз сонячної генерації"
+        }
+      },
       "init": {
         "title": "Cable Juice Planner",
         "description": "Оберіть, що змінити. Інтеграція перезавантажиться після збереження.",
@@ -842,7 +1004,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nStrømligning за замовчуванням вимикає датчики без ПДВ, а вимкнений датчик тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*). Прогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\n\n⚠️ Вимкнені датчики Strømligning, які тут не можна вибрати: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
+          "stromligning_buy_forecasts": "Прогнози ціни купівлі",
+          "stromligning_sell_current_price": "Ціна продажу (необов’язково)",
+          "stromligning_sell_tomorrow_available": "Ціна продажу завтра (необов’язково)",
+          "stromligning_sell_forecasts": "Прогнози ціни продажу (необов’язково)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning поточна ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Strømligning ціни купівлі на завтра доступні",
+          "stromligning_buy_forecasts": "Strømligning прогнози цін купівлі",
+          "stromligning_sell_current_price": "Strømligning поточна ціна продажу",
+          "stromligning_sell_tomorrow_available": "Strømligning ціни продажу на завтра",
+          "stromligning_sell_forecasts": "Strømligning прогнози цін продажу"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\nПрогнози цін також потребують *Include price forecasts for the next week?* у параметрах Strømligning.\n\n✅ Усі датчики Strømligning, які можна вибрати на цій сторінці, увімкнені.",
+        "data": {
+          "stromligning_buy_current_price": "Ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
+          "stromligning_buy_forecasts": "Прогнози ціни купівлі",
+          "stromligning_sell_current_price": "Ціна продажу (необов’язково)",
+          "stromligning_sell_tomorrow_available": "Ціна продажу завтра (необов’язково)",
+          "stromligning_sell_forecasts": "Прогнози ціни продажу (необов’язково)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning поточна ціна купівлі",
+          "stromligning_buy_tomorrow_available": "Strømligning ціни купівлі на завтра доступні",
+          "stromligning_buy_forecasts": "Strømligning прогнози цін купівлі",
+          "stromligning_sell_current_price": "Strømligning поточна ціна продажу",
+          "stromligning_sell_tomorrow_available": "Strømligning ціни продажу на завтра",
+          "stromligning_sell_forecasts": "Strømligning прогнози цін продажу"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Сенсори інтеграції Strømligning. Ціна купівлі обов’язкова.\n\n⚠️ Для цієї сторінки не знайдено датчиків Strømligning. Спочатку налаштуйте інтеграцію Strømligning.",
         "data": {
           "stromligning_buy_current_price": "Ціна купівлі",
           "stromligning_buy_tomorrow_available": "Ціна купівлі завтра",
@@ -862,7 +1064,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - тарифи при продажу",
-        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\nДатчики тарифів можуть бути вимкнені в Strømligning, і тоді їх тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*).\nЗараз вимкнено в Strømligning: {stromligning_disabled}",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\nДатчики тарифів можуть бути вимкнені в Strømligning, і тоді їх тут не можна вибрати: спершу увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*).\n\n⚠️ Вимкнені датчики Strømligning, які тут не можна вибрати: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Податок на електроенергію",
+          "stromligning_sell_nettariff": "Мережевий тариф",
+          "stromligning_sell_systemtariff": "Системний тариф",
+          "stromligning_sell_surcharge": "Надбавка до спотової ціни"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning продаж тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Strømligning продаж податок на електроенергію",
+          "stromligning_sell_nettariff": "Strømligning продаж мережевий тариф",
+          "stromligning_sell_systemtariff": "Strømligning продаж системний тариф",
+          "stromligning_sell_surcharge": "Strømligning продаж надбавка до спотової ціни"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - тарифи при продажу",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\n✅ Усі датчики Strømligning, які можна вибрати на цій сторінці, увімкнені.",
+        "data": {
+          "stromligning_sell_distribution": "Тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Податок на електроенергію",
+          "stromligning_sell_nettariff": "Мережевий тариф",
+          "stromligning_sell_systemtariff": "Системний тариф",
+          "stromligning_sell_surcharge": "Надбавка до спотової ціни"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning продаж тариф на розподіл",
+          "stromligning_sell_electricity_tax": "Strømligning продаж податок на електроенергію",
+          "stromligning_sell_nettariff": "Strømligning продаж мережевий тариф",
+          "stromligning_sell_systemtariff": "Strømligning продаж системний тариф",
+          "stromligning_sell_surcharge": "Strømligning продаж надбавка до спотової ціни"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - тарифи при продажу",
+        "description": "Під час продажу віднімаються тарифи й податки, що входять у ціну, а потім комісія за продаж та мережевий і системний тарифи. Залиште порожнім, щоб використати 0.\n\n⚠️ Для цієї сторінки не знайдено датчиків Strømligning. Спочатку налаштуйте інтеграцію Strømligning.",
         "data": {
           "stromligning_sell_distribution": "Тариф на розподіл",
           "stromligning_sell_electricity_tax": "Податок на електроенергію",
@@ -895,17 +1133,87 @@
       },
       "solar": {
         "title": "Сонячні панелі (необов’язково)",
-        "description": "Заповніть, якщо маєте сонячні панелі.\n\nForecast.Solar і Helios Forecast зчитуються з їхнього сонячного прогнозу для панелі «Енергія»; години, які вони не охоплюють, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\nЗараз вимкнені датчики Solcast: {solcast_disabled}",
+        "description": "Заповніть, якщо маєте сонячні панелі. Надлишок використовується для заряджання авто.",
         "data": {
           "production_entity_id": "Сонячне виробництво",
-          "forecast_entity_id": "Сонячний прогноз",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
           "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
           "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar або Helios Forecast. Solcast: напр. sensor.solcast_pv_forecast_forecast_today, наступні дні знаходяться автоматично. Forecast.Solar: будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Helios Forecast: напр. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_solcast": {
+        "title": "Сонячні панелі – Solcast PV Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nSolcast за замовчуванням вимикає датчики прогнозу з 3-го дня: увімкніть їх у **Налаштування → Пристрої та служби → Сутності** (*Показувати вимкнені сутності*) і увімкніть *Hourly detail* у *Forecast attributes breakdown* у параметрах Solcast, інакше ці дні плануються без Solcast.\n\n⚠️ Датчики Solcast, які вимкнені, відсутні, недоступні або без погодинних деталей: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.solcast_pv_forecast_forecast_today; наступні дні знаходяться автоматично. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Сонячні панелі – Solcast PV Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\n✅ Усі потрібні датчики Solcast увімкнені.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Solcast PV Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.solcast_pv_forecast_forecast_today; наступні дні знаходяться автоматично. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Сонячні панелі – Forecast.Solar",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nForecast.Solar зчитується з його сонячного прогнозу для панелі «Енергія»; години, які він не охоплює, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Forecast.Solar",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Будь-який його датчик; площини даху того самого сонячного джерела на панелі «Енергія» підсумовуються. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
+          "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
+        }
+      },
+      "solar_helios": {
+        "title": "Сонячні панелі – Helios Forecast",
+        "description": "Надлишок використовується для заряджання авто, а прогноз — у плані.\n\nHelios Forecast зчитується з його сонячного прогнозу для панелі «Енергія»; години, які він не охоплює, плануються за прогнозом погоди та збереженою сонячною історією; година без жодного з них вважається годиною без сонця.",
+        "data": {
+          "production_entity_id": "Сонячне виробництво",
+          "forecast_entity_id": "Датчик Helios Forecast",
+          "inverter_discharging_power_limit": "Макс. потужність інвертора",
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
+        },
+        "data_description": {
+          "production_entity_id": "Виробіток сонця (Вт)",
+          "forecast_entity_id": "Напр. sensor.helios_forecast_power_now. Залиште поле порожнім, щоб вибрати прогноз ще раз.",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
           "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
           "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
@@ -1068,6 +1376,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "Цей датчик не належить до вибраного прогнозу. Виберіть інший датчик або очистьте поле, щоб вибрати прогноз ще раз.",
+      "forecast_sensor_missing": "Датчик не вибрано. Виберіть прогноз ще раз або «Без прогнозу».",
       "detection_recorder": "Не вдалося підготувати пропозиції: recorder не працює, тож історії немає. Поточні значення зберігаються.",
       "detection_timeout": "Читання історії тривало надто довго. Поточні значення зберігаються; позначте *Визначити знову*, щоб спробувати ще раз.",
       "detection_error": "Не вдалося прочитати історію. Поточні значення зберігаються; позначте *Визначити знову*, щоб спробувати ще раз.",
@@ -1105,6 +1415,17 @@
     }
   },
   "selector": {
+    "solar_forecast_sources": {
+      "options": {
+        "none": "Без прогнозу",
+        "solcast_solar": "Solcast PV Forecast",
+        "solcast_solar_unconfirmed": "🧪 Solcast PV Forecast",
+        "forecast_solar": "Forecast.Solar",
+        "forecast_solar_unconfirmed": "🧪 Forecast.Solar",
+        "helios_forecast": "Helios Forecast",
+        "helios_forecast_unconfirmed": "🧪 Helios Forecast"
+      }
+    },
     "import_source": {
       "options": {
         "none": "Не імпортувати"

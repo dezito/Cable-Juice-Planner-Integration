@@ -258,6 +258,8 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Workplan, Loss, Eco
             if snapshot.price_data is not None:
                 self.price_provider.set_snapshot(snapshot.price_data)
         try:
+            if snapshot.solar_source is not None:
+                self.set_attr("current_charging_rule", "solar_check", self.solar_check())
             result.value = func(*args, **kwargs)
         except Exception as err:  # noqa: BLE001
             _LOGGER.exception("Cable Juice Planner job %s failed", getattr(func, "__name__", func))

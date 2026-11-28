@@ -23,6 +23,8 @@ from .dashboard import price_dashboard_entities
 from .availability import DEFAULT_COUNTRY, default_providers, provider_errors, provider_sections, providers_for_country, unconfirmed_providers
 from .factory import create_price_provider, providers_from_options
 from .stromligning import (
+    STROMLIGNING_PAGE_PREFIXES,
+    STROMLIGNING_UNUSED_PREFIXES,
     STROMLIGNING_PLATFORM,
     STROMLIGNING_UNIQUE_ID_PREFIXES,
     StromligningPriceProvider,

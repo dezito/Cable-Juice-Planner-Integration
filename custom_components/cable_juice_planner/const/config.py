@@ -435,7 +435,7 @@ OPTIONS_MENU: dict[str, list[str]] = {
     "ev": ["ev", "ev_specs"],
     "home": ["home", "powerwall", "detection_review"],
     "prices": ["price_provider", "prices_energidataservice", "prices_energypriceforecast", "prices_spotforecast", "prices_elprognos", "prices_wattcast", "prices_epexspot", "prices_gespot", "prices_octopus", "prices_nordpool", "prices_stromligning", "prices_stromligning_tariffs", "price_fees"],
-    "solar": ["solar", "solar_charging", "weather"],
+    "solar": ["solar_forecast_source", "solar", "solar_charging", "weather"],
     "notifications": ["notifications"],
     "advanced": ["advanced", "database"],
 }

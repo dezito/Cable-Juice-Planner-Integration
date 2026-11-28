@@ -6,6 +6,7 @@ import logging
 
 from ...const import WEATHER_CONDITION_DICT
 from ...utils.solcast import SOLCAST_ENDINGS
+from ...utils.solar_sources import CONFIRMED_SOLAR_SOURCES, solar_days
 from ...utils.helpers import (
     average,
     day_of_week_text,
@@ -52,6 +53,23 @@ def strip_forecast_suffix(entity_id: str, endings: list):
 
 class EnergyForecast:
     """Weather and solar forecast."""
+
+    def solar_check(self) -> dict:
+        """The attribute solar_check: what the chosen solar forecast delivers (utils/solar_sources.py). It only
+        reports facts: no plan depends on it, and anything that goes wrong gives no result."""
+        try:
+            source = self._snap.solar_source
+            tz = self._snap.tz
+            now = self.now()
+            return {
+                "source": source,
+                "confirmed": source in CONFIRMED_SOLAR_SOURCES,
+                "checked": now.replace(tzinfo=tz).isoformat(timespec="minutes"),
+                "days": solar_days(self._snap.solcast, now.date(), tz),
+            }
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("The check of the solar forecast failed: %s %s", err, type(err))
+            return {}
 
     def get_forecast_dict(self) -> dict:
         """weather.get_forecasts result (collected by the coordinator for the job)."""

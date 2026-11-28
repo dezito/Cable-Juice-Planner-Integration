@@ -44,7 +44,8 @@ def provider_of(value: str) -> str:
 
 
 class ProviderSelector(selector.SelectSelector):
-    """The list of price providers: a value is the provider name, with UNCONFIRMED_SUFFIX where the country has not confirmed it.
+    """The list of price providers (or solar forecast sources): a value is the name, with UNCONFIRMED_SUFFIX where it is not
+    confirmed (a price provider per country, a solar source in general).
 
     The frontend takes the label of a choice from the translation of its value, in the user's own language, and the same
     provider can be confirmed in one country and not in another. A plain provider name is accepted too and becomes the
@@ -52,7 +53,9 @@ class ProviderSelector(selector.SelectSelector):
 
     def __call__(self, data: Any) -> Any:
         listed = {provider_of(value): value for value in self.config["options"]}
-        if isinstance(data, list):
+        if isinstance(data, str):
+            data = listed.get(data, data)
+        elif isinstance(data, list):
             data = [listed.get(value, value) if isinstance(value, str) else value for value in data]
         return super().__call__(data)
 
@@ -84,6 +87,7 @@ CONFIG_FLOW_STEPS = [
     "prices_stromligning",
     "prices_stromligning_tariffs",
     "price_fees",
+    "solar_forecast_source",
     "solar",
     "solar_charging",
     "weather",
@@ -91,6 +95,11 @@ CONFIG_FLOW_STEPS = [
     "advanced",
     "database",
 ]
+
+
+def forecast_selector(source: str) -> selector.EntitySelector:
+    """The picker of the forecast sensor of one source."""
+    return _entity("sensor", integration=source)
 
 
 def _entity(
