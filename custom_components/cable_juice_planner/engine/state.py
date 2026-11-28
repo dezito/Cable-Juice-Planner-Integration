@@ -26,6 +26,8 @@ class Snapshot:
     # normalised hourly solar forecast rows by entity id: Solcast's detailedHourly, or the rows of Forecast.Solar or Helios
     # Forecast in the same shape (utils/solar_forecast.py); the name stays for the debug exports that hold it
     solcast: dict[str, list] = field(default_factory=dict)
+    # set when the job read a configured solar forecast: the platform of its sensor ("" = not known); None otherwise
+    solar_source: str | None = None
     astral: Any = None  # astral.Observer
     site: dict | None = None  # load balancing, see engine/site
     # whether the charger automation has steps that set the car's charge limit; None: not known (coordinator/status_states.py)

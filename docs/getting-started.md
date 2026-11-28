@@ -193,8 +193,8 @@ Enable *Carnot* in Energi Data Service to plan beyond the published prices – w
 the rest of the week from its own [price database](how-it-works.md#prices).
 The fee page sets the electricity tax refund and the selling fee, which are explained under [Prices](how-it-works.md#prices).
 
-**🧪** before a name means that the provider is **not confirmed with real data** in your country yet. Confirmed so far: Energi
-Data Service and Strømligning in Denmark. The others can be chosen too; check their prices after the setup.
+**🧪** before a name means that the provider is **not confirmed with real data** in your country yet. See [Tested integrations](tested-integrations.md) for
+which are confirmed, by country. The others can be chosen too; check their prices after the setup.
 
 With every price update the integration also tests each chosen provider on its own prices: the unit, whether the buy and
 sell prices are complete from the current hour to the end of today and for tomorrow, and how many days the forecast reaches.
@@ -265,6 +265,24 @@ missing tariff counts as 0, which makes the sell price too high.
 
 ### Solar panels, solar charging and weather (optional)
 
+First comes the **solar forecast** you use, on a page of its own (**No forecast** without solar panels or a forecast): Solcast
+PV Forecast, **🧪** Forecast.Solar or **🧪** Helios Forecast. 🧪 means **not confirmed with real data** yet; so far Solcast PV
+Forecast is confirmed. The next page is made for the chosen forecast, with its own title, explanation and sensor field. Its
+picker offers only that forecast's sensors (all three when the integration of a stored sensor is not known); leave the field
+empty to choose the forecast again. The choice is not stored: it is read from the sensor. Choosing another forecast removes
+the stored sensor (a sensor whose integration is not known is kept).
+
+With a forecast the dashboard shows **Settings → Solar forecast check** (click *Show the solar forecast check*): the source,
+and for each day how many hours the forecast delivers a value for, and their sum in kWh (the attribute
+`solar_check` of `sensor.cjp_current_charging_rule`). It judges nothing: compare it with your forecast integration. Some forecasts give no value
+for hours without full daylight, so fewer than 24 hours is not an error by itself.
+
+At the bottom of that section is the link **Solar Forecast Verification Report (Confirmed)**. Use it when you have seen the
+forecast work with real data and the values match. It opens a new, public issue on GitHub, filled in with the source, the versions, the time of the check with its time zone offset, the dates and the number of hours per day. It holds no
+kWh and no sensor names. Clicking the link
+sends these fields to GitHub; nothing is published until you submit the issue there. A report does not confirm a source by
+itself.
+
 Solar charging only with solar panels. The defaults work for most. See [Solar surplus charging](rules/solar.md) for the
 details, and [Fixed solar sell price](rules/solar.md#fixed-solar-sell-price) if your agreement pays a fixed price.
 
@@ -281,9 +299,9 @@ the days without Solcast use the weather forecast and the stored solar history.
 
 #### Forecast.Solar or Helios Forecast
 
-Instead of Solcast the **Solar forecast** field also takes a sensor of
+Instead of Solcast you can choose
 [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) or
-[Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast). CJP reads the hourly forecast these integrations
+[Helios Forecast](https://github.com/ReikanYsora/Helios-Forecast) on the solar forecast page; the next page then takes a sensor of that integration. CJP reads the hourly forecast these integrations
 give the Energy dashboard of Home Assistant, not the state of the sensor, so any sensor of the integration works. The
 sensor must still exist and be available: like every configured sensor, a missing or unavailable one makes CJP wait
 for it at startup and notify you.

@@ -81,11 +81,20 @@ class CoordinatorData:
             # the hourly solar forecast rows: Solcast's own detailedHourly, else the energy platform of Forecast.Solar
             # or Helios Forecast (utils/solar_forecast.py), normalised to the same rows
             snapshot.solcast = self._solcast_snapshot() or await self._async_energy_forecast_snapshot()
+            snapshot.solar_source = self._solar_source()
         return snapshot
 
     def _price_snapshot(self) -> dict:
         provider = self.price_provider
         return provider.snapshot(self.hass.states.get) if provider else {"attributes": {}, "values": {}}
+
+    def _solar_source(self) -> str | None:
+        """The integration of the configured solar forecast sensor (entity registry), "" when it is not known, None without a sensor."""
+        forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"]
+        if not forecast_entity:
+            return None
+        registered = er.async_get(self.hass).async_get(forecast_entity)
+        return registered.platform if registered else ""
 
     def _solcast_snapshot(self) -> dict[str, list]:
         forecast_entity = self.config["solar"]["entity_ids"]["forecast_entity_id"]

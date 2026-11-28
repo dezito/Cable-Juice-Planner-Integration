@@ -924,6 +924,45 @@ views:
         [Price Provider Verification Report (Confirmed)](https://github.com/dezito/Cable-Juice-Planner-Integration/issues/new?{{ query | urlencode }})
       grid_options: *id001
     - type: heading
+      heading: '@@section_solar_check@@'
+      icon: mdi:solar-power-variant-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@help_solar_check@@\n\n</details>"
+      grid_options: *id001
+    - type: markdown
+      content: |-
+        {% set check = state_attr('sensor.cjp_current_charging_rule', 'solar_check') or {} %}
+        {% set sources = {'solcast_solar': 'Solcast PV Forecast', 'forecast_solar': 'Forecast.Solar', 'helios_forecast': 'Helios Forecast'} %}
+        {% set days = check.get('days') or [] %}
+        {% set source = sources.get(check.get('source'), '') %}
+        <details><summary>@@solar_check_show@@</summary>
+
+        {% if check %}
+        @@solar_check_source@@: {{ '✅' if check.get('confirmed') is true else '🧪' }} {{ source or '➖' }}
+
+        @@price_check_checked@@: {{ check.get('checked', '')[:16] | replace('T', ' ') }}
+
+        {% if days %}
+        | @@solar_check_day@@ | @@solar_check_hours@@ | kWh |
+        |:--|:-:|:-:|
+        {% for day in days %}| {{ day.get('date') }} | {{ day.get('hours') }} | {{ day.get('kwh') if day.get('kwh') is not none else '➖' }} |
+        {% endfor %}
+        {% else %}
+        @@solar_check_no_rows@@
+        {% endif %}
+        {% else %}
+        @@solar_check_none@@
+        {% endif %}
+
+        </details>
+
+        {% set report = namespace(days=[]) %}
+        {% for day in days %}{% set report.days = report.days + [{'date': day.get('date'), 'hours': day.get('hours')}] %}{% endfor %}
+        {% set query = {'template': 'solar_forecast_verification.yml', 'title': 'Solar Forecast Verification Report (Confirmed)' ~ (': ' ~ source if source else ''), 'source': source, 'version': '@@report_version@@', 'ha_version': '@@report_ha_version@@', 'solar_check': {'checked': check.get('checked'), 'source': check.get('source'), 'days': report.days} | to_json if check else ''} %}
+        @@solar_check_report@@
+        [Solar Forecast Verification Report (Confirmed)](https://github.com/dezito/Cable-Juice-Planner-Integration/issues/new?{{ query | urlencode }})
+      grid_options: *id001
+    - type: heading
       heading: '@@section_problem@@'
       heading_style: subtitle
       icon: mdi:bug-outline

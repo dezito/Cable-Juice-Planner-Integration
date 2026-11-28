@@ -59,7 +59,7 @@ def test_the_solcast_entities_are_not_mapped_to_another_forecast_integration(pla
     """The price charts read Solcast's detailedHourly. Forecast.Solar's energy_production_today would match the _today
     rule and Helios' power_now has no such attribute: with those the Solcast entities stay unmapped (no solar forecast in
     the charts, as without a forecast)."""
-    from custom_components.cable_juice_planner.management.dashboard_build import external_entities
+    from custom_components.cable_juice_planner.management.dashboard_build import _drop_block, external_entities
 
     options = {**OPTIONS, "language": "da", "production_entity_id": "sensor.solar"}
     config = const.build_config({**options, "forecast_entity_id": forecast})
@@ -68,7 +68,11 @@ def test_the_solcast_entities_are_not_mapped_to_another_forecast_integration(pla
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price", forecast, "sensor.energy_production_tomorrow"}
     content = render_dashboard(config, "tesla", "entry1", existing, forecast_platform=platform)
     assert forecast not in content and "sensor.energy_production_tomorrow" not in content
-    assert content == render_dashboard(const.build_config({**options, "forecast_entity_id": ""}), "tesla", "entry1", existing)
+    # but for the check of the solar forecast, which is only there with a forecast
+    without = render_dashboard(const.build_config({**options, "forecast_entity_id": ""}), "tesla", "entry1", existing)
+    heading = load_texts("da")["dashboard.section_solar_check"]
+    assert heading in content and heading not in without
+    assert _drop_block(yaml.safe_load(content), heading) == yaml.safe_load(without)
     # a Solcast sensor, and a sensor whose integration is unknown, are mapped as before
     solcast_config = const.build_config({**options, "forecast_entity_id": "sensor.my_solcast_today"})
     mapping = external_entities(solcast_config, "solcast_solar")
@@ -435,7 +439,7 @@ def test_the_settings_page_is_compact_with_the_work_week_side_by_side() -> None:
         (2, ["workplan"]),
         (1, ["fill_up", "cheap", "solar", "full_charge"]),
         (1, ["battery_levels", "powerwall", "charging_loss", "virtual_ev", "advanced"]),
-        (1, ["charger_test", "price_check", "problem"]),
+        (1, ["charger_test", "price_check", "solar_check", "problem"]),
     ]
     switch, first_half, second_half = [card for card in settings["sections"][0]["cards"] if card["type"] == "entities"]
     assert [row["entity"] for row in switch["entities"]] == ["switch.cjp_workplan_charging"]

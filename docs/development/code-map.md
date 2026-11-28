@@ -40,7 +40,8 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 ├── management/                          Storage, backups, dashboard, and blueprint setup
 │   └── voltage_issue.py                 Fixable repair for a grid voltage still at the old 240 V default (sets 230 V)
 ├── utils/                               Shared utilities and datetime/time platform implementations
-│   └── solar_forecast.py                Forecast.Solar / Helios Forecast energy platform -> hourly solar rows (shared with BattMind)
+│   ├── solar_forecast.py                Forecast.Solar / Helios Forecast energy platform -> hourly solar rows (shared with BattMind)
+│   └── solar_sources.py                 The solar forecast sources, which are confirmed, and the facts of the dashboard's check (shared)
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
 ├── select.py / button.py / binary_sensor.py  Other HA entity platforms
 ├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base

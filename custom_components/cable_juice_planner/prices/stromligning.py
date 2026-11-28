@@ -161,6 +161,10 @@ STROMLIGNING_UNIQUE_ID_PREFIXES = (
     "systemtariff",
     "surcharge",
 )
+# spot price forecasts: they start like the price forecasts, but no field takes them
+STROMLIGNING_UNUSED_PREFIXES = ("forecasts_spotprice",)
+# the sensors each of the two pages can take: the prices on the first, the tariffs on the second
+STROMLIGNING_PAGE_PREFIXES = {"prices_stromligning": STROMLIGNING_UNIQUE_ID_PREFIXES[:3], "prices_stromligning_tariffs": STROMLIGNING_UNIQUE_ID_PREFIXES[3:]}
 
 
 def stromligning_entities_to_watch(prices: dict[str, str]) -> list[str]:

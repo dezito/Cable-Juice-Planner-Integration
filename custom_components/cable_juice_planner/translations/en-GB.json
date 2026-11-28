@@ -2,6 +2,13 @@
   "title": "Cable Juice Planner",
   "config": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Solar forecast",
+        "description": "Which solar forecast do you use? Without solar panels or a forecast, choose No forecast.\n\n🧪 = not yet confirmed with real data. You can still choose it: compare the forecast on the dashboard after the setup.",
+        "data": {
+          "solar_forecast_source": "Solar forecast"
+        }
+      },
       "general": {
         "title": "General",
         "description": "Language of texts and notifications, and the country of the electricity prices.",
@@ -265,7 +272,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\n\n⚠️ Disabled Strømligning sensors, which can't be chosen here: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Buy price",
+          "stromligning_buy_tomorrow_available": "Buy price tomorrow",
+          "stromligning_buy_forecasts": "Buy price forecasts",
+          "stromligning_sell_current_price": "Sell price (optional)",
+          "stromligning_sell_tomorrow_available": "Sell price tomorrow (optional)",
+          "stromligning_sell_forecasts": "Sell price forecasts (optional)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning current buy price",
+          "stromligning_buy_tomorrow_available": "Strømligning buy prices available tomorrow",
+          "stromligning_buy_forecasts": "Strømligning buy price forecasts",
+          "stromligning_sell_current_price": "Strømligning current sell price",
+          "stromligning_sell_tomorrow_available": "Strømligning sell prices for tomorrow",
+          "stromligning_sell_forecasts": "Strømligning sell price forecasts"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nThe price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\n\n✅ All the Strømligning sensors that can be chosen on this page are enabled.",
+        "data": {
+          "stromligning_buy_current_price": "Buy price",
+          "stromligning_buy_tomorrow_available": "Buy price tomorrow",
+          "stromligning_buy_forecasts": "Buy price forecasts",
+          "stromligning_sell_current_price": "Sell price (optional)",
+          "stromligning_sell_tomorrow_available": "Sell price tomorrow (optional)",
+          "stromligning_sell_forecasts": "Sell price forecasts (optional)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning current buy price",
+          "stromligning_buy_tomorrow_available": "Strømligning buy prices available tomorrow",
+          "stromligning_buy_forecasts": "Strømligning buy price forecasts",
+          "stromligning_sell_current_price": "Strømligning current sell price",
+          "stromligning_sell_tomorrow_available": "Strømligning sell prices for tomorrow",
+          "stromligning_sell_forecasts": "Strømligning sell price forecasts"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\n⚠️ No Strømligning sensors for this page were found. Set up the Strømligning integration first.",
         "data": {
           "stromligning_buy_current_price": "Buy price",
           "stromligning_buy_tomorrow_available": "Buy price tomorrow",
@@ -285,7 +332,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\nDisabled in Strømligning now: {stromligning_disabled}",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\n\n⚠️ Disabled Strømligning sensors, which can't be chosen here: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Distribution tariff",
+          "stromligning_sell_electricity_tax": "Electricity tax",
+          "stromligning_sell_nettariff": "Net tariff",
+          "stromligning_sell_systemtariff": "System tariff",
+          "stromligning_sell_surcharge": "Spot price surcharge"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sell distribution tariff",
+          "stromligning_sell_electricity_tax": "Strømligning sell electricity tax",
+          "stromligning_sell_nettariff": "Strømligning sell grid tariff",
+          "stromligning_sell_systemtariff": "Strømligning sell system tariff",
+          "stromligning_sell_surcharge": "Strømligning sell spot price surcharge"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - tariffs when selling",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\n✅ All the Strømligning sensors that can be chosen on this page are enabled.",
+        "data": {
+          "stromligning_sell_distribution": "Distribution tariff",
+          "stromligning_sell_electricity_tax": "Electricity tax",
+          "stromligning_sell_nettariff": "Net tariff",
+          "stromligning_sell_systemtariff": "System tariff",
+          "stromligning_sell_surcharge": "Spot price surcharge"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sell distribution tariff",
+          "stromligning_sell_electricity_tax": "Strømligning sell electricity tax",
+          "stromligning_sell_nettariff": "Strømligning sell grid tariff",
+          "stromligning_sell_systemtariff": "Strømligning sell system tariff",
+          "stromligning_sell_surcharge": "Strømligning sell spot price surcharge"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - tariffs when selling",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\n⚠️ No Strømligning sensors for this page were found. Set up the Strømligning integration first.",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
@@ -318,17 +401,87 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car.",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_solcast": {
+        "title": "Solar panels – Solcast PV Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\n\n⚠️ Solcast sensors that are disabled, missing, unavailable or without hourly detail: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Solcast PV Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.solcast_pv_forecast_forecast_today; the days ahead are found automatically. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Solar panels – Solcast PV Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\n✅ All the Solcast sensors that are needed are enabled.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Solcast PV Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.solcast_pv_forecast_forecast_today; the days ahead are found automatically. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Solar panels – Forecast.Solar",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar is read from its solar forecast for the Energy dashboard; the hours it doesn't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Forecast.Solar sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "Any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_helios": {
+        "title": "Solar panels – Helios Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nHelios Forecast is read from its solar forecast for the Energy dashboard; the hours it doesn't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Helios Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.helios_forecast_power_now. Leave it empty to choose the solar forecast again.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
@@ -528,6 +681,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "This sensor is not from the chosen solar forecast. Choose another sensor, or clear the field to choose the forecast again.",
+      "forecast_sensor_missing": "No sensor was chosen. Choose the solar forecast again, or No forecast.",
       "detection_recorder": "The suggestions could not be made: the recorder is not running, so there is no history. The current values are kept.",
       "detection_timeout": "Reading the history took too long. The current values are kept; tick *Detect again* to try again.",
       "detection_error": "The history could not be read. The current values are kept; tick *Detect again* to try again.",
@@ -564,6 +719,13 @@
   },
   "options": {
     "step": {
+      "solar_forecast_source": {
+        "title": "Solar forecast",
+        "description": "Which solar forecast do you use? Without solar panels or a forecast, choose No forecast.\n\n🧪 = not yet confirmed with real data. You can still choose it: compare the forecast on the dashboard after the setup.",
+        "data": {
+          "solar_forecast_source": "Solar forecast"
+        }
+      },
       "init": {
         "title": "Cable Juice Planner",
         "description": "Choose what to change. The integration is reloaded when you save.",
@@ -842,7 +1004,47 @@
       },
       "prices_stromligning": {
         "title": "Strømligning",
-        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\nDisabled in Strømligning now: {stromligning_disabled}",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nStrømligning switches its excl. VAT sensors off by default, and a disabled sensor can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*). The price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\n\n⚠️ Disabled Strømligning sensors, which can't be chosen here: {stromligning_disabled}",
+        "data": {
+          "stromligning_buy_current_price": "Buy price",
+          "stromligning_buy_tomorrow_available": "Buy price tomorrow",
+          "stromligning_buy_forecasts": "Buy price forecasts",
+          "stromligning_sell_current_price": "Sell price (optional)",
+          "stromligning_sell_tomorrow_available": "Sell price tomorrow (optional)",
+          "stromligning_sell_forecasts": "Sell price forecasts (optional)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning current buy price",
+          "stromligning_buy_tomorrow_available": "Strømligning buy prices available tomorrow",
+          "stromligning_buy_forecasts": "Strømligning buy price forecasts",
+          "stromligning_sell_current_price": "Strømligning current sell price",
+          "stromligning_sell_tomorrow_available": "Strømligning sell prices for tomorrow",
+          "stromligning_sell_forecasts": "Strømligning sell price forecasts"
+        }
+      },
+      "prices_stromligning_ready": {
+        "title": "Strømligning",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\nThe price forecasts also need *Include price forecasts for the next week?* in the Strømligning options.\n\n✅ All the Strømligning sensors that can be chosen on this page are enabled.",
+        "data": {
+          "stromligning_buy_current_price": "Buy price",
+          "stromligning_buy_tomorrow_available": "Buy price tomorrow",
+          "stromligning_buy_forecasts": "Buy price forecasts",
+          "stromligning_sell_current_price": "Sell price (optional)",
+          "stromligning_sell_tomorrow_available": "Sell price tomorrow (optional)",
+          "stromligning_sell_forecasts": "Sell price forecasts (optional)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning current buy price",
+          "stromligning_buy_tomorrow_available": "Strømligning buy prices available tomorrow",
+          "stromligning_buy_forecasts": "Strømligning buy price forecasts",
+          "stromligning_sell_current_price": "Strømligning current sell price",
+          "stromligning_sell_tomorrow_available": "Strømligning sell prices for tomorrow",
+          "stromligning_sell_forecasts": "Strømligning sell price forecasts"
+        }
+      },
+      "prices_stromligning_missing": {
+        "title": "Strømligning",
+        "description": "Sensors of the Strømligning integration. The buy price is required; the sell sensors give an exact sell price for solar.\n\n⚠️ No Strømligning sensors for this page were found. Set up the Strømligning integration first.",
         "data": {
           "stromligning_buy_current_price": "Buy price",
           "stromligning_buy_tomorrow_available": "Buy price tomorrow",
@@ -862,7 +1064,43 @@
       },
       "prices_stromligning_tariffs": {
         "title": "Strømligning - tariffs when selling",
-        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\nDisabled in Strømligning now: {stromligning_disabled}",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\nThe tariff sensors may be disabled in Strømligning, and then they can't be selected here: enable them first under **Settings → Devices & services → Entities** (*Show disabled entities*).\n\n⚠️ Disabled Strømligning sensors, which can't be chosen here: {stromligning_disabled}",
+        "data": {
+          "stromligning_sell_distribution": "Distribution tariff",
+          "stromligning_sell_electricity_tax": "Electricity tax",
+          "stromligning_sell_nettariff": "Net tariff",
+          "stromligning_sell_systemtariff": "System tariff",
+          "stromligning_sell_surcharge": "Spot price surcharge"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sell distribution tariff",
+          "stromligning_sell_electricity_tax": "Strømligning sell electricity tax",
+          "stromligning_sell_nettariff": "Strømligning sell grid tariff",
+          "stromligning_sell_systemtariff": "Strømligning sell system tariff",
+          "stromligning_sell_surcharge": "Strømligning sell spot price surcharge"
+        }
+      },
+      "prices_stromligning_tariffs_ready": {
+        "title": "Strømligning - tariffs when selling",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\n✅ All the Strømligning sensors that can be chosen on this page are enabled.",
+        "data": {
+          "stromligning_sell_distribution": "Distribution tariff",
+          "stromligning_sell_electricity_tax": "Electricity tax",
+          "stromligning_sell_nettariff": "Net tariff",
+          "stromligning_sell_systemtariff": "System tariff",
+          "stromligning_sell_surcharge": "Spot price surcharge"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sell distribution tariff",
+          "stromligning_sell_electricity_tax": "Strømligning sell electricity tax",
+          "stromligning_sell_nettariff": "Strømligning sell grid tariff",
+          "stromligning_sell_systemtariff": "Strømligning sell system tariff",
+          "stromligning_sell_surcharge": "Strømligning sell spot price surcharge"
+        }
+      },
+      "prices_stromligning_tariffs_missing": {
+        "title": "Strømligning - tariffs when selling",
+        "description": "When selling, the tariffs and taxes in the price are subtracted, followed by the sell fee and the net and system tariff. Leave a field empty to use 0.\n\n⚠️ No Strømligning sensors for this page were found. Set up the Strømligning integration first.",
         "data": {
           "stromligning_sell_distribution": "Distribution tariff",
           "stromligning_sell_electricity_tax": "Electricity tax",
@@ -895,17 +1133,87 @@
       },
       "solar": {
         "title": "Solar panels (optional)",
-        "description": "Fill in if you have solar panels. The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar and Helios Forecast are read from their solar forecast for the Energy dashboard; the hours they don't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\nDisabled Solcast sensors now: {solcast_disabled}",
+        "description": "Fill in if you have solar panels. The surplus is used to charge the car.",
         "data": {
           "production_entity_id": "Solar production",
-          "forecast_entity_id": "Solar forecast",
           "inverter_discharging_power_limit": "Inverter max power",
           "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
           "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
-          "forecast_entity_id": "Solcast PV Forecast, Forecast.Solar or Helios Forecast. Solcast: e.g. sensor.solcast_pv_forecast_forecast_today, the days ahead are found automatically. Forecast.Solar: any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Helios Forecast: e.g. sensor.helios_forecast_power_now.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_solcast": {
+        "title": "Solar panels – Solcast PV Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nSolcast switches the forecast sensors of day 3 and on off by default: enable them under **Settings → Devices & services → Entities** (*Show disabled entities*) and turn on *Hourly detail* under *Forecast attributes breakdown* in the Solcast options, or those days are planned without Solcast.\n\n⚠️ Solcast sensors that are disabled, missing, unavailable or without hourly detail: {solcast_problems}",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Solcast PV Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.solcast_pv_forecast_forecast_today; the days ahead are found automatically. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_solcast_ready": {
+        "title": "Solar panels – Solcast PV Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\n✅ All the Solcast sensors that are needed are enabled.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Solcast PV Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.solcast_pv_forecast_forecast_today; the days ahead are found automatically. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_forecast_solar": {
+        "title": "Solar panels – Forecast.Solar",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nForecast.Solar is read from its solar forecast for the Energy dashboard; the hours it doesn't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Forecast.Solar sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "Any of its sensors; the roof planes of the same solar source in the Energy dashboard are added up. Leave it empty to choose the solar forecast again.",
+          "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
+        }
+      },
+      "solar_helios": {
+        "title": "Solar panels – Helios Forecast",
+        "description": "The surplus is used to charge the car and the forecast is used in the plan.\n\nHelios Forecast is read from its solar forecast for the Energy dashboard; the hours it doesn't cover are planned from the weather forecast and the stored solar history; an hour with neither counts as no sun.",
+        "data": {
+          "production_entity_id": "Solar production",
+          "forecast_entity_id": "Helios Forecast sensor",
+          "inverter_discharging_power_limit": "Inverter max power",
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
+        },
+        "data_description": {
+          "production_entity_id": "Solar production (watts)",
+          "forecast_entity_id": "E.g. sensor.helios_forecast_power_now. Leave it empty to choose the solar forecast again.",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
           "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
           "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
@@ -1068,6 +1376,8 @@
       }
     },
     "error": {
+      "forecast_wrong_source": "This sensor is not from the chosen solar forecast. Choose another sensor, or clear the field to choose the forecast again.",
+      "forecast_sensor_missing": "No sensor was chosen. Choose the solar forecast again, or No forecast.",
       "detection_recorder": "The suggestions could not be made: the recorder is not running, so there is no history. The current values are kept.",
       "detection_timeout": "Reading the history took too long. The current values are kept; tick *Detect again* to try again.",
       "detection_error": "The history could not be read. The current values are kept; tick *Detect again* to try again.",
@@ -1105,6 +1415,17 @@
     }
   },
   "selector": {
+    "solar_forecast_sources": {
+      "options": {
+        "none": "No forecast",
+        "solcast_solar": "Solcast PV Forecast",
+        "solcast_solar_unconfirmed": "🧪 Solcast PV Forecast",
+        "forecast_solar": "Forecast.Solar",
+        "forecast_solar_unconfirmed": "🧪 Forecast.Solar",
+        "helios_forecast": "Helios Forecast",
+        "helios_forecast_unconfirmed": "🧪 Helios Forecast"
+      }
+    },
     "import_source": {
       "options": {
         "none": "Do not import"

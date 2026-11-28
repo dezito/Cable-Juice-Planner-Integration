@@ -343,6 +343,25 @@ def _drop_empty_groups(node: Any) -> Any:
     return node
 
 
+def _drop_block(node: Any, heading: str) -> Any:
+    """Remove a heading and the cards under it, up to the next heading of its section."""
+    if isinstance(node, list):
+        return [_drop_block(item, heading) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: _drop_block(value, heading) for key, value in node.items()}
+    cards = node.get("cards")
+    if node.get("type") == "grid" and isinstance(cards, list):
+        kept, dropping = [], False
+        for card in cards:
+            if isinstance(card, dict) and card.get("type") == "heading":
+                dropping = card.get("heading") == heading
+            if not dropping:
+                kept.append(card)
+        node["cards"] = kept
+    return node
+
+
 def _translate(node: Any, texts: dict[str, str]) -> Any:
     """Replace @@key@@ in every string with the dashboard text of the language (the key if missing)."""
     if isinstance(node, list):
@@ -447,6 +466,8 @@ def render_dashboard(
         missing |= {f"binary_sensor.{own}_public_charging_session_done", f"number.{own}_public_charging_session_cost"}
     if not is_ev_configured(config):
         template = _drop_sections(template, (*EV_SECTIONS, *EV_WHAT_IF_SECTIONS))
+    if not config["solar"]["entity_ids"]["forecast_entity_id"]:
+        template = _drop_block(template, "@@section_solar_check@@")
     texts = load_texts(normalize_language(config.get("language")), currency, distance, PRICE_CORRECTION_MAX * price_scale(config))
     # the link to the price provider report fills them in
     texts["dashboard.report_version"] = json.loads((Path(__file__).parent.parent / "manifest.json").read_text(encoding="utf-8"))["version"]

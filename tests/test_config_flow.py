@@ -13,6 +13,7 @@ from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from custom_components.cable_juice_planner.const import CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN
 from custom_components.cable_juice_planner.const.config import build_config, default_options
+from custom_components.cable_juice_planner.flow.pages import SOLAR_PAGES
 from custom_components.cable_juice_planner.flow import pages
 from custom_components.cable_juice_planner.flow.detection import Detection
 from custom_components.cable_juice_planner.management.backup import BACKUP_DIR
@@ -49,8 +50,18 @@ async def _start_instance(hass: HomeAssistant, prefix: str = "flow", **extra):
 
 
 async def _configure(hass: HomeAssistant, result, step_id: str, user_input: dict):
+    if step_id == "solar" and result.get("step_id") == "solar_forecast_source":
+        # the page before: the forecast the test is about to choose a sensor of
+        source = "solcast_solar" if user_input.get("forecast_entity_id") else "none"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"solar_forecast_source": source})
+        if "solar_forecast_source" in user_input:  # made from the page before: the solar page's own defaults, with what the test sets
+            user_input = {**form_defaults(result), **{key: value for key, value in user_input.items() if key != "solar_forecast_source"}}
     assert result["type"] is FlowResultType.FORM, result
-    assert result["step_id"] == step_id, result
+    # the solar page has a step id of its own for each forecast
+    other = (*SOLAR_PAGES.values(), "solar_solcast_ready") if step_id == "solar" else ()
+    if step_id in ("prices_stromligning", "prices_stromligning_tariffs"):
+        other = (f"{step_id}_ready", f"{step_id}_missing")
+    assert result["step_id"] == step_id or result["step_id"] in other, result
     return await hass.config_entries.flow.async_configure(result["flow_id"], user_input)
 
 
@@ -378,14 +389,22 @@ async def _to_powerwall(hass: HomeAssistant, result=None):
     return await _configure(hass, result, "home", {"power_consumption_entity_id": CONSUMPTION})
 
 
-async def _to_solar(hass: HomeAssistant, result) -> dict:
+async def _past_forecast_source(hass: HomeAssistant, result, source: str | None = None):
+    """Through the page that asks for the solar forecast (its default when no source is given) to the solar page."""
+    assert result["step_id"] == "solar_forecast_source", result
+    chosen = {"solar_forecast_source": source} if source else form_defaults(result)
+    return await hass.config_entries.flow.async_configure(result["flow_id"], chosen)
+
+
+async def _to_solar(hass: HomeAssistant, result, source: str | None = None) -> dict:
     """From the home battery page to the solar page, keeping the suggested battery power sensor."""
     result = await _configure(hass, result, "powerwall", {**form_defaults(result), "powerwall_battery_level_entity_id": POWERWALL_LEVEL})
     result = await _configure(hass, result, "detection_review", form_defaults(result))
     result = await _configure(hass, result, "country", {})
     result = await _configure(hass, result, "price_provider", providers_input("energidataservice"))
     result = await _configure(hass, result, "prices_energidataservice", {"energidataservice_buy_entity_id": PRICE})
-    return await _configure(hass, result, "price_fees", {"refund": 0.0, "sell_fee": 0.03})
+    result = await _configure(hass, result, "price_fees", {"refund": 0.0, "sell_fee": 0.03})
+    return await _past_forecast_source(hass, result, source)
 
 
 async def test_the_energy_dashboard_pre_fills_the_battery_and_solar_power(hass: HomeAssistant, detection) -> None:
@@ -500,15 +519,16 @@ def test_the_solar_forecast_picker_offers_the_three_integrations() -> None:
 async def test_a_forecast_solar_or_helios_sensor_is_accepted(hass: HomeAssistant, detection, forecast: str) -> None:
     """The solar page takes these sensors and stores the option as it is; a forecast still needs the production sensor."""
     await _energy_dashboard(hass)
-    result = await _to_solar(hass, await _to_powerwall(hass))
-    assert result["step_id"] == "solar"
+    source = "helios_forecast" if "helios" in forecast else "forecast_solar"
+    result = await _to_solar(hass, await _to_powerwall(hass), source)
+    assert result["step_id"] == SOLAR_PAGES[source]
     values = {**form_defaults(result), "forecast_entity_id": forecast}
     values.pop("production_entity_id", None)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], values)
-    assert result["step_id"] == "solar" and result["errors"] == {"production_entity_id": "production_required"}
+    assert result["step_id"] == SOLAR_PAGES[source] and result["errors"] == {"production_entity_id": "production_required"}
     hass.states.async_set("sensor.solar_power", "0", {"unit_of_measurement": "W", "device_class": "power"})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {**values, "production_entity_id": "sensor.solar_power"})
-    assert result["step_id"] != "solar" and not result.get("errors")
+    assert result["step_id"] not in SOLAR_PAGES.values() and not result.get("errors")
     result = await _submit_defaults_until(hass, result, "advanced")
     result = await _configure(hass, result, "advanced", {**form_defaults(result), "dashboard": False})
     result = await _submit_defaults_until(hass, result, None)
@@ -530,6 +550,8 @@ async def test_options_flow_never_pre_fills_from_the_energy_dashboard(hass: Home
     await _energy_dashboard(hass)
     result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_solar"})
+    assert result["step_id"] == "solar_forecast_source"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
     assert result["step_id"] == "solar"
     assert _suggested(result, "production_entity_id") in (None, "")
     while result["type"] is FlowResultType.FORM:

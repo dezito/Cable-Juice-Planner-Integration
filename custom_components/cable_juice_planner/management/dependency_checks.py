@@ -89,7 +89,41 @@ def solcast_problems(hass: HomeAssistant, forecast_entity: str, endings: list[st
     return {"disabled": disabled, "renamed": renamed, "no_detail": no_detail}
 
 
-def disabled_sensors(hass: HomeAssistant, platform: str, unique_id_prefix: str | tuple[str, ...] = "") -> str:
+def solcast_flow_problems(hass: HomeAssistant, forecast_entity: str, endings: list[str]) -> str:
+    """What stands in the way of the Solcast sensors a plan needs, for the flow page: the ones that are disabled, missing,
+    under another name, unavailable or without hourly detail. "" only when all of them are seen to be ready: no Solcast
+    sensor at all, or one without a state to judge, is not."""
+    registry = er.async_get(hass)
+    selected = registry.async_get(forecast_entity) if forecast_entity else None
+    if not forecast_entity or (selected is not None and selected.platform != SOLCAST_PLATFORM):
+        forecast_entity = registry.async_get_entity_id("sensor", SOLCAST_PLATFORM, SOLCAST_UNIQUE_IDS["today"]) or ""
+    found = solcast_problems(hass, forecast_entity, endings) if forecast_entity else None
+    if found is None:
+        names = [f"sensor.solcast_pv_forecast_forecast_{ending}" for ending in endings]
+    else:
+        names = [*found["disabled"], *found["renamed"], *found["no_detail"]]
+        # the repair leaves a sensor without a state alone, but the page must not call it ready
+        base = strip_forecast_suffix(forecast_entity)
+        for ending in endings:
+            entity_id = f"{base}_{ending}"
+            state = hass.states.get(entity_id)
+            if not any(entity_id in name for name in names) and (state is None or state.state == "unavailable"):
+                names.append(entity_id)
+    shown = ", ".join(names[:FLOW_LIST_LIMIT])
+    return f"{shown} … (+{len(names) - FLOW_LIST_LIMIT})" if len(names) > FLOW_LIST_LIMIT else shown
+
+
+def _wanted(unique_id: str, prefix: str | tuple[str, ...], unused: tuple[str, ...]) -> bool:
+    """Whether a unique id starts with one of the prefixes and with none of the unused ones."""
+    return unique_id.startswith(prefix) and not (unused and unique_id.startswith(unused))
+
+
+def sensors_registered(hass: HomeAssistant, platform: str, unique_id_prefix: str | tuple[str, ...], unused: tuple[str, ...] = ()) -> bool:
+    """Whether the integration has any such sensor, enabled or not: without one an empty list of disabled ones says nothing."""
+    return any(entry.platform == platform and _wanted(entry.unique_id, unique_id_prefix, unused) for entry in er.async_get(hass).entities.values())
+
+
+def disabled_sensors(hass: HomeAssistant, platform: str, unique_id_prefix: str | tuple[str, ...] = "", unused: tuple[str, ...] = ()) -> str:
     """The disabled sensors of an integration as text for a config flow page (the entity picker can't offer them).
 
     unique_id_prefix keeps the list to the sensors that can be used (Strømligning has about 20 per entry); its unique
@@ -99,7 +133,7 @@ def disabled_sensors(hass: HomeAssistant, platform: str, unique_id_prefix: str |
     found = sorted(
         entry.entity_id
         for entry in registry.entities.values()
-        if entry.platform == platform and entry.disabled_by and entry.unique_id.startswith(unique_id_prefix)
+        if entry.platform == platform and entry.disabled_by and _wanted(entry.unique_id, unique_id_prefix, unused)
     )
     if not found:
         return NOTHING

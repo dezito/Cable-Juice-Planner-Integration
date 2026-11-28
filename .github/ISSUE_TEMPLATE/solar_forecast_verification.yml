@@ -1,0 +1,54 @@
+name: Solar Forecast Verification Report (Confirmed)
+description: A solar forecast works with real data
+title: "Solar Forecast Verification Report (Confirmed): "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when you have seen a solar forecast work with **real data** in Cable Juice Planner. The easiest way: open it
+        from the link under *Solar forecast check* on the Cable Juice Planner dashboard (*Settings*). It fills in the source, the
+        versions and the number of hours per day.
+
+        **This issue is public.** Check the fields before you submit, and don't add sensor names, addresses or other
+        personal data. A report does not mark a source as confirmed by itself: the maintainer does that.
+  - type: input
+    id: source
+    attributes:
+      label: Solar forecast
+      description: Solcast PV Forecast, Forecast.Solar or Helios Forecast.
+    validations:
+      required: true
+  - type: textarea
+    id: amounts
+    attributes:
+      label: How did you compare the values?
+      description: Compare the hours and the energy of today and the next days in the check with your forecast integration, and say what you saw. The check of Cable Juice Planner does not judge them.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have used it with real data for at least a whole day.
+          required: true
+        - label: The values matched my forecast integration.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cable Juice Planner version
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+  - type: textarea
+    id: solar_check
+    attributes:
+      label: Solar forecast check
+      description: From the attribute `solar_check` of `sensor.cjp_current_charging_rule`, without the kWh. Filled in by the link on the dashboard.
+      render: json
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?

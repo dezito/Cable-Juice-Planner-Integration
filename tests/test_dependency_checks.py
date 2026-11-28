@@ -24,12 +24,14 @@ from custom_components.cable_juice_planner.management.dependency_checks import (
     DependencyWatcher,
     disabled_sensors,
     remove_issues,
+    solcast_flow_problems,
+    sensors_registered,
     solcast_problems,
 )
 from custom_components.cable_juice_planner.prices import STROMLIGNING_UNIQUE_ID_PREFIXES, stromligning_entities_to_watch, stromligning_problems
 from custom_components.cable_juice_planner.utils.solcast import SOLCAST_UNIQUE_IDS, solcast_endings_for_days
 
-from .conftest import MOCK_OPTIONS, async_unload_and_join, set_source_states
+from .conftest import MOCK_OPTIONS, async_unload_and_join, form_defaults, set_source_states
 
 DISABLED = er.RegistryEntryDisabler.INTEGRATION
 
@@ -325,9 +327,10 @@ async def test_the_flow_pages_list_the_disabled_sensors(hass: HomeAssistant, loa
 
     result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_solar"})
-    assert result["step_id"] == "solar"
-    assert result["description_placeholders"]["solcast_disabled"] == f"{BASE}_day_3"
-    assert result["description_placeholders"]["stromligning_disabled"] == "sensor.strom_nettariff"
+    assert result["step_id"] == "solar_forecast_source"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"solar_forecast_source": "solcast_solar"})
+    assert result["step_id"] == "solar_solcast"
+    assert f"{BASE}_day_3" in result["description_placeholders"]["solcast_problems"]
 
 
 @pytest.mark.parametrize("count", [3, 20])
@@ -524,3 +527,102 @@ async def test_a_sensor_seen_once_with_only_a_forecast_then_not_judged_starts_it
     await clock.next_hour()
     assert issue(hass, entry, ISSUE_FORECAST_ONLY)
     watched.stop()
+
+
+async def test_the_solcast_page_says_ready_only_when_every_needed_sensor_is(hass: HomeAssistant) -> None:
+    endings = solcast_endings_for_days(4)
+    # nothing of Solcast at all: every needed sensor is missing, never "ready"
+    assert solcast_flow_problems(hass, "", endings) == ", ".join(f"sensor.solcast_pv_forecast_forecast_{ending}" for ending in endings)
+    for ending in endings:
+        register(hass, "solcast_solar", SOLCAST_UNIQUE_IDS[ending], f"{BASE}_{ending}", disabled=ending == "day_4")
+        hass.states.async_set(f"{BASE}_{ending}", "1", {"detailedHourly": []})
+    assert solcast_flow_problems(hass, "", endings) == f"{BASE}_day_4"  # found by Solcast's own today sensor
+    assert solcast_flow_problems(hass, "", solcast_endings_for_days(3)) == ""  # a day the plan does not need
+    # another integration's sensor in the field: judged by Solcast's own
+    register(hass, "template", "other", "sensor.something_else")
+    assert solcast_flow_problems(hass, "sensor.something_else", solcast_endings_for_days(3)) == ""
+    # a sensor that is no longer registered under its name (a restored backup) is never ready
+    assert "sensor.old_solcast_today" in solcast_flow_problems(hass, "sensor.old_solcast_today", solcast_endings_for_days(3))
+    # without a state there is nothing to judge: not ready
+    hass.states.async_set(f"{BASE}_day_3", "unavailable")
+    assert solcast_flow_problems(hass, "", solcast_endings_for_days(3)) == f"{BASE}_day_3"
+    hass.states.async_remove(f"{BASE}_day_3")
+    assert solcast_flow_problems(hass, "", solcast_endings_for_days(3)) == f"{BASE}_day_3"
+    hass.states.async_set(f"{BASE}_day_3", "1", {"detailedHourly": []})
+    hass.states.async_set(f"{BASE}_tomorrow", "1", {})  # hourly detail switched off
+    assert solcast_flow_problems(hass, f"{BASE}_today", solcast_endings_for_days(3)) == f"{BASE}_tomorrow"
+
+
+async def test_the_flow_shows_the_ready_page_when_nothing_is_missing(hass: HomeAssistant, loaded_entry) -> None:
+    for ending in solcast_endings_for_days(7):
+        register(hass, "solcast_solar", SOLCAST_UNIQUE_IDS[ending], f"{BASE}_{ending}")
+        hass.states.async_set(f"{BASE}_{ending}", "1", {"detailedHourly": []})
+    options = hass.config_entries.options
+    result = await options.async_init(loaded_entry.entry_id)
+    result = await options.async_configure(result["flow_id"], {"next_step_id": "menu_solar"})
+    result = await options.async_configure(result["flow_id"], {"solar_forecast_source": "solcast_solar"})
+    assert result["step_id"] == "solar_solcast_ready" and result["description_placeholders"]["solcast_problems"] == ""
+    # the page is taken like the other one
+    result = await options.async_configure(result["flow_id"], {"forecast_entity_id": f"{BASE}_today", "production_entity_id": "sensor.pv",
+                                                               **{key: value for key, value in form_defaults(result).items() if key not in ("forecast_entity_id", "production_entity_id")}})
+    assert not result.get("errors") and result.get("step_id") not in ("solar", "solar_solcast", "solar_solcast_ready", "solar_forecast_source"), result
+
+
+@pytest.mark.parametrize(("page", "usable", "other"), [
+    ("prices_stromligning", "current_price_vat_abc", "nettariff_ex_vat_abc"),
+    ("prices_stromligning_tariffs", "nettariff_ex_vat_abc", "current_price_vat_abc"),
+])
+async def test_a_stromligning_page_says_whether_its_sensors_are_enabled(hass: HomeAssistant, loaded_entry, page, usable, other) -> None:
+
+    async def shown() -> tuple[str, str]:
+        started = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+        flow = hass.config_entries.options._progress[started["flow_id"]]  # the real options flow, opened at the page
+        result = await getattr(flow, f"async_step_{page}")()
+        hass.config_entries.options.async_abort(started["flow_id"])
+        return result["step_id"], result["description_placeholders"]["stromligning_disabled"]
+
+    # nothing of Strømligning, and only the other page's sensors: neither is "all enabled"
+    assert await shown() == (f"{page}_missing", "–")
+    register(hass, "stromligning", other, "sensor.strom_other")
+    assert await shown() == (f"{page}_missing", "–")
+    register(hass, "stromligning", usable, "sensor.strom_usable")
+    assert await shown() == (f"{page}_ready", "–")
+    register(hass, "stromligning", usable.replace("abc", "def"), "sensor.strom_off", disabled=True)
+    assert await shown() == (page, "sensor.strom_off")
+
+
+def test_every_language_has_the_three_versions_of_the_stromligning_pages() -> None:
+    import json
+
+    package = Path(__file__).parents[1] / "custom_components" / "cable_juice_planner"
+    for path in [package / "strings.json", *(package / "translations").glob("*.json")]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for flow in ("config", "options"):
+            for page in ("prices_stromligning", "prices_stromligning_tariffs"):
+                versions = {state: data[flow]["step"][page + state] for state in ("", "_ready", "_missing")}
+                assert "{stromligning_disabled}" in versions[""]["description"] and "⚠️" in versions[""]["description"], (path.name, page)
+                assert "✅" in versions["_ready"]["description"] and "⚠️" in versions["_missing"]["description"], (path.name, page)
+                for state in ("_ready", "_missing"):
+                    assert "{stromligning_disabled}" not in versions[state]["description"], (path.name, page, state)
+                    assert versions[state]["data"] == versions[""]["data"] and versions[state]["title"] == versions[""]["title"], (path.name, page)
+
+
+async def test_the_spot_price_forecasts_are_no_sensor_of_the_price_page(hass: HomeAssistant, loaded_entry) -> None:
+    register(hass, "stromligning", "forecasts_spotprice_ex_vat_abc", "sensor.strom_spot_forecast", disabled=True)
+    unused = ("forecasts_spotprice",)
+    prefixes = ("current_price", "tomorrow_available", "forecasts")
+    assert disabled_sensors(hass, "stromligning", prefixes, unused) == "–" and not sensors_registered(hass, "stromligning", prefixes, unused)
+    register(hass, "stromligning", "forecasts_ex_vat_abc", "sensor.strom_forecast", disabled=True)
+    assert disabled_sensors(hass, "stromligning", prefixes, unused) == "sensor.strom_forecast"
+
+
+async def test_a_form_sent_from_the_missing_page_goes_on_like_the_price_page(hass: HomeAssistant, loaded_entry) -> None:
+    from .conftest import providers_input
+
+    options = hass.config_entries.options
+    result = await options.async_init(loaded_entry.entry_id)
+    result = await options.async_configure(result["flow_id"], {"next_step_id": "menu_prices"})
+    result = await options.async_configure(result["flow_id"], providers_input("stromligning"))
+    assert result["step_id"] == "prices_stromligning_missing", result
+    result = await options.async_configure(result["flow_id"], {"stromligning_buy_current_price": "sensor.stromligning_price"})
+    assert result["step_id"] == "price_fees" and not result.get("errors"), result

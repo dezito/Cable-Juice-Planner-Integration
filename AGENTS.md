@@ -586,7 +586,23 @@ tariff (`transmissions_nettarif`) + system tariff (`systemtarif`)**. Formula:
   Verification Report (Confirmed)*), pre-filled with only the provider names, the country, the versions and the `price_check`
   results (no entity ids, prices or other user data); the integration sends nothing itself, and the form's field ids must
   match the link's query parameters. A report never confirms a provider by itself: the maintainer adds the country to
-  `confirmed_countries`.
+  `confirmed_countries`. `docs/tested-integrations.md` lists by country what is confirmed and what is not; its tables come
+  from the code (`tests/test_tested_integrations.py` fails when they differ), so update the page with every confirmation.
+- Solar forecast sources (`utils/solar_sources.py`, the same file in both repositories): a source is confirmed only by hand
+  via `CONFIRMED_SOLAR_SOURCES` (so far only Solcast PV Forecast, user decision). The flow asks for the source on its own page
+  before the solar page (marked values as for the price providers, `ProviderSelector`); no source is stored, it is read from
+  the platform of the forecast sensor, and a sensor whose platform is unknown is never cleared. Each
+  choice has its own solar page (step ids `solar`, `solar_solcast`, `solar_solcast_ready`, `solar_forecast_solar`, `solar_helios`,
+  `SOLAR_PAGES` in `flow/pages.py`) that holds only its own texts. The Solcast page says that all needed sensors are ready only
+  on `solar_solcast_ready`, when `solcast_flow_problems()` finds none; no Solcast sensor at all is a problem. The two
+  Strømligning pages do the same with the step ids `<page>_ready` and `<page>_missing` (each judges only the sensors it can
+  take, `STROMLIGNING_PAGE_PREFIXES`): never show an empty list as the answer, and never "ready" when there is no sensor. An empty sensor field goes back to the choice: a flow has no back button, so
+  no check may leave the user without a way out. Choosing a source clears a stored sensor whose known platform is another one. The attribute `solar_check`
+  states only facts about what the forecast delivers (source, confirmed, and per day the
+  hours with a value and their kWh), never passed or failed: a missing
+  value for a dark or partly dark hour can't be told from a missing forecast. The Settings view shows it only with a forecast
+  configured, with a link to `.github/ISSUE_TEMPLATE/solar_forecast_verification.yml`; the link carries no kWh, entity ids or
+  other user data, and the form's field ids must match its query parameters.
 - `sell_fee` is stored positive (`abs()`) and is always subtracted.
 - Every price chart (`dashboard/prices/<provider>.yaml`, one per provider) is the Energy Price Forecast chart with its data source replaced by
   one inline `adapt()`: it reads the prices the plan is made on, whatever provider gave them, from attribute `price_chart` of
