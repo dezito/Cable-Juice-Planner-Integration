@@ -422,6 +422,35 @@ def test_learned_distance_switch_is_under_advanced_settings() -> None:
         assert rendered_read_more.count("---") == 3, language
 
 
+def test_the_settings_page_is_compact_with_the_work_week_side_by_side() -> None:
+    """The layout the user made for a PC screen: the work plan takes two columns, its week in two cards next to each other."""
+    view = yaml.safe_load(template_text({}))
+    settings = next(item for item in (view["views"] if isinstance(view, dict) else view) if item["path"] == "settings")
+    assert settings["max_columns"] == 4 and settings["dense_section_placement"] is True
+    layout = [
+        (part.get("column_span", 1), [card["heading"].strip("@").removeprefix("section_") for card in part["cards"] if card["type"] == "heading"])
+        for part in settings["sections"]
+    ]
+    assert layout == [
+        (2, ["workplan"]),
+        (1, ["fill_up", "cheap", "solar", "full_charge"]),
+        (1, ["battery_levels", "powerwall", "charging_loss", "virtual_ev", "advanced"]),
+        (1, ["charger_test", "price_check", "problem"]),
+    ]
+    switch, first_half, second_half = [card for card in settings["sections"][0]["cards"] if card["type"] == "entities"]
+    assert [row["entity"] for row in switch["entities"]] == ["switch.cjp_workplan_charging"]
+    assert switch["grid_options"] == {"columns": "full", "rows": "auto"}
+    for card, days in ((first_half, ("monday", "tuesday", "wednesday", "thursday")), (second_half, ("friday", "saturday", "sunday"))):
+        assert card["grid_options"] == {"columns": 12, "rows": "auto"}
+        assert [row["label"] for row in card["entities"] if row.get("type") == "section"] == [f"@@{day}@@" for day in days]
+        assert [row["entity"] for row in card["entities"] if "entity" in row] == [
+            entity
+            for day in days
+            for entity in (f"switch.cjp_workday_{day}", f"time.cjp_workday_departure_{day}", f"time.cjp_workday_homecoming_{day}",
+                           f"number.cjp_workday_distance_needed_{day}", f"switch.cjp_preheat_{day}")
+        ]
+
+
 def _settings_sections(options: dict, existing: set[str]) -> dict[str, list[str]]:
     """Section heading -> entity ids of the Settings view."""
     settings = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"][1]

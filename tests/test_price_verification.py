@@ -1,19 +1,31 @@
 """The self test of the price providers (prices/verification.py) and which providers are confirmed with real data."""
 from __future__ import annotations
 
+import ast
+import json
+import pathlib
+import urllib.parse
+import re
 import datetime
 import zoneinfo
 
 import pytest
+import yaml
 
+from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.template import Template
 
 from custom_components.cable_juice_planner.const import build_config, default_options
+from custom_components.cable_juice_planner.flow.schema import PRICE_PROVIDER_NAMES
+from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
+from custom_components.cable_juice_planner.utils.formatting import load_texts
 from custom_components.cable_juice_planner.prices import create_price_provider, unconfirmed_providers
 from custom_components.cable_juice_planner.prices.factory import PROVIDER_CLASSES
 from custom_components.cable_juice_planner.prices.verification import day_check, forecast_days, local_slots, overall
 
 from .conftest import providers_input
+from .test_charger_test import _own
 from .test_price_country import _to_price_provider
 
 COPENHAGEN = zoneinfo.ZoneInfo("Europe/Copenhagen")
@@ -257,3 +269,136 @@ async def test_the_price_page_marks_the_providers_nobody_has_seen_work_yet(hass:
     assert marked(shown_again) == marked(result)
     result = await _to_price_provider(hass, price_country="DE")
     assert marked(result) == {"energidataservice", "energypriceforecast", "spotforecast", "epexspot", "gespot", "nordpool"}
+
+
+def _settings_card(language: str, marker: str) -> str:
+    """The content of the markdown card of the settings page that holds marker."""
+    dashboard = yaml.safe_load(render_dashboard(build_config({**default_options(), "language": language}), "mine", "entry1", _own("mine") | {"switch.cjp_mine_charger_test_run", "sensor.cjp_mine_charger_test"}))
+    view = next(view for view in dashboard["views"] if view["path"] == "settings")
+    found = [
+        card["content"]
+        for part in view["sections"]
+        for card in part["cards"]
+        if card.get("type") == "markdown" and marker in card.get("content", "")
+    ]
+    assert len(found) == 1, (language, marker, found)
+    return found[0]
+
+
+def _shown(hass: HomeAssistant, card: str) -> str:
+    return Template(card, hass).async_render(parse_result=False).strip()
+
+
+async def test_the_settings_page_shows_the_price_check_to_be_clicked_open(hass: HomeAssistant) -> None:
+    card = _settings_card("en", "price_check")
+    sensor = "sensor.cjp_mine_current_charging_rule"
+    for attributes in ({}, {"price_check": {}}, {"price_check": {"country": "DK", "checked": "2026-10-20T14:02+02:00", "providers": {}}}):
+        hass.states.async_set(sensor, "x", attributes)
+        shown = _shown(hass, card)
+        assert shown.startswith("<details><summary>Show the price check</summary>")
+        shown = shown.split("</details>")[0]
+        assert "No result." in shown and "|" not in shown and "✅" not in shown
+
+    passed = dict.fromkeys(("ok", "unit", "today", "tomorrow", "sell_today", "sell_tomorrow"), True)
+    providers = {
+        "energidataservice": {**passed, "confirmed": True, "ok": None, "tomorrow": None, "sell_today": False, "sell_tomorrow": None, "forecast_days": 0},
+        "nordpool": {**passed, "confirmed": False, "forecast_days": None},
+    }
+    hass.states.async_set(sensor, "x", {"price_check": {"country": "DK", "checked": "2026-10-20T14:02+02:00", "providers": providers}})
+    shown = _shown(hass, card)
+    assert "Checked: 2026-10-20 14:02 (DK)" in shown
+    # one unbroken table; a result that can't be judged (None) is never shown as passed
+    assert """
+| | Energi Data Service | Nord Pool |
+|:--|:-:|:-:|
+| Confirmed in your country | ✅ | 🧪 |
+| **Overall** | ➖ | ✅ |
+| Unit | ✅ | ✅ |
+| Buy prices, rest of today | ✅ | ✅ |
+| Buy prices, tomorrow | ➖ | ✅ |
+| Sell prices, rest of today | ❌ | ✅ |
+| Sell prices, tomorrow | ➖ | ✅ |
+| Forecast, days after today | 0 | ➖ |
+
+""" in shown, shown
+
+
+async def test_the_test_result_is_clicked_open_and_stays_open_while_the_test_runs(hass: HomeAssistant) -> None:
+    card = _settings_card("en", "charger_test', 'markdown')")
+    sensor = "sensor.cjp_mine_charger_test"
+    assert _shown(hass, card) == ""  # no sensor yet
+    hass.states.async_set(sensor, "idle", {"markdown": ""})
+    assert _shown(hass, card) == ""
+    hass.states.async_set(sensor, "done", {"markdown": "| ✅ | step |"})
+    assert _shown(hass, card) == "<details><summary>Show the test result</summary>\n\n| ✅ | step |\n\n</details>"
+    hass.states.async_set(sensor, "running", {"markdown": "| ▶️ | step |"})
+    assert _shown(hass, card).startswith("<details open><summary>Show the test result</summary>")
+
+
+@pytest.mark.parametrize("language", ['da', 'de', 'en', 'en-GB', 'pl', 'uk'])
+async def test_the_cards_of_every_language_render_and_name_every_provider(hass: HomeAssistant, language: str) -> None:
+    card = _settings_card(language, "price_check")
+    names = ast.literal_eval(re.search(r"set names = (\{.*?\}) %}", card)[1])
+    assert names == PRICE_PROVIDER_NAMES
+    result = {"country": "DK", "checked": "2026-10-20T14:02+02:00", "providers": {"stromligning": {"confirmed": True, "forecast_days": 6}}}
+    hass.states.async_set("sensor.cjp_mine_current_charging_rule", "x", {"price_check": result})
+    shown = _shown(hass, card)
+    assert "@@" not in shown and "price_check_" not in shown and shown.count("|\n|") == 9, shown
+    texts = load_texts(language)
+    assert "➖" in texts["dashboard.help_price_check"] and "➖" in texts["dashboard.price_check_legend"]
+
+
+def _report_link(shown: str) -> tuple[str, dict[str, str]]:
+    """The address of the report link under the price check, and the fields it fills in."""
+    after = shown.split("</details>")[1]  # it is seen without clicking anything open
+    address = re.search(r"\[Price Provider Verification Report \(Confirmed\)\]\((\S+)\)$", after.strip())
+    assert address, after
+    url = urllib.parse.urlsplit(address[1])
+    assert "(" not in address[1] and ")" not in address[1]
+    return f"{url.scheme}://{url.netloc}{url.path}", dict(urllib.parse.parse_qsl(url.query, keep_blank_values=True))
+
+
+async def test_the_report_link_fills_in_the_providers_and_the_check_and_nothing_else(hass: HomeAssistant) -> None:
+    card = _settings_card("en", "price_check")
+    sensor = "sensor.cjp_mine_current_charging_rule"
+    checked = "2026-10-20T14:02+02:00"
+    providers = {
+        "energidataservice": {"confirmed": True, "ok": True, "forecast_days": 6},
+        "nordpool": {"confirmed": False, "ok": None, "tomorrow": None, "forecast_days": None},
+        "epexspot": {"confirmed": False, "ok": False},
+    }
+    hass.states.async_set(sensor, "x", {"price_check": {"country": "DK", "checked": checked, "providers": providers}})
+    shown = _shown(hass, card)
+    address, fields = _report_link(shown)
+    assert address == "https://github.com/dezito/Cable-Juice-Planner-Integration/issues/new"
+    manifest = json.loads((pathlib.Path(__file__).parents[1] / "custom_components" / "cable_juice_planner" / "manifest.json").read_text(encoding="utf-8"))
+    # the providers still to be confirmed
+    assert fields == {
+        "template": "price_provider_verification.yml",
+        "title": "Price Provider Verification Report (Confirmed): Nord Pool, EPEX Spot (DK)",
+        "providers": "Nord Pool, EPEX Spot",
+        "country": "DK",
+        "version": manifest["version"],
+        "ha_version": HA_VERSION,
+        "price_check": fields["price_check"],
+    }
+    assert json.loads(fields["price_check"]) == {"checked": checked, "providers": providers}
+    assert "sensor." not in urllib.parse.unquote_plus(shown.split("</details>")[1])
+    # all confirmed: the chosen ones
+    only = {"energidataservice": providers["energidataservice"]}
+    hass.states.async_set(sensor, "x", {"price_check": {"country": "DK", "checked": checked, "providers": only}})
+    assert _report_link(_shown(hass, card))[1]["providers"] == "Energi Data Service"
+    # without a result the link is still there, with nothing made up
+    hass.states.async_set(sensor, "x", {})
+    fields = _report_link(_shown(hass, card))[1]
+    assert fields["title"] == "Price Provider Verification Report (Confirmed)"
+    assert (fields["providers"], fields["country"], fields["price_check"]) == ("", "", "")
+
+
+def test_the_issue_form_has_every_field_the_link_fills_in() -> None:
+    path = pathlib.Path(__file__).parents[1] / ".github" / "ISSUE_TEMPLATE" / "price_provider_verification.yml"
+    form = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert form["name"] == "Price Provider Verification Report (Confirmed)" and form["title"].startswith(form["name"])
+    ids = [item["id"] for item in form["body"] if "id" in item]
+    assert len(ids) == len(set(ids))
+    assert {"providers", "country", "version", "ha_version", "price_check"} <= set(ids)
