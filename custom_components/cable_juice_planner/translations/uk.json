@@ -444,12 +444,22 @@
       },
       "price_provider": {
         "title": "Ціни на електроенергію",
-        "description": "Оберіть, звідки беруться погодинні ціни. З кількома порядок такий: Strømligning, потім Energi Data Service, потім Energy Price Forecast: для кожної години використовується ціна першого, який її має, а наступний заповнює прогалини. Інтеграції біржових цін (Spot Forecast, Elprisprognos, Wattcast) йдуть останніми; вони дають оптові ціни, тому ПДВ і надбавку запитують на сторінці зборів. EPEX Spot, GE-Spot, Octopus Energy і Nord Pool дають ваші власні опубліковані ціни (сьогодні й завтра): поруч потрібен постачальник із прогнозом, а вони стоять одразу після Energi Data Service, перед Energy Price Forecast та іншими оцінками.\n\n**Недоступні в країні {country}:** {unavailable}",
-        "data": {
-          "price_providers": "Постачальники цін"
-        },
-        "data_description": {
-          "price_providers": "Показано лише постачальників, які мають ціни у вибраній країні. Країну можна змінити в розділі «Загальне» після завершення налаштування."
+        "description": "Оберіть одного або кількох.\n\n**Якщо їх кілька,** для кожної години використовується перший у цьому порядку, який має ціну (справжня ціна завжди має перевагу над прогнозом):\n{priority}\n\n🧪 У країні {country} ще не підтверджений реальними даними. Його все одно можна вибрати: перевірте ціни після налаштування.\n\n**Недоступні в країні {country}:** {unavailable}\nКраїну можна змінити в розділі «Загальне» після завершення налаштування.",
+        "sections": {
+          "with_forecast": {
+            "name": "📈 Ціни та прогноз",
+            "description": "Можуть давати прогноз. Деяким його треба ввімкнути в їхній власній інтеграції.",
+            "data": {
+              "providers": "Постачальники"
+            }
+          },
+          "prices_only": {
+            "name": "🕐 Лише ціни (сьогодні й завтра)",
+            "description": "Без прогнозу: виберіть також принаймні одного в розділі «Ціни та прогноз».",
+            "data": {
+              "providers": "Постачальники"
+            }
+          }
         }
       },
       "user": {
@@ -1001,12 +1011,22 @@
       },
       "price_provider": {
         "title": "Ціни на електроенергію",
-        "description": "Оберіть, звідки беруться погодинні ціни. З кількома порядок такий: Strømligning, потім Energi Data Service, потім Energy Price Forecast: для кожної години використовується ціна першого, який її має, а наступний заповнює прогалини. Інтеграції біржових цін (Spot Forecast, Elprisprognos, Wattcast) йдуть останніми; вони дають оптові ціни, тому ПДВ і надбавку запитують на сторінці зборів. EPEX Spot, GE-Spot, Octopus Energy і Nord Pool дають ваші власні опубліковані ціни (сьогодні й завтра): поруч потрібен постачальник із прогнозом, а вони стоять одразу після Energi Data Service, перед Energy Price Forecast та іншими оцінками.\n\n**Недоступні в країні {country}:** {unavailable}",
-        "data": {
-          "price_providers": "Постачальники цін"
-        },
-        "data_description": {
-          "price_providers": "Показано лише постачальників, які мають ціни в країні, указаній у розділі «Загальне»."
+        "description": "Оберіть одного або кількох.\n\n**Якщо їх кілька,** для кожної години використовується перший у цьому порядку, який має ціну (справжня ціна завжди має перевагу над прогнозом):\n{priority}\n\n🧪 У країні {country} ще не підтверджений реальними даними. Його все одно можна вибрати: перевірте ціни після налаштування.\n\n**Недоступні в країні {country}:** {unavailable}\nКраїна вказується в розділі «Загальне».",
+        "sections": {
+          "with_forecast": {
+            "name": "📈 Ціни та прогноз",
+            "description": "Можуть давати прогноз. Деяким його треба ввімкнути в їхній власній інтеграції.",
+            "data": {
+              "providers": "Постачальники"
+            }
+          },
+          "prices_only": {
+            "name": "🕐 Лише ціни (сьогодні й завтра)",
+            "description": "Без прогнозу: виберіть також принаймні одного в розділі «Ціни та прогноз».",
+            "data": {
+              "providers": "Постачальники"
+            }
+          }
         }
       },
       "site": {
@@ -1093,15 +1113,25 @@
     "price_providers": {
       "options": {
         "energidataservice": "Energi Data Service",
+        "energidataservice_unconfirmed": "🧪 Energi Data Service",
         "stromligning": "Strømligning",
+        "stromligning_unconfirmed": "🧪 Strømligning",
         "energypriceforecast": "Energy Price Forecast (Європа)",
+        "energypriceforecast_unconfirmed": "🧪 Energy Price Forecast (Європа)",
         "spotforecast": "Spot Forecast (DE, LU, NL, NO)",
+        "spotforecast_unconfirmed": "🧪 Spot Forecast (DE, LU, NL, NO)",
         "elprognos": "Elprisprognos (Швеція)",
+        "elprognos_unconfirmed": "🧪 Elprisprognos (Швеція)",
         "wattcast": "Wattcast (Фінляндія, країни Балтії)",
+        "wattcast_unconfirmed": "🧪 Wattcast (Фінляндія, країни Балтії)",
         "epexspot": "EPEX Spot (Європа, без прогнозу)",
+        "epexspot_unconfirmed": "🧪 EPEX Spot (Європа, без прогнозу)",
         "gespot": "GE-Spot (Європа та інше, без прогнозу)",
+        "gespot_unconfirmed": "🧪 GE-Spot (Європа та інше, без прогнозу)",
         "octopus": "Octopus Energy (Велика Британія, без прогнозу)",
-        "nordpool": "Nord Pool (HACS, без прогнозу)"
+        "octopus_unconfirmed": "🧪 Octopus Energy (Велика Британія, без прогнозу)",
+        "nordpool": "Nord Pool (HACS, без прогнозу)",
+        "nordpool_unconfirmed": "🧪 Nord Pool (HACS, без прогнозу)"
       }
     },
     "restore_backup": {

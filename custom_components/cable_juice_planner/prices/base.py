@@ -10,6 +10,7 @@ from typing import Any
 from ..const import CURRENCY_PRICE_SCALE, ENTITY_UNAVAILABLE_STATES, PRICE_ADDER_DAY_BETWEEN_DIVIDER, price_decimals, price_scale
 from ..management.value_checks import is_price_per_mwh, is_price_per_wh, is_price_subunit, price_unit_wrong
 from ..utils.helpers import days_between, float_or_none, reset_time_to_hour, to_local_datetime
+from .verification import check_provider
 from .intervals import common_interval_minutes, interval_slots, provider_intervals
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,6 +114,9 @@ class BasePriceProvider:
     # the countries (ISO 3166-1 alpha-2) the provider gives prices in (None: any, it has its own list), and whether it gives a forecast
     countries: frozenset[str] | None = None
     has_forecast = True
+    # the countries where the provider has been seen to work with real data: the price page names the others as not confirmed yet.
+    # A country is added only by hand, when someone has seen it work; a passed self test alone does not do it
+    confirmed_countries: frozenset[str] = frozenset()
     # whether the recorded state of its sensor is a buy price (the economy and the price history read it); the wholesale sensors are not
     records_history = True
 
@@ -304,6 +308,10 @@ class CombinedPriceProvider(BasePriceProvider):
     def __init__(self, config: dict, providers: list[BasePriceProvider]) -> None:
         super().__init__(config)
         self.providers = providers
+        # the self test of the providers (check_providers): the country, the price entities without a usable state, the providers whose last update failed
+        self.country = config.get("prices", {}).get("country") or "DK"
+        self.unavailable: set[str] = set()
+        self.failed_providers: set[str] = set()
         self.processed_version = -1
         self.buy_prices: dict = {}
         self.sell_prices: dict = {}
@@ -359,19 +367,22 @@ class CombinedPriceProvider(BasePriceProvider):
         return [entity_id for entity_id in (p.get_buy_price_entity_id() for p in self.providers if p.records_history) if entity_id]
 
     def snapshot(self, get_state: GetState) -> dict:
-        """The price entities for set_snapshot(): {"attributes": {...}, "values": {...}}."""
+        """The price entities for set_snapshot(): {"attributes": {...}, "values": {...}, "unavailable": [the entities without a usable state]}."""
         attributes: dict[str, dict] = {}
         values: dict[str, float] = {}
+        unavailable: list[str] = []
         tariff_entities = {self.entity_ids.get(key) for key in TARIFF_STATE_KEYS} - {None, ""}
         for entity_id in self.price_entity_ids():
             state = get_state(entity_id)
+            if state is None or getattr(state, "state", None) in ("unavailable", "unknown"):
+                unavailable.append(entity_id)  # the self test of the providers can't judge it
             if state is None:
                 continue
             attributes[entity_id] = dict(state.attributes)
             if entity_id in tariff_entities:
                 value = float_or_none(state.state)
                 values[entity_id] = value if value is not None else 0.0
-        return {"attributes": attributes, "values": values}
+        return {"attributes": attributes, "values": values, "unavailable": unavailable}
 
     def price_unit_divisors(self, get_state: GetState) -> dict[str, float | None]:
         """{entity_id: divisor} of the Energy Price Forecast, Energi Data Service, EPEX Spot, GE-Spot and Nord Pool sensors whose recorded history (the statistics
@@ -415,6 +426,24 @@ class CombinedPriceProvider(BasePriceProvider):
 
     # prices (worker) ----------------------------------------------------- #
 
+    def check_providers(self, now: datetime.datetime, tz: datetime.tzinfo | None = None) -> dict[str, dict]:
+        """The self test of every configured provider on its own prices (prices/verification.py), by provider name. It only reads."""
+        from .currency import PRICE_SENSOR_KEYS  # noqa: PLC0415 (currency.py imports this module)
+
+        def unit_error(key: str, unit: Any) -> bool:
+            if key == WATTCAST_BUY_KEY and not unit:
+                return True  # Wattcast's provider takes ct/kWh and nothing else
+            # as price_unit_problems judges it: a price sensor by the rules of its key, any other (Strømligning's) by its unit
+            return price_unit_error(key, unit) if key in PRICE_SENSOR_KEYS else price_unit_wrong(unit)
+
+        return {
+            provider.source_name: check_provider(
+                provider, self.country, now, tz, self.entity_ids, self.shared_data["attributes"], self.unavailable,
+                provider.source_name in self.failed_providers, unit_error,
+            )
+            for provider in self.providers
+        }
+
     def set_now(self, now: datetime.datetime, tz: datetime.tzinfo | None = None) -> None:
         """now: local time without tzinfo; tz: Home Assistant's time zone (None = drop the offset of a price row as it is)."""
         self.now = now
@@ -427,6 +456,7 @@ class CombinedPriceProvider(BasePriceProvider):
         """New HA snapshot (replaces _update_shared_price_data)."""
         self.shared_data["attributes"] = dict(price_data.get("attributes", {}))
         self.shared_data["values"] = dict(price_data.get("values", {}))
+        self.unavailable = set(price_data.get("unavailable", ()))
         self.shared_data["version"] += 1
 
     def update_prices(self, force=False) -> None:
@@ -435,11 +465,14 @@ class CombinedPriceProvider(BasePriceProvider):
     def _sync_prices(self) -> None:
         if self.processed_version == self.shared_data["version"] or self.shared_data["version"] == 0:
             return
+        failed: set[str] = set()
         for provider in self.providers:
             try:
                 provider.update_prices()
             except Exception as err:  # noqa: BLE001
+                failed.add(provider.source_name)
                 _LOGGER.warning("Can't update prices from %s: %s %s", provider.source_name, err, type(err))
+        self.failed_providers = failed
         self.buy_prices, self.buy_real_prices, self.buy_price_sources, _ = self._combine_or_empty("buy")
         self.sell_prices, self.sell_real_prices, self.sell_price_sources, self.sell_price_details = self._combine_or_empty("sell")
         self._apply_sells_nothing()

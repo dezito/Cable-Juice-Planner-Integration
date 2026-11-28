@@ -1,16 +1,22 @@
 """The country of the prices (the country page and General): which price providers can be chosen (the price provider page)."""
 from __future__ import annotations
 
+import re
+
+import probatio
 import pytest
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import InvalidData
 from homeassistant.core import HomeAssistant
 
+from homeassistant.helpers import config_validation as cv
+
+from custom_components.cable_juice_planner.flow.schema import provider_of
 from custom_components.cable_juice_planner.const import DOMAIN
 from custom_components.cable_juice_planner.const.config import build_config, default_options
 
-from .conftest import CONSUMPTION, EV_LEVEL, EV_ODOMETER, EV_RANGE, form_defaults
+from .conftest import CONSUMPTION, EV_LEVEL, EV_ODOMETER, EV_RANGE, form_defaults, providers_input
 from .test_config_flow import CHARGER_ENTITIES, _configure, _start_instance
 
 
@@ -34,9 +40,17 @@ async def _to_price_provider(hass: HomeAssistant, price_country: str | None = No
 
 
 def _offered(result) -> list[str]:
-    """The providers the price provider page lists."""
-    field = next(value for key, value in result["data_schema"].schema.items() if str(key) == "price_providers")
-    return list(field.config["options"])
+    """The providers the price provider page lists, section by section."""
+    return [provider_of(value) for value in _listed(result)]
+
+
+def _listed(result) -> list[str]:
+    """The values of the price provider page: the provider names, marked where the country has not confirmed them."""
+    return [value for part in result["data_schema"].schema.values() for field in part.schema.schema.values() for value in field.config["options"]]
+
+
+def _sections(result) -> dict[str, list[str]]:
+    return {str(key): list(next(iter(part.schema.schema.values())).config["options"]) for key, part in result["data_schema"].schema.items()}
 
 async def _first_page(hass: HomeAssistant):
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
@@ -46,6 +60,8 @@ async def _first_page(hass: HomeAssistant):
 
 
 def _defaults(result) -> dict:
+    if result["step_id"] == "price_provider":  # what is ticked, over both sections
+        return {"price_providers": [provider_of(value) for part in form_defaults(result).values() for value in part["providers"]]}
     return {str(key): key.default() for key in result["data_schema"].schema if hasattr(key, "default") and callable(key.default)}
 
 
@@ -64,7 +80,7 @@ async def test_a_new_entry_outside_denmark_starts_with_energy_price_forecast_and
     assert result["step_id"] == "price_provider"
     assert "price_country" not in {str(key) for key in result["data_schema"].schema}  # the country is not asked here any more
     assert _defaults(result) == {"price_providers": ["energypriceforecast"]}
-    assert _offered(result) == ["energidataservice", "energypriceforecast", "spotforecast", "epexspot", "gespot", "nordpool"]
+    assert _offered(result) == ["energidataservice", "energypriceforecast", "spotforecast", "nordpool", "epexspot", "gespot"]
     # the page says which providers the country does not have
     assert result["description_placeholders"]["country"] == "DE"
     assert result["description_placeholders"]["unavailable"] == "Strømligning, Elprisprognos, Wattcast, Octopus Energy"
@@ -83,8 +99,8 @@ async def test_stromligning_is_not_offered_outside_denmark_and_energi_data_servi
     flow = hass.config_entries.flow
     assert "stromligning" not in _offered(result)
     with pytest.raises(InvalidData):  # the page only takes what it lists
-        await flow.async_configure(result["flow_id"], {"price_providers": ["stromligning"]})
-    accepted = await flow.async_configure(result["flow_id"], {"price_providers": ["energidataservice"]})
+        await flow.async_configure(result["flow_id"], providers_input("stromligning"))
+    accepted = await flow.async_configure(result["flow_id"], providers_input("energidataservice"))
     assert accepted["step_id"] == "prices_energidataservice"
     result = await _to_price_provider(hass, price_country="GB")
     assert "energidataservice" not in _offered(result) and "octopus" in _offered(result)
@@ -125,7 +141,7 @@ async def test_the_options_menu_accepts_an_existing_danish_setup_in_a_foreign_ho
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_prices"})
     assert result["step_id"] == "price_provider"
     assert "stromligning" in _offered(result)  # Denmark, not Germany
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {"price_providers": ["stromligning", "energidataservice"]})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], providers_input("stromligning", "energidataservice"))
     assert not result.get("errors") and result["step_id"].startswith("prices_"), result
 
 
@@ -180,8 +196,6 @@ async def test_saving_the_general_page_without_a_country_change_does_not_lead_to
 async def test_saving_the_general_page_in_a_new_country_ends_with_the_country_stored_and_the_provider_of_the_old_one_cleared(hass: HomeAssistant, loaded_entry) -> None:
     from homeassistant.data_entry_flow import FlowResultType
 
-    from .conftest import form_defaults
-
     hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "price_country": "DK", "stromligning_buy_current_price": "sensor.stromligning_price"})
     await hass.async_block_till_done(wait_background_tasks=True)
     options = hass.config_entries.options
@@ -189,8 +203,64 @@ async def test_saving_the_general_page_in_a_new_country_ends_with_the_country_st
     result = await options.async_configure(result["flow_id"], {"next_step_id": "menu_general"})
     result = await options.async_configure(result["flow_id"], {"language": loaded_entry.options["language"], "price_country": "DE"})
     assert result["step_id"] == "price_provider"
-    result = await options.async_configure(result["flow_id"], {"price_providers": ["energidataservice"]})
+    result = await options.async_configure(result["flow_id"], providers_input("energidataservice"))
     while result["type"] is FlowResultType.FORM:
         result = await options.async_configure(result["flow_id"], form_defaults(result))
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["price_country"] == "DE" and result["data"]["stromligning_buy_current_price"] == ""
+
+
+async def test_the_providers_are_in_two_sections_and_the_unconfirmed_ones_are_marked(hass: HomeAssistant) -> None:
+    result = await _to_price_provider(hass, price_country="DK")
+    assert _sections(result) == {
+        "with_forecast": ["stromligning", "energidataservice", "energypriceforecast_unconfirmed"],
+        "prices_only": ["nordpool_unconfirmed", "epexspot_unconfirmed", "gespot_unconfirmed"],
+    }
+    # the order the prices are taken in, only with the providers the country has
+    assert result["description_placeholders"]["priority"] == "Strømligning → Energi Data Service → Nord Pool → EPEX Spot → GE-Spot → Energy Price Forecast"
+    # a provider is confirmed per country: Energi Data Service is not in Sweden
+    abroad = await _to_price_provider(hass, price_country="SE")
+    assert "energidataservice_unconfirmed" in _sections(abroad)["with_forecast"]
+    assert "energidataservice" not in _sections(abroad)["with_forecast"]
+
+
+async def test_the_form_sent_to_the_browser_has_both_sections_open(hass: HomeAssistant) -> None:
+    result = await _to_price_provider(hass, price_country="DK")
+    form = probatio.to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
+    assert [(field["name"], field["type"], field["expanded"]) for field in form] == [("with_forecast", "expandable", True), ("prices_only", "expandable", True)]
+    inner = form[0]["schema"][0]
+    assert inner["name"] == "providers" and inner["default"] == ["energidataservice"]
+    assert inner["selector"]["select"]["translation_key"] == "price_providers"
+    assert inner["selector"]["select"]["options"] == ["stromligning", "energidataservice", "energypriceforecast_unconfirmed"]
+
+
+async def test_a_marked_choice_is_taken_as_the_provider_and_stays_ticked_when_the_page_returns(hass: HomeAssistant) -> None:
+    flow = hass.config_entries.flow
+    result = await _to_price_provider(hass, price_country="DK")
+    # published prices alone have no forecast: the page returns with the marked choice still ticked
+    refused = await flow.async_configure(result["flow_id"], {"with_forecast": {"providers": []}, "prices_only": {"providers": ["nordpool_unconfirmed"]}})
+    assert refused["errors"] == {"base": "price_provider_no_forecast"} and form_defaults(refused)["prices_only"] == {"providers": ["nordpool_unconfirmed"]}
+    accepted = await flow.async_configure(refused["flow_id"], {"with_forecast": {"providers": ["energypriceforecast_unconfirmed"]}, "prices_only": {"providers": []}})
+    assert accepted["step_id"] == "prices_energypriceforecast"
+
+
+def test_every_language_names_both_sections_and_every_provider_with_and_without_the_mark() -> None:
+    import json
+    import pathlib
+
+    from custom_components.cable_juice_planner.flow.schema import PRICE_PROVIDERS
+
+    package = pathlib.Path(__file__).parents[1] / "custom_components" / "cable_juice_planner"
+    for path in [package / "strings.json", *(package / "translations").glob("*.json")]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        labels = data["selector"]["price_providers"]["options"]
+        assert set(labels) == {*PRICE_PROVIDERS, *(f"{name}_unconfirmed" for name in PRICE_PROVIDERS)}, path.name
+        for name in PRICE_PROVIDERS:
+            assert labels[f"{name}_unconfirmed"] == f"🧪 {labels[name]}", (path.name, name)
+        for flow in ("config", "options"):
+            page = data[flow]["step"]["price_provider"]
+            assert set(re.findall(r"\{(\w+)\}", page["description"])) == {"priority", "country", "unavailable"}, (path.name, flow)
+            assert "🧪" in page["description"], (path.name, flow)
+            assert set(page["sections"]) == {"with_forecast", "prices_only"}, (path.name, flow)
+            for part in page["sections"].values():
+                assert part["name"] and part["description"] and part["data"]["providers"], (path.name, flow)

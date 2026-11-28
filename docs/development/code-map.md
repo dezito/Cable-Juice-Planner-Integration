@@ -35,6 +35,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── spot_rows.py                     Pure row parsers of the three (the same file in both repositories)
 │   ├── publishedprices.py               EPEX Spot, GE-Spot, Octopus Energy, Nord Pool: the user's own published prices, no forecast
 │   ├── published_rows.py                Pure row parsers of the first three (the same file in both repositories)
+│   ├── verification.py                  The self test of each price provider on its own prices (the same file in both repositories)
 │   └── chart_rows.py                    The prices of the plan per price period for the price chart of every provider (the same file in both repositories)
 ├── management/                          Storage, backups, dashboard, and blueprint setup
 │   └── voltage_issue.py                 Fixable repair for a grid voltage still at the old 240 V default (sets 230 V)

@@ -20,7 +20,7 @@ from .energypriceforecast import EnergyPriceForecastPriceProvider
 from .publishedprices import EpexSpotPriceProvider, GeSpotPriceProvider, NordpoolPriceProvider, OctopusPriceProvider
 from .spotprices import ElprognosPriceProvider, SpotForecastPriceProvider, WattcastPriceProvider
 from .dashboard import price_dashboard_entities
-from .availability import DEFAULT_COUNTRY, default_providers, provider_errors, providers_for_country
+from .availability import DEFAULT_COUNTRY, default_providers, provider_errors, provider_sections, providers_for_country, unconfirmed_providers
 from .factory import create_price_provider, providers_from_options
 from .stromligning import (
     STROMLIGNING_PLATFORM,
@@ -56,7 +56,7 @@ __all__ = [
     "price_dashboard_entities",
     "price_sensor_errors",
     "provider_errors",
-    "providers_for_country",
+    "providers_for_country", "unconfirmed_providers", "provider_sections",
     "providers_from_options",
     "stromligning_entities_to_watch",
     "stromligning_problems",

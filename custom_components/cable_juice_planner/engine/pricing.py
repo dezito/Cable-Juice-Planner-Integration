@@ -43,6 +43,25 @@ class Pricing:
             # the prices of the plan (real and forecast) for the price chart of the dashboard, after every price update, also one that failed: the
             # chart shows what the plan has now (the cached or offline prices, or none), never the rows of an earlier update
             self.set_attr("current_charging_rule", "price_chart", self.price_chart_rows())
+            self.set_attr("current_charging_rule", "price_check", self.price_check())
+
+    def price_check(self) -> dict:
+        """The self test of the price providers (attribute price_check, prices/verification.py). It only reports: no price and
+        no plan depends on it, and a test that can't run gives no result, never a passed one."""
+        try:
+            # the moment the prices were read, not now: the price snapshot is renewed at most once an hour, so a later job can
+            # still hold older prices, and a price published since then would be called missing
+            now = self.price_provider.last_update
+            if now is None:
+                return {}
+            return {
+                "country": self.price_provider.country,
+                "checked": now.replace(tzinfo=self.price_provider.tz).isoformat(timespec="minutes"),
+                "providers": self.price_provider.check_providers(now, self.price_provider.tz),
+            }
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("The self test of the price providers failed: %s %s", err, type(err))
+            return {}
 
     def get_hour_prices(self, update_prices=False, sell_prices=False) -> dict:
         """Prices per period. Without online prices, offline prices from the price history."""

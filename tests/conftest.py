@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from homeassistant.data_entry_flow import section
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -125,13 +126,26 @@ def set_source_states(
 
 def form_defaults(result) -> dict[str, Any]:
     """The values a user submits by just pressing the button (defaults + suggested values)."""
+    return _schema_defaults(result["data_schema"])
+
+
+def _schema_defaults(schema) -> dict[str, Any]:
     values = {}
-    for key in result["data_schema"].schema:
-        if (suggested := (key.description or {}).get("suggested_value")) not in (None, ""):
+    for key, field in schema.schema.items():
+        if isinstance(field, section):
+            values[str(key)] = _schema_defaults(field.schema)
+        elif (suggested := (key.description or {}).get("suggested_value")) not in (None, ""):
             values[str(key)] = suggested
         elif callable(key.default):
             values[str(key)] = key.default()
     return values
+
+
+def providers_input(*names: str) -> dict[str, Any]:
+    """What the price provider page sends for these providers: each one in its section."""
+    from custom_components.cable_juice_planner.prices import provider_sections
+
+    return {part: {"providers": picked} for part, picked in provider_sections(list(names)).items()}
 
 
 async def async_advance(hass: HomeAssistant, seconds: float) -> None:

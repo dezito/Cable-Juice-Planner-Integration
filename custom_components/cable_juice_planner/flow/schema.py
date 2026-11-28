@@ -34,6 +34,29 @@ PRICE_PROVIDER_NAMES = {
     "octopus": "Octopus Energy",
     "nordpool": "Nord Pool",
 }
+# a provider not confirmed in the country is listed under this value, translated as its name with 🧪
+UNCONFIRMED_SUFFIX = "_unconfirmed"
+
+
+def provider_of(value: str) -> str:
+    """The provider name of a value of the price provider list."""
+    return value.removesuffix(UNCONFIRMED_SUFFIX)
+
+
+class ProviderSelector(selector.SelectSelector):
+    """The list of price providers: a value is the provider name, with UNCONFIRMED_SUFFIX where the country has not confirmed it.
+
+    The frontend takes the label of a choice from the translation of its value, in the user's own language, and the same
+    provider can be confirmed in one country and not in another. A plain provider name is accepted too and becomes the
+    listed value; only provider_of() of a value is stored."""
+
+    def __call__(self, data: Any) -> Any:
+        listed = {provider_of(value): value for value in self.config["options"]}
+        if isinstance(data, list):
+            data = [listed.get(value, value) if isinstance(value, str) else value for value in data]
+        return super().__call__(data)
+
+
 # the providers of wholesale prices: the VAT and the surcharge on the fee page are for them
 SPOT_PRICE_PROVIDERS = ("spotforecast", "elprognos", "wattcast")
 ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
